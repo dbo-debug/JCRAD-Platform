@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { Suspense, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 
 const THIRTY_DAYS_SECONDS = 60 * 60 * 24 * 30;
@@ -13,7 +13,7 @@ function safeInternalPath(value: string | null): string {
   return candidate;
 }
 
-export default function AgeGatePage() {
+function AgeGateContent() {
   const searchParams = useSearchParams();
   const returnTo = useMemo(() => safeInternalPath(searchParams.get("returnTo")), [searchParams]);
 
@@ -60,5 +60,13 @@ export default function AgeGatePage() {
         </section>
       </div>
     </main>
+  );
+}
+
+export default function AgeGatePage() {
+  return (
+    <Suspense fallback={null}>
+      <AgeGateContent />
+    </Suspense>
   );
 }

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import Hero from "@/components/Hero";
 import Card from "@/components/ui/Card";
 import PatternAccent from "@/components/marketing/PatternAccent";
@@ -31,7 +32,9 @@ export default function ContactPage() {
 
       <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
         <div className="space-y-4">
-          <ContactForm />
+          <Suspense fallback={null}>
+            <ContactForm />
+          </Suspense>
 
           <Card className="border border-[#dbe9ef] bg-[#f9fcfd] p-5 text-[#234353]">
             <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-[#0f766e]">Response expectation</h3>
