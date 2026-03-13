@@ -86,19 +86,32 @@ function looksLikeBucketPath(value: string): boolean {
   return !!left && !!right && !left.includes("/");
 }
 
-function resolveStoragePublicUrl(supabase: ReturnType<typeof createAdminClient>, bucket: string, path: string): string | null {
+const PUBLIC_STORAGE_BUCKETS = new Set(["catalog-public"]);
+
+async function resolveStorageUrl(
+  supabase: ReturnType<typeof createAdminClient>,
+  bucket: string,
+  path: string
+): Promise<string | null> {
   const cleanBucket = String(bucket || "").trim();
   const cleanPath = String(path || "").trim().replace(/^\/+/, "");
   if (!cleanBucket || !cleanPath) return null;
-  const { data } = supabase.storage.from(cleanBucket).getPublicUrl(cleanPath);
-  return String(data?.publicUrl || "").trim() || null;
+
+  if (PUBLIC_STORAGE_BUCKETS.has(cleanBucket)) {
+    const { data } = supabase.storage.from(cleanBucket).getPublicUrl(cleanPath);
+    return String(data?.publicUrl || "").trim() || null;
+  }
+
+  const { data, error } = await supabase.storage.from(cleanBucket).createSignedUrl(cleanPath, 60 * 60 * 24);
+  if (error) return null;
+  return String(data?.signedUrl || "").trim() || null;
 }
 
-function resolveMaybeStorageUrl(
+async function resolveMaybeStorageUrl(
   supabase: ReturnType<typeof createAdminClient>,
   raw: string | null | undefined,
   defaultBucket: string
-): string | null {
+): Promise<string | null> {
   const value = String(raw || "").trim();
   if (!value) return null;
   if (isHttpUrl(value) || isPathUrl(value)) return value;
@@ -107,10 +120,10 @@ function resolveMaybeStorageUrl(
     const [bucketRaw, ...rest] = value.split(":");
     const bucket = String(bucketRaw || "").trim();
     const path = rest.join(":").trim();
-    return resolveStoragePublicUrl(supabase, bucket, path);
+    return resolveStorageUrl(supabase, bucket, path);
   }
 
-  return resolveStoragePublicUrl(supabase, defaultBucket, value);
+  return resolveStorageUrl(supabase, defaultBucket, value);
 }
 
 function includesToken(haystack: string, needle: string): boolean {
@@ -348,7 +361,7 @@ export default async function MenuPage() {
       const bucket = String((row as any).bucket || "catalog-public");
       const objectPath = String((row as any).object_path || "");
       if (!objectPath) continue;
-      const publicUrl = resolveStoragePublicUrl(supabase, bucket, objectPath);
+      const publicUrl = await resolveStorageUrl(supabase, bucket, objectPath);
       if (!publicUrl) continue;
       firstByVariant.set(variantId, publicUrl);
     }
@@ -451,15 +464,15 @@ export default async function MenuPage() {
         internalInfusionProducts={internalInfusionProducts}
         externalLiquidProducts={externalLiquidProducts}
         externalDryProducts={externalDryProducts}
-        initialOffers={offers.map((o: any, index: number) => {
+        initialOffers={await Promise.all(offers.map(async (o: any, index: number) => {
           const productId = String(o.product_id || o.products?.id || "");
           const catalogItem = catalogItemByProductId.get(productId);
           const thumbnailRaw = String(catalogItem?.thumbnail_url || "").trim() || null;
-          const thumbnailResolved = resolveMaybeStorageUrl(supabase, thumbnailRaw, "catalog-public");
+          const thumbnailResolved = await resolveMaybeStorageUrl(supabase, thumbnailRaw, "catalog-public");
           const mediaFallback = mediaByProduct[productId] || null;
           const imageUrl = thumbnailResolved || mediaFallback || "/brand/BLACK.png";
           const videoRaw = String(catalogItem?.video_url || "").trim() || null;
-          const videoResolved = resolveMaybeStorageUrl(supabase, videoRaw, "catalog-public");
+          const videoResolved = await resolveMaybeStorageUrl(supabase, videoRaw, "catalog-public");
 
           if (process.env.NODE_ENV !== "production" && index < 10) {
             console.log("[menu:image-map]", {
@@ -477,7 +490,7 @@ export default async function MenuPage() {
             image_url: imageUrl,
             video_url: videoResolved,
           };
-        })}
+        }))}
       />
     </>
   );

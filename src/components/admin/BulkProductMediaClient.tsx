@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, type ChangeEvent } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 type MediaValues = {
   thumbnail_url: string | null;
@@ -23,13 +24,73 @@ type BulkProductMediaClientProps = {
 
 const IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "heic"]);
 const IMAGE_MIME_TYPES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp", "image/heic"]);
-const VIDEO_EXTENSIONS = new Set(["mp4", "mov"]);
-const VIDEO_MIME_TYPES = new Set(["video/mp4", "video/quicktime"]);
+const VIDEO_EXTENSIONS = new Set(["mp4", "mov", "webm"]);
+const VIDEO_MIME_TYPES = new Set(["video/mp4", "video/quicktime", "video/webm"]);
+const PUBLIC_STORAGE_BUCKETS = new Set(["catalog-public"]);
+const PRODUCT_MEDIA_BUCKET = "catalog-public";
 const MAX_VIDEO_BYTES = 50 * 1024 * 1024;
 const MAX_VIDEO_DURATION_SECONDS = 30;
 
 function fileExtension(file: File): string {
   return String(file.name || "").split(".").pop()?.trim().toLowerCase() || "";
+}
+
+function sanitizeFileName(fileName: string): string {
+  const trimmed = String(fileName || "").trim().toLowerCase();
+  const parts = trimmed.split(".");
+  const ext = parts.length > 1 ? parts.pop() || "" : "";
+  const stem = parts.join(".") || "video";
+  const cleanStem = stem.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80) || "video";
+  const cleanExt = ext.replace(/[^a-z0-9]+/g, "").slice(0, 10);
+  return cleanExt ? `${cleanStem}.${cleanExt}` : cleanStem;
+}
+
+function toStorageReference(bucket: string, objectPath: string): string {
+  return `${bucket}:${objectPath}`;
+}
+
+async function resolveStorageDisplayUrl(
+  supabase: ReturnType<typeof createClient>,
+  bucket: string,
+  objectPath: string
+): Promise<{ displayUrl: string; storedUrl: string }> {
+  const cleanBucket = String(bucket || "").trim();
+  const cleanPath = String(objectPath || "").trim().replace(/^\/+/, "");
+  if (!cleanBucket || !cleanPath) {
+    throw new Error("Missing storage location for uploaded video.");
+  }
+
+  if (PUBLIC_STORAGE_BUCKETS.has(cleanBucket)) {
+    const { data } = supabase.storage.from(cleanBucket).getPublicUrl(cleanPath);
+    const publicUrl = String(data?.publicUrl || "").trim();
+    if (!publicUrl) {
+      throw new Error("Uploaded video is missing a public URL.");
+    }
+    return { displayUrl: publicUrl, storedUrl: publicUrl };
+  }
+
+  const { data, error } = await supabase.storage.from(cleanBucket).createSignedUrl(cleanPath, 60 * 60 * 24);
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const signedUrl = String(data?.signedUrl || "").trim();
+  if (!signedUrl) {
+    throw new Error("Failed to create a signed video URL.");
+  }
+
+  return {
+    displayUrl: signedUrl,
+    storedUrl: toStorageReference(cleanBucket, cleanPath),
+  };
+}
+
+function isMissingColumnError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error || "");
+  const details = typeof error === "object" && error !== null && "code" in error ? String((error as { code?: string }).code || "") : "";
+  const lower = message.toLowerCase();
+  const code = details.toUpperCase();
+  return code === "42703" || code === "PGRST204" || (lower.includes("column") && lower.includes("does not exist"));
 }
 
 function validateSelection(kind: MediaKind, file: File): string | null {
@@ -42,7 +103,7 @@ function validateSelection(kind: MediaKind, file: File): string | null {
   }
   if (kind === "video") {
     if (VIDEO_EXTENSIONS.has(ext) || VIDEO_MIME_TYPES.has(mime)) return null;
-    return "Video must be mp4 or mov.";
+    return "Video must be mp4, mov, or webm.";
   }
   if (ext === "pdf" || mime === "application/pdf") return null;
   return "COA must be a PDF.";
@@ -78,6 +139,7 @@ async function readVideoDurationSeconds(file: File): Promise<number> {
 }
 
 export default function BulkProductMediaClient({ catalogItemId, initialMedia }: BulkProductMediaClientProps) {
+  const supabase = useMemo(() => createClient(), []);
   const [media, setMedia] = useState<MediaValues>(initialMedia);
   const [uploading, setUploading] = useState<Record<MediaKind, boolean>>({
     thumbnail: false,
@@ -100,6 +162,62 @@ export default function BulkProductMediaClient({ catalogItemId, initialMedia }: 
     [media.thumbnail_url]
   );
 
+  async function uploadVideoDirect(file: File) {
+    const ext = fileExtension(file);
+    const sanitizedFileName = sanitizeFileName(file.name || `phone-video.${ext || "mp4"}`);
+    const objectPath = `products/${catalogItemId}/phone-video/${Date.now()}-${sanitizedFileName}`;
+    const contentType = String(file.type || "").trim() || "application/octet-stream";
+
+    const { error: uploadError } = await supabase.storage.from(PRODUCT_MEDIA_BUCKET).upload(objectPath, file, {
+      cacheControl: "3600",
+      contentType,
+      upsert: false,
+    });
+    if (uploadError) {
+      throw new Error(uploadError.message || "Video upload failed.");
+    }
+
+    const { displayUrl, storedUrl } = await resolveStorageDisplayUrl(supabase, PRODUCT_MEDIA_BUCKET, objectPath);
+
+    const fullUpdate = await supabase
+      .from("catalog_items")
+      .update({
+        video_url: storedUrl,
+        video_bucket: PRODUCT_MEDIA_BUCKET,
+        video_object_path: objectPath,
+      })
+      .eq("id", catalogItemId)
+      .select("id")
+      .maybeSingle();
+
+    if (fullUpdate.error) {
+      if (!isMissingColumnError(fullUpdate.error)) {
+        throw new Error(fullUpdate.error.message);
+      }
+
+      const fallback = await supabase
+        .from("catalog_items")
+        .update({ video_url: storedUrl })
+        .eq("id", catalogItemId)
+        .select("id")
+        .maybeSingle();
+      if (fallback.error) {
+        throw new Error(fallback.error.message);
+      }
+      if (!fallback.data) {
+        throw new Error("Catalog item not found.");
+      }
+    } else if (!fullUpdate.data) {
+      throw new Error("Catalog item not found.");
+    }
+
+    return {
+      bucket: PRODUCT_MEDIA_BUCKET,
+      objectPath,
+      url: displayUrl,
+    };
+  }
+
   async function upload(kind: MediaKind, file: File, input: HTMLInputElement) {
     setUploading((prev) => ({ ...prev, [kind]: true }));
     setErrors((prev) => ({ ...prev, [kind]: "" }));
@@ -116,6 +234,16 @@ export default function BulkProductMediaClient({ catalogItemId, initialMedia }: 
         if (durationSeconds > MAX_VIDEO_DURATION_SECONDS) {
           throw new Error("Video must be 30 seconds or shorter.");
         }
+
+        const result = await uploadVideoDirect(file);
+        setMedia((prev) => ({
+          ...prev,
+          video_url: result.url,
+          video_bucket: result.bucket,
+          video_object_path: result.objectPath,
+        }));
+        setSaved((prev) => ({ ...prev, video: successLabel("video") }));
+        return;
       }
 
       const form = new FormData();
@@ -143,14 +271,6 @@ export default function BulkProductMediaClient({ catalogItemId, initialMedia }: 
             thumbnail_object_path: objectPath,
           };
         }
-        if (kind === "video") {
-          return {
-            ...prev,
-            video_url: url,
-            video_bucket: bucket,
-            video_object_path: objectPath,
-          };
-        }
         return {
           ...prev,
           coa_url: url,
@@ -160,8 +280,9 @@ export default function BulkProductMediaClient({ catalogItemId, initialMedia }: 
       });
 
       setSaved((prev) => ({ ...prev, [kind]: successLabel(kind) }));
-    } catch (err: any) {
-      setErrors((prev) => ({ ...prev, [kind]: String(err?.message || "Upload failed") }));
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Upload failed";
+      setErrors((prev) => ({ ...prev, [kind]: message }));
     } finally {
       input.value = "";
       setUploading((prev) => ({ ...prev, [kind]: false }));
@@ -214,7 +335,7 @@ export default function BulkProductMediaClient({ catalogItemId, initialMedia }: 
         )}
         <input
           type="file"
-          accept=".mp4,.mov,video/mp4,video/quicktime"
+          accept=".mp4,.mov,.webm,video/mp4,video/quicktime,video/webm"
           onChange={(event) => onSelect("video", event)}
           disabled={uploading.video}
           className="rounded border border-[#cfdde5] bg-white px-3 py-2 text-sm text-[#173543]"
