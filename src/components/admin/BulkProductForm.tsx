@@ -18,6 +18,15 @@ type ConcentrateType =
   | "Badder"
   | "Rosin";
 type VapeMedium = (typeof LIQUID_INFUSION_MEDIA)[number];
+type ProductBundleResponse = {
+  error?: string;
+  catalog_item?: { id?: string | null } | null;
+  product?: { id?: string | null } | null;
+};
+
+type OfferStatusResponse = {
+  error?: string;
+};
 
 export type BulkProductFormValues = {
   catalog_item_id?: string | null;
@@ -127,8 +136,10 @@ export default function BulkProductForm({
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  async function onSubmit(e: React.FormEvent) {
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    const submitData = new FormData(e.currentTarget);
+    const addAnother = submitData.get("addAnother") === "true";
     setBusy(true);
     setError("");
     setSuccess("");
@@ -222,15 +233,13 @@ export default function BulkProductForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const json = await res.json().catch(() => ({}));
+      const json: ProductBundleResponse = await res.json().catch(() => ({}));
       if (!res.ok) {
         throw new Error(String(json?.error || `Save failed (${res.status})`));
       }
 
-      const nextCatalogItemId = String(
-        (json as any)?.catalog_item?.id || form.catalog_item_id || ""
-      );
-      const nextProductId = String((json as any)?.product?.id || form.product_id || "");
+      const nextCatalogItemId = String(json.catalog_item?.id || form.catalog_item_id || "");
+      const nextProductId = String(json.product?.id || form.product_id || "");
 
       if (nextProductId) {
         const statusRes = await fetch("/api/admin/offers/set-status", {
@@ -238,7 +247,7 @@ export default function BulkProductForm({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ product_id: nextProductId, status: form.offer_status }),
         });
-        const statusJson = await statusRes.json().catch(() => ({}));
+        const statusJson: OfferStatusResponse = await statusRes.json().catch(() => ({}));
         if (!statusRes.ok) {
           throw new Error(String(statusJson?.error || `Offer status update failed (${statusRes.status})`));
         }
@@ -252,14 +261,14 @@ export default function BulkProductForm({
       }));
 
       if (mode === "new" && nextCatalogItemId) {
-        router.push("/admin/catalog/bulk");
+        router.push(addAnother ? "/admin/catalog/bulk/new" : "/admin/catalog/bulk");
         return;
       }
 
       setSuccess("Saved successfully.");
       router.refresh();
-    } catch (err: any) {
-      setError(err?.message || "Save failed");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Save failed");
     } finally {
       setBusy(false);
     }
@@ -511,13 +520,26 @@ export default function BulkProductForm({
       {error ? <p className="text-sm text-[#991b1b]">{error}</p> : null}
       {success ? <p className="text-sm text-[#0f766e]">{success}</p> : null}
 
-      <button
-        type="submit"
-        disabled={busy}
-        className="rounded bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95 disabled:opacity-60"
-      >
-        {busy ? "Saving..." : mode === "new" ? "Create Product" : "Save Changes"}
-      </button>
+      <div className="flex flex-wrap gap-3">
+        <button
+          type="submit"
+          disabled={busy}
+          className="rounded bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95 disabled:opacity-60"
+        >
+          {busy ? "Saving..." : mode === "new" ? "Create Product" : "Save Changes"}
+        </button>
+        {mode === "new" ? (
+          <button
+            type="submit"
+            name="addAnother"
+            value="true"
+            disabled={busy}
+            className="rounded border border-[#9ccfc8] bg-white px-4 py-2 text-sm font-semibold text-[#0f766e] transition hover:bg-[#f6fbfd] disabled:opacity-60"
+          >
+            {busy ? "Saving..." : "Create & Add Another"}
+          </button>
+        ) : null}
+      </div>
     </form>
   );
 }
