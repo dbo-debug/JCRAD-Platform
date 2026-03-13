@@ -136,8 +136,20 @@ function normalizeCategory(value: unknown): MenuCategory | "" {
   return "";
 }
 
+function normalizePackagingType(value: unknown): string {
+  return String(value || "").trim().toLowerCase().replace(/-/g, "_");
+}
+
 function packagingCategoryForSku(sku: PackagingSku): MenuCategory | "" {
-  return normalizeCategory(sku.applies_to || sku.category);
+  const explicit = normalizeCategory(sku.applies_to || sku.category);
+  if (explicit) return explicit;
+
+  const packagingType = normalizePackagingType(sku.packaging_type);
+  if (packagingType === "pre_roll_tube" || packagingType === "pre_roll_jar" || packagingType === "pre_roll_pack") {
+    return "pre_roll";
+  }
+
+  return "";
 }
 
 function normalizeWhitespace(value: string): string {

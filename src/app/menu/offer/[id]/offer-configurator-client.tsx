@@ -30,6 +30,22 @@ function normalizeSkuCategory(value: unknown): PackagingCategory | "" {
   return "";
 }
 
+function normalizePackagingType(value: unknown): string {
+  return String(value || "").trim().toLowerCase().replace(/-/g, "_");
+}
+
+function packagingCategoryForSku(row: { applies_to?: unknown; category?: unknown; packaging_type?: unknown }): PackagingCategory | "" {
+  const explicit = normalizeSkuCategory(row.applies_to || row.category);
+  if (explicit) return explicit;
+
+  const packagingType = normalizePackagingType(row.packaging_type);
+  if (packagingType === "pre_roll_tube" || packagingType === "pre_roll_jar" || packagingType === "pre_roll_pack") {
+    return "pre_roll";
+  }
+
+  return "";
+}
+
 export default function OfferConfiguratorClient({
   offer,
   packagingSkus,
@@ -83,7 +99,7 @@ export default function OfferConfiguratorClient({
 
   const filteredSkus = useMemo(() => {
     return packagingSkus.filter((s) => {
-      const skuCategory = normalizeSkuCategory(s.applies_to || s.category);
+      const skuCategory = packagingCategoryForSku(s);
 
       if (isPreRollMode) {
         if (skuCategory && skuCategory !== "pre_roll") return false;

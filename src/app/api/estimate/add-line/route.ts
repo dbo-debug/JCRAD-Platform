@@ -137,6 +137,28 @@ function isWholePositiveInteger(n: number): boolean {
   return Number.isFinite(n) && n > 0 && Math.abs(n - Math.round(n)) < 1e-9;
 }
 
+function normalizePackagingCategory(value: unknown): "flower" | "concentrate" | "vape" | "pre_roll" | "" {
+  const raw = String(value || "").trim().toLowerCase().replace(/-/g, "_");
+  if (raw === "flower" || raw === "concentrate" || raw === "vape" || raw === "pre_roll") return raw;
+  return "";
+}
+
+function normalizePackagingType(value: unknown): string {
+  return String(value || "").trim().toLowerCase().replace(/-/g, "_");
+}
+
+function packagingCategoryForSku(row: { category?: unknown; applies_to?: unknown; packaging_type?: unknown }) {
+  const explicit = normalizePackagingCategory(row.applies_to || row.category);
+  if (explicit) return explicit;
+
+  const packagingType = normalizePackagingType(row.packaging_type);
+  if (packagingType === "pre_roll_tube" || packagingType === "pre_roll_jar" || packagingType === "pre_roll_pack") {
+    return "pre_roll" as const;
+  }
+
+  return "";
+}
+
 type InfusionType = "none" | "internal" | "external";
 
 function normalizeInfusionType(value: unknown): InfusionType {
@@ -1426,7 +1448,9 @@ export async function POST(req: Request) {
           return respond({ error: skuErr?.message || "Packaging SKU not found" }, { status: 404 });
         }
 
-        const skuCategory = String((sku as any).category || (sku as any).applies_to || "").toLowerCase();
+        const skuCategory = packagingCategoryForSku(
+          sku as { category?: unknown; applies_to?: unknown; packaging_type?: unknown }
+        );
         if (isPreRoll) {
           if (skuCategory && skuCategory !== "pre_roll") {
             return respond({ error: "Pre-roll lines require pre_roll packaging SKUs" }, { status: 400 });

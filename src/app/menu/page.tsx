@@ -53,6 +53,12 @@ type InfusionProductOption = {
   category: "concentrate" | "vape";
 };
 
+type LiveInfusionSourceRow = {
+  id: string;
+  name: string;
+  category: "concentrate" | "vape";
+};
+
 function parseYieldPct(valueJson: unknown, fallback: number): number {
   const obj = (valueJson && typeof valueJson === "object" ? valueJson : {}) as Record<string, unknown>;
   const raw = Number(obj.pct);
@@ -128,6 +134,35 @@ async function resolveMaybeStorageUrl(
 
 function includesToken(haystack: string, needle: string): boolean {
   return haystack.toLowerCase().includes(needle.toLowerCase());
+}
+
+function buildLiveInfusionSources(args: {
+  catalogRows: CatalogItemRow[];
+  publishedByProductId: Map<string, OfferRow>;
+}): LiveInfusionSourceRow[] {
+  const byId = new Map<string, LiveInfusionSourceRow>();
+
+  for (const row of args.catalogRows) {
+    const productId = String(row.product_id || "").trim();
+    if (!productId || !args.publishedByProductId.has(productId)) continue;
+
+    const product = row.products;
+    const sourceId = String(product?.id || "").trim();
+    const sourceName = String(product?.name || "").trim();
+    const sourceCategory = String(product?.category || "").trim().toLowerCase();
+
+    if (!sourceId || !sourceName) continue;
+    if (sourceCategory !== "concentrate" && sourceCategory !== "vape") continue;
+    if (byId.has(sourceId)) continue;
+
+    byId.set(sourceId, {
+      id: sourceId,
+      name: sourceName,
+      category: sourceCategory as "concentrate" | "vape",
+    });
+  }
+
+  return Array.from(byId.values()).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export default async function MenuPage() {
@@ -209,32 +244,15 @@ export default async function MenuPage() {
     externalDistillatePer1g: parseNumberSetting(yieldsByKey.get("external_infusion_distillate_g_per_unit_1g"), 0.1),
     externalKiefPer1g: parseNumberSetting(yieldsByKey.get("external_infusion_kief_g_per_unit_1g"), 0.15),
   };
-  const { data: infusionProductsRows } = await supabase
-    .from("products")
-    .select("id, name, category")
-    .in("category", ["concentrate", "vape"]);
-  const infusionProducts = ((infusionProductsRows || []) as Array<{ id: string; name: string | null; category: string | null }>)
-    .map((row) => ({
-      id: String(row.id || ""),
-      name: String(row.name || "").trim(),
-      category: String(row.category || "").toLowerCase() as "concentrate" | "vape",
-    }))
-    .filter((row) => row.id && row.name && (row.category === "concentrate" || row.category === "vape"));
   const internalEligibleNames = Object.entries(INFUSION_ELIGIBILITY)
     .filter(([, flags]) => flags.internal)
     .map(([name]) => name);
   const externalDryNames = Object.entries(INFUSION_ELIGIBILITY)
     .filter(([, flags]) => flags.external)
     .map(([name]) => name);
-  const internalInfusionProducts: InfusionProductOption[] = infusionProducts
-    .filter((row) => row.category === "concentrate")
-    .filter((row) => internalEligibleNames.some((name) => includesToken(row.name, name)));
-  const externalDryProducts: InfusionProductOption[] = infusionProducts
-    .filter((row) => row.category === "concentrate")
-    .filter((row) => externalDryNames.some((name) => includesToken(row.name, name)));
-  const externalLiquidProducts: InfusionProductOption[] = infusionProducts
-    .filter((row) => row.category === "vape")
-    .filter((row) => LIQUID_INFUSION_MEDIA.some((name) => includesToken(row.name, name)));
+  let internalInfusionProducts: InfusionProductOption[] = [];
+  let externalDryProducts: InfusionProductOption[] = [];
+  let externalLiquidProducts: InfusionProductOption[] = [];
 
   if (productIds.length > 0) {
     const { data: offersData, error: offersErr } = await supabase
@@ -280,6 +298,20 @@ export default async function MenuPage() {
       }
     }
   }
+
+  const infusionProducts = buildLiveInfusionSources({
+    catalogRows,
+    publishedByProductId,
+  });
+  internalInfusionProducts = infusionProducts
+    .filter((row) => row.category === "concentrate")
+    .filter((row) => internalEligibleNames.some((name) => includesToken(row.name, name)));
+  externalDryProducts = infusionProducts
+    .filter((row) => row.category === "concentrate")
+    .filter((row) => externalDryNames.some((name) => includesToken(row.name, name)));
+  externalLiquidProducts = infusionProducts
+    .filter((row) => row.category === "vape")
+    .filter((row) => LIQUID_INFUSION_MEDIA.some((name) => includesToken(row.name, name)));
 
   const offers = catalogRows
     .map((item) => {
