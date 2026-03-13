@@ -136,6 +136,10 @@ function normalizeCategory(value: unknown): MenuCategory | "" {
   return "";
 }
 
+function packagingCategoryForSku(sku: PackagingSku): MenuCategory | "" {
+  return normalizeCategory(sku.applies_to || sku.category);
+}
+
 function normalizeWhitespace(value: string): string {
   return value.replace(/\s+/g, " ").trim();
 }
@@ -845,7 +849,7 @@ export default function MenuClient({
             ? CATEGORY_UNIT_SIZES[category]
             : ["3.5g"];
         const filteredSkus = packagingSkus.filter((sku) => {
-          const skuCategory = normalizeCategory(sku.category || sku.applies_to);
+          const skuCategory = packagingCategoryForSku(sku);
           if (isPreRoll) {
             if (skuCategory && skuCategory !== "pre_roll") return false;
             const skuSize = Number(sku.size_grams || 0);

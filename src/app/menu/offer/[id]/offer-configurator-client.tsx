@@ -24,6 +24,12 @@ function inferPackagingCategoryFromContext(mode: Mode, category: string): Packag
   return "";
 }
 
+function normalizeSkuCategory(value: unknown): PackagingCategory | "" {
+  const raw = String(value || "").trim().toLowerCase().replace(/-/g, "_");
+  if (raw === "flower" || raw === "concentrate" || raw === "vape" || raw === "pre_roll") return raw;
+  return "";
+}
+
 export default function OfferConfiguratorClient({
   offer,
   packagingSkus,
@@ -77,7 +83,7 @@ export default function OfferConfiguratorClient({
 
   const filteredSkus = useMemo(() => {
     return packagingSkus.filter((s) => {
-      const skuCategory = String(s.category || s.applies_to || "").toLowerCase();
+      const skuCategory = normalizeSkuCategory(s.applies_to || s.category);
 
       if (isPreRollMode) {
         if (skuCategory && skuCategory !== "pre_roll") return false;
