@@ -9,7 +9,13 @@ import MenuLayout from "@/components/menu/MenuLayout";
 import ProductGrid from "@/components/menu/ProductGrid";
 import { LIQUID_INFUSION_MEDIA } from "@/lib/infusion-config";
 import { type PackagingCategory } from "@/lib/packaging/category";
-import { CATEGORY_UNIT_SIZES, GRAMS_PER_LB, PRE_ROLL_UNIT_SIZES, gramsFromUnitSize } from "@/lib/pricing";
+import {
+  CATEGORY_UNIT_SIZES,
+  GRAMS_PER_LB,
+  PRE_ROLL_UNIT_SIZES,
+  gramsFromUnitSize,
+  litersFromGrams,
+} from "@/lib/pricing";
 import {
   type CardMode,
   type CardPackagingMode,
@@ -214,6 +220,9 @@ function availabilityLabelForOffer(offer: Offer): string | undefined {
   }
 
   const grams = inventoryUnit === "lb" ? qty * GRAMS_PER_LB : qty;
+  if (category === "vape") {
+    return `Available: ${Math.round(grams).toLocaleString()} g (${litersFromGrams(grams).toFixed(1)} L)`;
+  }
   return `Available: ${Math.round(grams).toLocaleString()} g`;
 }
 
@@ -273,14 +282,20 @@ function modeFromLine(modeRaw: unknown, preRollModeRaw: unknown): MenuMode | "pr
   return String(preRollModeRaw || "").trim() ? "pre_roll" : "copack";
 }
 
-function lineQuantityLabel(line: any, mode: MenuMode | "pre_roll"): string {
+function lineQuantityLabel(line: any, mode: MenuMode | "pre_roll", category: MenuCategory | "" | null): string {
   const quantityLbs = Number(line?.quantity_lbs || 0);
   const quantity = Number(line?.quantity || 0);
   const quantityUnit = String(line?.quantity_unit || "").toLowerCase();
   const units = Number(line?.units || 0);
   if (mode === "bulk") {
+    if (category === "vape" && quantityUnit === "g" && Number.isFinite(quantity) && quantity > 0) {
+      return `${litersFromGrams(quantity).toFixed(2)} L`;
+    }
     if (quantityUnit === "g" && Number.isFinite(quantity) && quantity > 0) return `${quantity.toFixed(0)} g`;
     if (quantityUnit === "lb" && Number.isFinite(quantity) && quantity > 0) return `${quantity.toFixed(2)} lb`;
+    if (category === "vape" && Number.isFinite(quantityLbs) && quantityLbs > 0) {
+      return `${litersFromGrams(quantityLbs * GRAMS_PER_LB).toFixed(2)} L`;
+    }
     return `${Number.isFinite(quantityLbs) && quantityLbs > 0 ? quantityLbs.toFixed(2) : "1.00"} lb`;
   }
   return `${Number.isFinite(units) && units > 0 ? units : 1} units`;
@@ -430,7 +445,7 @@ function mapEstimateLine(line: any): EstimateCartLine {
   const category = String(line?.pre_roll_mode || "").trim()
     ? "pre_roll"
     : normalizeCategory(line?.offers?.products?.category) || null;
-  const quantityLabel = lineQuantityLabel(line, mode);
+  const quantityLabel = lineQuantityLabel(line, mode, category);
   const lineTotalRaw = Number(line?.line_sell_total);
   const fallbackTotalRaw = Number(line?.line_total);
 
@@ -938,6 +953,7 @@ export default function MenuClient({
           onStartingWeightGramsChange: (next) => updateCardState(offer, (prev) => ({
             ...prev,
             startingWeightGrams: Number.isFinite(next) ? next : prev.startingWeightGrams,
+            startingWeightLbs: Number.isFinite(next) ? next / GRAMS_PER_LB : prev.startingWeightLbs,
           })),
           onAdvancedTargetUnitsChange: (next) => updateCardState(offer, (prev) => ({
             ...prev,
@@ -1050,7 +1066,9 @@ export default function MenuClient({
       const showExpectedRange = line.mode !== "bulk" && !isAddonLine;
       const startingWeightLabel = category === "flower"
         ? `Starting weight: ${startingWeightLbs.toFixed(2)} lb`
-        : `Starting weight: ${startingWeightGrams.toFixed(0)} g`;
+        : category === "vape"
+          ? `Starting volume: ${litersFromGrams(startingWeightGrams).toFixed(2)} L`
+          : `Starting weight: ${startingWeightGrams.toFixed(0)} g`;
       return {
         ...line,
         expectedRangeLabel: showExpectedRange ? expected.label : undefined,
@@ -1110,7 +1128,10 @@ export default function MenuClient({
     if (apiMode === "copack" && packagingMode === "jcrad" && !cardState.packagingSkuId) {
       throw new Error(category === "vape" ? "Select a vape vessel SKU (510 cart or AIO)." : "Select a packaging SKU.");
     }
-    if (apiMode === "bulk" && cardState.startingWeightLbs <= 0) {
+    if (apiMode === "bulk" && category === "vape" && cardState.startingWeightGrams <= 0) {
+      throw new Error("Bulk requires quantity liters > 0.");
+    }
+    if (apiMode === "bulk" && category !== "vape" && cardState.startingWeightLbs <= 0) {
       throw new Error("Bulk requires quantity lbs > 0.");
     }
     if ((mode === "copack" || mode === "pre_roll") && category === "flower" && cardState.startingWeightLbs <= 0) {
@@ -1171,15 +1192,26 @@ export default function MenuClient({
       if (!packagingSubmissionId) throw new Error("Packaging submission id missing.");
     }
 
+    const vapeBulkGrams = apiMode === "bulk" && category === "vape"
+      ? Math.max(0, Number(cardState.startingWeightGrams || 0))
+      : 0;
     const payload: Record<string, unknown> = {
       estimate_id: estimateId,
       offer_id: offer.id,
       mode: apiMode,
-      quantity_lbs: Math.max(0, Number(cardState.startingWeightLbs || 0)),
-      quantity: (category === "concentrate" || category === "vape")
+      quantity_lbs: apiMode === "bulk" && category === "vape"
+        ? vapeBulkGrams / GRAMS_PER_LB
+        : Math.max(0, Number(cardState.startingWeightLbs || 0)),
+      quantity: (apiMode === "bulk" && category === "vape")
+        ? vapeBulkGrams
+        : (category === "concentrate" || category === "vape")
         ? Math.max(0, Number(cardState.startingWeightGrams || 0))
         : Math.max(0, Number(cardState.startingWeightLbs || 0)),
-      quantity_unit: (category === "concentrate" || category === "vape") ? "g" : "lb",
+      quantity_unit: (apiMode === "bulk" && category === "vape")
+        ? "g"
+        : (category === "concentrate" || category === "vape")
+          ? "g"
+          : "lb",
       starting_weight_lbs: category === "flower" ? Math.max(0, Number(cardState.startingWeightLbs || 0)) : null,
       starting_weight_g: (category === "concentrate" || category === "vape")
         ? Math.max(0, Number(cardState.startingWeightGrams || 0))

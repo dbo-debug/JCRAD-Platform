@@ -35,6 +35,13 @@ type PackagingSubmissionRow = {
 };
 
 type ProfileRow = Record<string, unknown>;
+type PlatformEventRow = {
+  id: string;
+  event_type: string | null;
+  user_email: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string | null;
+};
 
 const APPROVED_VERIFICATION_STATUSES = new Set(["approved", "verified"]);
 const FOLLOW_UP_VERIFICATION_STATUSES = new Set(["rejected", "needs_review", "follow_up", "failed"]);
@@ -49,6 +56,20 @@ function formatDate(value: string | null): string {
   const parsed = Date.parse(value);
   if (!Number.isFinite(parsed)) return "Unknown date";
   return new Date(parsed).toLocaleDateString();
+}
+
+function formatRelativeTime(value: string | null): string {
+  if (!value) return "unknown time";
+  const ms = Date.parse(value);
+  if (!Number.isFinite(ms)) return "unknown time";
+  const diffMs = Date.now() - ms;
+  const diffMin = Math.max(0, Math.floor(diffMs / 60000));
+  if (diffMin < 1) return "just now";
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h ago`;
+  const diffDay = Math.floor(diffHr / 24);
+  return `${diffDay}d ago`;
 }
 
 function formatMoney(value: number | null): string {
@@ -86,10 +107,34 @@ function getPendingOrderCount(rows: OrderRow[]): number {
   }, 0);
 }
 
+function eventLabel(eventTypeRaw: string | null): string {
+  const eventType = normalizeStatus(eventTypeRaw);
+  if (eventType === "user_signup") return "User signup";
+  if (eventType === "user_login") return "User login";
+  if (eventType === "estimate_created") return "Estimate created";
+  if (eventType === "estimate_line_added") return "Estimate line added";
+  if (eventType === "estimate_add_line_failed") return "Estimate add-line failed";
+  if (eventType === "order_requested") return "Order requested";
+  return eventType || "Platform event";
+}
+
+function metadataSummary(metadata: Record<string, unknown> | null): string {
+  if (!metadata || typeof metadata !== "object") return "";
+  const preferredKeys = ["estimate_id", "order_id", "offer_id", "mode", "line_count", "error"];
+  const parts: string[] = [];
+  for (const key of preferredKeys) {
+    const value = metadata[key];
+    if (value == null || value === "") continue;
+    const display = String(value);
+    parts.push(`${key}: ${display.length > 120 ? `${display.slice(0, 119)}…` : display}`);
+  }
+  return parts.join(" • ");
+}
+
 export default async function AdminDashboardPage() {
   const supabase = createAdminClient();
 
-  const [estimateRes, orderRes, submissionRes, profileRes] = await Promise.all([
+  const [estimateRes, orderRes, submissionRes, profileRes, eventRes] = await Promise.all([
     supabase
       .from("estimates")
       .select("id, status, total, customer_name, customer_email, packaging_review_pending, created_at, updated_at")
@@ -106,12 +151,18 @@ export default async function AdminDashboardPage() {
       .order("created_at", { ascending: false })
       .limit(2000),
     supabase.from("profiles").select("*").limit(2000),
+    supabase
+      .from("platform_events")
+      .select("id, event_type, user_email, metadata, created_at")
+      .order("created_at", { ascending: false })
+      .limit(20),
   ]);
 
   const estimates = (estimateRes.data || []) as EstimateRow[];
   const orders = (orderRes.data || []) as OrderRow[];
   const submissions = (submissionRes.data || []) as PackagingSubmissionRow[];
   const profiles = (profileRes.data || []) as ProfileRow[];
+  const platformEvents = (eventRes.data || []) as PlatformEventRow[];
 
   const draftEstimates = estimates.filter((row) => {
     const status = normalizeStatus(row.status);
@@ -185,6 +236,7 @@ export default async function AdminDashboardPage() {
   const hasOrderError = Boolean(orderRes.error);
   const hasSubmissionError = Boolean(submissionRes.error);
   const hasProfileError = Boolean(profileRes.error);
+  const hasEventError = Boolean(eventRes.error);
 
   return (
     <div className="space-y-6">
@@ -220,7 +272,7 @@ export default async function AdminDashboardPage() {
         />
       </section>
 
-      {(hasEstimateError || hasOrderError || hasSubmissionError || hasProfileError) ? (
+      {(hasEstimateError || hasOrderError || hasSubmissionError || hasProfileError || hasEventError) ? (
         <div className="rounded-xl border border-[#f3d2d2] bg-[#fff4f4] px-4 py-3 text-sm text-[#991b1b]">
           Some dashboard data is unavailable right now. Refresh after backend sync.
         </div>
@@ -354,6 +406,32 @@ export default async function AdminDashboardPage() {
                 <p className="text-sm text-[#5b7382]">No pending customer approvals.</p>
               ) : null}
             </div>
+          </Panel>
+
+          <Panel
+            title="Platform Activity"
+            description="Recent tester activity and key flow events."
+          >
+            {platformEvents.length === 0 ? (
+              <p className="text-sm text-[#5b7382]">No activity logged yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {platformEvents.map((row) => (
+                  <div key={row.id} className="rounded-lg border border-[#dbe9ef] bg-white px-3 py-2 text-sm">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-semibold text-[#173543]">{eventLabel(row.event_type)}</p>
+                      <span className="text-xs text-[#6d8593]">{formatRelativeTime(row.created_at)}</span>
+                    </div>
+                    <p className="mt-0.5 text-xs text-[#5b7382]">
+                      {(row.user_email || "Unknown user")} • {formatDate(row.created_at)}
+                    </p>
+                    {metadataSummary(row.metadata) ? (
+                      <p className="mt-1 text-xs text-[#4f6877]">{metadataSummary(row.metadata)}</p>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            )}
           </Panel>
         </div>
       </section>

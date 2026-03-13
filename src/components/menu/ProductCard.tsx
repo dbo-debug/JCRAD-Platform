@@ -2,6 +2,7 @@
 
 import { type SyntheticEvent, useEffect, useRef, useState } from "react";
 import { type ProductCardItem } from "@/components/menu/types";
+import { gramsFromLiters, litersFromGrams } from "@/lib/pricing";
 
 type ProductCardProps = {
   item: ProductCardItem;
@@ -36,6 +37,11 @@ export default function ProductCard({ item, onAdd }: ProductCardProps) {
       && item.copackConfig.startingWeightUnit === "lb"
   );
   const showExternalInfusionSection = Boolean(item.copackConfig && item.copackConfig.mode === "pre_roll");
+  const isVapeBulk = Boolean(
+    item.copackConfig
+      && item.copackConfig.mode === "bulk"
+      && String(item.categoryLabel || "").toLowerCase() === "vape"
+  );
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -191,13 +197,17 @@ export default function ProductCard({ item, onAdd }: ProductCardProps) {
               <div className="space-y-2 text-[11px] text-[#304b5a]">
                 {item.copackConfig.mode === "bulk" ? (
                   <label className="grid gap-1">
-                    <span className="font-medium">Bulk lbs</span>
+                    <span className="font-medium">{isVapeBulk ? "Bulk L" : "Bulk lbs"}</span>
                     <input
                       type="number"
                       min={0}
-                      step="0.01"
-                      value={item.copackConfig.startingWeightLbs}
-                      onChange={(e) => item.copackConfig?.onStartingWeightLbsChange(Number(e.target.value))}
+                      step={isVapeBulk ? "0.1" : "0.01"}
+                      value={isVapeBulk ? litersFromGrams(item.copackConfig.startingWeightGrams) : item.copackConfig.startingWeightLbs}
+                      onChange={(e) =>
+                        isVapeBulk
+                          ? item.copackConfig?.onStartingWeightGramsChange(gramsFromLiters(Number(e.target.value)))
+                          : item.copackConfig?.onStartingWeightLbsChange(Number(e.target.value))
+                      }
                       className="rounded-lg border border-[#cfdde5] bg-white px-2 py-1.5 text-[11px] text-[#1f2937]"
                     />
                   </label>

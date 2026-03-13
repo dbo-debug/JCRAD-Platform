@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { displayPriceUnit } from "@/lib/pricing-display";
 import ProductMediaManager from "./product-media-manager";
 
 type Offer = {
@@ -94,6 +95,12 @@ function categoryLabel(category: ProductForm["category"] | Product["category"]) 
 
 function formatMoney(value: number | null | undefined) {
   return `$${Number(value || 0).toFixed(2)}`;
+}
+
+function formatPricePerUnit(value: number | null | undefined, product: { inventory_unit?: unknown; category?: unknown }): string {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "-";
+  return `$${n.toFixed(2)}/${displayPriceUnit(product)}`;
 }
 
 function roundTo2(value: number): number {
@@ -569,7 +576,9 @@ export default function ProductsAdminClient() {
             >
               {previewLive ? "LIVE" : "Draft"}
             </span>
-            <span style={{ fontSize: 13, fontWeight: 600 }}>Price: {formatMoney(form.bulk_sell_per_lb)}/lb</span>
+            <span style={{ fontSize: 13, fontWeight: 600 }}>
+              Price: {formatPricePerUnit(form.bulk_sell_per_lb, { inventory_unit: form.inventory_unit, category: form.category })}
+            </span>
           </div>
         </div>
 
@@ -627,7 +636,7 @@ export default function ProductsAdminClient() {
                 <div style={{ fontSize: 13 }}>{p.description || ""}</div>
                 <div style={{ fontSize: 13 }}>
                   {offer
-                    ? `${formatMoney(offer.bulk_sell_per_lb)}/lb | Min ${Number(offer.min_order || 0)} lbs | bulk=${String(!!offer.allow_bulk)} | copack=${String(!!offer.allow_copack)}`
+                    ? `${formatPricePerUnit(offer.bulk_sell_per_lb, { inventory_unit: p.inventory_unit, category: p.category })} | Min ${Number(offer.min_order || 0)} lbs | bulk=${String(!!offer.allow_bulk)} | copack=${String(!!offer.allow_copack)}`
                     : "No offer yet"}
                 </div>
                 {!offer && (

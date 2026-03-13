@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/requireAdmin";
+import { logPlatformEvent } from "@/lib/events/logPlatformEvent";
 import { appendOrderRowToSheet } from "@/lib/googleSheets";
 import { getEstimatePackagingReviewState } from "@/lib/packaging/reviewStatus";
 import { lbsFromEstimateLine, money } from "@/lib/pricing";
@@ -221,6 +222,17 @@ export async function POST(req: Request) {
       { status: 500 }
     );
   }
+
+  await logPlatformEvent({
+    eventType: "order_requested",
+    userEmail: String((estimate as any).customer_email || "").trim().toLowerCase() || null,
+    metadata: {
+      estimate_id,
+      order_id: String((order as any).id || ""),
+      line_count: Array.isArray(lines) ? lines.length : 0,
+      total: Number((order as any).total || 0),
+    },
+  });
 
   return NextResponse.json({ ok: true, order_id: (order as any).id });
 }

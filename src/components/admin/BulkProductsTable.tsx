@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
+import { displayPriceUnit } from "@/lib/pricing-display";
 
 type ProductRow = {
   id: string;
@@ -57,10 +58,10 @@ function formatQty(value: unknown, unit: string | null | undefined): string {
   return `${qty.toFixed(2)} ${normalizedUnit}`;
 }
 
-function formatMoneyPerLb(value: unknown): string {
+function formatMoneyPerUnit(value: unknown, product: { inventory_unit?: unknown; category?: unknown }): string {
   const n = finiteOrNull(value);
   if (n == null) return "-";
-  return `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/lb`;
+  return `$${n.toFixed(2)}/${displayPriceUnit(product)}`;
 }
 
 function categoryMatches(productCategory: string | null, selectedCategory: (typeof CATEGORY_TABS)[number]): boolean {
@@ -272,8 +273,8 @@ export default function BulkProductsTable() {
                     <td className="px-4 py-3">{product.name || "Untitled"}</td>
                     <td className="px-4 py-3 capitalize text-[#4f6877]">{product.category || "-"}</td>
                     <td className="px-4 py-3 text-[#4f6877]">{formatQty(inventoryQty, inventoryUnit)}</td>
-                    <td className="px-4 py-3 text-[#4f6877]">{formatMoneyPerLb(effectiveCost)}</td>
-                    <td className="px-4 py-3 text-[#4f6877]">{formatMoneyPerLb(sell)}</td>
+                    <td className="px-4 py-3 text-[#4f6877]">{formatMoneyPerUnit(effectiveCost, product)}</td>
+                    <td className="px-4 py-3 text-[#4f6877]">{formatMoneyPerUnit(sell, product)}</td>
                     <td className="px-4 py-3">
                       <span
                         className={[

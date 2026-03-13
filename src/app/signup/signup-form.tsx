@@ -51,6 +51,20 @@ export default function SignupForm({ returnTo }: SignupFormProps) {
       return;
     }
 
+    void fetch("/api/platform-events/log", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        event_type: "user_signup",
+        user_id: data?.user?.id || null,
+        user_email: data?.user?.email || email.trim().toLowerCase(),
+        metadata: {
+          source: data?.session ? "instant_session" : "email_confirmation_pending",
+          return_to: returnTo || "/dashboard",
+        },
+      }),
+    }).catch(() => {});
+
     setSubmitting(false);
     setSuccess(true);
 

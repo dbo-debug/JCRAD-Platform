@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CATEGORY_UNIT_SIZES, PRE_ROLL_UNIT_SIZES } from "@/lib/pricing";
+import { CATEGORY_UNIT_SIZES, GRAMS_PER_LB, PRE_ROLL_UNIT_SIZES, gramsFromLiters, litersFromGrams } from "@/lib/pricing";
 import { type PackagingCategory } from "@/lib/packaging/category";
 
 const ESTIMATE_KEY = "jc_estimate_id";
@@ -42,6 +42,7 @@ export default function OfferConfiguratorClient({
 
   const [mode, setMode] = useState<Mode>(initialMode);
   const [quantityLbs, setQuantityLbs] = useState<number>(Number(offer.min_order || 1));
+  const [quantityLiters, setQuantityLiters] = useState<number>(1);
   const [units, setUnits] = useState<number>(100);
   const [unitSize, setUnitSize] = useState("3.5g");
   const [preRollPackQty, setPreRollPackQty] = useState(1);
@@ -64,6 +65,7 @@ export default function OfferConfiguratorClient({
   const [success, setSuccess] = useState<string | null>(null);
 
   const isPreRollMode = mode === "pre_roll";
+  const isVapeBulk = mode === "bulk" && category === "vape";
 
   const unitSizeOptions = useMemo(() => {
     if (isPreRollMode) return [...PRE_ROLL_UNIT_SIZES];
@@ -201,6 +203,10 @@ export default function OfferConfiguratorClient({
       }
 
       const apiMode = mode === "pre_roll" ? "copack" : mode;
+      const vapeBulkGrams = isVapeBulk ? gramsFromLiters(quantityLiters) : 0;
+      const payloadQuantityLbs = isVapeBulk ? vapeBulkGrams / GRAMS_PER_LB : quantityLbs;
+      const payloadQuantity = isVapeBulk ? vapeBulkGrams : quantityLbs;
+      const payloadQuantityUnit = isVapeBulk ? "g" : "lb";
 
       const res = await fetch("/api/estimate/add-line", {
         method: "POST",
@@ -209,7 +215,9 @@ export default function OfferConfiguratorClient({
           estimate_id: estimateId,
           offer_id: offer.id,
           mode: apiMode,
-          quantity_lbs: quantityLbs,
+          quantity_lbs: payloadQuantityLbs,
+          quantity: payloadQuantity,
+          quantity_unit: payloadQuantityUnit,
           units,
           unit_size: unitSize,
           packaging_mode: apiMode === "bulk" ? null : packagingMode,
@@ -262,9 +270,17 @@ export default function OfferConfiguratorClient({
 
         {mode === "bulk" ? (
           <div style={{ display: "grid", gap: 8 }}>
-            <label>Quantity (lbs)</label>
-            <input type="number" min={offer.min_order || 0} step="0.01" value={quantityLbs} onChange={(e) => setQuantityLbs(Number(e.target.value))} />
-            <div style={{ fontSize: 13, opacity: 0.8 }}>Min order: {Number(offer.min_order || 0)} lbs</div>
+            <label>{isVapeBulk ? "Bulk L" : "Quantity (lbs)"}</label>
+            <input
+              type="number"
+              min={isVapeBulk ? (Number(offer.min_order || 0) * GRAMS_PER_LB) / 1000 : offer.min_order || 0}
+              step={isVapeBulk ? "0.1" : "0.01"}
+              value={isVapeBulk ? quantityLiters : quantityLbs}
+              onChange={(e) => isVapeBulk ? setQuantityLiters(Number(e.target.value)) : setQuantityLbs(Number(e.target.value))}
+            />
+            <div style={{ fontSize: 13, opacity: 0.8 }}>
+              Min order: {isVapeBulk ? `${litersFromGrams(Number(offer.min_order || 0) * GRAMS_PER_LB).toFixed(2)} L` : `${Number(offer.min_order || 0)} lbs`}
+            </div>
           </div>
         ) : (
           <div style={{ display: "grid", gap: 8 }}>

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { logPlatformEvent } from "@/lib/events/logPlatformEvent";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -51,5 +52,13 @@ export async function POST(req: Request) {
     .single();
 
   if (error) return respond({ error: error.message }, { status: 500 });
+  await logPlatformEvent({
+    eventType: "estimate_created",
+    userId: user?.id || null,
+    userEmail: customer_email || user?.email || null,
+    metadata: {
+      estimate_id: (data as any)?.id || null,
+    },
+  });
   return respond({ estimate: data });
 }

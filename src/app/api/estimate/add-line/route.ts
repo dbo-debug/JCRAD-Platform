@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { logPlatformEvent } from "@/lib/events/logPlatformEvent";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   CATEGORY_UNIT_SIZES,
@@ -620,6 +621,9 @@ export async function POST(req: Request) {
   const requestId = crypto.randomUUID();
   const t0 = Date.now();
   const isDev = process.env.NODE_ENV !== "production";
+  let eventEstimateId: string | null = null;
+  let eventOfferId: string | null = null;
+  let eventMode: string | null = null;
   const debugRequested = (() => {
     try {
       return new URL(req.url).searchParams.get("debug") === "1";
@@ -634,6 +638,20 @@ export async function POST(req: Request) {
   const respond = (payload: unknown, init?: ResponseInit) => {
     if (isDev) {
       console.log(`[add-line:${requestId}] response`, { status: init?.status || 200, ms: Date.now() - t0 });
+    }
+    const statusCode = init?.status || 200;
+    if (statusCode >= 400) {
+      const errorMessage = String((payload as any)?.error || "unknown").slice(0, 300);
+      void logPlatformEvent({
+        eventType: "estimate_add_line_failed",
+        metadata: {
+          estimate_id: eventEstimateId,
+          offer_id: eventOfferId,
+          mode: eventMode,
+          status: statusCode,
+          error: errorMessage,
+        },
+      });
     }
     return NextResponse.json(payload, init);
   };
@@ -656,11 +674,14 @@ export async function POST(req: Request) {
     });
 
     const estimate_id = await ensureEstimate(supabase, body?.estimate_id ? String(body.estimate_id) : null);
+    eventEstimateId = estimate_id;
     mark("after ensureEstimate");
     const line_id = body?.line_id ? String(body.line_id) : null;
 
     const offer_id = body?.offer_id ? String(body.offer_id) : null;
+    eventOfferId = offer_id;
     const mode = String(body?.mode || "bulk").toLowerCase();
+    eventMode = mode;
 
     if (!offer_id) return respond({ error: "offer_id required" }, { status: 400 });
     if (mode !== "bulk" && mode !== "copack") {
@@ -1825,6 +1846,17 @@ export async function POST(req: Request) {
     const totals = await recalcEstimate(supabase, estimate_id);
     mark("after recalcEstimate");
     console.log(`[add-line:${requestId}] success`, { ms: Date.now() - t0, estimate_id, line_id: line?.id ?? null });
+    await logPlatformEvent({
+      eventType: "estimate_line_added",
+      metadata: {
+        estimate_id,
+        line_id: String((line as any)?.id || ""),
+        offer_id,
+        mode,
+        quantity_unit,
+        units: Number(units || 0),
+      },
+    });
     mark("final return");
     const debugPayload = debugRequested
       ? {

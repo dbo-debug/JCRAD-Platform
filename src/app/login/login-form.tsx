@@ -22,12 +22,26 @@ export default function LoginForm({ returnTo }: LoginFormProps) {
     setSubmitting(true);
     setMessage("");
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       setMessage(error.message);
       setSubmitting(false);
       return;
     }
+
+    void fetch("/api/platform-events/log", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        event_type: "user_login",
+        user_id: data?.user?.id || null,
+        user_email: data?.user?.email || email.trim().toLowerCase(),
+        metadata: {
+          source: "password_login",
+          return_to: returnTo || "/dashboard",
+        },
+      }),
+    }).catch(() => {});
 
     window.location.href = returnTo || "/dashboard";
   }

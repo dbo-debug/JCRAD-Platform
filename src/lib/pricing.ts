@@ -29,6 +29,7 @@ export type PackagingTier = {
 };
 
 export const GRAMS_PER_LB = 453.592;
+export const GRAMS_PER_LITER = 1000;
 
 export const CATEGORY_UNIT_SIZES: Record<string, string[]> = {
   flower: ["3.5g", "5g", "7g", "14g", "28g"],
@@ -77,6 +78,14 @@ export function materialUnitCostFromLb(bulkSellPerLb: number, unitSizeGrams: num
 
 export function lbsFromCopack(units: number, gramsPerUnit: number): number {
   return (Math.max(0, units) * Math.max(0, gramsPerUnit)) / GRAMS_PER_LB;
+}
+
+export function gramsFromLiters(liters: number): number {
+  return Math.max(0, Number(liters || 0)) * GRAMS_PER_LITER;
+}
+
+export function litersFromGrams(grams: number): number {
+  return Math.max(0, Number(grams || 0)) / GRAMS_PER_LITER;
 }
 
 export function lbsFromEstimateLine(line: {

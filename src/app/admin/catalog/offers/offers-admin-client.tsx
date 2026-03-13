@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { displayPriceUnit } from "@/lib/pricing-display";
 
 type Product = {
   id: string;
@@ -23,6 +24,12 @@ type Offer = {
   allow_copack: boolean;
   products?: Product;
 };
+
+function formatPricePerUnit(value: unknown, product?: { inventory_unit?: unknown; category?: unknown }): string {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "-";
+  return `$${n.toFixed(2)}/${displayPriceUnit(product || {})}`;
+}
 
 const blank = {
   id: "",
@@ -164,7 +171,7 @@ export default function OffersAdminClient() {
                 {o.products?.category || "-"} / {o.products?.type || "-"} / {o.products?.tier || "-"}
               </div>
               <div style={{ fontSize: 13 }}>
-                Sell ${Number(o.bulk_sell_per_lb || 0).toFixed(2)}/lb | Min {Number(o.min_order || 0)} lbs | bulk={String(o.allow_bulk)} copack={String(o.allow_copack)}
+                Sell {formatPricePerUnit(o.bulk_sell_per_lb, o.products)} | Min {Number(o.min_order || 0)} lbs | bulk={String(o.allow_bulk)} copack={String(o.allow_copack)}
               </div>
               <div style={{ fontSize: 13 }}>
                 Product inventory: {Number(o.products?.inventory_qty || 0)} {o.products?.inventory_unit || "lb"}

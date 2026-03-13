@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { DEFAULT_MARKUP_PCT, deriveSellPricingFromCost } from "@/lib/pricing-defaults";
 import { requireAdmin } from "@/lib/requireAdmin";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -85,7 +86,10 @@ export async function POST(req: Request) {
       ? null
       : Number(body.bulk_cost_per_lb);
 
-  const bulk_sell_per_lb = Number(body?.bulk_sell_per_lb || 0);
+  let bulk_sell_per_lb =
+    body?.bulk_sell_per_lb === "" || body?.bulk_sell_per_lb == null
+      ? null
+      : Number(body?.bulk_sell_per_lb);
   const allow_bulk = !!body?.allow_bulk;
   const allow_copack = !!body?.allow_copack;
 
@@ -102,7 +106,31 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "bulk_cost_per_lb must be null or >= 0" }, { status: 400 });
     }
   }
-  if (!bulk_sell_per_lb || bulk_sell_per_lb <= 0) {
+  if (bulk_sell_per_lb != null && !Number.isFinite(bulk_sell_per_lb)) {
+    return NextResponse.json({ error: "bulk_sell_per_lb must be null or a finite number" }, { status: 400 });
+  }
+
+  const { data: productRow, error: productErr } = await supabase
+    .from("products")
+    .select("category")
+    .eq("id", product_id)
+    .maybeSingle();
+  if (productErr) return NextResponse.json({ error: productErr.message }, { status: 500 });
+
+  const sellDefaults = deriveSellPricingFromCost({
+    category: (productRow as { category?: string | null } | null)?.category || null,
+    costPerLb: bulk_cost_per_lb,
+    costPerG: bulk_cost_per_lb,
+    explicitSellPerLb: bulk_sell_per_lb,
+    markupPct: DEFAULT_MARKUP_PCT,
+  });
+  const derivedPersistedSell =
+    sellDefaults.unit === "per_g" ? sellDefaults.sellPerG : sellDefaults.sellPerLb;
+  if ((bulk_sell_per_lb == null || bulk_sell_per_lb <= 0) && derivedPersistedSell != null) {
+    bulk_sell_per_lb = derivedPersistedSell;
+  }
+
+  if (bulk_sell_per_lb == null || bulk_sell_per_lb <= 0) {
     return NextResponse.json({ error: "bulk_sell_per_lb must be > 0" }, { status: 400 });
   }
 

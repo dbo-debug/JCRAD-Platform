@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { DEFAULT_MARKUP_PCT, deriveSellPricingFromCost } from "@/lib/pricing-defaults";
+import { normalizeMaterialCostPerG } from "@/lib/pricing-normalize";
 import { requireAdmin } from "@/lib/requireAdmin";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -150,13 +152,37 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "material_cost_input must be >= 0" }, { status: 400 });
     }
 
-    if (material_cost_basis === "per_lb") material_cost_per_g = material_cost_input / LB_TO_G;
-    else if (material_cost_basis === "per_g") material_cost_per_g = material_cost_input;
-    else material_cost_per_g = material_cost_input / 1000;
+    material_cost_per_g = normalizeMaterialCostPerG({
+      materialCostBasis: material_cost_basis,
+      materialCostInput: material_cost_input,
+      bulkCostPerLb: null,
+      inventoryUnit: inventory_unit,
+    });
   }
 
   if ((material_cost_per_g == null || material_cost_per_g <= 0) && bulk_cost_per_lb != null && bulk_cost_per_lb > 0) {
-    material_cost_per_g = inventory_unit === "g" ? bulk_cost_per_lb : bulk_cost_per_lb / LB_TO_G;
+    material_cost_per_g = normalizeMaterialCostPerG({
+      materialCostBasis: null,
+      materialCostInput: null,
+      bulkCostPerLb: bulk_cost_per_lb,
+      inventoryUnit: inventory_unit,
+    });
+  }
+
+  const inferredCostPerLb = material_cost_per_g != null && material_cost_per_g > 0
+    ? material_cost_per_g * LB_TO_G
+    : null;
+  const sellDefaults = deriveSellPricingFromCost({
+    category,
+    costPerLb: inferredCostPerLb,
+    costPerG: material_cost_per_g,
+    explicitSellPerLb: bulk_sell_per_lb,
+    markupPct: DEFAULT_MARKUP_PCT,
+  });
+  const derivedPersistedSell =
+    sellDefaults.unit === "per_g" ? sellDefaults.sellPerG : sellDefaults.sellPerLb;
+  if ((bulk_sell_per_lb == null || bulk_sell_per_lb <= 0) && derivedPersistedSell != null) {
+    bulk_sell_per_lb = derivedPersistedSell;
   }
 
   if (!name) return NextResponse.json({ error: "name required" }, { status: 400 });
