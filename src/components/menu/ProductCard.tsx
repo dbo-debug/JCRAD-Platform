@@ -407,11 +407,6 @@ export default function ProductCard({ item, onAdd }: ProductCardProps) {
                             </select>
                           </label>
                         ) : null}
-                        {(item.copackConfig.mode === "copack" || item.copackConfig.mode === "pre_roll") ? (
-                          <div className="rounded-lg border border-[#dbe6ed] bg-[#f9fcfe] px-2 py-1.5 text-[11px] text-[#355060]">
-                            Stickers auto-included: 3 per finished unit.
-                          </div>
-                        ) : null}
                       </>
                     ) : (
                       <div className="space-y-2 rounded-lg border border-[#dbe6ed] bg-[#f9fcfe] p-2">
