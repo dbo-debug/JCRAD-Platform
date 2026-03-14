@@ -38,6 +38,7 @@ export default function EstimatePrintClient({ estimateId }: EstimatePrintClientP
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(true);
   const [missingId, setMissingId] = useState(false);
+  const [sendEmailMessage, setSendEmailMessage] = useState<string | null>(null);
 
   const quoteDate = useMemo(() => {
     const source = estimate?.created_at || new Date().toISOString();
@@ -121,7 +122,7 @@ export default function EstimatePrintClient({ estimateId }: EstimatePrintClientP
           <div className="flex items-center gap-3">
             <img src="/brand/BLACK.png" alt="JC RAD" className="h-14 w-14 rounded-xl border border-[#dbe6ed] bg-white p-2" />
             <div className="space-y-0.5">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#5b7382]">Estimate Print View</div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#5b7382]">Estimate PDF</div>
               <h1 className="text-2xl font-semibold tracking-tight text-[#1a3240]">JC RAD Estimate</h1>
               <div className="text-xs text-[#607988]">Estimate ID: {resolvedEstimateId}</div>
               <div className="text-xs text-[#607988]">
@@ -135,13 +136,30 @@ export default function EstimatePrintClient({ estimateId }: EstimatePrintClientP
               onClick={() => window.print()}
               className="rounded-full bg-[#14b8a6] px-3 py-1.5 text-xs font-semibold text-white"
             >
-              Print / Save as PDF
+              Download PDF
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSendEmailMessage("Estimate email sending is not wired yet. Download the PDF from this screen for now.");
+              }}
+              className="rounded-full border border-[#14b8a6] px-3 py-1.5 text-xs font-semibold text-[#0f766e]"
+            >
+              Send Email
             </button>
             <Link href="/estimate" className="rounded-full border border-[#d2dfe7] px-3 py-1.5 text-xs font-semibold text-[#274555]">
               Back to Estimate
             </Link>
           </div>
         </div>
+        <p className="no-print mt-3 text-xs text-[#607988]">
+          Download the estimate as a PDF from this screen, or use Send Email when the backend mail flow is available.
+        </p>
+        {sendEmailMessage ? (
+          <div className="no-print mt-3 rounded-xl border border-[#f2d58f] bg-[#fff8e7] px-3 py-2 text-xs text-[#9a6a15]">
+            {sendEmailMessage}
+          </div>
+        ) : null}
       </header>
 
       <div className="estimate-break-avoid rounded-2xl border border-[#e2ebf0] bg-[repeating-linear-gradient(135deg,#ffffff_0px,#ffffff_18px,#f6f9fb_18px,#f6f9fb_36px)] px-3 py-2">

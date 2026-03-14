@@ -1318,7 +1318,7 @@ export default function MenuClient({
       return;
     }
     const href = `/estimate/${encodeURIComponent(estimateId)}/print`;
-    window.open(href, "_blank", "noopener,noreferrer");
+    router.push(href);
   }
 
   function onRequestOrder() {

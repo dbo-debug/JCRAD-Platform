@@ -194,8 +194,6 @@ export default function EstimateClient() {
           <div className="no-print flex flex-wrap gap-2">
             <Link
               href={`/estimate/${encodeURIComponent(safeEstimateId)}/print`}
-              target="_blank"
-              rel="noopener noreferrer"
               className="rounded-full bg-[#14b8a6] px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-95"
             >
               Send Estimate PDF
