@@ -6,6 +6,7 @@ import Card from "@/components/ui/Card";
 import { getUserAndProfile } from "@/lib/auth/getUserAndProfile";
 import { normalizePackagingCategory, type PackagingCategory } from "@/lib/packaging/category";
 import { createClient } from "@/lib/supabase/server";
+import CustomerLogoCard from "./customer-logo-card";
 
 type EstimateRow = {
   id: string;
@@ -66,6 +67,11 @@ export default async function DashboardPage() {
   if (role === "sales" || role === "employee") redirect("/portal");
 
   const companyName = String((profile as any)?.company_name || "").trim() || "Your team";
+  const initialLogo = {
+    logo_url: String((profile as any)?.logo_url || "").trim() || null,
+    logo_bucket: String((profile as any)?.logo_bucket || "").trim() || null,
+    logo_object_path: String((profile as any)?.logo_object_path || "").trim() || null,
+  };
   const supabase = await createClient();
 
   let recentEstimates: EstimateRow[] = [];
@@ -204,9 +210,9 @@ export default async function DashboardPage() {
 
           <Card className="border border-[var(--surface-border)] bg-white p-6 text-[var(--text)] shadow-sm">
             <h2 className="text-lg font-semibold text-[#173543]">Logo upload</h2>
-            <p className="mt-2 text-sm text-[#4a6575]">Upload your brand logo for production materials and customer-facing estimate presentation.</p>
-            <div className="mt-4 rounded-xl border border-dashed border-[#c9dbe4] bg-[#f6fbfd] px-4 py-5 text-sm text-[#4a6575]">
-              Logo upload setup is coming next. This panel is reserved for brand asset onboarding.
+            <p className="mt-2 text-sm text-[#4a6575]">Upload your brand logo for JC RAD production and copacking use.</p>
+            <div className="mt-4">
+              <CustomerLogoCard initialLogo={initialLogo} />
             </div>
           </Card>
         </section>

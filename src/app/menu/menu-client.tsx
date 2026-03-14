@@ -891,11 +891,14 @@ export default function MenuClient({
           return contexts.includes("concentrate") || appliesTo === "concentrate";
         });
         const vapeMylarBagOptions = packagingSkus.filter((sku) => isMylar35Sku(sku));
+        const selectedVapePackagingSku = category === "vape"
+          ? packagingSkus.find((sku) => String(sku.id) === String(cardState.packagingSkuId))
+          : null;
         const requiresSecondaryBag = apiMode === "copack"
           && cardState.packagingMode === "jcrad"
           && (
             (category === "concentrate")
-            || (category === "vape" && cardState.unitSize === "3.5g")
+            || (category === "vape" && isVapeVesselSku(selectedVapePackagingSku as PackagingSku))
           )
           && !isPreRoll;
         const expectedRange = deriveExpectedRange({
@@ -1132,7 +1135,10 @@ export default function MenuClient({
       && mode !== "pre_roll"
       && (
         category === "concentrate"
-        || (category === "vape" && cardState.unitSize === "3.5g")
+        || (
+          category === "vape"
+          && isVapeVesselSku(packagingSkus.find((sku) => String(sku.id) === String(cardState.packagingSkuId)) as PackagingSku)
+        )
       );
 
     if (apiMode === "bulk" && !offer.allow_bulk) {
@@ -1164,7 +1170,7 @@ export default function MenuClient({
       if (!vesselSku || !isVapeVesselSku(vesselSku)) {
         throw new Error("Select a vape vessel SKU (510 cart or AIO).");
       }
-      if (cardState.unitSize === "3.5g") {
+      if (isVapeVesselSku(vesselSku)) {
         const bagSku = packagingSkus.find((sku) => String(sku.id) === String(cardState.secondaryPackagingSkuId));
         if (!bagSku || !isMylar35Sku(bagSku)) {
           throw new Error("Select a 3.5g mylar bag SKU.");

@@ -185,6 +185,19 @@ function hasWorkflowContext(row: any, value: string): boolean {
   return contexts.map((v: unknown) => String(v || "").toLowerCase()).includes(target);
 }
 
+function isMylar35SecondarySku(row: any): boolean {
+  const secondaryType = String(row?.packaging_type || "").toLowerCase();
+  const secondarySize = Number(row?.size_grams || 0);
+  const secondaryActive = row?.active === true;
+  const secondaryRole = String(row?.packaging_role || "").toLowerCase();
+  return (
+    secondaryActive &&
+    secondaryType === "flower_in_bag" &&
+    Math.abs(secondarySize - 3.5) < 1e-9 &&
+    (!secondaryRole || secondaryRole === "secondary")
+  );
+}
+
 type OfferPricingRow = {
   id: string;
   product_id: string;
@@ -953,6 +966,12 @@ export async function POST(req: Request) {
     let packaging_cost_total = 0;
     let packaging_sell_total = 0;
     let packaging_base_sell_total = 0;
+    let packaging_primary_cost_total = 0;
+    let packaging_primary_sell_total = 0;
+    let packaging_secondary_cost_total = 0;
+    let packaging_secondary_sell_total = 0;
+    let packaging_primary_label = "";
+    let packaging_secondary_label = "";
     let sticker_sell_total = 0;
     let heat_shrink_sell_total = 0;
     let cone_sell_total = 0;
@@ -1439,7 +1458,7 @@ export async function POST(req: Request) {
 
         const { data: sku, error: skuErr } = await supabase
           .from("packaging_skus")
-          .select("id, packaging_type, category, size_grams, pack_qty, vape_device, vape_fill_grams, applies_to, unit_cost")
+          .select("id, name, packaging_type, category, size_grams, pack_qty, vape_device, vape_fill_grams, applies_to, unit_cost")
           .eq("id", packaging_sku_id)
           .single();
         mark("after packaging_skus select");
@@ -1485,11 +1504,21 @@ export async function POST(req: Request) {
         packagingType = String((sku as any).packaging_type || "flower_in_bag");
         void selectedTier;
         let packagingUnitCostInternal = money(Number((sku as any).unit_cost || 0));
+        packaging_primary_cost_total = packagingUnitCostInternal;
+        const isVapeHardwarePackaging =
+          productCategory === "vape" && (packagingType === "vape_510_cart" || packagingType === "vape_all_in_one");
+        if (isVapeHardwarePackaging) {
+          packaging_primary_label = String((sku as any).name || "Vape hardware");
+        }
 
-        if (productCategory === "concentrate") {
+        if (productCategory === "concentrate" || isVapeHardwarePackaging) {
           if (!secondary_packaging_sku_id) {
             return respond(
-              { error: "Secondary bag (required) must be selected for concentrate JC RAD packaging." },
+              {
+                error: productCategory === "vape"
+                  ? "Secondary bag (required) must be selected for vape JC RAD packaging."
+                  : "Secondary bag (required) must be selected for concentrate JC RAD packaging.",
+              },
               { status: 400 }
             );
           }
@@ -1506,35 +1535,36 @@ export async function POST(req: Request) {
             return respond({ error: secondaryErr?.message || "Secondary packaging SKU not found" }, { status: 404 });
           }
 
-          const secondaryType = String((secondarySku as any).packaging_type || "").toLowerCase();
-          const secondarySize = Number((secondarySku as any).size_grams || 0);
-          const secondaryActive = (secondarySku as any).active === true;
-          const secondaryRole = String((secondarySku as any).packaging_role || "").toLowerCase();
           const secondaryAppliesTo = String((secondarySku as any).applies_to || "").toLowerCase();
           const secondaryContextOk =
-            hasWorkflowContext(secondarySku, "concentrate") || secondaryAppliesTo === "concentrate";
+            productCategory === "vape"
+              ? true
+              : hasWorkflowContext(secondarySku, "concentrate") || secondaryAppliesTo === "concentrate";
 
           if (
-            !secondaryActive ||
-            secondaryType !== "flower_in_bag" ||
-            Math.abs(secondarySize - 3.5) > 1e-9 ||
-            (secondaryRole && secondaryRole !== "secondary") ||
+            !isMylar35SecondarySku(secondarySku) ||
             !secondaryContextOk
           ) {
             return respond(
-              { error: "Secondary bag must be an active 3.5g flower_in_bag SKU valid for concentrate context." },
+              {
+                error: productCategory === "vape"
+                  ? "Secondary bag must be an active 3.5g flower_in_bag SKU for vape hardware jobs."
+                  : "Secondary bag must be an active 3.5g flower_in_bag SKU valid for concentrate context.",
+              },
               { status: 400 }
             );
           }
 
-          packagingUnitCostInternal = money(packagingUnitCostInternal + Number((secondarySku as any).unit_cost || 0));
-          const secondaryBagLine = `Secondary bag: ${String((secondarySku as any).name || secondary_packaging_sku_id)}`;
-          if (!notes.includes(secondaryBagLine)) {
-            notes = notes ? `${notes}\n${secondaryBagLine}` : secondaryBagLine;
+          packaging_secondary_cost_total = money(Number((secondarySku as any).unit_cost || 0));
+          if (isVapeHardwarePackaging) {
+            packaging_secondary_label = String((secondarySku as any).name || "3.5g mylar bag");
           }
+          packagingUnitCostInternal = money(packagingUnitCostInternal + packaging_secondary_cost_total);
         }
 
         packaging_base_cost_total = money(packagingUnitCostInternal * units);
+        packaging_primary_sell_total = money(packaging_primary_cost_total * units * markupMultiplier);
+        packaging_secondary_sell_total = money(packaging_secondary_cost_total * units * markupMultiplier);
         packaging_cost_total = packaging_base_cost_total;
         if (isPreRoll) {
           const heatShrinkQty = Math.max(
@@ -1629,6 +1659,8 @@ export async function POST(req: Request) {
       const stickerSell = sticker_sell_total;
       const heatShrinkSell = heat_shrink_sell_total;
       const coneSell = cone_sell_total;
+      const packagingPrimarySell = packaging_primary_sell_total;
+      const packagingSecondarySell = packaging_secondary_sell_total;
       const lineCostComputed = money(material_cost_total + packaging_cost_total + labor_cost_total + coa_cost_total);
       const lineSellComputed = money(material_sell_total + packaging_sell_total + labor_sell_total + coa_sell_total);
       if (isDev && debugRequested && productCategory === "flower") {
@@ -1710,6 +1742,12 @@ export async function POST(req: Request) {
           packaging: {
             base_cost_total: money(packaging_base_cost_total),
             base_sell_total: packagingBaseSell,
+            primary_label: packaging_primary_label,
+            primary_cost_total: money(packaging_primary_cost_total * units),
+            primary_sell_total: packagingPrimarySell,
+            secondary_label: packaging_secondary_label,
+            secondary_cost_total: money(packaging_secondary_cost_total * units),
+            secondary_sell_total: packagingSecondarySell,
             stickers_cost_total: money(sticker_cost_total),
             stickers_sell_total: stickerSell,
             heat_shrink_cost_total: money(heat_shrink_cost_total),

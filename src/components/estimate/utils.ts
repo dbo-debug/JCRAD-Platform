@@ -125,13 +125,28 @@ export function buildBreakdownGroups(line: EstimateLine): BreakdownGroupData[] {
     - money(pickNumber(packaging, "stickers_sell_total"))
     - money(pickNumber(packaging, "heat_shrink_sell_total"))
     - money(pickNumber(packaging, "cone_sell_total"));
+  const packagingPrimaryLabel = String(packaging.primary_label || "").trim();
+  const packagingSecondaryLabel = String(packaging.secondary_label || "").trim();
 
   const packagingRows = positiveRows([
-    {
-      id: "pack",
-      label: "Packaging",
-      total: money(pickNumber(packaging, "base_sell_total", packagingBaseFallback)),
-    },
+    packagingPrimaryLabel
+      ? {
+        id: "pack-primary",
+        label: packagingPrimaryLabel,
+        total: money(pickNumber(packaging, "primary_sell_total")),
+      }
+      : {
+        id: "pack",
+        label: "Packaging",
+        total: money(pickNumber(packaging, "base_sell_total", packagingBaseFallback)),
+      },
+    packagingSecondaryLabel
+      ? {
+        id: "pack-secondary",
+        label: packagingSecondaryLabel,
+        total: money(pickNumber(packaging, "secondary_sell_total")),
+      }
+      : { id: "pack-secondary", label: "", total: 0 },
     { id: "stickers", label: "Stickers", total: money(pickNumber(packaging, "stickers_sell_total")) },
     { id: "heat", label: "Heat Shrink", total: money(pickNumber(packaging, "heat_shrink_sell_total")) },
     { id: "cones", label: "Cones", total: money(pickNumber(packaging, "cone_sell_total")) },
