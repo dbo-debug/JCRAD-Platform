@@ -246,8 +246,8 @@ function productIdForOffer(offer: Offer): string {
   return String(offer.product_id || offer.products?.id || "").trim();
 }
 
-function isVapeVesselSku(sku: PackagingSku): boolean {
-  const t = normalizedLower(sku.packaging_type);
+function isVapeVesselSku(sku: PackagingSku | null | undefined): boolean {
+  const t = normalizedLower(sku?.packaging_type);
   return t === "vape_510_cart" || t === "vape_all_in_one";
 }
 
@@ -898,7 +898,7 @@ export default function MenuClient({
           && cardState.packagingMode === "jcrad"
           && (
             (category === "concentrate")
-            || (category === "vape" && isVapeVesselSku(selectedVapePackagingSku as PackagingSku))
+            || (category === "vape" && isVapeVesselSku(selectedVapePackagingSku))
           )
           && !isPreRoll;
         const expectedRange = deriveExpectedRange({
@@ -1137,7 +1137,7 @@ export default function MenuClient({
         category === "concentrate"
         || (
           category === "vape"
-          && isVapeVesselSku(packagingSkus.find((sku) => String(sku.id) === String(cardState.packagingSkuId)) as PackagingSku)
+          && isVapeVesselSku(packagingSkus.find((sku) => String(sku.id) === String(cardState.packagingSkuId)))
         )
       );
 
