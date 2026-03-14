@@ -109,9 +109,11 @@ export function buildBreakdownGroups(line: EstimateLine): BreakdownGroupData[] {
   const labor = asRecord(costBreakdown.labor);
   const coa = asRecord(costBreakdown.coa);
   const materialSplit = resolveMaterialSellSplit(line);
+  const materialCategory = String(line?.offers?.products?.category || "").trim().toLowerCase();
+  const baseMaterialLabel = materialCategory === "vape" ? "Distillate" : "Flower";
 
   const materialsRows = positiveRows([
-    { id: "flower", label: "Flower", total: money(pickNumber(material, "flower_sell_total", materialSplit.flower)) },
+    { id: "flower", label: baseMaterialLabel, total: money(pickNumber(material, "flower_sell_total", materialSplit.flower)) },
     { id: "internal", label: "Internal Infusion", total: money(pickNumber(material, "internal_infusion_sell_total")) },
     {
       id: "ext-dist",
