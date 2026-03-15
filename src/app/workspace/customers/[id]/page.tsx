@@ -7,9 +7,10 @@ import { loadCustomerWorkspaceDetail } from "@/lib/customerWorkspace";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireStaff } from "@/lib/requireStaff";
 
-function formatDate(value: string | null): string {
-  if (!value) return "Unknown";
-  const parsed = Date.parse(value);
+function formatDate(value: unknown): string {
+  const text = String(value || "").trim();
+  if (!text) return "Unknown";
+  const parsed = Date.parse(text);
   if (!Number.isFinite(parsed)) return "Unknown";
   return new Date(parsed).toLocaleDateString();
 }
