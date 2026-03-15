@@ -4,7 +4,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const NAV_ITEMS = [{ label: "Customers", href: "/workspace/customers" }] as const;
+const NAV_ITEMS = [
+  { label: "Customers", href: "/workspace/customers" },
+  { label: "Customer Import", href: "/workspace/customers/import" },
+] as const;
 
 export default function WorkspaceSidebar() {
   const pathname = usePathname();

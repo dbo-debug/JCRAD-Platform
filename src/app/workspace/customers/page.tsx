@@ -17,6 +17,14 @@ export default async function WorkspaceCustomersPage() {
       <AdminPageHeader
         title="Customers"
         description="Read-only internal customer workspace for admin and sales users. Linked records prefer customer_account_id and fall back to legacy matching only when needed."
+        action={
+          <Link
+            href="/workspace/customers/import"
+            className="inline-flex rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95"
+          >
+            Import from Google Sheets
+          </Link>
+        }
       />
 
       <section className="grid gap-4 md:grid-cols-4">

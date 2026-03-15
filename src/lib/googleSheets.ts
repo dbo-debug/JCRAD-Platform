@@ -65,6 +65,40 @@ async function getAccessToken() {
   return tokenJson.access_token as string;
 }
 
+function parseSpreadsheetId(input: string) {
+  const trimmed = String(input || "").trim();
+  if (!trimmed) throw new Error("Spreadsheet id is required");
+
+  const match = trimmed.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  return match?.[1] || trimmed;
+}
+
+export async function getSheetValues(args: { spreadsheetIdOrUrl: string; tabName: string }) {
+  const spreadsheetId = parseSpreadsheetId(args.spreadsheetIdOrUrl);
+  const tab = String(args.tabName || "").trim();
+  if (!tab) throw new Error("Sheet tab name is required");
+
+  const accessToken = await getAccessToken();
+  const readUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(tab)}`;
+
+  const res = await fetch(readUrl, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(`Failed reading sheet values: ${res.status} ${JSON.stringify(json)}`);
+  }
+
+  return {
+    spreadsheetId,
+    tabName: tab,
+    values: Array.isArray(json?.values) ? (json.values as string[][]) : [],
+  };
+}
+
 export async function appendOrderRowToSheet(row: AppendOrderRow) {
   const sheetId = process.env.GOOGLE_SHEET_ID;
   const tab = process.env.GOOGLE_SHEET_TAB || "Orders";
