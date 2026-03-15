@@ -214,7 +214,7 @@ async function loadWorkspaceData(): Promise<WorkspaceData> {
   while (true) {
     const { data, error } = await supabase.auth.admin.listUsers({ page, perPage });
     if (error) throw new Error(error.message);
-    const users = (data?.users || []).map((user) => ({
+    const users = (data?.users || []).map((user: { id?: string; email?: string | null }) => ({
       id: String(user.id || ""),
       email: String(user.email || "").trim() || null,
     }));
