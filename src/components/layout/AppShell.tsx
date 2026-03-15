@@ -10,7 +10,7 @@ type AppShellProps = {
 export default async function AppShell({ children }: AppShellProps) {
   const { user, profile } = await getUserAndProfile();
   const role = String((profile as Record<string, unknown> | null)?.role || "customer").toLowerCase();
-  const dashboardHref = role === "admin" ? "/admin" : "/dashboard";
+  const dashboardHref = role === "admin" ? "/admin" : role === "sales" ? "/workspace/customers" : "/dashboard";
 
   return (
     <SurfaceShell>

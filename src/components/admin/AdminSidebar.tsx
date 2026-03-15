@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 const NAV_ITEMS: ReadonlyArray<{ label: string; href: string; subItem?: boolean }> = [
   { label: "Dashboard", href: "/admin" },
   { label: "Packaging Reviews", href: "/admin/packaging/submissions" },
-  { label: "Customers", href: "/admin/customers" },
+  { label: "Customers", href: "/workspace/customers" },
   { label: "Orders", href: "/admin/orders" },
   { label: "Catalog", href: "/admin/catalog" },
   { label: "Bulk Products", href: "/admin/catalog/bulk", subItem: true },
