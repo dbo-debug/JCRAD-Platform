@@ -205,6 +205,10 @@ function sortByRecent<T extends { createdAt: string | null }>(rows: T[]): T[] {
   });
 }
 
+function isLinkedRecord(row: LinkedRecord | null): row is LinkedRecord {
+  return row !== null;
+}
+
 async function loadWorkspaceData(): Promise<WorkspaceData> {
   const supabase = createAdminClient();
   const authUsers: AuthUser[] = [];
@@ -302,7 +306,7 @@ function buildLinkedRecords(
   }
 ): LinkedRecord[] {
   return rows
-    .map((row) => {
+    .map((row): LinkedRecord | null => {
       const matchType = matchLegacyRow({ row, ...args });
       if (!matchType) return null;
       return {
@@ -313,7 +317,7 @@ function buildLinkedRecords(
         updatedAt: firstText(row.updated_at) || null,
       } satisfies LinkedRecord;
     })
-    .filter((row): row is LinkedRecord => Boolean(row))
+    .filter(isLinkedRecord)
     .sort((a, b) => {
       const aTime = Date.parse(String(a.updatedAt || a.createdAt || ""));
       const bTime = Date.parse(String(b.updatedAt || b.createdAt || ""));
