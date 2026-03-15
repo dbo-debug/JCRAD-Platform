@@ -39,7 +39,10 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
   ]);
 
   const authEmailById = new Map(
-    (authUsersRes.data?.users || []).map((user) => [String(user.id || ""), String(user.email || "").trim() || null] as const)
+    (authUsersRes.data?.users || []).map((user: { id?: string; email?: string | null }) => [
+      String(user.id || ""),
+      String(user.email || "").trim() || null,
+    ] as const)
   );
   const salesOptions = ((salesProfilesRes.data || []) as Array<Record<string, unknown>>).map((profile) => {
     const userId = String(profile.id || "");
