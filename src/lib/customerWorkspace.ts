@@ -251,7 +251,7 @@ async function loadWorkspaceData(): Promise<WorkspaceData> {
       .limit(5000),
     supabase
       .from("orders")
-      .select("id, customer_account_id, customer_id, status, total, created_at")
+      .select("id, customer_account_id, customer_id, status, created_at")
       .order("created_at", { ascending: false })
       .limit(5000),
     supabase
