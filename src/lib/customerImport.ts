@@ -686,6 +686,7 @@ async function applyPreview(args: {
     assignmentsResolved: 0,
     rowsSkipped: 0,
     rowsFailed: 0,
+    totalSourceRowsProcessed: args.preview.rows.length,
   };
 
   for (const row of args.preview.rows) {

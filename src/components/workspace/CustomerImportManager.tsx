@@ -24,6 +24,15 @@ type PreviewResponse = {
   rows: PreviewRow[];
 };
 
+type ApplyReport = {
+  customersCreated?: number;
+  customersUpdated?: number;
+  contactsCreated?: number;
+  rowsSkipped?: number;
+  rowsFailed?: number;
+  totalSourceRowsProcessed?: number;
+};
+
 async function parseJsonSafe(res: Response): Promise<Record<string, unknown>> {
   const contentType = res.headers.get("content-type") || "";
   if (!contentType.includes("application/json")) return {};
@@ -38,12 +47,12 @@ export default function CustomerImportManager({ fields, canApply }: { fields: Im
   const [mapping, setMapping] = useState<Record<string, string | null>>({});
   const [busy, setBusy] = useState<"preview" | "apply" | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [successReport, setSuccessReport] = useState<ApplyReport | null>(null);
 
   async function runPreview(nextMapping?: Record<string, string | null>) {
     setBusy("preview");
     setError(null);
-    setSuccess(null);
+    setSuccessReport(null);
     try {
       const res = await fetch("/api/workspace/customer-import/preview", {
         method: "POST",
@@ -69,7 +78,7 @@ export default function CustomerImportManager({ fields, canApply }: { fields: Im
   async function applyImport() {
     setBusy("apply");
     setError(null);
-    setSuccess(null);
+    setSuccessReport(null);
     try {
       const res = await fetch("/api/workspace/customer-import/apply", {
         method: "POST",
@@ -82,19 +91,18 @@ export default function CustomerImportManager({ fields, canApply }: { fields: Im
         }),
       });
       const json = await parseJsonSafe(res);
-      const report = (json.report ?? {}) as {
-        customersCreated?: number;
-        customersUpdated?: number;
-        contactsCreated?: number;
-      };
+      const report = (json.report ?? {}) as ApplyReport;
       if (!res.ok) throw new Error(String(json.error || `Apply failed (${res.status})`));
-      setSuccess(
-        `Applied import. Created ${Number(report.customersCreated || 0)} customers, updated ${Number(report.customersUpdated || 0)}, created ${Number(report.contactsCreated || 0)} contacts.`
-      );
       if (json.preview) {
         const nextPreview = json.preview as PreviewResponse;
         setPreview(nextPreview);
         setMapping(nextPreview.mapping || {});
+        setSuccessReport({
+          ...report,
+          totalSourceRowsProcessed: Number(report.totalSourceRowsProcessed ?? nextPreview.rows.length),
+        });
+      } else {
+        setSuccessReport(report);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Apply failed");
@@ -154,7 +162,19 @@ export default function CustomerImportManager({ fields, canApply }: { fields: Im
           )}
         </div>
         {error ? <p className="mt-3 text-sm text-[#991b1b]">{error}</p> : null}
-        {success ? <p className="mt-3 text-sm text-[#0f766e]">{success}</p> : null}
+        {successReport ? (
+          <div className="mt-3 rounded-xl border border-[#b7efe6] bg-[#f2fffb] px-4 py-3 text-sm text-[#0f766e]">
+            <p className="font-semibold text-[#0b5f58]">Import activity summary</p>
+            <div className="mt-2 grid gap-1 md:grid-cols-2">
+              <p>Accounts created: {Number(successReport.customersCreated || 0)}</p>
+              <p>Accounts updated: {Number(successReport.customersUpdated || 0)}</p>
+              <p>Contacts created: {Number(successReport.contactsCreated || 0)}</p>
+              <p>Rows skipped: {Number(successReport.rowsSkipped || 0)}</p>
+              <p>Rows failed: {Number(successReport.rowsFailed || 0)}</p>
+              <p>Total source rows processed: {Number(successReport.totalSourceRowsProcessed || 0)}</p>
+            </div>
+          </div>
+        ) : null}
       </section>
 
       {preview ? (

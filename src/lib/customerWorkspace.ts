@@ -2,18 +2,25 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 type GenericRow = Record<string, unknown>;
 type AuthUser = { id: string; email: string | null };
+type AdminClient = ReturnType<typeof createAdminClient>;
+const WORKSPACE_BATCH_SIZE = 500;
 
 export type CustomerSummary = {
   id: string;
   name: string;
   status: string;
   stage: string | null;
+  areaZone: string | null;
+  territoryCode: string | null;
+  website: string | null;
+  mainPhone: string | null;
   primaryContactEmail: string | null;
   assignedSalesUserId: string | null;
   assignedSalesName: string | null;
   assignedSalesEmail: string | null;
   createdAt: string | null;
   updatedAt: string | null;
+  contactCount: number;
   primaryContacts: Array<{
     id: string;
     name: string;
@@ -81,6 +88,19 @@ export type CustomerDetail = {
   orders: LinkedRecord[];
   packagingSubmissions: LinkedRecord[];
   documents: LinkedRecord[];
+};
+
+export type CustomerWorkspaceMetrics = {
+  totalCustomers: number;
+  totalContacts: number;
+  customersWithContacts: number;
+  missingPrimaryContact: number;
+  customersWithoutContacts: number;
+};
+
+export type CustomerWorkspaceIndexData = {
+  customers: CustomerSummary[];
+  metrics: CustomerWorkspaceMetrics;
 };
 
 type WorkspaceData = {
@@ -209,6 +229,37 @@ function isLinkedRecord(row: LinkedRecord | null): row is LinkedRecord {
   return row !== null;
 }
 
+async function fetchAllTableRows(args: {
+  supabase: AdminClient;
+  table: string;
+  columns?: string;
+  orderBy?: { column: string; ascending: boolean };
+}) {
+  const rows: GenericRow[] = [];
+  let from = 0;
+
+  while (true) {
+    let query = args.supabase
+      .from(args.table)
+      .select(args.columns || "*")
+      .range(from, from + WORKSPACE_BATCH_SIZE - 1);
+
+    if (args.orderBy) {
+      query = query.order(args.orderBy.column, { ascending: args.orderBy.ascending });
+    }
+
+    const { data, error } = await query;
+    if (error) throw new Error(error.message);
+
+    const page = (data || []) as GenericRow[];
+    rows.push(...page);
+    if (page.length < WORKSPACE_BATCH_SIZE) break;
+    from += WORKSPACE_BATCH_SIZE;
+  }
+
+  return rows;
+}
+
 async function loadWorkspaceData(): Promise<WorkspaceData> {
   const supabase = createAdminClient();
   const authUsers: AuthUser[] = [];
@@ -228,22 +279,22 @@ async function loadWorkspaceData(): Promise<WorkspaceData> {
   }
 
   const [
-    customersRes,
-    customerUsersRes,
-    customerContactsRes,
-    customerNotesRes,
-    customerActivityRes,
+    customers,
+    customerUsers,
+    customerContacts,
+    customerNotes,
+    customerActivity,
     estimatesRes,
     ordersRes,
     packagingRes,
     customerDocumentsRes,
-    profilesRes,
+    profiles,
   ] = await Promise.all([
-    supabase.from("customers").select("*").order("updated_at", { ascending: false }),
-    supabase.from("customer_users").select("*"),
-    supabase.from("customer_contacts").select("*"),
-    supabase.from("customer_notes").select("*").order("created_at", { ascending: false }),
-    supabase.from("customer_activity").select("*").order("created_at", { ascending: false }),
+    fetchAllTableRows({ supabase, table: "customers", orderBy: { column: "updated_at", ascending: false } }),
+    fetchAllTableRows({ supabase, table: "customer_users" }),
+    fetchAllTableRows({ supabase, table: "customer_contacts" }),
+    fetchAllTableRows({ supabase, table: "customer_notes", orderBy: { column: "created_at", ascending: false } }),
+    fetchAllTableRows({ supabase, table: "customer_activity", orderBy: { column: "created_at", ascending: false } }),
     supabase
       .from("estimates")
       .select("id, customer_account_id, customer_name, customer_email, status, total, created_at, updated_at")
@@ -260,37 +311,48 @@ async function loadWorkspaceData(): Promise<WorkspaceData> {
       .order("created_at", { ascending: false })
       .limit(5000),
     supabase.from("customer_documents").select("*").order("created_at", { ascending: false }).limit(5000),
-    supabase.from("profiles").select("id, role, company_name"),
+    fetchAllTableRows({ supabase, table: "profiles", columns: "id, role, company_name" }),
   ]);
 
-  const responses = [
-    customersRes,
-    customerUsersRes,
-    customerContactsRes,
-    customerNotesRes,
-    customerActivityRes,
-    estimatesRes,
-    ordersRes,
-    packagingRes,
-    customerDocumentsRes,
-    profilesRes,
-  ];
+  const responses = [estimatesRes, ordersRes, packagingRes, customerDocumentsRes];
 
   const error = responses.find((response) => response.error)?.error;
   if (error) throw new Error(error.message);
 
   return {
-    customers: (customersRes.data || []) as GenericRow[],
-    customerUsers: (customerUsersRes.data || []) as GenericRow[],
-    customerContacts: (customerContactsRes.data || []) as GenericRow[],
-    customerNotes: (customerNotesRes.data || []) as GenericRow[],
-    customerActivity: (customerActivityRes.data || []) as GenericRow[],
+    customers,
+    customerUsers,
+    customerContacts,
+    customerNotes,
+    customerActivity,
     estimates: (estimatesRes.data || []) as GenericRow[],
     orders: (ordersRes.data || []) as GenericRow[],
     packagingSubmissions: (packagingRes.data || []) as GenericRow[],
     customerDocuments: (customerDocumentsRes.data || []) as GenericRow[],
-    profiles: (profilesRes.data || []) as GenericRow[],
+    profiles,
     authUsers,
+  };
+}
+
+function buildWorkspaceMetrics(data: WorkspaceData): CustomerWorkspaceMetrics {
+  const customersWithContacts = new Set(
+    data.customerContacts
+      .map((row) => String(row.customer_id || "").trim())
+      .filter(Boolean)
+  );
+  const customersWithPrimaryContact = new Set(
+    data.customerContacts
+      .filter((row) => row.is_primary === true)
+      .map((row) => String(row.customer_id || "").trim())
+      .filter(Boolean)
+  );
+
+  return {
+    totalCustomers: data.customers.length,
+    totalContacts: data.customerContacts.length,
+    customersWithContacts: customersWithContacts.size,
+    missingPrimaryContact: data.customers.filter((customer) => !customersWithPrimaryContact.has(String(customer.id || "").trim())).length,
+    customersWithoutContacts: data.customers.filter((customer) => !customersWithContacts.has(String(customer.id || "").trim())).length,
   };
 }
 
@@ -325,12 +387,15 @@ function buildLinkedRecords(
     });
 }
 
-export async function loadCustomerWorkspaceIndex(): Promise<CustomerSummary[]> {
+export async function loadCustomerWorkspaceIndex(): Promise<CustomerWorkspaceIndexData> {
   const data = await loadWorkspaceData();
   const profileById = getProfileMap(data.profiles);
   const authUserById = getAuthUserMap(data.authUsers);
 
-  return data.customers.map((customer) => buildCustomerSummary({ customer, data, profileById, authUserById }));
+  return {
+    customers: data.customers.map((customer) => buildCustomerSummary({ customer, data, profileById, authUserById })),
+    metrics: buildWorkspaceMetrics(data),
+  };
 }
 
 export async function loadCustomerWorkspaceDetail(customerId: string): Promise<CustomerDetail | null> {
@@ -518,12 +583,17 @@ function buildCustomerSummary({
     name: getCustomerName(customer),
     status: getCustomerStatus(customer),
     stage: firstText(customer.stage),
+    areaZone: firstText(customer.area_zone),
+    territoryCode: firstText(customer.territory_code),
+    website: firstText(customer.website),
+    mainPhone: firstText(customer.main_phone),
     primaryContactEmail: firstText(customer.primary_contact_email),
     assignedSalesUserId,
     assignedSalesName: formatProfileName(assignedSalesProfile),
     assignedSalesEmail: firstText(authUserById.get(assignedSalesUserId || "")?.email),
     createdAt: firstText(customer.created_at) || null,
     updatedAt: firstText(customer.updated_at) || null,
+    contactCount: contacts.length,
     primaryContacts,
     memberUsers,
     counts: {
