@@ -656,7 +656,11 @@ async function applyPreview(args: {
       if (row.assignmentUserId) report.assignmentsResolved += 1;
 
       for (const contact of row.proposedContacts) {
-        const payload = {
+        const payload: Record<string, unknown> & {
+          customer_id: string;
+          email?: string | null;
+          is_primary?: boolean;
+        } = {
           ...contact,
           customer_id: customerId,
         };
