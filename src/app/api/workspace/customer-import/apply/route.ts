@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { applyCustomerImport } from "@/lib/customerImport";
 import { getStaffContext } from "@/lib/getStaffContext";
 
+export const maxDuration = 300;
+
 export async function POST(req: Request) {
   const staff = await getStaffContext();
   if (!staff || staff.role !== "admin") {
@@ -19,6 +21,7 @@ export async function POST(req: Request) {
   }
 
   try {
+    const startedAt = Date.now();
     const result = await applyCustomerImport({
       spreadsheetIdOrUrl,
       tabName,
@@ -26,9 +29,20 @@ export async function POST(req: Request) {
       importNotes,
       actorUserId: staff.userId,
     });
+    console.info("[customer-import] apply completed", {
+      spreadsheetIdOrUrl,
+      tabName,
+      durationMs: Date.now() - startedAt,
+      report: result.report,
+    });
     return NextResponse.json(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Apply failed";
+    console.error("[customer-import] apply failed", {
+      spreadsheetIdOrUrl,
+      tabName,
+      error: message,
+    });
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

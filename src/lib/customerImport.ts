@@ -54,6 +54,18 @@ type CustomerSnapshot = {
   contacts: ContactSnapshot[];
 };
 
+type PendingContactInsert = Record<string, unknown> & {
+  customer_id: string;
+  email?: string | null;
+  is_primary?: boolean;
+};
+
+type PendingNoteInsert = {
+  customer_id: string;
+  note: string;
+  author_user_id: string;
+};
+
 type ParsedRow = {
   rowNumber: number;
   source: Record<string, string>;
@@ -238,6 +250,14 @@ function rowToObject(headers: string[], row: string[]) {
     out[header] = String(row[index] || "").trim();
   });
   return out;
+}
+
+function chunkArray<T>(items: T[], size: number) {
+  const chunks: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+  return chunks;
 }
 
 function parseRow(rowNumber: number, source: Record<string, string>, mapping: ImportMapping): ParsedRow {
@@ -441,6 +461,21 @@ function findExistingContact(customer: CustomerSnapshot, parsed: ParsedRow) {
   return null;
 }
 
+function findExistingContactByPayload(customer: CustomerSnapshot, contact: { email?: string | null; name?: string | null }) {
+  const email = normalizeText(contact.email);
+  const name = normalizeText(contact.name);
+
+  if (email) {
+    const byEmail = customer.contacts.find((existing) => normalizeText(existing.email) === email);
+    if (byEmail) return byEmail;
+  }
+  if (name) {
+    const byName = customer.contacts.find((existing) => normalizeText(existing.name) === name);
+    if (byName) return byName;
+  }
+  return null;
+}
+
 function buildContactPayloads(customerId: string, parsed: ParsedRow) {
   const contacts: Array<Record<string, unknown>> = [];
   if (parsed.buyerName || parsed.primaryEmail || parsed.buyerTitle || parsed.mainPhone) {
@@ -512,7 +547,7 @@ async function buildPreview(args: {
     let matchStatus: PreviewRow["matchStatus"] = "invalid";
     let matchVia: PreviewRow["matchVia"] = null;
     let proposedContacts: Array<Record<string, unknown>> = [];
-    let proposedCustomerFields: Record<string, unknown> = buildCustomerPatch(parsed, assignment.userId);
+    const proposedCustomerFields: Record<string, unknown> = buildCustomerPatch(parsed, assignment.userId);
 
     if (match.kind === "new") {
       classification = "new_customer";
@@ -610,6 +645,10 @@ function buildUpdatePayload(existing: GenericRow, previewFields: Record<string, 
   return out;
 }
 
+function buildImportExternalKey(preview: PreviewResponse, rowNumber: number) {
+  return `${preview.spreadsheetId}:${preview.tabName}:${rowNumber}`;
+}
+
 async function applyPreview(args: {
   preview: PreviewResponse;
   importNotes: boolean;
@@ -617,6 +656,16 @@ async function applyPreview(args: {
 }) {
   const supabase = createAdminClient();
   const customers = await loadCustomerState();
+  const customerIdsByImportKey = new Map<string, string>();
+  for (const customer of customers.values()) {
+    const importKey = asText(customer.fields.import_external_key);
+    if (importKey) customerIdsByImportKey.set(importKey, customer.id);
+  }
+
+  const pendingContacts: PendingContactInsert[] = [];
+  const pendingNotes: PendingNoteInsert[] = [];
+  const primaryClears = new Set<string>();
+  const primaryEmailUpdates = new Map<string, string | null>();
   const report = {
     customersCreated: 0,
     customersUpdated: 0,
@@ -634,13 +683,44 @@ async function applyPreview(args: {
 
     try {
       let customerId = String(row.customerId || "");
+      const importExternalKey = buildImportExternalKey(args.preview, row.rowNumber);
 
       if (row.classification === "new_customer") {
-        const insertPayload = removeNullishValues(row.proposedCustomerFields);
-        const { data, error } = await supabase.from("customers").insert(insertPayload).select("id").single();
-        if (error || !data?.id) throw new Error(error?.message || "Failed to create customer");
-        customerId = String(data.id);
-        report.customersCreated += 1;
+        const existingCustomerId = customerIdsByImportKey.get(importExternalKey);
+        if (existingCustomerId) {
+          customerId = existingCustomerId;
+          const existing = customers.get(customerId);
+          if (existing) {
+            const updatePayload = buildUpdatePayload(existing.fields, row.proposedCustomerFields);
+            if (Object.keys(updatePayload).length > 0) {
+              const { error } = await supabase.from("customers").update(updatePayload).eq("id", customerId);
+              if (error) throw new Error(error.message);
+              existing.fields = { ...existing.fields, ...updatePayload };
+              existing.companyName = asText(existing.fields.company_name);
+              existing.primaryContactEmail = asText(existing.fields.primary_contact_email);
+              report.customersUpdated += 1;
+            }
+          }
+        } else {
+          const insertPayload = removeNullishValues({
+            ...row.proposedCustomerFields,
+            import_external_key: importExternalKey,
+          }) as GenericRow;
+          const { data, error } = await supabase.from("customers").insert(insertPayload).select("id").single();
+          if (error || !data?.id) throw new Error(error?.message || "Failed to create customer");
+          customerId = String(data.id);
+          customerIdsByImportKey.set(importExternalKey, customerId);
+          customers.set(customerId, {
+            id: customerId,
+            isPreviewOnly: false,
+            companyName: asText(insertPayload.company_name),
+            primaryContactEmail: asText(insertPayload.primary_contact_email),
+            assignedSalesUserId: asText(insertPayload.assigned_sales_user_id),
+            fields: { ...insertPayload, id: customerId },
+            contacts: [],
+          });
+          report.customersCreated += 1;
+        }
       } else {
         const existing = customers.get(customerId);
         if (existing) {
@@ -648,6 +728,9 @@ async function applyPreview(args: {
           if (Object.keys(updatePayload).length > 0) {
             const { error } = await supabase.from("customers").update(updatePayload).eq("id", customerId);
             if (error) throw new Error(error.message);
+            existing.fields = { ...existing.fields, ...updatePayload };
+            existing.companyName = asText(existing.fields.company_name);
+            existing.primaryContactEmail = asText(existing.fields.primary_contact_email);
             report.customersUpdated += 1;
           }
         }
@@ -655,56 +738,93 @@ async function applyPreview(args: {
 
       if (row.assignmentUserId) report.assignmentsResolved += 1;
 
+      const customer = customers.get(customerId);
+      if (!customer) throw new Error(`Customer snapshot missing for ${customerId}`);
+
       for (const contact of row.proposedContacts) {
-        const payload: Record<string, unknown> & {
-          customer_id: string;
-          email?: string | null;
-          is_primary?: boolean;
-        } = {
+        const payload: PendingContactInsert = {
           ...contact,
           customer_id: customerId,
         };
         const email = normalizeText(payload.email);
-        let existingContact: GenericRow | null = null;
-
-        if (email) {
-          const existingByEmail = await supabase
-            .from("customer_contacts")
-            .select("id, customer_id")
-            .eq("customer_id", customerId)
-            .eq("email", email)
-            .maybeSingle();
-          if (existingByEmail.error && existingByEmail.error.code !== "PGRST116") throw new Error(existingByEmail.error.message);
-          existingContact = (existingByEmail.data as GenericRow | null) ?? null;
-        }
+        const existingContact = findExistingContactByPayload(customer, {
+          email: payload.email,
+          name: asText(payload.name),
+        });
 
         if (existingContact) continue;
 
         if (payload.is_primary === true) {
-          const clearPrimary = await supabase.from("customer_contacts").update({ is_primary: false }).eq("customer_id", customerId);
-          if (clearPrimary.error) throw new Error(clearPrimary.error.message);
-          const { error: customerErr } = await supabase
-            .from("customers")
-            .update({ primary_contact_email: payload.email || null })
-            .eq("id", customerId);
-          if (customerErr) throw new Error(customerErr.message);
+          primaryClears.add(customerId);
+          primaryEmailUpdates.set(customerId, payload.email || null);
+          customer.contacts = customer.contacts.map((existingItem) => ({ ...existingItem, isPrimary: false }));
+          customer.primaryContactEmail = payload.email || null;
+          customer.fields = { ...customer.fields, primary_contact_email: payload.email || null };
         }
 
-        const { error } = await supabase.from("customer_contacts").insert(removeNullishValues(payload));
-        if (error) throw new Error(error.message);
-        report.contactsCreated += 1;
+        pendingContacts.push(removeNullishValues(payload));
+        customer.contacts.push({
+          id: `${customerId}-pending-${pendingContacts.length}`,
+          name: asText(payload.name),
+          email,
+          phone: asText(payload.phone),
+          title: asText(payload.title),
+          isPrimary: payload.is_primary === true,
+        });
       }
 
       if (args.importNotes && row.proposedCustomerFields.notes) {
-        const { error } = await supabase.from("customer_notes").insert({
+        pendingNotes.push({
           customer_id: customerId,
           note: `Imported from Google Sheets (row ${row.rowNumber}): ${String(row.proposedCustomerFields.notes)}`,
           author_user_id: args.actorUserId,
         });
-        if (error) throw new Error(error.message);
       }
-    } catch {
+    } catch (error) {
       report.rowsFailed += 1;
+      console.error("[customer-import] apply row failed", {
+        rowNumber: row.rowNumber,
+        classification: row.classification,
+        customerId: row.customerId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  const primaryClearIds = Array.from(primaryClears);
+  for (const chunk of chunkArray(primaryClearIds, 100)) {
+    const { error } = await supabase.from("customer_contacts").update({ is_primary: false }).in("customer_id", chunk);
+    if (error) throw new Error(error.message);
+  }
+
+  const primaryEmailUpdateEntries = Array.from(primaryEmailUpdates.entries());
+  for (const chunk of chunkArray(primaryEmailUpdateEntries, 25)) {
+    await Promise.all(chunk.map(async ([customerId, primaryEmail]) => {
+      const { error } = await supabase.from("customers").update({ primary_contact_email: primaryEmail }).eq("id", customerId);
+      if (error) throw new Error(error.message);
+    }));
+  }
+
+  for (const chunk of chunkArray(pendingContacts, 100)) {
+    const { error } = await supabase.from("customer_contacts").insert(chunk);
+    if (error) throw new Error(error.message);
+    report.contactsCreated += chunk.length;
+  }
+
+  if (pendingNotes.length > 0) {
+    const noteCustomerIds = Array.from(new Set(pendingNotes.map((note) => note.customer_id)));
+    const { data: existingNotes, error } = await supabase
+      .from("customer_notes")
+      .select("customer_id, note")
+      .in("customer_id", noteCustomerIds);
+    if (error) throw new Error(error.message);
+    const existingNoteKeys = new Set(
+      ((existingNotes || []) as GenericRow[]).map((note) => `${String(note.customer_id || "")}::${String(note.note || "")}`)
+    );
+    const notesToInsert = pendingNotes.filter((note) => !existingNoteKeys.has(`${note.customer_id}::${note.note}`));
+    for (const chunk of chunkArray(notesToInsert, 100)) {
+      const { error: insertError } = await supabase.from("customer_notes").insert(chunk);
+      if (insertError) throw new Error(insertError.message);
     }
   }
 
