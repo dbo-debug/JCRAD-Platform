@@ -65,6 +65,29 @@ async function getAccessToken() {
   return tokenJson.access_token as string;
 }
 
+async function getReadHeadersAndUrl(readUrl: string) {
+  const apiKey = process.env.GOOGLE_SHEETS_API_KEY;
+  if (apiKey) {
+    const url = new URL(readUrl);
+    url.searchParams.set("key", apiKey);
+    return { url: url.toString(), headers: undefined };
+  }
+
+  const clientEmail = process.env.GOOGLE_SHEETS_CLIENT_EMAIL;
+  const privateKeyRaw = process.env.GOOGLE_SHEETS_PRIVATE_KEY;
+  if (clientEmail && privateKeyRaw) {
+    const accessToken = await getAccessToken();
+    return {
+      url: readUrl,
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    };
+  }
+
+  throw new Error("Missing GOOGLE_SHEETS_API_KEY or GOOGLE_SHEETS_CLIENT_EMAIL/GOOGLE_SHEETS_PRIVATE_KEY");
+}
+
 function parseSpreadsheetId(input: string) {
   const trimmed = String(input || "").trim();
   if (!trimmed) throw new Error("Spreadsheet id is required");
@@ -78,14 +101,10 @@ export async function getSheetValues(args: { spreadsheetIdOrUrl: string; tabName
   const tab = String(args.tabName || "").trim();
   if (!tab) throw new Error("Sheet tab name is required");
 
-  const accessToken = await getAccessToken();
   const readUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(tab)}`;
+  const request = await getReadHeadersAndUrl(readUrl);
 
-  const res = await fetch(readUrl, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
+  const res = await fetch(request.url, request.headers ? { headers: request.headers } : undefined);
 
   const json = await res.json().catch(() => ({}));
   if (!res.ok) {
