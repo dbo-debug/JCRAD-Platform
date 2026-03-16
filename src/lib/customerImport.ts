@@ -476,6 +476,19 @@ function findExistingContactByPayload(customer: CustomerSnapshot, contact: { ema
   return null;
 }
 
+function getContactInsertName(contact: { email?: string | null; name?: string | null }) {
+  const name = asText(contact.name);
+  if (name) return name;
+
+  const email = asText(contact.email);
+  if (email) {
+    const prefix = email.split("@")[0]?.trim();
+    if (prefix) return prefix;
+  }
+
+  return "Unknown Contact";
+}
+
 function buildContactPayloads(customerId: string, parsed: ParsedRow) {
   const contacts: Array<Record<string, unknown>> = [];
   if (parsed.buyerName || parsed.primaryEmail || parsed.buyerTitle || parsed.mainPhone) {
@@ -746,6 +759,7 @@ async function applyPreview(args: {
           ...contact,
           customer_id: customerId,
         };
+        payload.name = getContactInsertName(payload);
         const email = normalizeText(payload.email);
         const existingContact = findExistingContactByPayload(customer, {
           email: payload.email,
