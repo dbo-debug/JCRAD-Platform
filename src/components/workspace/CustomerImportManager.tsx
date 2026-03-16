@@ -82,9 +82,14 @@ export default function CustomerImportManager({ fields, canApply }: { fields: Im
         }),
       });
       const json = await parseJsonSafe(res);
+      const report = (json.report ?? {}) as {
+        customersCreated?: number;
+        customersUpdated?: number;
+        contactsCreated?: number;
+      };
       if (!res.ok) throw new Error(String(json.error || `Apply failed (${res.status})`));
       setSuccess(
-        `Applied import. Created ${Number(json.report?.customersCreated || 0)} customers, updated ${Number(json.report?.customersUpdated || 0)}, created ${Number(json.report?.contactsCreated || 0)} contacts.`
+        `Applied import. Created ${Number(report.customersCreated || 0)} customers, updated ${Number(report.customersUpdated || 0)}, created ${Number(report.contactsCreated || 0)} contacts.`
       );
       if (json.preview) {
         const nextPreview = json.preview as PreviewResponse;
