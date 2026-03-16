@@ -170,17 +170,17 @@ export default function CustomerWorkspaceIndex({ customers }: CustomerWorkspaceI
   const visibleWithOwners = visibleCustomers.filter((customer) => customer.assignedSalesName).length;
 
   return (
-    <div className="space-y-5">
-      <section className="rounded-[28px] border border-[#d8e6ee] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbfd_100%)] p-5 shadow-[0_24px_60px_rgba(16,42,67,0.08)]">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
+    <div className="mx-auto max-w-[1360px] space-y-5">
+      <section className="rounded-[28px] border border-[#d8e6ee] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbfd_100%)] p-5 shadow-[0_24px_60px_rgba(16,42,67,0.08)] lg:px-6">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div className="max-w-[780px]">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6c8797]">CRM Workspace</p>
             <h2 className="mt-2 text-2xl font-semibold text-[#173543]">Operator views for account coverage, follow-up, and routing readiness</h2>
             <p className="mt-2 max-w-3xl text-sm text-[#5c7483]">
               Search live CRM accounts, pivot between saved views, and review contact coverage, ownership, territory, and activity without leaving the workspace.
             </p>
           </div>
-          <div className="grid min-w-[220px] gap-3 rounded-2xl border border-[#dbe8ef] bg-white/85 p-4 shadow-sm">
+          <div className="grid w-full gap-3 rounded-2xl border border-[#dbe8ef] bg-white/85 p-4 shadow-sm sm:max-w-[280px] xl:w-[280px] xl:flex-none">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7891a0]">Visible Accounts</p>
               <p className="mt-1 text-3xl font-semibold text-[#173543]">{visibleCustomers.length}</p>
@@ -219,8 +219,8 @@ export default function CustomerWorkspaceIndex({ customers }: CustomerWorkspaceI
         </div>
       </section>
 
-      <section className="rounded-[28px] border border-[#dbe8ef] bg-white p-5 shadow-[0_12px_32px_rgba(16,42,67,0.06)]">
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.5fr)_repeat(4,minmax(0,1fr))]">
+      <section className="rounded-[28px] border border-[#dbe8ef] bg-white p-5 shadow-[0_12px_32px_rgba(16,42,67,0.06)] lg:px-6">
+        <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-[minmax(0,1.35fr)_repeat(4,minmax(0,0.9fr))]">
           <label className="grid gap-1 text-sm text-[#4b6676]">
             <span className="font-medium">Search accounts</span>
             <input
@@ -304,11 +304,11 @@ export default function CustomerWorkspaceIndex({ customers }: CustomerWorkspaceI
           return (
             <article
               key={customer.id}
-              className="rounded-[28px] border border-[#d9e7ee] bg-white p-5 shadow-[0_14px_40px_rgba(16,42,67,0.05)] transition hover:-translate-y-0.5 hover:shadow-[0_20px_48px_rgba(16,42,67,0.08)]"
+              className="rounded-[28px] border border-[#d9e7ee] bg-white p-4 shadow-[0_14px_40px_rgba(16,42,67,0.05)] transition hover:-translate-y-0.5 hover:shadow-[0_20px_48px_rgba(16,42,67,0.08)] lg:p-5"
             >
-              <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+              <div className="flex flex-col gap-4 2xl:flex-row 2xl:items-start 2xl:justify-between">
                 <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-start gap-3">
+                  <div className="flex flex-col gap-3 xl:flex-row xl:items-start">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <Link href={`/workspace/customers/${customer.id}`} className="text-lg font-semibold text-[#173543] transition hover:text-[#0f766e]">
@@ -336,7 +336,7 @@ export default function CustomerWorkspaceIndex({ customers }: CustomerWorkspaceI
                       </p>
                     </div>
 
-                    <div className="grid min-w-[220px] gap-2 rounded-2xl border border-[#e1ebf1] bg-[#fbfdfe] p-3 text-sm text-[#53707f]">
+                    <div className="grid w-full gap-2 rounded-2xl border border-[#e1ebf1] bg-[#fbfdfe] p-3 text-sm text-[#53707f] xl:max-w-[240px] xl:flex-none">
                       <div className="flex items-center justify-between gap-3">
                         <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[#8198a5]">Activity</span>
                         <span className="font-semibold text-[#173543]">{activityCount} linked</span>
@@ -350,7 +350,7 @@ export default function CustomerWorkspaceIndex({ customers }: CustomerWorkspaceI
                     </div>
                   </div>
 
-                  <div className="mt-4 grid gap-4 lg:grid-cols-[1.3fr_1fr_1fr]">
+                  <div className="mt-4 grid gap-3 xl:grid-cols-2 2xl:grid-cols-[1.2fr_1fr_1fr]">
                     <InfoBlock
                       label="Primary Contact"
                       title={primaryContact?.name || "No primary contact"}
@@ -383,7 +383,7 @@ export default function CustomerWorkspaceIndex({ customers }: CustomerWorkspaceI
                   </div>
                 </div>
 
-                <div className="flex min-w-[220px] flex-col gap-2">
+                <div className="flex w-full flex-col gap-2 sm:max-w-[220px] 2xl:w-[200px] 2xl:flex-none">
                   <Link
                     href={`/workspace/customers/${customer.id}`}
                     className="inline-flex items-center justify-center rounded-full bg-[#173543] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#0f2a35]"

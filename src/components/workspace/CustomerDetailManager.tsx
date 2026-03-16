@@ -38,6 +38,8 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
   const [accountBusy, setAccountBusy] = useState(false);
   const [contactBusy, setContactBusy] = useState(false);
   const [noteBusy, setNoteBusy] = useState(false);
+  const [activityBusy, setActivityBusy] = useState(false);
+  const [taskBusy, setTaskBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -52,6 +54,13 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
   const [contactPhone, setContactPhone] = useState(props.primaryContact?.phone || "");
   const [contactTitle, setContactTitle] = useState(props.primaryContact?.title || "");
   const [note, setNote] = useState("");
+  const [activityType, setActivityType] = useState("note");
+  const [activitySummary, setActivitySummary] = useState("");
+  const [activityDetails, setActivityDetails] = useState("");
+  const [taskTitle, setTaskTitle] = useState("");
+  const [taskDueDate, setTaskDueDate] = useState("");
+  const [taskAssignedUserId, setTaskAssignedUserId] = useState(props.assignedSalesUserId || "");
+  const [taskPriority, setTaskPriority] = useState("2");
 
   async function refreshWithMessage(message: string) {
     setSuccess(message);
@@ -136,6 +145,82 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
       setError(err instanceof Error ? err.message : "Save failed");
     } finally {
       setNoteBusy(false);
+    }
+  }
+
+  async function createActivity() {
+    if (!activitySummary.trim()) {
+      setError("Enter an activity summary first.");
+      return;
+    }
+
+    setActivityBusy(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      let details: Record<string, unknown> | undefined;
+      const trimmedDetails = activityDetails.trim();
+      if (trimmedDetails) {
+        try {
+          details = { notes: trimmedDetails };
+        } catch {
+          throw new Error("Activity details are invalid.");
+        }
+      }
+
+      const res = await fetch(`/api/workspace/customers/${props.customerId}/activity`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          activity_type: activityType,
+          summary: activitySummary,
+          details,
+        }),
+      });
+      const json = await parseJsonSafe(res);
+      if (!res.ok) throw new Error(String(json.error || `Save failed (${res.status})`));
+      setActivitySummary("");
+      setActivityDetails("");
+      await refreshWithMessage("Activity logged.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setActivityBusy(false);
+    }
+  }
+
+  async function createTask() {
+    if (!taskTitle.trim()) {
+      setError("Enter a task title first.");
+      return;
+    }
+
+    setTaskBusy(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const res = await fetch(`/api/workspace/customers/${props.customerId}/tasks`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: taskTitle,
+          due_date: taskDueDate || null,
+          assigned_user_id: taskAssignedUserId || null,
+          priority: taskPriority ? Number(taskPriority) : null,
+        }),
+      });
+      const json = await parseJsonSafe(res);
+      if (!res.ok) throw new Error(String(json.error || `Save failed (${res.status})`));
+      setTaskTitle("");
+      setTaskDueDate("");
+      setTaskPriority("2");
+      await refreshWithMessage("Task created.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setTaskBusy(false);
     }
   }
 
@@ -275,6 +360,127 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
             className="rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
           >
             {noteBusy ? "Saving..." : "Add Note"}
+          </button>
+          {error ? <p className="text-sm text-[#991b1b]">{error}</p> : null}
+          {success ? <p className="text-sm text-[#0f766e]">{success}</p> : null}
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-[#dbe9ef] bg-white p-5 shadow-sm">
+        <h2 className="text-lg font-semibold text-[#173543]">Log Activity</h2>
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <label className="grid gap-1 text-sm text-[#4a6575]">
+            <span>Activity Type</span>
+            <select
+              value={activityType}
+              onChange={(e) => setActivityType(e.target.value)}
+              disabled={activityBusy}
+              className="rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a]"
+            >
+              {["note", "call", "email", "meeting", "task_update"].map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="grid gap-1 text-sm text-[#4a6575]">
+            <span>Summary</span>
+            <input
+              value={activitySummary}
+              onChange={(e) => setActivitySummary(e.target.value)}
+              disabled={activityBusy}
+              className="rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a]"
+              placeholder="Called buyer to confirm next steps."
+            />
+          </label>
+          <label className="grid gap-1 text-sm text-[#4a6575] md:col-span-2">
+            <span>Details</span>
+            <textarea
+              value={activityDetails}
+              onChange={(e) => setActivityDetails(e.target.value)}
+              rows={4}
+              disabled={activityBusy}
+              className="rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a]"
+              placeholder="Optional context for the timeline entry."
+            />
+          </label>
+        </div>
+        <div className="mt-4">
+          <button
+            type="button"
+            onClick={() => void createActivity()}
+            disabled={activityBusy}
+            className="rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+          >
+            {activityBusy ? "Saving..." : "Log Activity"}
+          </button>
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-[#dbe9ef] bg-white p-5 shadow-sm">
+        <h2 className="text-lg font-semibold text-[#173543]">Create Task</h2>
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <label className="grid gap-1 text-sm text-[#4a6575] md:col-span-2">
+            <span>Title</span>
+            <input
+              value={taskTitle}
+              onChange={(e) => setTaskTitle(e.target.value)}
+              disabled={taskBusy}
+              className="rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a]"
+              placeholder="Send updated pricing sheet."
+            />
+          </label>
+          <label className="grid gap-1 text-sm text-[#4a6575]">
+            <span>Due Date</span>
+            <input
+              type="date"
+              value={taskDueDate}
+              onChange={(e) => setTaskDueDate(e.target.value)}
+              disabled={taskBusy}
+              className="rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a]"
+            />
+          </label>
+          <label className="grid gap-1 text-sm text-[#4a6575]">
+            <span>Priority</span>
+            <select
+              value={taskPriority}
+              onChange={(e) => setTaskPriority(e.target.value)}
+              disabled={taskBusy}
+              className="rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a]"
+            >
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+            </select>
+          </label>
+          <label className="grid gap-1 text-sm text-[#4a6575] md:col-span-2">
+            <span>Assigned To</span>
+            <select
+              value={taskAssignedUserId}
+              onChange={(e) => setTaskAssignedUserId(e.target.value)}
+              disabled={taskBusy}
+              className="rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a]"
+            >
+              <option value="">Unassigned</option>
+              {props.salesOptions.map((option) => (
+                <option key={option.userId} value={option.userId}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <div className="mt-4 flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => void createTask()}
+            disabled={taskBusy}
+            className="rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+          >
+            {taskBusy ? "Saving..." : "Create Task"}
           </button>
           {error ? <p className="text-sm text-[#991b1b]">{error}</p> : null}
           {success ? <p className="text-sm text-[#0f766e]">{success}</p> : null}

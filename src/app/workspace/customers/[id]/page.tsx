@@ -27,6 +27,12 @@ function matchLabel(value: string): string {
   return "Legacy company match";
 }
 
+function getActivityNotes(details: Record<string, unknown> | null): string | null {
+  const notes = details?.notes;
+  const text = typeof notes === "string" ? notes.trim() : "";
+  return text || null;
+}
+
 export default async function WorkspaceCustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const staff = await requireStaff();
   const { id } = await params;
@@ -35,7 +41,7 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
 
   const supabase = createAdminClient();
   const [salesProfilesRes, authUsersRes] = await Promise.all([
-    supabase.from("profiles").select("id, role, company_name").in("role", ["admin", "sales"]),
+    supabase.from("profiles").select("id, role, company_name, full_name").in("role", ["admin", "sales"]),
     supabase.auth.admin.listUsers({ page: 1, perPage: 1000 }),
   ]);
 
@@ -47,7 +53,7 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
   );
   const salesOptions = ((salesProfilesRes.data || []) as Array<Record<string, unknown>>).map((profile) => {
     const userId = String(profile.id || "");
-    const label = String(profile.company_name || authEmailById.get(userId) || userId);
+    const label = String(profile.full_name || profile.company_name || authEmailById.get(userId) || userId);
     const email = authEmailById.get(userId);
     return {
       userId,
@@ -95,15 +101,7 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
         <Panel title="Activity Timeline">
           <div className="space-y-3">
             {detail.activity.map((item) => (
-              <div key={item.id} className="rounded-xl border border-[#dbe9ef] bg-[#f9fcfd] px-4 py-3">
-                <p className="font-semibold text-[#173543]">{item.summary}</p>
-                <p className="mt-1 text-sm text-[#4a6575]">
-                  {item.actorName || "System"} • {formatDate(item.createdAt)}
-                </p>
-                <p className="mt-1 text-xs uppercase tracking-wide text-[#6b8593]">
-                  {item.activityType}{item.entityType ? ` • ${item.entityType}` : ""}
-                </p>
-              </div>
+              <ActivityCard key={item.id} item={item} />
             ))}
             {detail.activity.length === 0 ? <EmptyState label="No customer activity yet." /> : null}
           </div>
@@ -195,6 +193,35 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
       </section>
 
       <section className="grid gap-4 xl:grid-cols-2">
+        <Panel title="Task List">
+          <div className="space-y-3">
+            {detail.tasks.map((task) => (
+              <div key={task.id} className="rounded-xl border border-[#dbe9ef] bg-[#f9fcfd] px-4 py-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-semibold text-[#173543]">{task.title}</p>
+                  <span className="rounded-full border border-[#d7e6ed] bg-white px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#4f6877]">
+                    {task.status}
+                  </span>
+                  {task.priority !== null ? (
+                    <span className="rounded-full border border-[#f1ddad] bg-[#fff9eb] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#9a6b00]">
+                      Priority {task.priority}
+                    </span>
+                  ) : null}
+                </div>
+                <p className="mt-1 text-sm text-[#4a6575]">
+                  {task.assignedUserName || "Unassigned"}
+                  {task.dueDate ? ` • Due ${formatDate(task.dueDate)}` : " • No due date"}
+                </p>
+                <p className="mt-1 text-xs text-[#5d7685]">
+                  Created {formatDate(task.createdAt)}
+                  {task.completedAt ? ` • Completed ${formatDate(task.completedAt)}` : ""}
+                </p>
+              </div>
+            ))}
+            {detail.tasks.length === 0 ? <EmptyState label="No customer tasks yet." /> : null}
+          </div>
+        </Panel>
+
         <Panel title="Customer Documents">
           <div className="space-y-3">
             {detail.documents.map((doc) => (
@@ -235,6 +262,34 @@ function SummaryCard({ label, value, helper }: { label: string; value: string; h
       <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#5d7685]">{label}</p>
       <p className="mt-2 text-lg font-semibold text-[#173543]">{value}</p>
       {helper ? <p className="mt-1 text-sm text-[#4a6575]">{helper}</p> : null}
+    </div>
+  );
+}
+
+function ActivityCard({
+  item,
+}: {
+  item: {
+    summary: string;
+    actorName: string | null;
+    createdAt: string | null;
+    activityType: string;
+    entityType: string | null;
+    details: Record<string, unknown> | null;
+  };
+}) {
+  const notes = getActivityNotes(item.details);
+
+  return (
+    <div className="rounded-xl border border-[#dbe9ef] bg-[#f9fcfd] px-4 py-3">
+      <p className="font-semibold text-[#173543]">{item.summary}</p>
+      <p className="mt-1 text-sm text-[#4a6575]">
+        {item.actorName || "System"} • {formatDate(item.createdAt)}
+      </p>
+      <p className="mt-1 text-xs uppercase tracking-wide text-[#6b8593]">
+        {item.activityType}{item.entityType ? ` • ${item.entityType}` : ""}
+      </p>
+      {notes ? <p className="mt-2 whitespace-pre-wrap text-sm text-[#4a6575]">{notes}</p> : null}
     </div>
   );
 }

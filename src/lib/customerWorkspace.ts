@@ -79,10 +79,22 @@ export type CustomerDetail = {
     id: string;
     activityType: string;
     summary: string;
+    details: Record<string, unknown> | null;
     createdAt: string | null;
     actorName: string | null;
     entityType: string | null;
     entityId: string | null;
+  }>;
+  tasks: Array<{
+    id: string;
+    title: string;
+    dueDate: string | null;
+    assignedUserId: string | null;
+    assignedUserName: string | null;
+    status: string;
+    priority: number | null;
+    createdAt: string | null;
+    completedAt: string | null;
   }>;
   estimates: LinkedRecord[];
   orders: LinkedRecord[];
@@ -109,6 +121,7 @@ type WorkspaceData = {
   customerContacts: GenericRow[];
   customerNotes: GenericRow[];
   customerActivity: GenericRow[];
+  customerTasks: GenericRow[];
   estimates: GenericRow[];
   orders: GenericRow[];
   packagingSubmissions: GenericRow[];
@@ -234,6 +247,7 @@ async function fetchAllTableRows(args: {
   table: string;
   columns?: string;
   orderBy?: { column: string; ascending: boolean };
+  optionalRelation?: boolean;
 }) {
   const rows: GenericRow[] = [];
   let from = 0;
@@ -249,7 +263,12 @@ async function fetchAllTableRows(args: {
     }
 
     const { data, error } = await query;
-    if (error) throw new Error(error.message);
+    if (error) {
+      if (args.optionalRelation && error.code === "42P01") {
+        return [];
+      }
+      throw new Error(error.message);
+    }
 
     const page = (data || []) as GenericRow[];
     rows.push(...page);
@@ -284,6 +303,7 @@ async function loadWorkspaceData(): Promise<WorkspaceData> {
     customerContacts,
     customerNotes,
     customerActivity,
+    customerTasks,
     estimatesRes,
     ordersRes,
     packagingRes,
@@ -294,7 +314,8 @@ async function loadWorkspaceData(): Promise<WorkspaceData> {
     fetchAllTableRows({ supabase, table: "customer_users" }),
     fetchAllTableRows({ supabase, table: "customer_contacts" }),
     fetchAllTableRows({ supabase, table: "customer_notes", orderBy: { column: "created_at", ascending: false } }),
-    fetchAllTableRows({ supabase, table: "customer_activity", orderBy: { column: "created_at", ascending: false } }),
+    fetchAllTableRows({ supabase, table: "customer_activity", orderBy: { column: "created_at", ascending: false }, optionalRelation: true }),
+    fetchAllTableRows({ supabase, table: "customer_tasks", orderBy: { column: "created_at", ascending: false }, optionalRelation: true }),
     supabase
       .from("estimates")
       .select("id, customer_account_id, customer_name, customer_email, status, total, created_at, updated_at")
@@ -311,7 +332,7 @@ async function loadWorkspaceData(): Promise<WorkspaceData> {
       .order("created_at", { ascending: false })
       .limit(5000),
     supabase.from("customer_documents").select("*").order("created_at", { ascending: false }).limit(5000),
-    fetchAllTableRows({ supabase, table: "profiles", columns: "id, role, company_name" }),
+    fetchAllTableRows({ supabase, table: "profiles", columns: "id, role, company_name, full_name" }),
   ]);
 
   const responses = [estimatesRes, ordersRes, packagingRes, customerDocumentsRes];
@@ -325,6 +346,7 @@ async function loadWorkspaceData(): Promise<WorkspaceData> {
     customerContacts,
     customerNotes,
     customerActivity,
+    customerTasks,
     estimates: (estimatesRes.data || []) as GenericRow[],
     orders: (ordersRes.data || []) as GenericRow[],
     packagingSubmissions: (packagingRes.data || []) as GenericRow[],
@@ -463,11 +485,47 @@ export async function loadCustomerWorkspaceDetail(customerId: string): Promise<C
           id: String(row.id || ""),
           activityType: firstText(row.activity_type) || "activity",
           summary: firstText(row.summary, row.description, row.activity_type) || "Activity",
+          details: row.details && typeof row.details === "object" && !Array.isArray(row.details) ? (row.details as Record<string, unknown>) : null,
           createdAt: firstText(row.created_at) || null,
           actorName: formatProfileName(actor),
           entityType: firstText(row.entity_type),
           entityId: firstText(row.entity_id),
         };
+      })
+  );
+
+  const tasks = sortByRecent(
+    data.customerTasks
+      .filter((row) => String(row.customer_id || "").trim() === customerId)
+      .map((row) => {
+        const assignee = profileById.get(String(row.assigned_user_id || ""));
+        const completedAt = firstText(row.completed_at) || null;
+        return {
+          id: String(row.id || ""),
+          title: firstText(row.title) || "Untitled task",
+          dueDate: firstText(row.due_date),
+          assignedUserId: firstText(row.assigned_user_id),
+          assignedUserName: formatProfileName(assignee),
+          status: firstText(row.status) || "open",
+          priority: typeof row.priority === "number" ? row.priority : Number.isFinite(Number(row.priority)) ? Number(row.priority) : null,
+          createdAt: firstText(row.created_at) || null,
+          completedAt,
+        };
+      })
+      .sort((a, b) => {
+        const statusWeight = a.completedAt ? 1 : 0;
+        const otherStatusWeight = b.completedAt ? 1 : 0;
+        if (statusWeight !== otherStatusWeight) return statusWeight - otherStatusWeight;
+
+        const aDue = Date.parse(String(a.dueDate || ""));
+        const bDue = Date.parse(String(b.dueDate || ""));
+        if (Number.isFinite(aDue) || Number.isFinite(bDue)) {
+          return (Number.isFinite(aDue) ? aDue : Number.MAX_SAFE_INTEGER) - (Number.isFinite(bDue) ? bDue : Number.MAX_SAFE_INTEGER);
+        }
+
+        const aCreated = Date.parse(String(a.createdAt || ""));
+        const bCreated = Date.parse(String(b.createdAt || ""));
+        return (Number.isFinite(bCreated) ? bCreated : 0) - (Number.isFinite(aCreated) ? aCreated : 0);
       })
   );
 
@@ -498,6 +556,7 @@ export async function loadCustomerWorkspaceDetail(customerId: string): Promise<C
     }),
     notes,
     activity,
+    tasks,
     estimates,
     orders,
     packagingSubmissions,

@@ -7,14 +7,14 @@ export default async function WorkspaceCustomersPage() {
   const { customers, metrics } = await loadCustomerWorkspaceIndex();
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto w-full max-w-[1440px] space-y-6 2xl:max-w-[1500px]">
       <AdminPageHeader
         title="Customers"
         description="CRM workspace for account ownership, contact coverage, pipeline management, and sales follow-up. Google Sheets imports feed this system, but CRM records are now the source of truth."
         action={<HeaderActions />}
       />
 
-      <section className="grid gap-4 lg:grid-cols-5">
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <MetricCard label="Total Customers" value={metrics.totalCustomers} />
         <MetricCard label="Total Contacts" value={metrics.totalContacts} />
         <MetricCard label="With Contacts" value={metrics.customersWithContacts} />
