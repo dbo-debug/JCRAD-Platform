@@ -30,6 +30,7 @@ type DraftStop = {
   estimatedDriveMinutesFromPrevious: number;
   estimatedVisitMinutes: number;
   legDistanceMeters: number;
+  scheduleFlag: "on_time" | "tight" | "overtime";
 };
 
 type LunchBlock = {
@@ -48,7 +49,15 @@ type PlannedRoute = {
   estimatedTotalMinutes: number;
   projectedFinishTime: string | null;
   estimatedReturnTime: string | null;
+  projectedReturnTime: string | null;
   returnDriveMinutes: number;
+  fitsWithinShift: boolean;
+  shiftStartTime: string;
+  requiredReturnBy: string;
+  overtimeMinutes: number;
+  firstOvertimeStopIndex: number | null;
+  firstOvertimeStopId: string | null;
+  suggestedTrimStopIds: string[];
   polyline: string | null;
   warning: string | null;
 };
@@ -66,6 +75,18 @@ function formatDateTime(value: string | null) {
   return new Date(parsed).toLocaleString();
 }
 
+function formatCompactDateTime(value: string | null) {
+  if (!value) return "Not set";
+  const parsed = Date.parse(value);
+  if (!Number.isFinite(parsed)) return "Not set";
+  return new Date(parsed).toLocaleString([], {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 function toTimeLabel(minutesFromMidnight: number) {
   const hours = Math.floor(minutesFromMidnight / 60);
   const minutes = minutesFromMidnight % 60;
@@ -80,6 +101,40 @@ function parseStartTimeMinutes(value: string) {
   const minutes = Number(minutesText);
   if (!Number.isInteger(hours) || !Number.isInteger(minutes)) return 9 * 60;
   return hours * 60 + minutes;
+}
+
+function scheduleFlagBadgeClass(flag: DraftStop["scheduleFlag"]) {
+  if (flag === "overtime") return "border-[#f3c6c6] bg-[#fff3f3] text-[#a33a3a]";
+  if (flag === "tight") return "border-[#f2ddb0] bg-[#fff9ea] text-[#9a640a]";
+  return "border-[#cfe8e4] bg-[#effaf7] text-[#0f766e]";
+}
+
+function routeStatusTone(args: { fitsWithinShift: boolean; previewNeedsRefresh: boolean; overtimeApproved: boolean }) {
+  if (args.previewNeedsRefresh) {
+    return {
+      label: "Needs Re-Optimize",
+      className: "border-[#f2ddb0] bg-[#fff9ea] text-[#9a640a]",
+      detail: "Preview timing is out of date after manual edits.",
+    };
+  }
+  if (!args.fitsWithinShift) {
+    return args.overtimeApproved
+      ? {
+          label: "Approved Overtime",
+          className: "border-[#f3c6c6] bg-[#fff3f3] text-[#a33a3a]",
+          detail: "Route exceeds shift cutoff, but overtime has been approved locally.",
+        }
+      : {
+          label: "Blocked By Overtime",
+          className: "border-[#f3c6c6] bg-[#fff3f3] text-[#a33a3a]",
+          detail: "Approve overtime or reduce the route before saving.",
+        };
+  }
+  return {
+    label: "Ready To Save",
+    className: "border-[#cfe8e4] bg-[#effaf7] text-[#0f766e]",
+    detail: "Preview is current and the route fits within shift.",
+  };
 }
 
 function deriveRouteTerritoryCode(stops: DraftStop[], explicitTerritoryCode: string) {
@@ -115,8 +170,11 @@ export default function SavedRoutePlannerPanel({
   const [draftStops, setDraftStops] = useState<DraftStop[]>([]);
   const [draftSource, setDraftSource] = useState<"pending" | "territory" | null>(null);
   const [draftPlan, setDraftPlan] = useState<PlannedRoute | null>(null);
+  const [selectedPreviewStopId, setSelectedPreviewStopId] = useState<string | null>(null);
+  const [overtimeApproved, setOvertimeApproved] = useState(false);
+  const [previewNeedsRefresh, setPreviewNeedsRefresh] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [busy, setBusy] = useState<"generate_pending" | "generate_territory" | "save" | "queue" | null>(null);
+  const [busy, setBusy] = useState<"generate_pending" | "generate_territory" | "save" | "queue" | "reoptimize" | null>(null);
 
   const selectedTerritory = territoryOptions.find((option) => option.value === territoryCode) || null;
   const coordinateReadyPendingStops = pendingStops.filter((stop) => stop.customer.latitude !== null && stop.customer.longitude !== null);
@@ -129,11 +187,74 @@ export default function SavedRoutePlannerPanel({
   const draftMapCustomers = draftStops
     .map((stop) => customerById.get(stop.customerId))
     .filter((customer): customer is CustomerSummary => Boolean(customer));
+  const suggestedTrimStops = (draftPlan?.suggestedTrimStopIds || [])
+    .map((customerId) => draftPlan?.orderedStops.find((stop) => stop.customerId === customerId))
+    .filter((stop): stop is DraftStop => Boolean(stop));
+  const selectedPreviewStop = draftStops.find((stop) => stop.customerId === selectedPreviewStopId) || draftStops[0] || null;
+  const saveBlockedByOvertime = Boolean(draftPlan && !draftPlan.fitsWithinShift && !overtimeApproved);
+  const saveBlocked = saveBlockedByOvertime || previewNeedsRefresh;
+  const topLevelRouteStatus = routeStatusTone({
+    fitsWithinShift: draftPlan?.fitsWithinShift ?? false,
+    previewNeedsRefresh,
+    overtimeApproved,
+  });
 
   function applyPlannedRoute(nextPlan: PlannedRoute, source: "pending" | "territory") {
     setDraftPlan(nextPlan);
     setDraftStops(nextPlan.orderedStops);
     setDraftSource(source);
+    setSelectedPreviewStopId(nextPlan.orderedStops[0]?.customerId || null);
+    setOvertimeApproved(false);
+    setPreviewNeedsRefresh(false);
+  }
+
+  function toPlannerStops(stops: DraftStop[]) {
+    return stops
+      .map((stop) => {
+        const customer = customerById.get(stop.customerId);
+        if (!customer || customer.latitude === null || customer.longitude === null) return null;
+        return {
+          customer_id: stop.customerId,
+          customer_name: stop.customerName,
+          territory_code: stop.territoryCode,
+          route_day: stop.routeDay,
+          latitude: customer.latitude,
+          longitude: customer.longitude,
+          queue_id: stop.queueId,
+        };
+      })
+      .filter((stop): stop is NonNullable<typeof stop> => Boolean(stop));
+  }
+
+  async function reoptimizeDraft(nextDraftStops: DraftStop[], source: "pending" | "territory", successMessage: string) {
+    setBusy("reoptimize");
+    setStatusMessage(null);
+
+    try {
+      const plannerStops = toPlannerStops(nextDraftStops);
+      const res = await fetch("/api/workspace/routes/plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          route_date: routeDate,
+          planned_start_time: startTime,
+          max_stops: Math.max(1, Math.min(normalizedMaxStops, plannerStops.length || normalizedMaxStops)),
+          stops: plannerStops,
+        }),
+      });
+      const json = await parseJsonSafe(res);
+      if (!res.ok) throw new Error(String(json.error || `Route planning failed (${res.status})`));
+
+      const plan = (json.plan || null) as PlannedRoute | null;
+      if (!plan) throw new Error("Route planning did not return a plan");
+
+      applyPlannedRoute(plan, source);
+      setStatusMessage(successMessage);
+    } catch (error) {
+      setStatusMessage(error instanceof Error ? error.message : "Route planning failed");
+    } finally {
+      setBusy(null);
+    }
   }
 
   async function syncPendingStops(args: { method: "DELETE"; body: Record<string, unknown> }) {
@@ -255,6 +376,9 @@ export default function SavedRoutePlannerPanel({
     nextStops.splice(nextIndex, 0, stop);
     setDraftStops(nextStops.map((item, nextOrder) => ({ ...item, stopOrder: nextOrder + 1 })));
     setDraftPlan((current) => (current ? { ...current, orderedStops: nextStops.map((item, nextOrder) => ({ ...item, stopOrder: nextOrder + 1 })) } : current));
+    setOvertimeApproved(false);
+    setPreviewNeedsRefresh(true);
+    setStatusMessage("Stop order changed. Re-optimize route to refresh schedule and overtime calculations before saving.");
   }
 
   async function removePendingStop(queueId: string) {
@@ -308,8 +432,17 @@ export default function SavedRoutePlannerPanel({
 
   function removeDraftStop(customerId: string) {
     const nextStops = draftStops.filter((stop) => stop.customerId !== customerId).map((stop, index) => ({ ...stop, stopOrder: index + 1 }));
-    setDraftStops(nextStops);
-    setDraftPlan((current) => (current ? { ...current, orderedStops: nextStops } : current));
+    const nextSelectedStopId = selectedPreviewStopId === customerId ? nextStops[0]?.customerId || null : selectedPreviewStopId;
+    setSelectedPreviewStopId(nextSelectedStopId);
+    if (nextStops.length === 0) {
+      setDraftStops([]);
+      setDraftPlan(null);
+      setOvertimeApproved(false);
+      setPreviewNeedsRefresh(false);
+      setStatusMessage("Removed the last stop from the draft route.");
+      return;
+    }
+    void reoptimizeDraft(nextStops, draftSource || "pending", "Removed stop and refreshed route preview.");
   }
 
   async function saveRoute() {
@@ -319,6 +452,14 @@ export default function SavedRoutePlannerPanel({
     }
     if (draftStops.length === 0 || !draftPlan) {
       setStatusMessage("Generate a finalized route before saving.");
+      return;
+    }
+    if (previewNeedsRefresh) {
+      setStatusMessage("Re-optimize the route before saving so the preview timing and overtime state are current.");
+      return;
+    }
+    if (saveBlockedByOvertime) {
+      setStatusMessage("Approve overtime or bring the route back within shift before saving.");
       return;
     }
 
@@ -373,6 +514,9 @@ export default function SavedRoutePlannerPanel({
       setDraftStops([]);
       setDraftPlan(null);
       setDraftSource(null);
+      setSelectedPreviewStopId(null);
+      setOvertimeApproved(false);
+      setPreviewNeedsRefresh(false);
       setNotes("");
       router.refresh();
       if (routeId) {
@@ -400,7 +544,7 @@ export default function SavedRoutePlannerPanel({
           <MetricLine label="Queue Ready" value={String(coordinateReadyPendingStops.length)} />
           <MetricLine label="Draft Stops" value={String(draftStops.length)} />
           <MetricLine label="Drive Minutes" value={String(draftPlan?.estimatedDriveMinutes || 0)} />
-          <MetricLine label="Projected Return" value={draftPlan?.estimatedReturnTime ? formatDateTime(draftPlan.estimatedReturnTime) : "Not set"} />
+          <MetricLine label="Projected Return" value={draftPlan?.projectedReturnTime ? formatDateTime(draftPlan.projectedReturnTime) : "Not set"} />
         </div>
       </div>
 
@@ -525,88 +669,257 @@ export default function SavedRoutePlannerPanel({
             </p>
           </div>
 
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => void saveRoute()}
-              disabled={busy !== null || draftStops.length === 0 || !draftPlan}
-              className="rounded-full bg-[#14b8a6] px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-95 disabled:opacity-60"
-            >
-              {busy === "save" ? "Saving..." : "Save Route"}
-            </button>
-            {statusMessage ? <p className="text-sm text-[#4f6877]">{statusMessage}</p> : null}
-          </div>
+          {statusMessage ? <p className="mt-4 text-sm text-[#4f6877]">{statusMessage}</p> : null}
         </section>
       </div>
 
-      {draftMapCustomers.length > 0 ? (
-        <RouteStopsMap
-          customers={draftMapCustomers}
-          title="Optimized Draft Map"
-          description="Review the finalized stop set on the map before saving. Stop order and timing come from the server-planned route schedule."
-          emptyLabel="The finalized draft does not have map-ready stops."
-          secondaryActionLabel="Open Account"
-          secondaryActionHref={(customerId) => `/workspace/customers/${customerId}`}
-        />
-      ) : null}
+      <div className="mt-5 grid gap-5 xl:grid-cols-[1.25fr_0.75fr]">
+        <section className="space-y-5">
+          {draftMapCustomers.length > 0 && draftPlan ? (
+            <RouteStopsMap
+              customers={draftMapCustomers}
+              title="Route Preview"
+              description="Review the finalized route on the map first. The preview reflects the server-planned order, origin, and route path before you save the route."
+              emptyLabel="The finalized draft does not have map-ready stops."
+              secondaryActionLabel="Open Account"
+              secondaryActionHref={(customerId) => `/workspace/customers/${customerId}`}
+              selectedCustomerId={selectedPreviewStopId}
+              onSelectedCustomerIdChange={setSelectedPreviewStopId}
+              plannedRoute={{
+                origin: {
+                  name: JC_RAD_HQ.name,
+                  latitude: JC_RAD_HQ.latitude,
+                  longitude: JC_RAD_HQ.longitude,
+                },
+                stopOrder: draftPlan.orderedStops.map((stop) => stop.customerId),
+                provider: draftPlan.provider,
+                polyline: draftPlan.polyline,
+              }}
+            />
+          ) : (
+            <section className="rounded-[24px] border border-dashed border-[#cfdde6] bg-[#fbfdfe] px-4 py-12 text-center text-sm text-[#5c7483]">
+              Finalize a pending-stop or territory route to open the map-first preview.
+            </section>
+          )}
 
-      <div className="mt-5 grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
-        <section className="rounded-[24px] border border-[#dbe8ef] bg-white p-4 shadow-sm">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Finalized Schedule</p>
-              <h3 className="mt-1 text-lg font-semibold text-[#173543]">{draftStops.length > 0 ? `${draftStops.length} scheduled stops` : "No finalized route yet"}</h3>
-              <p className="mt-1 text-sm text-[#5c7483]">
-                {draftPlan
-                  ? `${draftPlan.provider === "google" ? "Google routing" : "Fallback routing"} • projected finish ${formatDateTime(draftPlan.projectedFinishTime)} • projected return ${formatDateTime(draftPlan.estimatedReturnTime)}`
-                  : "Finalize a route to review planned arrival/departure times, lunch, and return-to-base timing."}
-              </p>
-              {draftPlan?.warning ? <p className="mt-1 text-sm text-[#946200]">{draftPlan.warning}</p> : null}
-            </div>
-            <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4f6877]">
-              Start {toTimeLabel(parseStartTimeMinutes(startTime))}
-            </span>
-          </div>
-
-          {draftPlan?.lunchBlock ? (
-            <div className="mt-4 rounded-2xl border border-[#f1ddad] bg-[#fff9eb] p-3 text-sm text-[#8a5a08]">
-              Lunch block {formatDateTime(draftPlan.lunchBlock.startTime)} to {formatDateTime(draftPlan.lunchBlock.endTime)} ({draftPlan.lunchBlock.minutes} min)
-            </div>
-          ) : null}
-
-          <div className="mt-4 space-y-3">
-            {draftStops.map((stop, index) => (
-              <div key={`${stop.customerId}-${stop.stopOrder}`} className="rounded-2xl border border-[#dbe8ef] bg-[#fbfdfe] p-3">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7d95a3]">Stop {stop.stopOrder}</p>
-                    <p className="mt-1 font-semibold text-[#173543]">{stop.customerName}</p>
-                    <p className="mt-1 text-sm text-[#5c7483]">
-                      Arrive {formatDateTime(stop.plannedArrivalTime)} • Depart {formatDateTime(stop.plannedDepartureTime)}
-                    </p>
-                    <p className="mt-1 text-sm text-[#5c7483]">
-                      Leg {stop.estimatedDriveMinutesFromPrevious} min • Visit {stop.estimatedVisitMinutes} min • Distance {(stop.legDistanceMeters / 1609.34).toFixed(1)} mi
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <button type="button" onClick={() => moveStop(index, -1)} disabled={index === 0} className="rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm text-[#42606f] disabled:opacity-60">
-                      Up
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => moveStop(index, 1)}
-                      disabled={index === draftStops.length - 1}
-                      className="rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm text-[#42606f] disabled:opacity-60"
-                    >
-                      Down
-                    </button>
-                    <button type="button" onClick={() => removeDraftStop(stop.customerId)} className="rounded-full border border-[#f2d1d1] bg-white px-3 py-1.5 text-sm text-[#9a3d3d]">
-                      Remove
-                    </button>
-                  </div>
+          <section className="rounded-[24px] border border-[#dbe8ef] bg-white p-4 shadow-sm">
+            <div className="rounded-[22px] border border-[#dbe8ef] bg-[linear-gradient(180deg,#f8fcfd_0%,#f3f8fa_100%)] p-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Route Decision</p>
+                  <h3 className="mt-1 text-xl font-semibold text-[#173543]">
+                    {draftStops.length > 0 ? `${draftStops.length} stops ready for final review` : "No finalized route yet"}
+                  </h3>
+                  <p className="mt-1 text-sm text-[#5c7483]">
+                    {draftPlan
+                      ? `${draftPlan.provider === "google" ? "Google routing" : "Fallback routing"} with a projected return of ${formatDateTime(draftPlan.projectedReturnTime)}.`
+                      : "Finalize a route to review shift fit, stop timing, and return-to-origin feasibility."}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <span className={["rounded-full border px-3 py-1.5 text-sm font-semibold", draftPlan ? topLevelRouteStatus.className : "border-[#d7e6ed] bg-[#f8fbfc] text-[#4f6877]"].join(" ")}>
+                    {draftPlan ? topLevelRouteStatus.label : "Awaiting Preview"}
+                  </span>
+                  <span className="rounded-full border border-[#d7e6ed] bg-white px-3 py-1.5 text-sm text-[#4f6877]">
+                    Start {draftPlan ? formatCompactDateTime(draftPlan.shiftStartTime) : toTimeLabel(parseStartTimeMinutes(startTime))}
+                  </span>
                 </div>
               </div>
-            ))}
+
+              <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <SummaryCard label="Projected Finish" value={draftPlan ? formatCompactDateTime(draftPlan.projectedFinishTime) : "Not set"} />
+                <SummaryCard label="Projected Return" value={draftPlan ? formatCompactDateTime(draftPlan.projectedReturnTime) : "Not set"} />
+                <SummaryCard label="Required Return By" value={draftPlan ? formatCompactDateTime(draftPlan.requiredReturnBy) : "Not set"} />
+                <SummaryCard label="Route Status" value={draftPlan ? topLevelRouteStatus.label : "Not set"} />
+              </div>
+
+              <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
+                <span className="rounded-full border border-[#d7e6ed] bg-white px-3 py-1.5 text-[#4f6877]">
+                  Lunch {draftPlan?.lunchBlock ? `${draftPlan.lunchBlock.minutes} min` : "Not scheduled"}
+                </span>
+                <span className="rounded-full border border-[#d7e6ed] bg-white px-3 py-1.5 text-[#4f6877]">
+                  Overtime {draftPlan && !draftPlan.fitsWithinShift ? `${draftPlan.overtimeMinutes} min` : "0 min"}
+                </span>
+                <span className="text-sm text-[#5c7483]">{draftPlan ? topLevelRouteStatus.detail : "Build a route to unlock final review actions."}</span>
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Decision Actions</p>
+                <h4 className="mt-1 text-lg font-semibold text-[#173543]">Choose the path that gets this route into a savable state</h4>
+                <p className="mt-1 text-sm text-[#5c7483]">Trim stops, re-optimize after manual edits, or explicitly approve overtime for this local finalization session.</p>
+                {draftPlan?.warning ? <p className="mt-1 text-sm text-[#946200]">{draftPlan.warning}</p> : null}
+                {previewNeedsRefresh ? <p className="mt-1 text-sm text-[#946200]">Preview is stale after manual order changes. Re-optimize before saving.</p> : null}
+              </div>
+              <div className="grid min-w-[260px] gap-2 rounded-2xl border border-[#dbe8ef] bg-[#fbfdfe] p-3 text-sm">
+                <MetricLine label="Save Status" value={!draftPlan ? "Locked" : saveBlocked ? "Blocked" : "Ready"} />
+                <MetricLine label="Selected Stop" value={selectedPreviewStop ? `${selectedPreviewStop.stopOrder}` : "None"} />
+                <MetricLine label="Route Provider" value={draftPlan ? (draftPlan.provider === "google" ? "Google" : "Fallback") : "Not set"} />
+              </div>
+            </div>
+
+            {draftPlan && !draftPlan.fitsWithinShift ? (
+              <div className="mt-4 rounded-2xl border border-[#f3c6c6] bg-[#fff3f3] p-4 text-sm text-[#8d3535]">
+                <p className="font-semibold">Projected return exceeds the required field-day cutoff.</p>
+                <p className="mt-1">
+                  First overtime stop:{" "}
+                  {draftPlan.firstOvertimeStopIndex !== null
+                    ? `Stop ${draftPlan.firstOvertimeStopIndex + 1}${draftPlan.firstOvertimeStopId ? ` (${draftPlan.orderedStops.find((stop) => stop.customerId === draftPlan.firstOvertimeStopId)?.customerName || draftPlan.firstOvertimeStopId})` : ""}`
+                    : "Not identified"}
+                  . Overtime: {draftPlan.overtimeMinutes} min.
+                </p>
+                {suggestedTrimStops.length > 0 ? (
+                  <p className="mt-1">
+                    Suggested trim from end: {suggestedTrimStops.map((stop) => `#${stop.stopOrder} ${stop.customerName}`).join(" • ")}
+                  </p>
+                ) : null}
+                {overtimeApproved ? <p className="mt-2 font-medium text-[#8d3535]">Overtime approved for this local finalization session.</p> : null}
+              </div>
+            ) : null}
+
+            {draftPlan?.lunchBlock ? (
+              <div className="mt-4 rounded-2xl border border-[#f1ddad] bg-[#fff9eb] p-3 text-sm text-[#8a5a08]">
+                Lunch block {formatDateTime(draftPlan.lunchBlock.startTime)} to {formatDateTime(draftPlan.lunchBlock.endTime)} ({draftPlan.lunchBlock.minutes} min)
+              </div>
+            ) : null}
+
+            <div className="mt-5 rounded-[22px] border border-[#dbe8ef] bg-[#fbfdfe] p-4">
+              <div className="flex flex-col gap-4">
+                <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                  <button
+                    type="button"
+                    onClick={() => setOvertimeApproved((current) => !current)}
+                    disabled={busy !== null || !draftPlan || draftPlan.fitsWithinShift || previewNeedsRefresh}
+                    className="rounded-2xl border border-[#d0dde5] bg-white px-4 py-3 text-sm font-semibold text-[#21424d] transition hover:border-[#14b8a6] hover:text-[#0f766e] disabled:opacity-60"
+                  >
+                    {overtimeApproved ? "Overtime Approved" : "Approve Overtime"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeDraftStop(draftStops[draftStops.length - 1]?.customerId || "")}
+                    disabled={busy !== null || draftStops.length === 0}
+                    className="rounded-2xl border border-[#d0dde5] bg-white px-4 py-3 text-sm font-semibold text-[#21424d] transition hover:border-[#14b8a6] hover:text-[#0f766e] disabled:opacity-60"
+                  >
+                    Remove Last Stop
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => (selectedPreviewStop ? removeDraftStop(selectedPreviewStop.customerId) : undefined)}
+                    disabled={busy !== null || !selectedPreviewStop}
+                    className="rounded-2xl border border-[#d0dde5] bg-white px-4 py-3 text-sm font-semibold text-[#21424d] transition hover:border-[#14b8a6] hover:text-[#0f766e] disabled:opacity-60"
+                  >
+                    {selectedPreviewStop ? `Remove Selected Stop (#${selectedPreviewStop.stopOrder})` : "Remove Selected Stop"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void reoptimizeDraft(draftStops, draftSource || "pending", "Re-optimized current draft route.")}
+                    disabled={busy !== null || draftStops.length === 0}
+                    className="rounded-2xl border border-[#d0dde5] bg-white px-4 py-3 text-sm font-semibold text-[#21424d] transition hover:border-[#14b8a6] hover:text-[#0f766e] disabled:opacity-60"
+                  >
+                    {busy === "reoptimize" ? "Re-optimizing..." : "Re-Optimize Route"}
+                  </button>
+                </div>
+
+                <div className="flex flex-col gap-3 rounded-2xl border border-[#d9e7ee] bg-white p-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7d95a3]">Save Decision</p>
+                    <p className="mt-1 text-lg font-semibold text-[#173543]">{!draftPlan ? "Route not ready" : saveBlocked ? "Save is blocked" : "Route can be saved"}</p>
+                    <p className="mt-1 text-sm text-[#5c7483]">
+                      {previewNeedsRefresh
+                        ? "Manual order edits require re-optimization before save."
+                        : saveBlockedByOvertime
+                          ? "Overtime must be approved or the route must be reduced to fit within shift."
+                          : "Preview is current and meets the current save rules."}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void saveRoute()}
+                    disabled={busy !== null || draftStops.length === 0 || !draftPlan || saveBlocked}
+                    className={[
+                      "rounded-full px-5 py-3 text-sm font-semibold text-white transition disabled:opacity-60",
+                      saveBlocked ? "bg-[#9fb6c0]" : "bg-[#14b8a6] hover:opacity-95",
+                    ].join(" ")}
+                  >
+                    {busy === "save" ? "Saving..." : "Save Route"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+        </section>
+
+        <section className="rounded-[24px] border border-[#dbe8ef] bg-white p-4 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Route Stops</p>
+              <h3 className="mt-1 text-lg font-semibold text-[#173543]">{draftStops.length > 0 ? "Ordered stop schedule" : "No stops yet"}</h3>
+              <p className="mt-1 text-sm text-[#5c7483]">Each stop shows arrival, departure, travel time, visit time, and shift-feasibility status from the current server-planned route.</p>
+            </div>
+            {draftPlan ? (
+              <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4f6877]">
+                {draftPlan.provider === "google" ? "Google" : "Fallback"} • {draftPlan.orderedStops.length} stops
+              </span>
+            ) : null}
+          </div>
+
+          <div className="mt-4 space-y-2.5">
+            {draftStops.map((stop, index) => {
+              const isFirstOvertimeStop =
+                draftPlan?.firstOvertimeStopIndex === index || (draftPlan?.firstOvertimeStopId ? draftPlan.firstOvertimeStopId === stop.customerId : false);
+
+              return (
+                <div
+                  key={`${stop.customerId}-${stop.stopOrder}`}
+                  className={[
+                    "rounded-[20px] border px-3 py-3",
+                    isFirstOvertimeStop
+                      ? "border-[#f3c6c6] bg-[#fff6f6]"
+                      : stop.scheduleFlag === "tight"
+                        ? "border-[#f2ddb0] bg-[#fffdf6]"
+                        : "border-[#dbe8ef] bg-[#fbfdfe]",
+                  ].join(" ")}
+                >
+                  <div className="flex flex-col gap-2.5">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="rounded-full border border-[#d7e6ed] bg-white px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#607b89]">Stop {index + 1}</p>
+                          <span className={["rounded-full border px-2.5 py-1 text-xs font-semibold", scheduleFlagBadgeClass(stop.scheduleFlag)].join(" ")}>
+                            {stop.scheduleFlag.replace("_", " ")}
+                          </span>
+                          {isFirstOvertimeStop ? (
+                            <span className="rounded-full border border-[#f3c6c6] bg-[#fff1f1] px-2.5 py-1 text-xs font-semibold text-[#a33a3a]">First overtime stop</span>
+                          ) : null}
+                        </div>
+                        <p className="mt-1 font-semibold text-[#173543]">{stop.customerName}</p>
+                        <div className="mt-2 grid gap-1 text-sm text-[#5c7483]">
+                          <p>Arrive {formatDateTime(stop.plannedArrivalTime)} • Depart {formatDateTime(stop.plannedDepartureTime)}</p>
+                          <p>Drive {stop.estimatedDriveMinutesFromPrevious} min • Visit {stop.estimatedVisitMinutes} min • Distance {(stop.legDistanceMeters / 1609.34).toFixed(1)} mi</p>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <button type="button" onClick={() => moveStop(index, -1)} disabled={index === 0} className="rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm text-[#42606f] transition hover:border-[#14b8a6] hover:text-[#0f766e] disabled:opacity-60">
+                          Up
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveStop(index, 1)}
+                          disabled={index === draftStops.length - 1}
+                          className="rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm text-[#42606f] transition hover:border-[#14b8a6] hover:text-[#0f766e] disabled:opacity-60"
+                        >
+                          Down
+                        </button>
+                        <button type="button" onClick={() => removeDraftStop(stop.customerId)} className="rounded-full border border-[#f2d1d1] bg-white px-3 py-1.5 text-sm text-[#9a3d3d] transition hover:bg-[#fff7f7]">
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
 
             {draftStops.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-[#cfdde6] bg-[#fbfdfe] px-4 py-10 text-center text-sm text-[#5c7483]">
@@ -719,6 +1032,15 @@ function MetricLine({ label, value }: { label: string; value: string }) {
     <div className="flex items-center justify-between gap-3">
       <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7d95a3]">{label}</span>
       <span className="text-base font-semibold text-[#173543]">{value}</span>
+    </div>
+  );
+}
+
+function SummaryCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-[#dbe8ef] bg-[#fbfdfe] p-3">
+      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7d95a3]">{label}</p>
+      <p className="mt-1 text-base font-semibold text-[#173543]">{value}</p>
     </div>
   );
 }

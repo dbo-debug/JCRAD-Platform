@@ -20,10 +20,13 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
   const routeDate = asText(body.route_date);
   const plannedStartTime = asText(body.planned_start_time);
+  const requiredReturnBy = asText(body.required_return_by);
+  const stopDurationMinutes = asNumber(body.stop_duration_minutes);
+  const lunchMinutes = asNumber(body.lunch_minutes);
   const stops = (Array.isArray(body.stops) ? body.stops : []) as Array<Record<string, unknown>>;
 
-  if (!routeDate || !plannedStartTime) {
-    return NextResponse.json({ error: "route_date and planned_start_time are required" }, { status: 400 });
+  if (!routeDate) {
+    return NextResponse.json({ error: "route_date is required" }, { status: 400 });
   }
 
   const normalizedStops = stops
@@ -49,6 +52,9 @@ export async function POST(req: Request) {
     stops: normalizedStops,
     routeDate,
     startTime: plannedStartTime,
+    requiredReturnByTime: requiredReturnBy,
+    visitMinutes: stopDurationMinutes,
+    lunchMinutes,
   });
 
   return NextResponse.json({ ok: true, plan });

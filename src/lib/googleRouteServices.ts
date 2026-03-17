@@ -111,6 +111,7 @@ export async function optimizeStopOrderWithGoogle(args: {
   origin: LatLng;
   stops: OptimizeStop[];
   routeDateTimeIso: string;
+  serviceDurationMinutes?: number;
 }) {
   const projectId = asText(process.env.GOOGLE_ROUTE_OPTIMIZATION_PROJECT_ID);
   if (!projectId) throw new Error("Missing GOOGLE_ROUTE_OPTIMIZATION_PROJECT_ID");
@@ -138,7 +139,7 @@ export async function optimizeStopOrderWithGoogle(args: {
                 latitude: stop.latitude,
                 longitude: stop.longitude,
               },
-              duration: "1800s",
+              duration: `${Math.max(0, Math.round(args.serviceDurationMinutes || 30)) * 60}s`,
             },
           ],
         })),

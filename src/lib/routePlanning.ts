@@ -9,6 +9,9 @@ export const JC_RAD_HQ = {
 
 const DEFAULT_VISIT_MINUTES = 30;
 const DEFAULT_LUNCH_MINUTES = 30;
+const DEFAULT_SHIFT_START_TIME = "09:00";
+const DEFAULT_REQUIRED_RETURN_TIME = "16:30";
+const TIGHT_RETURN_BUFFER_MINUTES = 30;
 
 export type RoutePlanStopInput = {
   customerId: string;
@@ -32,6 +35,7 @@ export type PlannedRouteStop = {
   estimatedDriveMinutesFromPrevious: number;
   estimatedVisitMinutes: number;
   legDistanceMeters: number;
+  scheduleFlag: "on_time" | "tight" | "overtime";
 };
 
 export type LunchBlock = {
@@ -50,7 +54,15 @@ export type PlannedRoute = {
   estimatedTotalMinutes: number;
   projectedFinishTime: string | null;
   estimatedReturnTime: string | null;
+  projectedReturnTime: string | null;
   returnDriveMinutes: number;
+  fitsWithinShift: boolean;
+  shiftStartTime: string;
+  requiredReturnBy: string;
+  overtimeMinutes: number;
+  firstOvertimeStopIndex: number | null;
+  firstOvertimeStopId: string | null;
+  suggestedTrimStopIds: string[];
   polyline: string | null;
   warning: string | null;
 };
@@ -75,6 +87,11 @@ function estimateDriveMinutes(miles: number) {
 
 function parseStartDateTime(args: { routeDate: string; startTime: string }) {
   return new Date(`${args.routeDate}T${args.startTime}:00`);
+}
+
+function parseTimeText(value: string | null | undefined, fallback: string) {
+  const text = String(value || "").trim();
+  return /^\d{2}:\d{2}$/.test(text) ? text : fallback;
 }
 
 function addMinutes(date: Date, minutes: number) {
@@ -117,20 +134,110 @@ function maybeInsertLunch(args: {
   currentTime: Date;
   lunchInserted: boolean;
   remainingStops: number;
+  lunchMinutes: number;
 }): LunchBlock | null {
-  if (args.lunchInserted || args.remainingStops <= 0) return null;
+  if (args.lunchInserted || args.remainingStops <= 0 || args.lunchMinutes <= 0) return null;
 
   const lunchThreshold = new Date(args.currentTime);
   lunchThreshold.setHours(12, 0, 0, 0);
   if (args.currentTime.getTime() < lunchThreshold.getTime()) return null;
 
   const startTime = new Date(args.currentTime);
-  const endTime = addMinutes(startTime, DEFAULT_LUNCH_MINUTES);
+  const endTime = addMinutes(startTime, args.lunchMinutes);
   return {
     startTime: startTime.toISOString(),
     endTime: endTime.toISOString(),
-    minutes: DEFAULT_LUNCH_MINUTES,
+    minutes: args.lunchMinutes,
   } satisfies LunchBlock;
+}
+
+function estimateMinutesToOrigin(stop: RoutePlanStopInput) {
+  return estimateDriveMinutes(
+    haversineMiles({
+      leftLat: stop.latitude,
+      leftLng: stop.longitude,
+      rightLat: JC_RAD_HQ.latitude,
+      rightLng: JC_RAD_HQ.longitude,
+    })
+  );
+}
+
+function buildTrimSuggestions(args: {
+  orderedStops: RoutePlanStopInput[];
+  orderedScheduledStops: PlannedRouteStop[];
+  requiredReturnBy: Date;
+}) {
+  if (args.orderedScheduledStops.length === 0) return [] as string[];
+
+  for (let index = args.orderedScheduledStops.length - 1; index >= 0; index -= 1) {
+    const prefixLastScheduledStop = args.orderedScheduledStops[index];
+    const prefixLastInputStop = args.orderedStops[index];
+    const projectedReturnTime = addMinutes(new Date(prefixLastScheduledStop.plannedDepartureTime), estimateMinutesToOrigin(prefixLastInputStop));
+
+    if (projectedReturnTime.getTime() <= args.requiredReturnBy.getTime()) {
+      return args.orderedScheduledStops.slice(index + 1).map((stop) => stop.customerId);
+    }
+  }
+
+  return args.orderedScheduledStops.map((stop) => stop.customerId);
+}
+
+function evaluateShiftFeasibility(args: {
+  orderedStops: RoutePlanStopInput[];
+  orderedScheduledStops: Omit<PlannedRouteStop, "scheduleFlag">[];
+  returnDriveMinutes: number;
+  shiftStartTime: Date;
+  requiredReturnBy: Date;
+  projectedReturnTime: string | null;
+}) {
+  let firstOvertimeStopIndex: number | null = null;
+  let firstOvertimeStopId: string | null = null;
+
+  const orderedStops = args.orderedScheduledStops.map((stop, index) => {
+    const stopReturnMinutes = index === args.orderedScheduledStops.length - 1 ? args.returnDriveMinutes : estimateMinutesToOrigin(args.orderedStops[index]);
+    const projectedPrefixReturnTime = addMinutes(new Date(stop.plannedDepartureTime), stopReturnMinutes);
+    const bufferMinutes = Math.round((args.requiredReturnBy.getTime() - projectedPrefixReturnTime.getTime()) / 60000);
+
+    // This marks the first stop after which the rep can no longer finish service and get back to HQ by the required cutoff.
+    if (bufferMinutes < 0 && firstOvertimeStopIndex === null) {
+      firstOvertimeStopIndex = index;
+      firstOvertimeStopId = stop.customerId;
+    }
+
+    let scheduleFlag: PlannedRouteStop["scheduleFlag"] = "on_time";
+    if (bufferMinutes < 0) scheduleFlag = "overtime";
+    else if (bufferMinutes <= TIGHT_RETURN_BUFFER_MINUTES) scheduleFlag = "tight";
+
+    return {
+      ...stop,
+      scheduleFlag,
+    } satisfies PlannedRouteStop;
+  });
+
+  const projectedReturnDate = args.projectedReturnTime ? new Date(args.projectedReturnTime) : null;
+  const overtimeMinutes =
+    projectedReturnDate && projectedReturnDate.getTime() > args.requiredReturnBy.getTime()
+      ? Math.round((projectedReturnDate.getTime() - args.requiredReturnBy.getTime()) / 60000)
+      : 0;
+
+  return {
+    orderedStops,
+    projectedReturnTime: args.projectedReturnTime,
+    fitsWithinShift: overtimeMinutes === 0,
+    shiftStartTime: args.shiftStartTime.toISOString(),
+    requiredReturnBy: args.requiredReturnBy.toISOString(),
+    overtimeMinutes,
+    firstOvertimeStopIndex,
+    firstOvertimeStopId,
+    suggestedTrimStopIds:
+      overtimeMinutes > 0
+        ? buildTrimSuggestions({
+            orderedStops: args.orderedStops,
+            orderedScheduledStops: orderedStops,
+            requiredReturnBy: args.requiredReturnBy,
+          })
+        : [],
+  };
 }
 
 function buildScheduledPlan(args: {
@@ -140,13 +247,18 @@ function buildScheduledPlan(args: {
   returnDriveMinutes: number;
   routeDate: string;
   startTime: string;
+  requiredReturnByTime: string;
+  visitMinutes: number;
+  lunchMinutes: number;
   polyline: string | null;
   provider: "google" | "fallback";
   warning: string | null;
 }) {
-  let cursor = parseStartDateTime({ routeDate: args.routeDate, startTime: args.startTime });
+  const shiftStartTime = parseStartDateTime({ routeDate: args.routeDate, startTime: args.startTime });
+  const requiredReturnBy = parseStartDateTime({ routeDate: args.routeDate, startTime: args.requiredReturnByTime });
+  let cursor = new Date(shiftStartTime);
   let lunchBlock: LunchBlock | null = null;
-  let lunchMinutes = 0;
+  let consumedLunchMinutes = 0;
 
   const orderedStops = args.orderedStops.map((stop, index) => {
     cursor = addMinutes(cursor, args.legDriveMinutes[index] || 0);
@@ -154,15 +266,16 @@ function buildScheduledPlan(args: {
       currentTime: cursor,
       lunchInserted: Boolean(lunchBlock),
       remainingStops: args.orderedStops.length - index,
+      lunchMinutes: args.lunchMinutes,
     });
     if (lunchCandidate) {
       lunchBlock = lunchCandidate;
-      lunchMinutes = lunchCandidate.minutes;
+      consumedLunchMinutes = lunchCandidate.minutes;
       cursor = new Date(lunchCandidate.endTime);
     }
 
     const plannedArrivalTime = new Date(cursor);
-    const plannedDepartureTime = addMinutes(plannedArrivalTime, DEFAULT_VISIT_MINUTES);
+    const plannedDepartureTime = addMinutes(plannedArrivalTime, args.visitMinutes);
     cursor = plannedDepartureTime;
 
     return {
@@ -175,26 +288,43 @@ function buildScheduledPlan(args: {
       plannedArrivalTime: plannedArrivalTime.toISOString(),
       plannedDepartureTime: plannedDepartureTime.toISOString(),
       estimatedDriveMinutesFromPrevious: args.legDriveMinutes[index] || 0,
-      estimatedVisitMinutes: DEFAULT_VISIT_MINUTES,
+      estimatedVisitMinutes: args.visitMinutes,
       legDistanceMeters: args.legDistanceMeters[index] || 0,
-    } satisfies PlannedRouteStop;
+    } satisfies Omit<PlannedRouteStop, "scheduleFlag">;
   });
 
   const projectedFinishTime = orderedStops.length > 0 ? cursor.toISOString() : null;
   const estimatedReturnTime = projectedFinishTime ? addMinutes(new Date(projectedFinishTime), args.returnDriveMinutes).toISOString() : null;
   const estimatedDriveMinutes = args.legDriveMinutes.reduce((sum, minutes) => sum + minutes, 0) + args.returnDriveMinutes;
-  const estimatedVisitMinutes = orderedStops.length * DEFAULT_VISIT_MINUTES;
+  const estimatedVisitMinutes = orderedStops.length * args.visitMinutes;
+  const feasibility = evaluateShiftFeasibility({
+    orderedStops: args.orderedStops,
+    orderedScheduledStops: orderedStops,
+    returnDriveMinutes: args.returnDriveMinutes,
+    shiftStartTime,
+    requiredReturnBy,
+    projectedReturnTime: estimatedReturnTime,
+  });
+
   return {
     provider: args.provider,
-    orderedStops,
+    orderedStops: feasibility.orderedStops,
     lunchBlock,
-    lunchMinutes,
+    lunchMinutes: consumedLunchMinutes,
     estimatedDriveMinutes,
     estimatedVisitMinutes,
-    estimatedTotalMinutes: estimatedDriveMinutes + estimatedVisitMinutes + lunchMinutes,
+    estimatedTotalMinutes: estimatedDriveMinutes + estimatedVisitMinutes + consumedLunchMinutes,
     projectedFinishTime,
     estimatedReturnTime,
+    projectedReturnTime: feasibility.projectedReturnTime,
     returnDriveMinutes: args.returnDriveMinutes,
+    fitsWithinShift: feasibility.fitsWithinShift,
+    shiftStartTime: feasibility.shiftStartTime,
+    requiredReturnBy: feasibility.requiredReturnBy,
+    overtimeMinutes: feasibility.overtimeMinutes,
+    firstOvertimeStopIndex: feasibility.firstOvertimeStopIndex,
+    firstOvertimeStopId: feasibility.firstOvertimeStopId,
+    suggestedTrimStopIds: feasibility.suggestedTrimStopIds,
     polyline: args.polyline,
     warning: args.warning,
   } satisfies PlannedRoute;
@@ -203,8 +333,15 @@ function buildScheduledPlan(args: {
 export async function buildPlannedRoute(args: {
   stops: RoutePlanStopInput[];
   routeDate: string;
-  startTime: string;
+  startTime?: string | null;
+  requiredReturnByTime?: string | null;
+  visitMinutes?: number | null;
+  lunchMinutes?: number | null;
 }): Promise<PlannedRoute> {
+  const startTime = parseTimeText(args.startTime, DEFAULT_SHIFT_START_TIME);
+  const requiredReturnByTime = parseTimeText(args.requiredReturnByTime, DEFAULT_REQUIRED_RETURN_TIME);
+  const visitMinutes = Math.max(0, Math.round(args.visitMinutes || DEFAULT_VISIT_MINUTES)) || DEFAULT_VISIT_MINUTES;
+  const lunchMinutes = Math.max(0, Math.round(args.lunchMinutes ?? DEFAULT_LUNCH_MINUTES));
   const trimmedStops = args.stops;
   if (trimmedStops.length === 0) {
     return {
@@ -217,13 +354,21 @@ export async function buildPlannedRoute(args: {
       estimatedTotalMinutes: 0,
       projectedFinishTime: null,
       estimatedReturnTime: null,
+      projectedReturnTime: null,
       returnDriveMinutes: 0,
+      fitsWithinShift: true,
+      shiftStartTime: parseStartDateTime({ routeDate: args.routeDate, startTime }).toISOString(),
+      requiredReturnBy: parseStartDateTime({ routeDate: args.routeDate, startTime: requiredReturnByTime }).toISOString(),
+      overtimeMinutes: 0,
+      firstOvertimeStopIndex: null,
+      firstOvertimeStopId: null,
+      suggestedTrimStopIds: [],
       polyline: null,
       warning: "No coordinate-ready stops were available to plan.",
     };
   }
 
-  const routeDateTimeIso = parseStartDateTime({ routeDate: args.routeDate, startTime: args.startTime }).toISOString();
+  const routeDateTimeIso = parseStartDateTime({ routeDate: args.routeDate, startTime }).toISOString();
 
   if (canUseGoogleRouteServices()) {
     try {
@@ -238,6 +383,7 @@ export async function buildPlannedRoute(args: {
           longitude: stop.longitude,
         })),
         routeDateTimeIso,
+        serviceDurationMinutes: visitMinutes,
       });
 
       const stopById = new Map(trimmedStops.map((stop) => [stop.customerId, stop]));
@@ -267,7 +413,10 @@ export async function buildPlannedRoute(args: {
         legDistanceMeters: outboundLegs.map((leg) => leg.distanceMeters),
         returnDriveMinutes: Math.max(0, Math.round((returnLeg?.durationSeconds || 0) / 60)),
         routeDate: args.routeDate,
-        startTime: args.startTime,
+        startTime,
+        requiredReturnByTime,
+        visitMinutes,
+        lunchMinutes,
         polyline: routes.polyline,
         provider: "google",
         warning: null,
@@ -311,7 +460,10 @@ export async function buildPlannedRoute(args: {
         legDistanceMeters: new Array(fallbackOrderedStops.length).fill(0),
         returnDriveMinutes,
         routeDate: args.routeDate,
-        startTime: args.startTime,
+        startTime,
+        requiredReturnByTime,
+        visitMinutes,
+        lunchMinutes,
         polyline: null,
         provider: "fallback",
         warning: message,
@@ -356,7 +508,10 @@ export async function buildPlannedRoute(args: {
     legDistanceMeters: new Array(fallbackOrderedStops.length).fill(0),
     returnDriveMinutes,
     routeDate: args.routeDate,
-    startTime: args.startTime,
+    startTime,
+    requiredReturnByTime,
+    visitMinutes,
+    lunchMinutes,
     polyline: null,
     provider: "fallback",
     warning: "Google routing is not configured. Used heuristic fallback order and timing.",
