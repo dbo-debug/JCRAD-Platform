@@ -122,6 +122,15 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
           nextVisitDueAt={detail.customer.nextVisitDueAt}
           latitude={detail.customer.latitude}
           longitude={detail.customer.longitude}
+          address1={detail.customer.address1}
+          address2={detail.customer.address2}
+          city={detail.customer.city}
+          state={detail.customer.state}
+          postalCode={detail.customer.postalCode}
+          geocodeStatus={detail.customer.geocodeStatus}
+          geocodedAddress={detail.customer.geocodedAddress}
+          lastGeocodedAt={detail.customer.lastGeocodedAt}
+          geocodeProvider={detail.customer.geocodeProvider}
           address={address}
           staffRole={staff.role}
           salesOptions={salesOptions}

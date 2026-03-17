@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { geocodeCustomerRow, getCustomerNormalizedAddress } from "@/lib/customerGeocode";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStaffContext } from "@/lib/getStaffContext";
 
@@ -58,6 +59,12 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
   const primaryContactEmail = asText(body.primary_contact_email);
   const status = asText(body.status);
   const stage = asText(body.stage);
+  const address1 = asText(body.address_1);
+  const address2 = asText(body.address_2);
+  const city = asText(body.city);
+  const state = asText(body.state);
+  const postalCode = asText(body.postal_code);
+  const forceGeocode = body.force_geocode === true || body.force_geocode === "true";
   const assignedSalesUserId = asText(body.assigned_sales_user_id);
   const territoryCode = asText(body.territory_code);
   const routeDay = asRouteDay(body.route_day);
@@ -114,6 +121,11 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
   if ("status" in body) payload.status = status;
   if ("stage" in body) payload.stage = stage;
   if ("primary_contact_email" in body) payload.primary_contact_email = primaryContactEmail;
+  if ("address_1" in body) payload.address_1 = address1;
+  if ("address_2" in body) payload.address_2 = address2;
+  if ("city" in body) payload.city = city;
+  if ("state" in body) payload.state = state;
+  if ("postal_code" in body) payload.postal_code = postalCode;
   if ("territory_code" in body) payload.territory_code = territoryCode;
   if ("route_day" in body) payload.route_day = routeDay;
   if ("route_priority" in body) payload.route_priority = routePriority;
@@ -138,6 +150,21 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
   }
 
   const supabase = createAdminClient();
+  const { data: currentCustomer, error: customerError } = await supabase
+    .from("customers")
+    .select(
+      "id, address_1, address_2, city, state, postal_code, latitude, longitude, geocode_status, geocoded_address, geocode_provider, last_geocoded_at, geocode_source, geocoded_at"
+    )
+    .eq("id", id)
+    .maybeSingle();
+
+  if (customerError) {
+    return NextResponse.json({ error: customerError.message }, { status: 500 });
+  }
+  if (!currentCustomer) {
+    return NextResponse.json({ error: "Customer not found" }, { status: 404 });
+  }
+
   if (territoryCode) {
     const { data: territory, error: territoryError } = await supabase.from("territories").select("code").eq("code", territoryCode).maybeSingle();
     if (territoryError) {
@@ -152,10 +179,56 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
     return NextResponse.json({ ok: true });
   }
 
+  const nextCustomerRow = {
+    address_1: "address_1" in body ? address1 : asText(currentCustomer.address_1),
+    address_2: "address_2" in body ? address2 : asText(currentCustomer.address_2),
+    city: "city" in body ? city : asText(currentCustomer.city),
+    state: "state" in body ? state : asText(currentCustomer.state),
+    postal_code: "postal_code" in body ? postalCode : asText(currentCustomer.postal_code),
+    latitude: "latitude" in body ? latitude : asNullableNumber(currentCustomer.latitude),
+    longitude: "longitude" in body ? longitude : asNullableNumber(currentCustomer.longitude),
+  };
+  const addressFieldsTouched = "address_1" in body || "address_2" in body || "city" in body || "state" in body || "postal_code" in body;
+  const normalizedPreviousAddress = getCustomerNormalizedAddress({
+    address_1: asText(currentCustomer.address_1),
+    city: asText(currentCustomer.city),
+    state: asText(currentCustomer.state),
+    postal_code: asText(currentCustomer.postal_code),
+  });
+  const normalizedNextAddress = getCustomerNormalizedAddress(nextCustomerRow);
+  const shouldAttemptGeocode = forceGeocode || (addressFieldsTouched && normalizedPreviousAddress !== normalizedNextAddress);
+
+  if (shouldAttemptGeocode) {
+    const geocode = await geocodeCustomerRow(nextCustomerRow);
+    payload.geocode_status = geocode.status;
+    payload.geocoded_address = geocode.normalizedAddress;
+    payload.geocode_provider = geocode.provider;
+    payload.geocode_source = geocode.provider;
+    payload.last_geocoded_at = geocode.status === "missing_address" ? null : new Date().toISOString();
+    payload.geocoded_at = geocode.status === "missing_address" ? null : new Date().toISOString();
+
+    if (geocode.ok) {
+      payload.latitude = geocode.latitude;
+      payload.longitude = geocode.longitude;
+    } else if (geocode.status === "missing_address" || normalizedPreviousAddress !== normalizedNextAddress || forceGeocode) {
+      payload.latitude = null;
+      payload.longitude = null;
+    }
+  }
+
   const { error } = await supabase.from("customers").update(payload).eq("id", id);
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({
+    ok: true,
+    geocoded: shouldAttemptGeocode,
+    latitude: payload.latitude ?? nextCustomerRow.latitude ?? null,
+    longitude: payload.longitude ?? nextCustomerRow.longitude ?? null,
+    geocode_status: payload.geocode_status ?? asText(currentCustomer.geocode_status),
+    geocoded_address: payload.geocoded_address ?? asText(currentCustomer.geocoded_address),
+    geocode_provider: payload.geocode_provider ?? asText(currentCustomer.geocode_provider || currentCustomer.geocode_source),
+    last_geocoded_at: payload.last_geocoded_at ?? asText(currentCustomer.last_geocoded_at || currentCustomer.geocoded_at),
+  });
 }

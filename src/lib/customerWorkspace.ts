@@ -24,6 +24,10 @@ export type CustomerSummary = {
   postalCode: string | null;
   latitude: number | null;
   longitude: number | null;
+  geocodeStatus: "geocoded" | "missing_address" | "failed" | "needs_review" | null;
+  geocodedAddress: string | null;
+  lastGeocodedAt: string | null;
+  geocodeProvider: string | null;
   website: string | null;
   mainPhone: string | null;
   primaryContactEmail: string | null;
@@ -692,6 +696,10 @@ function buildCustomerSummary({
     postalCode: firstText(customer.postal_code),
     latitude: firstNumber(customer.latitude),
     longitude: firstNumber(customer.longitude),
+    geocodeStatus: firstText(customer.geocode_status) as CustomerSummary["geocodeStatus"],
+    geocodedAddress: firstText(customer.geocoded_address),
+    lastGeocodedAt: firstText(customer.last_geocoded_at, customer.geocoded_at),
+    geocodeProvider: firstText(customer.geocode_provider, customer.geocode_source),
     website: firstText(customer.website),
     mainPhone: firstText(customer.main_phone),
     primaryContactEmail: firstText(customer.primary_contact_email),

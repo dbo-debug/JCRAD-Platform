@@ -39,6 +39,15 @@ type CustomerDetailManagerProps = {
   nextVisitDueAt: string | null;
   latitude: number | null;
   longitude: number | null;
+  address1: string | null;
+  address2: string | null;
+  city: string | null;
+  state: string | null;
+  postalCode: string | null;
+  geocodeStatus: "geocoded" | "missing_address" | "failed" | "needs_review" | null;
+  geocodedAddress: string | null;
+  lastGeocodedAt: string | null;
+  geocodeProvider: string | null;
   address: string | null;
   staffRole: "admin" | "sales";
   salesOptions: StaffOption[];
@@ -109,6 +118,14 @@ function addDaysDateValue(days: number) {
   return date.toISOString().slice(0, 10);
 }
 
+function formatShortDateTime(value: string | null | undefined) {
+  const text = String(value || "").trim();
+  if (!text) return "Never";
+  const parsed = Date.parse(text);
+  if (!Number.isFinite(parsed)) return "Never";
+  return new Date(parsed).toLocaleString();
+}
+
 function StatusPill({ label, tone = "neutral" }: { label: string; tone?: "neutral" | "warn" | "ok" }) {
   const toneClass =
     tone === "ok"
@@ -158,6 +175,15 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
   const [nextVisitDueAt, setNextVisitDueAt] = useState(toDateTimeLocalValue(props.nextVisitDueAt));
   const [latitude, setLatitude] = useState(props.latitude === null ? "" : String(props.latitude));
   const [longitude, setLongitude] = useState(props.longitude === null ? "" : String(props.longitude));
+  const [address1, setAddress1] = useState(props.address1 || "");
+  const [address2, setAddress2] = useState(props.address2 || "");
+  const [city, setCity] = useState(props.city || "");
+  const [stateCode, setStateCode] = useState(props.state || "");
+  const [postalCode, setPostalCode] = useState(props.postalCode || "");
+  const [geocodeStatus, setGeocodeStatus] = useState(props.geocodeStatus);
+  const [geocodedAddress, setGeocodedAddress] = useState(props.geocodedAddress);
+  const [lastGeocodedAt, setLastGeocodedAt] = useState(props.lastGeocodedAt);
+  const [geocodeProvider, setGeocodeProvider] = useState(props.geocodeProvider);
 
   const [contactName, setContactName] = useState(props.primaryContact?.name || "");
   const [contactEmail, setContactEmail] = useState(props.primaryContact?.email || "");
@@ -176,14 +202,20 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
   const [routeOutcomeTaskTitle, setRouteOutcomeTaskTitle] = useState("");
   const [routeOutcomeTaskDueDate, setRouteOutcomeTaskDueDate] = useState("");
 
-  const mapHref = buildMapHref(props.address, latitude, longitude);
+  const composedAddress = [address1, address2, [city, stateCode, postalCode].filter(Boolean).join(", ")].filter(Boolean).join(" • ") || null;
+  const mapHref = buildMapHref(composedAddress || props.address, latitude, longitude);
   const territoryMeta = props.territoryOptions.find((option) => option.code === territoryCode) || null;
   const hasCoords = Boolean(latitude.trim() && longitude.trim());
-  const hasAddress = Boolean(String(props.address || "").trim());
-  const coordinateCoverageState = hasCoords ? "has_coords" : hasAddress ? "address_ready" : "missing_address";
+  const hasAddress = Boolean(address1.trim() || city.trim() || stateCode.trim() || postalCode.trim());
+  const coordinateCoverageState =
+    hasCoords ? "has_coords" : geocodeStatus === "failed" ? "failed" : geocodeStatus === "needs_review" ? "needs_review" : hasAddress ? "address_ready" : "missing_address";
   const coordinateStatusLabel =
     coordinateCoverageState === "has_coords"
       ? "Map Ready"
+      : coordinateCoverageState === "failed"
+        ? "Geocode Failed"
+        : coordinateCoverageState === "needs_review"
+          ? "Needs Review"
       : coordinateCoverageState === "address_ready"
         ? "Has Address, Missing Coords"
         : "No Address, Missing Coords";
@@ -210,6 +242,15 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
     router.refresh();
   }
 
+  function syncGeocodeState(payload: Record<string, unknown>) {
+    setGeocodeStatus((payload.geocode_status as CustomerDetailManagerProps["geocodeStatus"]) ?? geocodeStatus);
+    setGeocodedAddress((payload.geocoded_address as string | null | undefined) ?? geocodedAddress);
+    setLastGeocodedAt((payload.last_geocoded_at as string | null | undefined) ?? lastGeocodedAt);
+    setGeocodeProvider((payload.geocode_provider as string | null | undefined) ?? geocodeProvider);
+    if ("latitude" in payload) setLatitude(payload.latitude == null ? "" : String(payload.latitude));
+    if ("longitude" in payload) setLongitude(payload.longitude == null ? "" : String(payload.longitude));
+  }
+
   async function saveAccount() {
     setAccountBusy(true);
     setError(null);
@@ -224,11 +265,17 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
           status,
           stage,
           primary_contact_email: primaryContactEmail,
+          address_1: address1 || null,
+          address_2: address2 || null,
+          city: city || null,
+          state: stateCode || null,
+          postal_code: postalCode || null,
           assigned_sales_user_id: assignedSalesUserId || null,
         }),
       });
       const json = await parseJsonSafe(res);
       if (!res.ok) throw new Error(String(json.error || `Save failed (${res.status})`));
+      syncGeocodeState(json);
       await refreshWithMessage("Customer account updated.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
@@ -260,6 +307,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
       });
       const json = await parseJsonSafe(res);
       if (!res.ok) throw new Error(String(json.error || `Save failed (${res.status})`));
+      syncGeocodeState(json);
       await refreshWithMessage(hasRouteConfig ? "Route settings updated." : "Route settings saved.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
@@ -484,7 +532,36 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
     if (mapHref) {
       window.open(mapHref, "_blank", "noopener,noreferrer");
     }
-    setSuccess("Geocode placeholder ready. Verify the location in Maps, then paste latitude and longitude into the route fields.");
+    setSuccess("Maps opened for coordinate review. Saved address changes will also attempt automatic geocoding on the server.");
+  }
+
+  async function retryGeocode() {
+    setRouteBusy(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const res = await fetch(`/api/workspace/customers/${props.customerId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          address_1: address1 || null,
+          address_2: address2 || null,
+          city: city || null,
+          state: stateCode || null,
+          postal_code: postalCode || null,
+          force_geocode: true,
+        }),
+      });
+      const json = await parseJsonSafe(res);
+      if (!res.ok) throw new Error(String(json.error || `Retry failed (${res.status})`));
+      syncGeocodeState(json);
+      await refreshWithMessage("Geocode retry completed.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Retry failed");
+    } finally {
+      setRouteBusy(false);
+    }
   }
 
   return (
@@ -702,23 +779,41 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
                   <p className="mt-1 text-xs text-[#5c7483]">
                     {hasCoords
                       ? "Coordinates are ready for route mapping."
-                      : hasAddress
-                        ? "Address is present. Use Maps to verify the stop and paste confirmed coordinates."
+                      : coordinateCoverageState === "failed"
+                        ? "Automatic geocoding failed. Retry geocoding or review the address."
+                        : coordinateCoverageState === "needs_review"
+                          ? "The address needs review before coordinates can be trusted."
+                        : hasAddress
+                          ? "Address is present. Saving the address will attempt automatic geocoding."
                         : "Add an address first before coordinates can be generated or verified."}
                   </p>
+                  <p className="mt-1 text-xs text-[#6d8593]">
+                    Status {titleCase(geocodeStatus, "Unknown")} • Provider {geocodeProvider || "Not set"} • Last geocoded {formatShortDateTime(lastGeocodedAt)}
+                  </p>
+                  {geocodedAddress ? <p className="mt-1 text-xs text-[#6d8593]">Geocoded address: {geocodedAddress}</p> : null}
                 </div>
-                <button
-                  type="button"
-                  onClick={handleGenerateCoordinates}
-                  disabled={!hasAddress}
-                  className="rounded-full border border-[#cfdde6] bg-white px-3 py-1.5 text-sm font-semibold text-[#21424d] transition hover:border-[#14b8a6] hover:text-[#0f766e] disabled:cursor-not-allowed disabled:border-[#d9e5eb] disabled:bg-[#f7fbfd] disabled:text-[#89a0ad]"
-                >
-                  {hasCoords ? "Review Coordinates" : "Generate Coordinates"}
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={handleGenerateCoordinates}
+                    disabled={!hasAddress}
+                    className="rounded-full border border-[#cfdde6] bg-white px-3 py-1.5 text-sm font-semibold text-[#21424d] transition hover:border-[#14b8a6] hover:text-[#0f766e] disabled:cursor-not-allowed disabled:border-[#d9e5eb] disabled:bg-[#f7fbfd] disabled:text-[#89a0ad]"
+                  >
+                    {hasCoords ? "Review Coordinates" : "Open in Maps"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void retryGeocode()}
+                    disabled={!hasAddress || routeBusy}
+                    className="rounded-full border border-[#cfdde6] bg-white px-3 py-1.5 text-sm font-semibold text-[#21424d] transition hover:border-[#14b8a6] hover:text-[#0f766e] disabled:cursor-not-allowed disabled:border-[#d9e5eb] disabled:bg-[#f7fbfd] disabled:text-[#89a0ad]"
+                  >
+                    {routeBusy ? "Saving..." : "Retry Geocode"}
+                  </button>
+                </div>
               </div>
               {!hasCoords ? (
                 <div className="mt-2 flex flex-wrap gap-2">
-                  <StatusPill label="Needs Coordinates" tone="warn" />
+                  <StatusPill label={coordinateStatusLabel} tone={coordinateCoverageState === "failed" || coordinateCoverageState === "missing_address" ? "warn" : "neutral"} />
                   <StatusPill label={hasAddress ? "Address On File" : "Address Missing"} tone={hasAddress ? "neutral" : "warn"} />
                 </div>
               ) : null}
@@ -726,7 +821,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
 
             <div className="rounded-xl border border-[#dbe9ef] bg-white px-3 py-2.5">
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8398a5]">Address</p>
-              <p className="mt-1 text-sm text-[#456271]">{props.address || "No address on file"}</p>
+              <p className="mt-1 text-sm text-[#456271]">{composedAddress || "No address on file"}</p>
             </div>
           </aside>
         </div>
@@ -778,6 +873,31 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
                   </option>
                 ))}
               </select>
+            </label>
+
+            <label className="grid gap-1 text-sm text-[#4a6575] md:col-span-2">
+              <span>Address 1</span>
+              <input value={address1} onChange={(e) => setAddress1(e.target.value)} disabled={accountBusy} className={inputClass} />
+            </label>
+
+            <label className="grid gap-1 text-sm text-[#4a6575] md:col-span-2">
+              <span>Address 2</span>
+              <input value={address2} onChange={(e) => setAddress2(e.target.value)} disabled={accountBusy} className={inputClass} />
+            </label>
+
+            <label className="grid gap-1 text-sm text-[#4a6575]">
+              <span>City</span>
+              <input value={city} onChange={(e) => setCity(e.target.value)} disabled={accountBusy} className={inputClass} />
+            </label>
+
+            <label className="grid gap-1 text-sm text-[#4a6575]">
+              <span>State</span>
+              <input value={stateCode} onChange={(e) => setStateCode(e.target.value)} disabled={accountBusy} className={inputClass} />
+            </label>
+
+            <label className="grid gap-1 text-sm text-[#4a6575] md:col-span-2">
+              <span>Postal Code</span>
+              <input value={postalCode} onChange={(e) => setPostalCode(e.target.value)} disabled={accountBusy} className={inputClass} />
             </label>
           </div>
           <div className="mt-3">

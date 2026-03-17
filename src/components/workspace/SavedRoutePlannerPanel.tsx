@@ -133,6 +133,14 @@ function deriveRouteTerritoryCode(stops: DraftStop[], explicitTerritoryCode: str
   return territoryCodes.length === 1 ? territoryCodes[0] : "";
 }
 
+function getMissingCoordLabel(customer: CustomerSummary) {
+  if (customer.latitude !== null && customer.longitude !== null) return "Coords ready";
+  if (customer.geocodeStatus === "failed") return "Geocode failed";
+  if (customer.geocodeStatus === "needs_review") return "Needs review";
+  if (customer.address1 || customer.city || customer.state || customer.postalCode) return "Missing coords";
+  return "No address";
+}
+
 export default function SavedRoutePlannerPanel({
   customers,
   currentUserId,
@@ -447,8 +455,7 @@ export default function SavedRoutePlannerPanel({
                   <div>
                     <p className="font-semibold text-[#173543]">{stop.customer.name}</p>
                     <p className="mt-1 text-sm text-[#5c7483]">
-                      {stop.customer.territoryCode || "Territory open"} • {stop.customer.routeDay || "No route day"} •{" "}
-                      {stop.customer.latitude !== null && stop.customer.longitude !== null ? "Coords ready" : "Missing coords"}
+                      {stop.customer.territoryCode || "Territory open"} • {stop.customer.routeDay || "No route day"} • {getMissingCoordLabel(stop.customer)}
                     </p>
                     <p className="mt-1 text-sm text-[#5c7483]">{stop.customer.address1 || stop.customer.city || "No address on file"}</p>
                   </div>

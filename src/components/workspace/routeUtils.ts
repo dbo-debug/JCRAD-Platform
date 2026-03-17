@@ -1,7 +1,7 @@
 import type { CustomerSummary } from "@/lib/customerWorkspace";
 
 export type RouteViewMode = "list" | "map";
-export type CoordinateCoverageFilter = "all" | "has_coords" | "needs_coords" | "address_ready" | "missing_address";
+export type CoordinateCoverageFilter = "all" | "has_coords" | "needs_coords" | "address_ready" | "missing_address" | "failed" | "needs_review";
 export type TerritorySortMode = "account_count" | "due_today" | "follow_up_needed";
 export type TerritoryFocusMode = "all" | "my_territories" | "unassigned_territories" | "due_heavy" | "cleanup";
 
@@ -148,6 +148,8 @@ export function customerHasAddress(customer: CustomerSummary) {
 
 export function getCoordinateCoverageState(customer: CustomerSummary): Exclude<CoordinateCoverageFilter, "all" | "needs_coords"> {
   if (customer.latitude !== null && customer.longitude !== null) return "has_coords";
+  if (customer.geocodeStatus === "failed") return "failed";
+  if (customer.geocodeStatus === "needs_review") return "needs_review";
   return customerHasAddress(customer) ? "address_ready" : "missing_address";
 }
 

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
+import CustomerGeocodeBatchButton from "@/components/workspace/CustomerGeocodeBatchButton";
 import CustomerWorkspaceIndex from "@/components/workspace/CustomerWorkspaceIndex";
 import { loadCustomerWorkspaceIndex } from "@/lib/customerWorkspace";
 import { loadPendingRouteStops } from "@/lib/routeStopQueue";
@@ -28,7 +29,7 @@ export default async function WorkspaceCustomersPage({
       <AdminPageHeader
         title="Customers"
         description="CRM workspace for account ownership, contact coverage, pipeline management, and sales follow-up. Google Sheets imports feed this system, but CRM records are now the source of truth."
-        action={<HeaderActions />}
+        action={<HeaderActions isAdmin={staff.role === "admin"} />}
       />
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
@@ -72,9 +73,10 @@ function MetricCard({ label, value }: { label: string; value: number }) {
   );
 }
 
-function HeaderActions() {
+function HeaderActions({ isAdmin }: { isAdmin: boolean }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
+      {isAdmin ? <CustomerGeocodeBatchButton /> : null}
       <Link
         href="/workspace/customers/import"
         className="inline-flex rounded-full border border-[#b9d5df] bg-white px-4 py-2 text-sm font-semibold text-[#21414d] transition hover:border-[#14b8a6] hover:text-[#0f766e]"

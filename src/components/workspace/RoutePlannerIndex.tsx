@@ -59,6 +59,8 @@ export default function RoutePlannerIndex({ customers, routeRepOptions, territor
   const [coordinateStatusFilter, setCoordinateStatusFilter] = useState<CoordinateCoverageFilter>(
     initialFilters.coordinateStatus === "has_coords" ||
       initialFilters.coordinateStatus === "needs_coords" ||
+      initialFilters.coordinateStatus === "failed" ||
+      initialFilters.coordinateStatus === "needs_review" ||
       initialFilters.coordinateStatus === "address_ready" ||
       initialFilters.coordinateStatus === "missing_address"
       ? initialFilters.coordinateStatus
@@ -177,6 +179,8 @@ export default function RoutePlannerIndex({ customers, routeRepOptions, territor
             options={[
               { value: "has_coords", label: "Map Ready" },
               { value: "needs_coords", label: "Needs Coordinates" },
+              { value: "failed", label: "Geocode Failed" },
+              { value: "needs_review", label: "Needs Review" },
               { value: "address_ready", label: "Has Address, Missing Coords" },
               { value: "missing_address", label: "No Address, No Coords" },
             ]}
