@@ -1,5 +1,6 @@
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import RoutePlannerIndex from "@/components/workspace/RoutePlannerIndex";
+import SavedRoutePlannerPanel from "@/components/workspace/SavedRoutePlannerPanel";
 import { requireStaff } from "@/lib/requireStaff";
 import { loadRouteWorkspaceData } from "@/lib/routeWorkspace";
 
@@ -13,13 +14,20 @@ export default async function WorkspaceRoutesPage({
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const staff = await requireStaff();
-  const [params, { customers, routeRepOptions, territoryOptions }] = await Promise.all([searchParams, loadRouteWorkspaceData()]);
+  const [params, { customers, routeRepOptions, territoryOptions, savedRoutes }] = await Promise.all([searchParams, loadRouteWorkspaceData()]);
 
   return (
     <div className="mx-auto w-full max-w-[1440px] space-y-6 2xl:max-w-[1500px]">
       <AdminPageHeader
         title="Routes"
         description="Phase 1 route planning for field reps. Use this operational board to stage daily stop lists by route day, territory, assigned rep, visit status, and priority."
+      />
+      <SavedRoutePlannerPanel
+        customers={customers}
+        currentUserId={staff.userId}
+        routeRepOptions={routeRepOptions}
+        territoryOptions={territoryOptions}
+        savedRoutes={savedRoutes}
       />
       <RoutePlannerIndex
         customers={customers}
