@@ -14,7 +14,10 @@ export default async function WorkspaceRoutesPage({
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const staff = await requireStaff();
-  const [params, { customers, routeRepOptions, territoryOptions, savedRoutes }] = await Promise.all([searchParams, loadRouteWorkspaceData()]);
+  const [params, { customers, routeRepOptions, territoryOptions, savedRoutes, pendingStops }] = await Promise.all([
+    searchParams,
+    loadRouteWorkspaceData(staff.userId),
+  ]);
 
   return (
     <div className="mx-auto w-full max-w-[1440px] space-y-6 2xl:max-w-[1500px]">
@@ -25,6 +28,7 @@ export default async function WorkspaceRoutesPage({
       <SavedRoutePlannerPanel
         customers={customers}
         currentUserId={staff.userId}
+        pendingStops={pendingStops}
         routeRepOptions={routeRepOptions}
         territoryOptions={territoryOptions}
         savedRoutes={savedRoutes}

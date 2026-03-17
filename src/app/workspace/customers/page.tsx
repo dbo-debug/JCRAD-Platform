@@ -2,6 +2,7 @@ import Link from "next/link";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import CustomerWorkspaceIndex from "@/components/workspace/CustomerWorkspaceIndex";
 import { loadCustomerWorkspaceIndex } from "@/lib/customerWorkspace";
+import { loadPendingRouteStops } from "@/lib/routeStopQueue";
 import { loadRouteReferenceData } from "@/lib/routeWorkspace";
 import { requireStaff } from "@/lib/requireStaff";
 
@@ -20,6 +21,7 @@ export default async function WorkspaceCustomersPage({
     loadRouteReferenceData(),
     searchParams,
   ]);
+  const pendingStops = await loadPendingRouteStops({ userId: staff.userId, customers });
 
   return (
     <div className="mx-auto w-full max-w-[1440px] space-y-6 2xl:max-w-[1500px]">
@@ -38,6 +40,7 @@ export default async function WorkspaceCustomersPage({
       </section>
       <CustomerWorkspaceIndex
         customers={customers}
+        initialPendingStops={pendingStops}
         staffRole={staff.role}
         currentUserId={staff.userId}
         salesRepOptions={routeRepOptions}

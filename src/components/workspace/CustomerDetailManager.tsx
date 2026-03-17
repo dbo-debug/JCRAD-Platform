@@ -260,7 +260,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
       });
       const json = await parseJsonSafe(res);
       if (!res.ok) throw new Error(String(json.error || `Save failed (${res.status})`));
-      await refreshWithMessage(hasRouteConfig ? "Route plan updated." : "Customer added to route planning.");
+      await refreshWithMessage(hasRouteConfig ? "Route settings updated." : "Route settings saved.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
     } finally {
@@ -516,7 +516,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
                 disabled={routeBusy}
                 className="rounded-full bg-[#173543] px-3.5 py-1.5 text-sm font-semibold text-white disabled:opacity-60"
               >
-                {routeBusy ? "Saving..." : hasRouteConfig ? "Update Route" : "Add to Route"}
+                {routeBusy ? "Saving..." : hasRouteConfig ? "Update Route Settings" : "Save Route Settings"}
               </button>
             </div>
           }

@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { loadCustomerWorkspaceIndex, type CustomerSummary } from "@/lib/customerWorkspace";
+import { loadPendingRouteStops, type PendingRouteStop } from "@/lib/routeStopQueue";
 import { formatTerritoryOptionLabel, loadTerritories } from "@/lib/territories";
 
 export type RouteRepOption = {
@@ -18,6 +19,7 @@ export type RouteWorkspaceData = {
   routeRepOptions: RouteRepOption[];
   territoryOptions: TerritoryOption[];
   savedRoutes: SavedRouteSummary[];
+  pendingStops: PendingRouteStop[];
 };
 
 export type SavedRouteSummary = {
@@ -62,13 +64,15 @@ export type SavedRouteDetail = Omit<SavedRouteSummary, "stopCount"> & {
   stops: SavedRouteStop[];
 };
 
-export async function loadRouteWorkspaceData(): Promise<RouteWorkspaceData> {
+export async function loadRouteWorkspaceData(currentUserId: string): Promise<RouteWorkspaceData> {
   const [{ customers }, referenceData, savedRoutes] = await Promise.all([loadCustomerWorkspaceIndex(), loadRouteReferenceData(), loadSavedRoutes()]);
+  const pendingStops = await loadPendingRouteStops({ userId: currentUserId, customers });
 
   return {
     customers,
     ...referenceData,
     savedRoutes,
+    pendingStops,
   };
 }
 

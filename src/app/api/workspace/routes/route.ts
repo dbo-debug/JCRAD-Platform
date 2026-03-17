@@ -33,9 +33,12 @@ export async function POST(req: Request) {
   const estimatedTotalMinutes = asNullableNumber(body.estimated_total_minutes) || 0;
   const originLatitude = asNullableNumber(body.origin_latitude);
   const originLongitude = asNullableNumber(body.origin_longitude);
+  const queueIds = Array.isArray(body.queue_ids)
+    ? Array.from(new Set(body.queue_ids.map((value: unknown) => asText(value)).filter((value: string | null): value is string => Boolean(value))))
+    : [];
   const stops = (Array.isArray(body.stops) ? body.stops : []) as Array<Record<string, unknown>>;
 
-  if (!name || !territoryCode || !originName || !originAddress || !assignedUserId || !routeDate || !plannedStartTime) {
+  if (!name || !originName || !originAddress || !assignedUserId || !routeDate || !plannedStartTime) {
     return NextResponse.json({ error: "Missing required route fields" }, { status: 400 });
   }
   if (!["draft", "assigned", "in_progress", "completed", "archived"].includes(status)) {
@@ -109,6 +112,14 @@ export async function POST(req: Request) {
   if (stopsError) {
     await supabase.from("routes").delete().eq("id", route.id);
     return NextResponse.json({ error: stopsError.message }, { status: 500 });
+  }
+
+  if (queueIds.length > 0) {
+    const { error: queueError } = await supabase.from("route_stop_queue").delete().eq("added_by_user_id", staff.userId).in("id", queueIds);
+    if (queueError) {
+      await supabase.from("routes").delete().eq("id", route.id);
+      return NextResponse.json({ error: queueError.message }, { status: 500 });
+    }
   }
 
   return NextResponse.json({ ok: true, route_id: route.id });

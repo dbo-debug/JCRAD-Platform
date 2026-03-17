@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { startTransition, useEffect, useState } from "react";
 import type { CustomerSummary } from "@/lib/customerWorkspace";
+import type { PendingRouteStop } from "@/lib/routeStopQueue";
 import type { RouteRepOption, TerritoryOption } from "@/lib/routeWorkspace";
 import {
   buildTerritoryStats,
@@ -15,6 +16,7 @@ import {
 
 type CustomerWorkspaceIndexProps = {
   customers: CustomerSummary[];
+  initialPendingStops: PendingRouteStop[];
   staffRole: "admin" | "sales";
   currentUserId: string;
   salesRepOptions: RouteRepOption[];
@@ -34,11 +36,10 @@ type CustomerWorkspaceIndexProps = {
   };
 };
 
-type BulkActionKind = "assign_sales_rep" | "assign_territory" | "assign_route_day" | "add_to_route";
+type BulkActionKind = "assign_sales_rep" | "assign_territory" | "assign_route_day" | "add_to_pending_stops" | "remove_from_pending_stops";
 type BulkActionState = {
   kind: BulkActionKind;
   value: string;
-  routeRepUserId: string;
 };
 
 type SavedViewKey = "all" | "pipeline" | "unassigned" | "missing_primary" | "with_orders";
@@ -60,29 +61,12 @@ const BULK_ACTIONS: Array<{ key: BulkActionKind; label: string }> = [
   { key: "assign_sales_rep", label: "Assign Sales Rep" },
   { key: "assign_territory", label: "Assign Territory" },
   { key: "assign_route_day", label: "Assign Route Day" },
-  { key: "add_to_route", label: "Add to Route" },
+  { key: "add_to_pending_stops", label: "Add to Pending Stops" },
+  { key: "remove_from_pending_stops", label: "Remove from Pending Stops" },
 ];
 
 function sameIds(left: string[], right: string[]) {
   return left.length === right.length && left.every((value, index) => value === right[index]);
-}
-
-function buildRouteRunnerHref(customer: {
-  id: string;
-  territoryCode: string | null;
-  routeDay: string | null;
-  assignedRouteRepUserId?: string | null;
-}) {
-  const params = new URLSearchParams({
-    customerId: customer.id,
-    scope: "all",
-  });
-
-  if (customer.territoryCode) params.set("territory", customer.territoryCode);
-  if (customer.routeDay) params.set("routeDay", customer.routeDay);
-  if (customer.assignedRouteRepUserId) params.set("rep", customer.assignedRouteRepUserId);
-
-  return `/workspace/routes/run?${params.toString()}`;
 }
 
 async function parseJsonSafe(res: Response): Promise<Record<string, unknown>> {
@@ -191,7 +175,15 @@ function compareGroupLabels(left: string, right: string) {
   return left.localeCompare(right);
 }
 
-export default function CustomerWorkspaceIndex({ customers, staffRole, currentUserId, salesRepOptions, territoryOptions, initialFilters }: CustomerWorkspaceIndexProps) {
+export default function CustomerWorkspaceIndex({
+  customers,
+  initialPendingStops,
+  staffRole,
+  currentUserId,
+  salesRepOptions,
+  territoryOptions,
+  initialFilters,
+}: CustomerWorkspaceIndexProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -247,10 +239,10 @@ export default function CustomerWorkspaceIndex({ customers, staffRole, currentUs
   const [bulkAction, setBulkAction] = useState<BulkActionState>({
     kind: staffRole === "admin" ? "assign_sales_rep" : "assign_territory",
     value: "",
-    routeRepUserId: staffRole === "sales" ? currentUserId : "",
   });
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkStatusMessage, setBulkStatusMessage] = useState<string | null>(null);
+  const [pendingStops, setPendingStops] = useState<PendingRouteStop[]>(initialPendingStops);
 
   const statuses = Array.from(new Set(customers.map((customer) => customer.status).filter(Boolean))).sort((a, b) => a.localeCompare(b));
   const stages = Array.from(new Set(customers.map((customer) => customer.stage).filter((value): value is string => Boolean(value)))).sort((a, b) => a.localeCompare(b));
@@ -318,6 +310,7 @@ export default function CustomerWorkspaceIndex({ customers, staffRole, currentUs
 
   const visibleCustomerIds = visibleCustomers.map((customer) => customer.id);
   const visibleCustomerIdSet = new Set(visibleCustomerIds);
+  const pendingCustomerIdSet = new Set(pendingStops.map((stop) => stop.customerId));
   const visibleCustomerIdsKey = visibleCustomerIds.join("|");
   const selectedVisibleCustomerIds = selectedCustomerIds.filter((id) => visibleCustomerIdSet.has(id));
   const selectedVisibleCustomers = visibleCustomers.filter((customer) => selectedVisibleCustomerIds.includes(customer.id));
@@ -420,12 +413,53 @@ export default function CustomerWorkspaceIndex({ customers, staffRole, currentUs
     setBulkAction((current) => {
       const nextKind = current.kind === "assign_sales_rep" ? "assign_territory" : current.kind;
       const nextValue = current.kind === "assign_sales_rep" ? "" : current.value;
-      if (nextKind === current.kind && nextValue === current.value && current.routeRepUserId === currentUserId) {
+      if (nextKind === current.kind && nextValue === current.value) {
         return current;
       }
-      return { ...current, kind: nextKind, value: nextValue, routeRepUserId: currentUserId };
+      return { ...current, kind: nextKind, value: nextValue };
     });
   }, [currentUserId, staffRole]);
+
+  async function syncPendingStops(args: { method: "POST" | "DELETE"; body: Record<string, unknown> }) {
+    const res = await fetch("/api/workspace/route-stop-queue", {
+      method: args.method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(args.body),
+    });
+    const json = await parseJsonSafe(res);
+    if (!res.ok) throw new Error(String(json.error || `Pending stop update failed (${res.status})`));
+
+    const queueRows = Array.isArray(json.queue) ? (json.queue as Array<Record<string, unknown>>) : [];
+    const queueByCustomerId = new Map(initialPendingStops.map((stop) => [stop.customerId, stop]));
+    const customerById = new Map(customers.map((customer) => [customer.id, customer]));
+    const nextPendingStops: PendingRouteStop[] = [];
+
+    queueRows.forEach((row) => {
+      const customerId = String(row.customer_id || row.customerId || "").trim();
+      const customer = customerById.get(customerId);
+      const id = String(row.id || "").trim();
+      if (!customer || !id || !customerId) return;
+
+      nextPendingStops.push({
+        id,
+        customerId,
+        addedByUserId: String(row.added_by_user_id || row.addedByUserId || currentUserId).trim(),
+        createdAt: String(row.created_at || row.createdAt || queueByCustomerId.get(customerId)?.createdAt || "").trim() || null,
+        customer,
+      });
+    });
+
+    setPendingStops(nextPendingStops);
+    return nextPendingStops;
+  }
+
+  async function togglePendingStop(customerId: string, nextSelected: boolean) {
+    setBulkStatusMessage(null);
+    await syncPendingStops({
+      method: nextSelected ? "POST" : "DELETE",
+      body: { customer_ids: [customerId] },
+    });
+  }
 
   function toggleCustomerSelection(customerId: string) {
     setSelectedCustomerIds((current) => (current.includes(customerId) ? current.filter((id) => id !== customerId) : [...current, customerId]));
@@ -472,12 +506,8 @@ export default function CustomerWorkspaceIndex({ customers, staffRole, currentUs
 
   async function applyBulkAction() {
     if (selectedVisibleCustomers.length === 0 || bulkBusy) return;
-    if (bulkAction.kind !== "add_to_route" && !bulkAction.value) {
+    if (bulkAction.kind !== "add_to_pending_stops" && bulkAction.kind !== "remove_from_pending_stops" && !bulkAction.value) {
       setBulkStatusMessage("Choose a value before applying the bulk action.");
-      return;
-    }
-    if (bulkAction.kind === "add_to_route" && !bulkAction.routeRepUserId) {
-      setBulkStatusMessage("Choose a route rep before applying route assignments.");
       return;
     }
 
@@ -488,6 +518,21 @@ export default function CustomerWorkspaceIndex({ customers, staffRole, currentUs
     let skippedCount = 0;
 
     try {
+      if (bulkAction.kind === "add_to_pending_stops" || bulkAction.kind === "remove_from_pending_stops") {
+        await syncPendingStops({
+          method: bulkAction.kind === "add_to_pending_stops" ? "POST" : "DELETE",
+          body: { customer_ids: selectedVisibleCustomers.map((customer) => customer.id) },
+        });
+        setBulkStatusMessage(
+          `${bulkAction.kind === "add_to_pending_stops" ? "Added" : "Removed"} ${selectedVisibleCustomers.length} selected account${
+            selectedVisibleCustomers.length === 1 ? "" : "s"
+          } ${bulkAction.kind === "add_to_pending_stops" ? "to" : "from"} pending stops.`
+        );
+        setSelectedCustomerIds([]);
+        router.refresh();
+        return;
+      }
+
       for (const customer of selectedVisibleCustomers) {
         let payload: Record<string, string | null>;
 
@@ -498,22 +543,8 @@ export default function CustomerWorkspaceIndex({ customers, staffRole, currentUs
         } else if (bulkAction.kind === "assign_route_day") {
           payload = { route_day: bulkAction.value || null };
         } else {
-          const territory = territoryOptions.find((option) => option.value === customer.territoryCode) || null;
-          const territoryCode = customer.territoryCode || null;
-          const routeDay = customer.routeDay || territory?.routeDayDefault || null;
-
-          if (!territoryCode || !routeDay) {
-            skippedCount += 1;
-            continue;
-          }
-
-          payload = {
-            apply_route: "true",
-            territory_code: territoryCode,
-            route_day: routeDay,
-            assigned_route_rep_user_id: bulkAction.routeRepUserId,
-            visit_status: customer.visitStatus || "due",
-          };
+          skippedCount += 1;
+          continue;
         }
 
         const res = await fetch(`/api/workspace/customers/${customer.id}`, {
@@ -530,9 +561,7 @@ export default function CustomerWorkspaceIndex({ customers, staffRole, currentUs
       }
 
       setBulkStatusMessage(
-        bulkAction.kind === "add_to_route"
-          ? `Updated ${successCount} account${successCount === 1 ? "" : "s"} for route planning${skippedCount ? `, skipped ${skippedCount} without territory and route day` : ""}.`
-          : `Updated ${successCount} selected account${successCount === 1 ? "" : "s"}.`
+        `Updated ${successCount} selected account${successCount === 1 ? "" : "s"}${skippedCount ? `, skipped ${skippedCount}` : ""}.`
       );
       setSelectedCustomerIds([]);
       router.refresh();
@@ -679,6 +708,9 @@ export default function CustomerWorkspaceIndex({ customers, staffRole, currentUs
           <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4f6877]">
             Selected {selectedVisibleCustomerIds.length} of {visibleCustomers.length} filtered
           </span>
+          <span className="rounded-full border border-[#bfe8e2] bg-[#f5fffd] px-3 py-1.5 text-sm font-medium text-[#0f766e]">
+            Pending Stops {pendingStops.length}
+          </span>
           <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4f6877]">
             Search mode: explicit apply
           </span>
@@ -716,7 +748,6 @@ export default function CustomerWorkspaceIndex({ customers, staffRole, currentUs
           action={bulkAction}
           busy={bulkBusy}
           selectedCount={selectedVisibleCustomerIds.length}
-          currentUserId={currentUserId}
           staffRole={staffRole}
           salesRepOptions={salesRepOptions}
           territoryOptions={territoryOptions}
@@ -767,12 +798,10 @@ export default function CustomerWorkspaceIndex({ customers, staffRole, currentUs
                 <CustomerCard
                   key={customer.id}
                   customer={customer}
-                  currentUserId={currentUserId}
-                  staffRole={staffRole}
-                  routeRepOptions={salesRepOptions}
-                  territoryOptions={territoryOptions}
                   selected={selectedCustomerIds.includes(customer.id)}
+                  pendingSelected={pendingCustomerIdSet.has(customer.id)}
                   onToggleSelected={toggleCustomerSelection}
+                  onTogglePendingSelected={togglePendingStop}
                 />
               ))}
             </div>
@@ -792,20 +821,16 @@ export default function CustomerWorkspaceIndex({ customers, staffRole, currentUs
 
 function CustomerCard({
   customer,
-  currentUserId,
-  staffRole,
-  routeRepOptions,
-  territoryOptions,
   selected,
+  pendingSelected,
   onToggleSelected,
+  onTogglePendingSelected,
 }: {
   customer: CustomerSummary;
-  currentUserId: string;
-  staffRole: "admin" | "sales";
-  routeRepOptions: RouteRepOption[];
-  territoryOptions: TerritoryOption[];
   selected: boolean;
+  pendingSelected: boolean;
   onToggleSelected: (customerId: string) => void;
+  onTogglePendingSelected: (customerId: string, nextSelected: boolean) => void;
 }) {
   const primaryContact = customer.primaryContacts[0] || null;
   const activityCount = customer.counts.estimates + customer.counts.orders + customer.counts.packagingSubmissions + customer.counts.documents;
@@ -818,7 +843,7 @@ function CustomerCard({
     <article
       className={[
         "rounded-[22px] border bg-white p-3 shadow-[0_10px_24px_rgba(16,42,67,0.05)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(16,42,67,0.07)] lg:p-4",
-        selected ? "border-[#14b8a6] ring-2 ring-[#b8efe7]" : "border-[#d9e7ee]",
+        selected || pendingSelected ? "border-[#14b8a6] ring-2 ring-[#b8efe7]" : "border-[#d9e7ee]",
       ].join(" ")}
     >
       <div className="flex flex-col gap-3 2xl:flex-row 2xl:items-start 2xl:justify-between">
@@ -845,6 +870,9 @@ function CustomerCard({
                 <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-2.5 py-1 text-xs font-semibold text-[#496574]">
                   {customer.routeDay ? `Route ${customer.routeDay}` : "No Route Day"}
                 </span>
+                {pendingSelected ? (
+                  <span className="rounded-full border border-[#bfe8e2] bg-[#f5fffd] px-2.5 py-1 text-xs font-semibold text-[#0f766e]">Pending Stop</span>
+                ) : null}
                 <RouteReadinessPill state={routeReadiness} />
               </div>
               <p className="mt-1.5 text-sm text-[#5a7483]">
@@ -919,10 +947,8 @@ function CustomerCard({
           </Link>
           <RouteActionButton
             customer={customer}
-            currentUserId={currentUserId}
-            staffRole={staffRole}
-            routeRepOptions={routeRepOptions}
-            territoryOptions={territoryOptions}
+            pendingSelected={pendingSelected}
+            onTogglePendingSelected={onTogglePendingSelected}
           />
           <QuickAction href={primaryEmailHref} label="Email Primary" />
           <QuickAction href={phoneHref} label="Call Account" />
@@ -935,63 +961,28 @@ function CustomerCard({
 
 function RouteActionButton({
   customer,
-  currentUserId,
-  staffRole,
-  routeRepOptions,
-  territoryOptions,
+  pendingSelected,
+  onTogglePendingSelected,
 }: {
   customer: CustomerSummary;
-  currentUserId: string;
-  staffRole: "admin" | "sales";
-  routeRepOptions: RouteRepOption[];
-  territoryOptions: TerritoryOption[];
+  pendingSelected: boolean;
+  onTogglePendingSelected: (customerId: string, nextSelected: boolean) => void;
 }) {
-  const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [routeRepUserId, setRouteRepUserId] = useState(customer.assignedRouteRepUserId || (staffRole === "sales" ? currentUserId : ""));
-  const selectableRouteRepOptions =
-    staffRole === "sales" ? routeRepOptions.filter((option) => option.userId === currentUserId) : routeRepOptions;
-  const territory = territoryOptions.find((option) => option.value === customer.territoryCode) || null;
-  const nextRouteDay = customer.routeDay || territory?.routeDayDefault || null;
-  const effectiveRouteRepUserId = staffRole === "sales" ? currentUserId : routeRepUserId || customer.assignedRouteRepUserId || "";
-  const canApplyRoute = Boolean(customer.territoryCode && nextRouteDay && effectiveRouteRepUserId);
-  const routeHref = canApplyRoute
-    ? buildRouteRunnerHref({
-        id: customer.id,
-        territoryCode: customer.territoryCode,
-        routeDay: nextRouteDay,
-        assignedRouteRepUserId: effectiveRouteRepUserId,
-      })
+  const routeHref = pendingSelected
+    ? `/workspace/routes?pending=1&customerId=${encodeURIComponent(customer.id)}`
     : null;
 
-  async function handleAddToRoute() {
-    if (!canApplyRoute) return;
+  async function handlePendingToggle() {
     setBusy(true);
     setStatusMessage(null);
 
     try {
-      const res = await fetch(`/api/workspace/customers/${customer.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          apply_route: true,
-          territory_code: customer.territoryCode,
-          route_day: nextRouteDay,
-          assigned_route_rep_user_id: effectiveRouteRepUserId,
-          visit_status: customer.visitStatus || "due",
-        }),
-      });
-
-      const json = await parseJsonSafe(res);
-      if (!res.ok) {
-        throw new Error(String((json as { error?: string }).error || `Save failed (${res.status})`));
-      }
-
-      setStatusMessage("Route applied.");
-      router.refresh();
+      await onTogglePendingSelected(customer.id, !pendingSelected);
+      setStatusMessage(pendingSelected ? "Removed from pending stops." : "Added to pending stops.");
     } catch (error) {
-      setStatusMessage(error instanceof Error ? error.message : "Route update failed");
+      setStatusMessage(error instanceof Error ? error.message : "Pending stop update failed");
     } finally {
       setBusy(false);
     }
@@ -999,36 +990,22 @@ function RouteActionButton({
 
   return (
     <div className="space-y-1">
-      <label className="grid gap-1 text-sm text-[#4b6676]">
-        <span className="text-xs font-medium uppercase tracking-[0.12em] text-[#7d95a3]">Route Rep</span>
-        <select
-          value={effectiveRouteRepUserId}
-          onChange={(event) => setRouteRepUserId(event.target.value)}
-          disabled={busy || staffRole === "sales"}
-          className="rounded-2xl border border-[#cedde6] bg-white px-3 py-2 text-sm text-[#173543] outline-none transition focus:border-[#14b8a6]"
-        >
-          <option value="">Select route rep</option>
-          {selectableRouteRepOptions.map((option) => (
-            <option key={option.userId} value={option.userId}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </label>
       <button
         type="button"
-        onClick={() => void handleAddToRoute()}
-        disabled={!canApplyRoute || busy}
+        onClick={() => void handlePendingToggle()}
+        disabled={busy}
         className={[
           "inline-flex items-center justify-center rounded-full px-4 py-2.5 text-sm font-semibold transition",
-          canApplyRoute ? "border border-[#cddbe4] bg-white text-[#21424d] hover:border-[#14b8a6] hover:text-[#0f766e]" : "border border-[#d9e5eb] bg-[#f7fbfd] text-[#89a0ad]",
+          pendingSelected
+            ? "border border-[#bfe8e2] bg-[#f5fffd] text-[#0f766e] hover:border-[#14b8a6]"
+            : "border border-[#cddbe4] bg-white text-[#21424d] hover:border-[#14b8a6] hover:text-[#0f766e]",
         ].join(" ")}
       >
-        {busy ? "Saving..." : canApplyRoute ? "Apply Route" : "Needs Territory, Day, Rep"}
+        {busy ? "Saving..." : pendingSelected ? "Remove from Pending Stops" : "Add to Pending Stops"}
       </button>
       {routeHref ? (
         <Link href={routeHref} className="inline-flex px-1 text-xs font-medium text-[#0f766e] transition hover:text-[#0b5f58]">
-          Open in Route Runner
+          Open Pending Stops
         </Link>
       ) : null}
       {statusMessage ? <p className="px-1 text-xs text-[#4f6877]">{statusMessage}</p> : null}
@@ -1040,7 +1017,6 @@ function BulkActionBar({
   action,
   busy,
   selectedCount,
-  currentUserId,
   staffRole,
   salesRepOptions,
   territoryOptions,
@@ -1052,7 +1028,6 @@ function BulkActionBar({
   action: BulkActionState;
   busy: boolean;
   selectedCount: number;
-  currentUserId: string;
   staffRole: "admin" | "sales";
   salesRepOptions: RouteRepOption[];
   territoryOptions: TerritoryOption[];
@@ -1062,8 +1037,6 @@ function BulkActionBar({
   onClear: () => void;
 }) {
   const availableActions = BULK_ACTIONS.filter((item) => (staffRole === "admin" ? true : item.key !== "assign_sales_rep"));
-  const selectableRouteRepOptions =
-    staffRole === "sales" ? salesRepOptions.filter((option) => option.userId === currentUserId) : salesRepOptions;
   const valueLabel =
     action.kind === "assign_sales_rep"
       ? "Sales rep"
@@ -1072,7 +1045,6 @@ function BulkActionBar({
         : action.kind === "assign_route_day"
           ? "Route day"
           : null;
-  const needsRouteRep = action.kind === "add_to_route";
 
   return (
     <section className="sticky top-4 z-10 rounded-[24px] border border-[#bfe8e2] bg-[linear-gradient(180deg,#f5fffd_0%,#ffffff_100%)] p-4 shadow-[0_18px_40px_rgba(16,42,67,0.08)]">
@@ -1132,27 +1104,8 @@ function BulkActionBar({
               </select>
             </label>
           ) : (
-            <div className="rounded-2xl border border-[#d7e6ed] bg-white px-4 py-3 text-sm text-[#4f6877]">Requires existing territory and route day. Sets `visit_status` to `due` if blank.</div>
+            <div className="rounded-2xl border border-[#d7e6ed] bg-white px-4 py-3 text-sm text-[#4f6877]">Queues or removes the current filtered selection for route generation.</div>
           )}
-
-          {needsRouteRep ? (
-            <label className="grid gap-1 text-sm text-[#4b6676]">
-              <span className="font-medium">Route rep</span>
-              <select
-                value={action.routeRepUserId}
-                onChange={(event) => onActionChange({ ...action, routeRepUserId: event.target.value })}
-                disabled={busy || staffRole === "sales"}
-                className="min-w-[220px] rounded-2xl border border-[#cedde6] bg-white px-4 py-3 text-sm text-[#173543] outline-none transition focus:border-[#14b8a6]"
-              >
-                <option value="">Select route rep</option>
-                {selectableRouteRepOptions.map((option) => (
-                  <option key={option.userId} value={option.userId}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : null}
 
           <button
             type="button"

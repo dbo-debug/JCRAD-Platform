@@ -17,7 +17,7 @@ export default async function WorkspaceRouteRunnerPage({
   const [params] = await Promise.all([searchParams]);
   const focusCustomerId = asQueryValue(params?.customerId) || undefined;
   const routeId = asQueryValue(params?.routeId) || undefined;
-  const [workspaceData, savedRoute] = await Promise.all([loadRouteWorkspaceData(), routeId ? loadSavedRouteDetail(routeId) : Promise.resolve(null)]);
+  const [workspaceData, savedRoute] = await Promise.all([loadRouteWorkspaceData(staff.userId), routeId ? loadSavedRouteDetail(routeId) : Promise.resolve(null)]);
   const { customers, routeRepOptions, territoryOptions } = workspaceData;
 
   return (
