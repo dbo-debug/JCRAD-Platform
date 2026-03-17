@@ -1026,9 +1026,9 @@ export default function SavedRoutePlannerPanel({
         <section className="rounded-[24px] border border-[#dbe8ef] bg-white p-4 shadow-sm">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Route Stops</p>
-              <h3 className="mt-1 text-lg font-semibold text-[#173543]">{draftStops.length > 0 ? "Ordered stop schedule" : "No stops yet"}</h3>
-              <p className="mt-1 text-sm text-[#5c7483]">Each stop shows arrival, departure, travel time, visit time, and shift-feasibility status from the current server-planned route.</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Route Itinerary</p>
+              <h3 className="mt-1 text-lg font-semibold text-[#173543]">{draftStops.length > 0 ? "Leg-by-leg stop itinerary" : "No stops yet"}</h3>
+              <p className="mt-1 text-sm text-[#5c7483]">Each stop shows arrival, departure, drive time, visit duration, distance from the previous stop, and return-to-HQ context on the final leg.</p>
             </div>
             {draftPlan ? (
               <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4f6877]">
@@ -1070,6 +1070,11 @@ export default function SavedRoutePlannerPanel({
                         <div className="mt-2 grid gap-1 text-sm text-[#5c7483]">
                           <p>Arrive {formatDateTime(stop.plannedArrivalTime)} • Depart {formatDateTime(stop.plannedDepartureTime)}</p>
                           <p>Drive {stop.estimatedDriveMinutesFromPrevious} min • Visit {stop.estimatedVisitMinutes} min • Distance {(stop.legDistanceMeters / 1609.34).toFixed(1)} mi</p>
+                          {index === draftStops.length - 1 && draftPlan?.projectedReturnTime ? (
+                            <p className="text-[#355966]">
+                              Return to HQ {draftPlan.returnDriveMinutes} min • ETA {formatDateTime(draftPlan.projectedReturnTime)}
+                            </p>
+                          ) : null}
                         </div>
                       </div>
                       <div className="flex flex-wrap gap-2">

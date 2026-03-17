@@ -33,6 +33,10 @@ function asText(value: unknown): string | null {
   return text || null;
 }
 
+function getGoogleRoutesApiKey() {
+  return asText(process.env.GOOGLE_ROUTES_API_KEY) || asText(process.env.GOOGLE_MAPS_SERVER_API_KEY);
+}
+
 function parseDurationToSeconds(value: string | null | undefined) {
   const text = String(value || "").trim();
   if (!text) return 0;
@@ -98,13 +102,20 @@ function toWaypoint(latLng: LatLng) {
   };
 }
 
-export function canUseGoogleRouteServices() {
+export function canUseGoogleRoutesApi() {
+  return Boolean(getGoogleRoutesApiKey());
+}
+
+export function canUseGoogleRouteOptimization() {
   return Boolean(
-    asText(process.env.GOOGLE_ROUTES_API_KEY) &&
-      asText(process.env.GOOGLE_ROUTE_OPTIMIZATION_PROJECT_ID) &&
+    asText(process.env.GOOGLE_ROUTE_OPTIMIZATION_PROJECT_ID) &&
       asText(process.env.GOOGLE_ROUTE_OPTIMIZATION_CLIENT_EMAIL) &&
       asText(process.env.GOOGLE_ROUTE_OPTIMIZATION_PRIVATE_KEY)
   );
+}
+
+export function canUseGoogleRouteServices() {
+  return canUseGoogleRoutesApi();
 }
 
 export async function optimizeStopOrderWithGoogle(args: {
@@ -184,8 +195,8 @@ export async function computeGoogleRouteSchedule(args: {
   origin: LatLng;
   orderedStops: Array<{ latitude: number; longitude: number }>;
 }) {
-  const apiKey = asText(process.env.GOOGLE_ROUTES_API_KEY);
-  if (!apiKey) throw new Error("Missing GOOGLE_ROUTES_API_KEY");
+  const apiKey = getGoogleRoutesApiKey();
+  if (!apiKey) throw new Error("Missing GOOGLE_ROUTES_API_KEY or GOOGLE_MAPS_SERVER_API_KEY");
 
   const waypoints = args.orderedStops.map((stop) =>
     toWaypoint({

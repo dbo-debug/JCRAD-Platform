@@ -1,4 +1,9 @@
-import { canUseGoogleRouteServices, computeGoogleRouteSchedule, optimizeStopOrderWithGoogle } from "@/lib/googleRouteServices";
+import {
+  canUseGoogleRouteOptimization,
+  canUseGoogleRouteServices,
+  computeGoogleRouteSchedule,
+  optimizeStopOrderWithGoogle,
+} from "@/lib/googleRouteServices";
 
 export const JC_RAD_HQ = {
   name: "JC RAD HQ",
@@ -370,7 +375,11 @@ export async function buildPlannedRoute(args: {
 
   const routeDateTimeIso = parseStartDateTime({ routeDate: args.routeDate, startTime }).toISOString();
 
-  if (canUseGoogleRouteServices()) {
+  let orderedStopsForPlanning = trimmedStops;
+  let googlePlanningWarning: string | null = null;
+
+  // Use Google Route Optimization for stop order only when its OAuth/project credentials are configured.
+  if (canUseGoogleRouteOptimization()) {
     try {
       const optimizedOrder = await optimizeStopOrderWithGoogle({
         origin: {
@@ -388,27 +397,40 @@ export async function buildPlannedRoute(args: {
 
       const stopById = new Map(trimmedStops.map((stop) => [stop.customerId, stop]));
       const orderedStops = optimizedOrder.orderedStopIds.map((id) => stopById.get(id)).filter((stop): stop is RoutePlanStopInput => Boolean(stop));
-      const fallbackOrderedStops =
+      orderedStopsForPlanning =
         orderedStops.length === trimmedStops.length
           ? orderedStops
           : [...orderedStops, ...trimmedStops.filter((stop) => !optimizedOrder.orderedStopIds.includes(stop.customerId))];
+    } catch (error) {
+      orderedStopsForPlanning = buildFallbackOrder(trimmedStops);
+      googlePlanningWarning = error instanceof Error ? error.message : "Google route optimization failed";
+    }
+  } else {
+    orderedStopsForPlanning = buildFallbackOrder(trimmedStops);
+    if (canUseGoogleRouteServices()) {
+      googlePlanningWarning = "Google route optimization is not configured. Used heuristic stop order with Google road timing.";
+    }
+  }
 
+  // Prefer Google Routes for road geometry and leg timing whenever the server routes key is available.
+  if (canUseGoogleRouteServices()) {
+    try {
       const routes = await computeGoogleRouteSchedule({
         origin: {
           latitude: JC_RAD_HQ.latitude,
           longitude: JC_RAD_HQ.longitude,
         },
-        orderedStops: fallbackOrderedStops.map((stop) => ({
+        orderedStops: orderedStopsForPlanning.map((stop) => ({
           latitude: stop.latitude,
           longitude: stop.longitude,
         })),
       });
 
-      const outboundLegs = routes.legs.slice(0, fallbackOrderedStops.length);
-      const returnLeg = routes.legs[fallbackOrderedStops.length];
+      const outboundLegs = routes.legs.slice(0, orderedStopsForPlanning.length);
+      const returnLeg = routes.legs[orderedStopsForPlanning.length];
 
       return buildScheduledPlan({
-        orderedStops: fallbackOrderedStops,
+        orderedStops: orderedStopsForPlanning,
         legDriveMinutes: outboundLegs.map((leg) => Math.max(0, Math.round(leg.durationSeconds / 60))),
         legDistanceMeters: outboundLegs.map((leg) => leg.distanceMeters),
         returnDriveMinutes: Math.max(0, Math.round((returnLeg?.durationSeconds || 0) / 60)),
@@ -419,59 +441,14 @@ export async function buildPlannedRoute(args: {
         lunchMinutes,
         polyline: routes.polyline,
         provider: "google",
-        warning: null,
+        warning: googlePlanningWarning,
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Google routing failed";
-      const fallbackOrderedStops = buildFallbackOrder(trimmedStops);
-      const legDriveMinutes = fallbackOrderedStops.map((stop, index) => {
-        if (index === 0) {
-          return estimateDriveMinutes(
-            haversineMiles({
-              leftLat: JC_RAD_HQ.latitude,
-              leftLng: JC_RAD_HQ.longitude,
-              rightLat: stop.latitude,
-              rightLng: stop.longitude,
-            })
-          );
-        }
-        const previous = fallbackOrderedStops[index - 1];
-        return estimateDriveMinutes(
-          haversineMiles({
-            leftLat: previous.latitude,
-            leftLng: previous.longitude,
-            rightLat: stop.latitude,
-            rightLng: stop.longitude,
-          })
-        );
-      });
-      const returnDriveMinutes = estimateDriveMinutes(
-        haversineMiles({
-          leftLat: fallbackOrderedStops[fallbackOrderedStops.length - 1].latitude,
-          leftLng: fallbackOrderedStops[fallbackOrderedStops.length - 1].longitude,
-          rightLat: JC_RAD_HQ.latitude,
-          rightLng: JC_RAD_HQ.longitude,
-        })
-      );
-
-      return buildScheduledPlan({
-        orderedStops: fallbackOrderedStops,
-        legDriveMinutes,
-        legDistanceMeters: new Array(fallbackOrderedStops.length).fill(0),
-        returnDriveMinutes,
-        routeDate: args.routeDate,
-        startTime,
-        requiredReturnByTime,
-        visitMinutes,
-        lunchMinutes,
-        polyline: null,
-        provider: "fallback",
-        warning: message,
-      });
+      googlePlanningWarning = [googlePlanningWarning, error instanceof Error ? error.message : "Google routing failed"].filter(Boolean).join(" ");
     }
   }
 
-  const fallbackOrderedStops = buildFallbackOrder(trimmedStops);
+  const fallbackOrderedStops = orderedStopsForPlanning.length > 0 ? orderedStopsForPlanning : buildFallbackOrder(trimmedStops);
   const legDriveMinutes = fallbackOrderedStops.map((stop, index) => {
     if (index === 0) {
       return estimateDriveMinutes(
@@ -514,6 +491,6 @@ export async function buildPlannedRoute(args: {
     lunchMinutes,
     polyline: null,
     provider: "fallback",
-    warning: "Google routing is not configured. Used heuristic fallback order and timing.",
+    warning: googlePlanningWarning || "Google routing is not configured. Used heuristic fallback order and timing.",
   });
 }
