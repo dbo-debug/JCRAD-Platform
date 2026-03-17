@@ -347,25 +347,70 @@ export default function RouteStopsMap({
           {emptyLabel}
         </div>
       ) : (
-        <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.95fr)]">
-          {plannedRoute && googleMapReady ? (
-            <GooglePlannedRouteMap
-              plannedRoute={plannedRoute}
-              orderedProjectedStops={orderedProjectedStops}
-              selectedCustomerId={selectedCustomerId}
-              onSelectCustomer={selectCustomer}
-            />
-          ) : (
-            <ProjectedRouteMap
-              plannedRoute={plannedRoute}
-              orderedProjectedStops={orderedProjectedStops}
-              projectedOrigin={projectedOrigin}
-              svgPath={svgPath}
-              withCoords={withCoords}
-              selectedCustomerId={selectedCustomerId}
-              onSelectCustomer={selectCustomer}
-            />
-          )}
+        <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1.85fr)_minmax(300px,0.72fr)]">
+          <div className="space-y-4">
+            {plannedRoute && googleMapReady ? (
+              <GooglePlannedRouteMap
+                plannedRoute={plannedRoute}
+                orderedProjectedStops={orderedProjectedStops}
+                selectedCustomerId={selectedCustomerId}
+                onSelectCustomer={selectCustomer}
+              />
+            ) : (
+              <ProjectedRouteMap
+                plannedRoute={plannedRoute}
+                orderedProjectedStops={orderedProjectedStops}
+                projectedOrigin={projectedOrigin}
+                svgPath={svgPath}
+                withCoords={withCoords}
+                selectedCustomerId={selectedCustomerId}
+                onSelectCustomer={selectCustomer}
+              />
+            )}
+
+            {plannedRoute && orderedProjectedStops.length > 0 ? (
+              <div className="rounded-[24px] border border-[#dbe8ef] bg-[#fbfdfe] p-4 shadow-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-sm font-semibold uppercase tracking-[0.12em] text-[#6f8897]">Stop Strip</h4>
+                    <p className="mt-1 text-sm text-[#5d7685]">Use the map strip for quick navigation. Detailed control stays in the itinerary.</p>
+                  </div>
+                  <span className="rounded-full border border-[#d7e6ed] bg-white px-2.5 py-1 text-xs font-semibold text-[#4f6877]">{orderedProjectedStops.length} stops</span>
+                </div>
+                <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+                  {orderedProjectedStops.map((stop, index) => {
+                    const isActive = stop.customer.id === selectedStop?.customer.id;
+                    return (
+                      <button
+                        key={stop.customer.id}
+                        type="button"
+                        onClick={() => selectCustomer(stop.customer.id)}
+                        className={[
+                          "min-w-[160px] rounded-2xl border px-3 py-3 text-left transition",
+                          isActive
+                            ? "border-[#173543] bg-[#173543] text-white shadow-[0_10px_24px_rgba(16,42,67,0.16)]"
+                            : "border-[#dbe8ef] bg-white text-[#173543] hover:border-[#14b8a6] hover:bg-[#f5fbfa]",
+                        ].join(" ")}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className={["rounded-full px-2 py-1 text-[11px] font-semibold", isActive ? "bg-white/16 text-white" : "bg-[#effaf7] text-[#0f766e]"].join(" ")}>
+                            Stop {index + 1}
+                          </span>
+                          <span className={["rounded-full border px-2 py-1 text-[11px] font-semibold", isActive ? "border-white/20 text-white" : visitStatusChipClass(stop.customer.visitStatus)].join(" ")}>
+                            {titleCase(stop.customer.visitStatus, "Open")}
+                          </span>
+                        </div>
+                        <p className="mt-2 line-clamp-2 text-sm font-semibold">{stop.customer.name}</p>
+                        <p className={["mt-1 text-xs", isActive ? "text-white/80" : "text-[#5d7685]"].join(" ")}>
+                          {stop.customer.territoryCode || "Unassigned"} • {titleCase(stop.customer.routeDay, "No route day")}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+          </div>
 
           <div className="grid gap-4">
             {plannedRoute && googleMapFailed ? (
@@ -375,66 +420,20 @@ export default function RouteStopsMap({
             ) : null}
             {selectedStop ? (
               <div className="rounded-[24px] border border-[#dbe8ef] bg-[#fbfdfe] p-4 shadow-sm">
-                {plannedRoute && orderedProjectedStops.length > 0 ? (
-                  <div className="mb-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <h4 className="text-sm font-semibold uppercase tracking-[0.12em] text-[#6f8897]">Route Stops</h4>
-                      <span className="text-xs font-medium text-[#6a8291]">
-                        {selectedOrderIndex >= 0 ? `Viewing stop ${selectedOrderIndex + 1} of ${orderedProjectedStops.length}` : `${orderedProjectedStops.length} planned`}
-                      </span>
-                    </div>
-                    <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-                      {orderedProjectedStops.map((stop, index) => {
-                        const isActive = stop.customer.id === selectedStop.customer.id;
-                        return (
-                          <button
-                            key={stop.customer.id}
-                            type="button"
-                            onClick={() => selectCustomer(stop.customer.id)}
-                            className={[
-                              "min-w-[168px] rounded-2xl border px-3 py-3 text-left transition",
-                              isActive
-                                ? "border-[#173543] bg-[#173543] text-white shadow-[0_10px_24px_rgba(16,42,67,0.16)]"
-                                : "border-[#dbe8ef] bg-white text-[#173543] hover:border-[#14b8a6] hover:bg-[#f5fbfa]",
-                            ].join(" ")}
-                          >
-                            <div className="flex items-center justify-between gap-2">
-                              <span className={["rounded-full px-2 py-1 text-[11px] font-semibold", isActive ? "bg-white/16 text-white" : "bg-[#effaf7] text-[#0f766e]"].join(" ")}>
-                                Stop {index + 1}
-                              </span>
-                              <span className={["rounded-full border px-2 py-1 text-[11px] font-semibold", isActive ? "border-white/20 text-white" : visitStatusChipClass(stop.customer.visitStatus)].join(" ")}>
-                                {titleCase(stop.customer.visitStatus, "Open")}
-                              </span>
-                            </div>
-                            <p className="mt-2 line-clamp-2 text-sm font-semibold">{stop.customer.name}</p>
-                            <p className={["mt-1 text-xs", isActive ? "text-white/80" : "text-[#5d7685]"].join(" ")}>
-                              {stop.customer.territoryCode || "Unassigned"} • {titleCase(stop.customer.routeDay, "No route day")}
-                            </p>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ) : null}
-
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <h4 className="text-base font-semibold text-[#173543]">{selectedStop.customer.name}</h4>
+                      <h4 className="text-base font-semibold text-[#173543]">Focused Stop</h4>
                       {plannedRoute && selectedOrderIndex >= 0 ? (
                         <span className="rounded-full border border-[#cfe8e4] bg-[#effaf7] px-2.5 py-1 text-xs font-semibold text-[#0f766e]">
                           Stop {selectedOrderIndex + 1}
                         </span>
                       ) : null}
                     </div>
+                    <p className="mt-1 text-sm font-semibold text-[#173543]">{selectedStop.customer.name}</p>
                     <p className="mt-1 text-sm text-[#58717f]">
-                      Territory {selectedStop.customer.territoryCode || "Unassigned"} • {titleCase(selectedStop.customer.routeDay, "No route day")}
+                      {selectedStop.customer.territoryCode || "Unassigned"} • {titleCase(selectedStop.customer.routeDay, "No route day")} • {plannedRoute ? (plannedRoute.provider === "google" ? "Google route" : "Fallback route") : "Map preview"}
                     </p>
-                    {plannedRoute ? (
-                      <p className="mt-1 text-sm text-[#58717f]">
-                        Origin {plannedRoute.origin.name} • {plannedRoute.provider === "google" ? "Google routing" : "Fallback routing"}
-                      </p>
-                    ) : null}
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <span className={["rounded-full border px-2.5 py-1 text-xs font-semibold", visitStatusChipClass(selectedStop.customer.visitStatus)].join(" ")}>
@@ -445,18 +444,17 @@ export default function RouteStopsMap({
                     </span>
                   </div>
                 </div>
-                <div className="mt-4 grid gap-3 rounded-2xl border border-[#e1ebf1] bg-white p-3 text-sm text-[#4f6877] sm:grid-cols-2">
-                  <InfoLine label="Primary Contact" value={selectedStop.customer.primaryContacts[0]?.name || "No primary contact"} />
-                  <InfoLine label="Contact Info" value={selectedStop.customer.primaryContacts[0]?.email || selectedStop.customer.mainPhone || "No contact info"} />
-                  <InfoLine
-                    label="Coordinates"
-                    value={
-                      selectedStop.customer.latitude !== null && selectedStop.customer.longitude !== null
-                        ? `${selectedStop.customer.latitude.toFixed(4)}, ${selectedStop.customer.longitude.toFixed(4)}`
-                        : "No coordinates"
-                    }
-                  />
-                  <InfoLine label="Customer ID" value={selectedStop.customer.id} />
+                <div className="mt-4 rounded-2xl border border-[#e1ebf1] bg-white p-3 text-sm text-[#4f6877]">
+                  <p>{selectedStop.customer.address1 || selectedStop.customer.city || "No address on file"}</p>
+                  <p className="mt-1">
+                    Contact {selectedStop.customer.primaryContacts[0]?.name || "No primary contact"} • {selectedStop.customer.primaryContacts[0]?.email || selectedStop.customer.mainPhone || "No contact info"}
+                  </p>
+                  <p className="mt-1">
+                    Priority {selectedStop.customer.routePriority ?? "None"} • Coordinates{" "}
+                    {selectedStop.customer.latitude !== null && selectedStop.customer.longitude !== null
+                      ? `${selectedStop.customer.latitude.toFixed(4)}, ${selectedStop.customer.longitude.toFixed(4)}`
+                      : "No coordinates"}
+                  </p>
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
                   <Link
@@ -529,7 +527,7 @@ function ProjectedRouteMap(args: {
       <div className="pointer-events-none absolute left-[28%] top-[69%] text-[11px] font-semibold uppercase tracking-[0.16em] text-[#6f8897]">Los Angeles</div>
       <div className="pointer-events-none absolute left-[18%] top-[84%] text-[11px] font-semibold uppercase tracking-[0.16em] text-[#6f8897]">San Diego</div>
 
-      <div className="relative aspect-[1.45/1] min-h-[420px]">
+      <div className="relative aspect-[1.7/1] min-h-[520px]">
         {args.svgPath ? (
           <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="pointer-events-none absolute inset-0 h-full w-full">
             <path
@@ -727,7 +725,7 @@ function GooglePlannedRouteMap(args: {
   return (
     <div className="relative overflow-hidden rounded-[24px] border border-[#dbe8ef] bg-[linear-gradient(180deg,#f6fbfd_0%,#ecf7fa_100%)] shadow-sm">
       <div className="pointer-events-none absolute inset-0 z-10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0))]" />
-      <div ref={mapRef} className="aspect-[1.45/1] min-h-[420px] w-full" />
+      <div ref={mapRef} className="aspect-[1.7/1] min-h-[520px] w-full" />
     </div>
   );
 }
@@ -737,15 +735,6 @@ function MapMetric({ label, value }: { label: string; value: string }) {
     <div className="flex items-center justify-between gap-3">
       <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7d95a3]">{label}</span>
       <span className="text-base font-semibold text-[#173543]">{value}</span>
-    </div>
-  );
-}
-
-function InfoLine({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-start justify-between gap-3">
-      <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7d95a3]">{label}</span>
-      <span className="max-w-[68%] text-right text-sm text-[#173543]">{value}</span>
     </div>
   );
 }

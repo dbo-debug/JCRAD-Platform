@@ -23,7 +23,7 @@ export default async function WorkspaceRoutesPage({
     <div className="mx-auto w-full max-w-[1440px] space-y-6 2xl:max-w-[1500px]">
       <AdminPageHeader
         title="Routes"
-        description="Phase 1 route planning for field reps. Use this operational board to stage daily stop lists by route day, territory, assigned rep, visit status, and priority."
+        description="Route command center for field reps. Build daily routes from route-ready stops, review the map and itinerary, and hand saved plans into the runner."
       />
       <SavedRoutePlannerPanel
         customers={customers}

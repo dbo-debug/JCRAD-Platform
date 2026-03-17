@@ -67,7 +67,14 @@ type RouteReadinessItem = {
   queueId: string;
   customer: CustomerSummary;
   status: "included" | "route_ready" | "excluded";
-  reason: "missing_coordinates" | "missing_address" | "invalid_coordinates" | "not_eligible_for_current_planning_set" | "not_in_finalized_preview" | null;
+  reason:
+    | "missing_coordinates"
+    | "missing_address"
+    | "invalid_coordinates"
+    | "geocode_needs_attention"
+    | "not_eligible_for_current_planning_set"
+    | "not_in_finalized_preview"
+    | null;
 };
 
 function parseJsonSafe(res: Response): Promise<Record<string, unknown>> {
@@ -143,10 +150,26 @@ function hasValidCoordinates(customer: CustomerSummary) {
   return Number.isFinite(customer.latitude) && Number.isFinite(customer.longitude) && Math.abs(customer.latitude) <= 90 && Math.abs(customer.longitude) <= 180;
 }
 
+function isRouteEligibleCustomer(customer: CustomerSummary) {
+  if (!hasAnyAddress(customer) || customer.geocodeStatus === "missing_address") return false;
+  if (!hasValidCoordinates(customer)) return false;
+  if (customer.geocodeStatus === "failed" || customer.geocodeStatus === "needs_review") return false;
+  return true;
+}
+
+function getRouteEligibilityReason(customer: CustomerSummary): RouteReadinessItem["reason"] {
+  if (!hasAnyAddress(customer) || customer.geocodeStatus === "missing_address") return "missing_address";
+  if (customer.latitude === null || customer.longitude === null) return "missing_coordinates";
+  if (!hasValidCoordinates(customer)) return "invalid_coordinates";
+  if (customer.geocodeStatus === "failed" || customer.geocodeStatus === "needs_review") return "geocode_needs_attention";
+  return null;
+}
+
 function readinessReasonLabel(reason: RouteReadinessItem["reason"]) {
   if (reason === "missing_address") return "Missing address";
   if (reason === "missing_coordinates") return "Missing coordinates";
   if (reason === "invalid_coordinates") return "Invalid coordinates";
+  if (reason === "geocode_needs_attention") return "Geocode needs attention";
   if (reason === "not_eligible_for_current_planning_set") return "Not eligible for current planning set";
   if (reason === "not_in_finalized_preview") return "Not included in finalized preview";
   return "Included";
@@ -156,14 +179,6 @@ function deriveRouteTerritoryCode(stops: DraftStop[], explicitTerritoryCode: str
   if (explicitTerritoryCode) return explicitTerritoryCode;
   const territoryCodes = Array.from(new Set(stops.map((stop) => stop.territoryCode).filter((value): value is string => Boolean(value))));
   return territoryCodes.length === 1 ? territoryCodes[0] : "";
-}
-
-function getMissingCoordLabel(customer: CustomerSummary) {
-  if (customer.latitude !== null && customer.longitude !== null) return "Coords ready";
-  if (customer.geocodeStatus === "failed") return "Geocode failed";
-  if (customer.geocodeStatus === "needs_review") return "Needs review";
-  if (customer.address1 || customer.city || customer.state || customer.postalCode) return "Missing coords";
-  return "No address";
 }
 
 export default function SavedRoutePlannerPanel({
@@ -193,10 +208,8 @@ export default function SavedRoutePlannerPanel({
   const [busy, setBusy] = useState<"generate_pending" | "generate_territory" | "save" | "queue" | "reoptimize" | "delete_route" | null>(null);
 
   const selectedTerritory = territoryOptions.find((option) => option.value === territoryCode) || null;
-  const coordinateReadyPendingStops = pendingStops.filter((stop) => stop.customer.latitude !== null && stop.customer.longitude !== null);
-  const candidateCustomers = customers.filter(
-    (customer) => customer.territoryCode === territoryCode && customer.latitude !== null && customer.longitude !== null
-  );
+  const routeReadyPendingStops = pendingStops.filter((stop) => isRouteEligibleCustomer(stop.customer));
+  const candidateCustomers = customers.filter((customer) => customer.territoryCode === territoryCode && isRouteEligibleCustomer(customer));
   const normalizedMaxStops = Math.max(1, Math.min(40, Number(maxStops) || 12));
   const derivedRouteTerritoryCode = deriveRouteTerritoryCode(draftStops, territoryCode);
   const customerById = new Map(customers.map((customer) => [customer.id, customer]));
@@ -207,31 +220,16 @@ export default function SavedRoutePlannerPanel({
     .map((customerId) => draftPlan?.orderedStops.find((stop) => stop.customerId === customerId))
     .filter((stop): stop is DraftStop => Boolean(stop));
   const previewIncludedIds = new Set((draftPlan?.orderedStops || []).map((stop) => stop.customerId));
-  const pendingRouteReadyStops = pendingStops.filter((stop) => hasValidCoordinates(stop.customer));
+  const pendingRouteReadyStops = pendingStops.filter((stop) => isRouteEligibleCustomer(stop.customer));
   const pendingEligibleIds = new Set(pendingRouteReadyStops.slice(0, normalizedMaxStops).map((stop) => stop.customerId));
   const readinessItems = pendingStops.map((stop) => {
-    if (!hasAnyAddress(stop.customer) || stop.customer.geocodeStatus === "missing_address") {
+    const reason = getRouteEligibilityReason(stop.customer);
+    if (reason) {
       return {
         queueId: stop.id,
         customer: stop.customer,
         status: "excluded",
-        reason: "missing_address",
-      } satisfies RouteReadinessItem;
-    }
-    if (stop.customer.latitude === null || stop.customer.longitude === null) {
-      return {
-        queueId: stop.id,
-        customer: stop.customer,
-        status: "excluded",
-        reason: "missing_coordinates",
-      } satisfies RouteReadinessItem;
-    }
-    if (!hasValidCoordinates(stop.customer)) {
-      return {
-        queueId: stop.id,
-        customer: stop.customer,
-        status: "excluded",
-        reason: "invalid_coordinates",
+        reason,
       } satisfies RouteReadinessItem;
     }
     if (!pendingEligibleIds.has(stop.customerId)) {
@@ -272,6 +270,8 @@ export default function SavedRoutePlannerPanel({
     previewNeedsRefresh,
     overtimeApproved,
   });
+  const lunchInsertIndex =
+    draftPlan?.lunchBlock ? draftStops.findIndex((stop) => new Date(stop.plannedArrivalTime).getTime() >= new Date(draftPlan.lunchBlock?.endTime || "").getTime()) : -1;
 
   function applyPlannedRoute(nextPlan: PlannedRoute, source: "pending" | "territory") {
     setDraftPlan(nextPlan);
@@ -399,7 +399,7 @@ export default function SavedRoutePlannerPanel({
       setStatusMessage(
         plan.orderedStops.length > 0
           ? `Generated a ${plan.orderedStops.length}-stop ${args.source === "pending" ? "pending-stop" : "territory"} route with ${plan.provider === "google" ? "Google routing" : "fallback routing"}.`
-          : "No coordinate-ready customers were available for route planning."
+          : "No route-ready customers were available for route planning."
       );
     } catch (error) {
       setStatusMessage(error instanceof Error ? error.message : "Route planning failed");
@@ -411,7 +411,7 @@ export default function SavedRoutePlannerPanel({
   function generatePendingDraft() {
     void generatePlan({
       source: "pending",
-      stops: coordinateReadyPendingStops.map((stop) => ({
+        stops: routeReadyPendingStops.map((stop) => ({
         customer_id: stop.customerId,
         customer_name: stop.customer.name,
         territory_code: stop.customer.territoryCode,
@@ -632,16 +632,16 @@ export default function SavedRoutePlannerPanel({
   return (
     <section className="rounded-[28px] border border-[#d8e6ee] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbfd_100%)] p-5 shadow-[0_24px_60px_rgba(16,42,67,0.08)] lg:px-6">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-        <div className="max-w-[760px]">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6c8797]">Saved Routes</p>
-          <h2 className="mt-2 text-2xl font-semibold text-[#173543]">Build pending-stop routes with Google optimization and traffic-aware timing</h2>
+        <div className="max-w-[820px]">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6c8797]">Route Command Center</p>
+          <h2 className="mt-2 text-2xl font-semibold text-[#173543]">Build, review, and save field routes from one cleaner planning surface</h2>
           <p className="mt-2 text-sm text-[#5c7483]">
-            Pending stops remain the primary workflow. Route drafts are finalized server-side, use Google services when configured, and fall back safely when they are not.
+            The itinerary now drives stop order and removals. Pending stops stay in the CRM queue, but only geocoded route-ready locations can enter route generation.
           </p>
         </div>
         <div className="grid w-full gap-2 rounded-2xl border border-[#dbe8ef] bg-white/90 p-4 text-sm text-[#506877] shadow-sm sm:max-w-[340px]">
           <MetricLine label="Pending Stops" value={String(pendingStops.length)} />
-          <MetricLine label="Queue Ready" value={String(coordinateReadyPendingStops.length)} />
+          <MetricLine label="Route-Ready" value={String(routeReadyPendingStops.length)} />
           <MetricLine label="Draft Stops" value={String(draftStops.length)} />
           <MetricLine label="Drive Minutes" value={String(draftPlan?.estimatedDriveMinutes || 0)} />
           <MetricLine label="Projected Return" value={draftPlan?.projectedReturnTime ? formatDateTime(draftPlan.projectedReturnTime) : "Not set"} />
@@ -652,15 +652,15 @@ export default function SavedRoutePlannerPanel({
         <section className="rounded-[24px] border border-[#dbe8ef] bg-white p-4 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Pending Stops</p>
-              <h3 className="mt-1 text-lg font-semibold text-[#173543]">{pendingStops.length} queued for this staff user</h3>
-              <p className="mt-1 text-sm text-[#5c7483]">Generate a finalized daily route from coordinate-ready pending stops or use territory generation as a fallback path.</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Pending Stop Queue</p>
+              <h3 className="mt-1 text-lg font-semibold text-[#173543]">{pendingStops.length} queued stops for this planner</h3>
+              <p className="mt-1 text-sm text-[#5c7483]">Build from the pending queue first. Stops stay visible here even when they are blocked from route generation.</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={() => startTransition(generatePendingDraft)}
-                disabled={busy !== null || pendingStops.length === 0}
+                disabled={busy !== null || routeReadyPendingStops.length === 0}
                 className="rounded-full bg-[#173543] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#0f2a35] disabled:opacity-60"
               >
                 {busy === "generate_pending" ? "Building Preview..." : "Build Pending Route Preview"}
@@ -677,38 +677,50 @@ export default function SavedRoutePlannerPanel({
           </div>
 
           <div className="mt-4 flex flex-wrap gap-2 text-sm text-[#4f6877]">
-            <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5">Coordinate-ready {coordinateReadyPendingStops.length}</span>
-            <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5">Missing coords {pendingStops.length - coordinateReadyPendingStops.length}</span>
+            <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5">Route-ready now {routeReadyPendingStops.length}</span>
+            <span className="rounded-full border border-[#f2ddb0] bg-[#fff9ea] px-3 py-1.5 text-[#9a640a]">Blocked until geocoded {pendingStops.length - routeReadyPendingStops.length}</span>
             <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5">Max stops/day {normalizedMaxStops}</span>
           </div>
 
-          <div className="mt-4 space-y-3">
-            {pendingStops.map((stop) => (
-              <div key={stop.id} className="rounded-2xl border border-[#dbe8ef] bg-[#fbfdfe] p-3">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                  <div>
-                    <p className="font-semibold text-[#173543]">{stop.customer.name}</p>
-                    <p className="mt-1 text-sm text-[#5c7483]">
-                      {stop.customer.territoryCode || "Territory open"} • {stop.customer.routeDay || "No route day"} • {getMissingCoordLabel(stop.customer)}
-                    </p>
-                    <p className="mt-1 text-sm text-[#5c7483]">{stop.customer.address1 || stop.customer.city || "No address on file"}</p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Link href={`/workspace/customers/${stop.customer.id}`} className="rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm text-[#42606f]">
-                      Open Account
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={() => void removePendingStop(stop.id)}
-                      disabled={busy !== null}
-                      className="rounded-full border border-[#f2d1d1] bg-white px-3 py-1.5 text-sm text-[#9a3d3d] disabled:opacity-60"
-                    >
-                      Remove Stop
-                    </button>
+          <div className="mt-4 space-y-2.5">
+            {pendingStops.map((stop) => {
+              const isEligible = isRouteEligibleCustomer(stop.customer);
+              return (
+                <div key={stop.id} className="rounded-2xl border border-[#dbe8ef] bg-[#fbfdfe] px-3 py-3">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-semibold text-[#173543]">{stop.customer.name}</p>
+                        <span
+                          className={[
+                            "rounded-full border px-2.5 py-1 text-[11px] font-semibold",
+                            isEligible ? "border-[#cfe8e4] bg-[#effaf7] text-[#0f766e]" : "border-[#f2ddb0] bg-[#fff9ea] text-[#9a640a]",
+                          ].join(" ")}
+                        >
+                          {isEligible ? "Route-ready" : readinessReasonLabel(getRouteEligibilityReason(stop.customer))}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-sm text-[#5c7483]">
+                        {stop.customer.address1 || stop.customer.city || "No address on file"} • {stop.customer.territoryCode || "Territory open"} • {stop.customer.routeDay || "No route day"}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Link href={`/workspace/customers/${stop.customer.id}`} className="rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm text-[#42606f]">
+                        Open Account
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => void removePendingStop(stop.id)}
+                        disabled={busy !== null}
+                        className="rounded-full border border-[#f2d1d1] bg-white px-3 py-1.5 text-sm text-[#9a3d3d] disabled:opacity-60"
+                      >
+                        Remove Stop
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
 
             {pendingStops.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-[#cfdde6] bg-[#fbfdfe] px-4 py-10 text-center text-sm text-[#5c7483]">
@@ -721,14 +733,14 @@ export default function SavedRoutePlannerPanel({
         <section className="rounded-[24px] border border-[#dbe8ef] bg-white p-4 shadow-sm">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Route Setup</p>
-            <h3 className="mt-1 text-lg font-semibold text-[#173543]">Assign rep, date, start time, and save a finalized schedule</h3>
+            <h3 className="mt-1 text-lg font-semibold text-[#173543]">Set the route frame, then build from the eligible stop set</h3>
           </div>
 
           <div className="mt-4 rounded-[22px] border border-[#dbe8ef] bg-[linear-gradient(180deg,#f8fcfd_0%,#f3f8fa_100%)] p-4">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7d95a3]">Leave Time</p>
-                <p className="mt-1 text-sm text-[#5c7483]">Set the field rep departure time before building the route preview. This directly drives all planned stop times.</p>
+                <p className="mt-1 text-sm text-[#5c7483]">Departure time from HQ drives the stop timeline, lunch placement, and return calculations.</p>
               </div>
               <div className="flex items-center gap-3 rounded-2xl border border-[#dbe8ef] bg-white px-4 py-3">
                 <span className="text-sm font-semibold text-[#173543]">Leave JC RAD HQ</span>
@@ -742,7 +754,7 @@ export default function SavedRoutePlannerPanel({
             </div>
           </div>
 
-          <div className="mt-4 grid gap-4 lg:grid-cols-2 xl:grid-cols-1">
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
             <PlannerSelect label="Assigned Rep" value={assignedUserId} onChange={setAssignedUserId} options={routeRepOptions.map((option) => ({ value: option.userId, label: option.label }))} />
             <PlannerInput label="Route Date" type="date" value={routeDate} onChange={setRouteDate} />
             <PlannerInput label="Max Stops" type="number" value={maxStops} onChange={setMaxStops} min="1" max="40" />
@@ -769,8 +781,8 @@ export default function SavedRoutePlannerPanel({
           <div className="mt-5 rounded-2xl border border-[#dbe8ef] bg-[#fbfdfe] p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Territory-First Backup</p>
-                <p className="mt-1 text-sm text-[#5c7483]">Use the same finalized scheduling flow against a territory’s coordinate-ready candidate set when needed.</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Territory Backup Build</p>
+                <p className="mt-1 text-sm text-[#5c7483]">Use the same route builder against a territory’s route-ready customer set when the pending queue is not the right entry point.</p>
               </div>
               <button
                 type="button"
@@ -782,7 +794,7 @@ export default function SavedRoutePlannerPanel({
               </button>
             </div>
             <p className="mt-3 text-sm text-[#5c7483]">
-              {selectedTerritory ? `${candidateCustomers.length} coordinate-ready customers in ${selectedTerritory.label}.` : "Choose a territory override to generate a territory-first route."}
+              {selectedTerritory ? `${candidateCustomers.length} route-ready customers in ${selectedTerritory.label}.` : "Choose a territory override to build a territory-first route."}
             </p>
           </div>
 
@@ -794,9 +806,9 @@ export default function SavedRoutePlannerPanel({
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Route Readiness</p>
-            <h3 className="mt-1 text-lg font-semibold text-[#173543]">Understand what the planner can use before you finalize</h3>
+            <h3 className="mt-1 text-lg font-semibold text-[#173543]">Only route-ready stops can enter generation</h3>
             <p className="mt-1 text-sm text-[#5c7483]">
-              Pending stops move through this sequence: queued, route-ready, then included in the current preview. Anything excluded is called out here with a reason.
+              Pending stops stay in the queue even when blocked. The planner only uses stops with an address, valid coordinates, and no unresolved geocode issue.
             </p>
           </div>
           <div className="grid gap-2 rounded-2xl border border-[#dbe8ef] bg-[#fbfdfe] p-4 text-sm text-[#506877] sm:min-w-[240px]">
@@ -880,13 +892,13 @@ export default function SavedRoutePlannerPanel({
         </div>
       </section>
 
-      <div className="mt-5 grid gap-5 xl:grid-cols-[1.25fr_0.75fr]">
+      <div className="mt-5 grid gap-5 2xl:grid-cols-[minmax(0,1.35fr)_minmax(380px,0.95fr)]">
         <section className="space-y-5">
           {draftMapCustomers.length > 0 && draftPlan ? (
             <RouteStopsMap
               customers={draftMapCustomers}
               title="Route Preview"
-              description="Review the finalized route on the map first. The preview reflects the server-planned order, origin, and route path before you save the route."
+              description="Use the map as a live preview and the itinerary as the working control surface. The stop strip mirrors the finalized order without duplicating the full stop card UI."
               emptyLabel="The finalized draft does not have map-ready stops."
               secondaryActionLabel="Open Account"
               secondaryActionHref={(customerId) => `/workspace/customers/${customerId}`}
@@ -904,8 +916,8 @@ export default function SavedRoutePlannerPanel({
               }}
             />
           ) : (
-            <section className="rounded-[24px] border border-dashed border-[#cfdde6] bg-[#fbfdfe] px-4 py-12 text-center text-sm text-[#5c7483]">
-              Finalize a pending-stop or territory route to open the map-first preview.
+            <section className="rounded-[24px] border border-dashed border-[#cfdde6] bg-[#fbfdfe] px-4 py-14 text-center text-sm text-[#5c7483]">
+              Build a pending-stop or territory route preview to open the map workspace.
             </section>
           )}
 
@@ -1054,6 +1066,49 @@ export default function SavedRoutePlannerPanel({
                 </div>
               </div>
             </div>
+
+            <div className="mt-5 rounded-[22px] border border-[#dbe8ef] bg-[#fbfdfe] p-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Recent Saved Routes</p>
+                <h4 className="mt-1 text-lg font-semibold text-[#173543]">Saved route runner handoff</h4>
+                <p className="mt-1 text-sm text-[#5c7483]">This same itinerary structure becomes the next runner foundation. Saved routes stay available here for quick handoff.</p>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {savedRoutesState.map((route) => (
+                  <div key={route.id} className="rounded-2xl border border-[#dbe8ef] bg-white p-3">
+                    <div className="flex flex-col gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-semibold text-[#173543]">{route.name}</p>
+                        <span className="rounded-full border border-[#d7e6ed] bg-[#fbfdfe] px-2.5 py-1 text-xs font-semibold text-[#496574]">{route.status}</span>
+                      </div>
+                      <p className="text-sm text-[#5c7483]">
+                        {route.routeDate || "No date"} • {route.assignedUserLabel || "Unassigned rep"} • {route.stopCount} stops
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        <Link href={`/workspace/routes/run?routeId=${route.id}`} className="rounded-full bg-[#173543] px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-[#0f2a35]">
+                          Open Runner
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => void deleteSavedRoute(route.id)}
+                          disabled={busy !== null}
+                          className="rounded-full border border-[#f2d1d1] bg-white px-3 py-1.5 text-sm font-semibold text-[#9a3d3d] transition hover:bg-[#fff7f7] disabled:opacity-60"
+                        >
+                          {busy === "delete_route" ? "Deleting..." : "Erase Route"}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {savedRoutesState.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-[#cfdde6] bg-white px-4 py-10 text-center text-sm text-[#5c7483]">
+                    No saved routes yet.
+                  </div>
+                ) : null}
+              </div>
+            </div>
           </section>
         </section>
 
@@ -1061,8 +1116,8 @@ export default function SavedRoutePlannerPanel({
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Route Itinerary</p>
-              <h3 className="mt-1 text-lg font-semibold text-[#173543]">{draftStops.length > 0 ? "Leg-by-leg stop itinerary" : "No stops yet"}</h3>
-              <p className="mt-1 text-sm text-[#5c7483]">Each stop shows arrival, departure, drive time, visit duration, distance from the previous stop, and return-to-HQ context on the final leg.</p>
+              <h3 className="mt-1 text-lg font-semibold text-[#173543]">{draftStops.length > 0 ? "Primary route control surface" : "No stops yet"}</h3>
+              <p className="mt-1 text-sm text-[#5c7483]">Reorder and remove here. Lunch and the final HQ return are separate itinerary blocks so this structure can carry forward into the route runner.</p>
             </div>
             {draftPlan ? (
               <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4f6877]">
@@ -1077,55 +1132,68 @@ export default function SavedRoutePlannerPanel({
                 draftPlan?.firstOvertimeStopIndex === index || (draftPlan?.firstOvertimeStopId ? draftPlan.firstOvertimeStopId === stop.customerId : false);
 
               return (
-                <div
-                  key={`${stop.customerId}-${stop.stopOrder}`}
-                  className={[
-                    "rounded-[20px] border px-3 py-3",
-                    isFirstOvertimeStop
-                      ? "border-[#f3c6c6] bg-[#fff6f6]"
-                      : stop.scheduleFlag === "tight"
-                        ? "border-[#f2ddb0] bg-[#fffdf6]"
-                        : "border-[#dbe8ef] bg-[#fbfdfe]",
-                  ].join(" ")}
-                >
-                  <div className="flex flex-col gap-2.5">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="rounded-full border border-[#d7e6ed] bg-white px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#607b89]">Stop {index + 1}</p>
-                          <span className={["rounded-full border px-2.5 py-1 text-xs font-semibold", scheduleFlagBadgeClass(stop.scheduleFlag)].join(" ")}>
-                            {stop.scheduleFlag.replace("_", " ")}
-                          </span>
-                          {isFirstOvertimeStop ? (
-                            <span className="rounded-full border border-[#f3c6c6] bg-[#fff1f1] px-2.5 py-1 text-xs font-semibold text-[#a33a3a]">First overtime stop</span>
-                          ) : null}
+                <div key={`${stop.customerId}-${stop.stopOrder}`}>
+                  {draftPlan?.lunchBlock && index === lunchInsertIndex ? (
+                    <div className="mb-2.5 rounded-[20px] border border-[#f1ddad] bg-[#fff9eb] px-3 py-3">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="rounded-full border border-[#f1ddad] bg-white px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#8a5a08]">Lunch</p>
+                            <span className="rounded-full border border-[#f1ddad] bg-[#fff3cf] px-2.5 py-1 text-xs font-semibold text-[#8a5a08]">{draftPlan.lunchBlock.minutes} min</span>
+                          </div>
+                          <p className="mt-2 text-sm font-medium text-[#6f4a0a]">
+                            {formatDateTime(draftPlan.lunchBlock.startTime)} to {formatDateTime(draftPlan.lunchBlock.endTime)}
+                          </p>
                         </div>
-                        <p className="mt-1 font-semibold text-[#173543]">{stop.customerName}</p>
-                        <div className="mt-2 grid gap-1 text-sm text-[#5c7483]">
-                          <p>Arrive {formatDateTime(stop.plannedArrivalTime)} • Depart {formatDateTime(stop.plannedDepartureTime)}</p>
-                          <p>Drive {stop.estimatedDriveMinutesFromPrevious} min • Visit {stop.estimatedVisitMinutes} min • Distance {(stop.legDistanceMeters / 1609.34).toFixed(1)} mi</p>
-                          {index === draftStops.length - 1 && draftPlan?.projectedReturnTime ? (
-                            <p className="text-[#355966]">
-                              Return to HQ {draftPlan.returnDriveMinutes} min • ETA {formatDateTime(draftPlan.projectedReturnTime)}
-                            </p>
-                          ) : null}
-                        </div>
+                        <p className="text-sm text-[#8a5a08]">Dedicated itinerary block for the mid-route break.</p>
                       </div>
-                      <div className="flex flex-wrap gap-2">
-                        <button type="button" onClick={() => moveStop(index, -1)} disabled={index === 0} className="rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm text-[#42606f] transition hover:border-[#14b8a6] hover:text-[#0f766e] disabled:opacity-60">
-                          Up
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => moveStop(index, 1)}
-                          disabled={index === draftStops.length - 1}
-                          className="rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm text-[#42606f] transition hover:border-[#14b8a6] hover:text-[#0f766e] disabled:opacity-60"
-                        >
-                          Down
-                        </button>
-                        <button type="button" onClick={() => removeDraftStop(stop.customerId)} className="rounded-full border border-[#f2d1d1] bg-white px-3 py-1.5 text-sm text-[#9a3d3d] transition hover:bg-[#fff7f7]">
-                          Remove
-                        </button>
+                    </div>
+                  ) : null}
+
+                  <div
+                    className={[
+                      "rounded-[20px] border px-3 py-3",
+                      isFirstOvertimeStop
+                        ? "border-[#f3c6c6] bg-[#fff6f6]"
+                        : stop.scheduleFlag === "tight"
+                          ? "border-[#f2ddb0] bg-[#fffdf6]"
+                          : "border-[#dbe8ef] bg-[#fbfdfe]",
+                    ].join(" ")}
+                  >
+                    <div className="flex flex-col gap-2.5">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="rounded-full border border-[#d7e6ed] bg-white px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#607b89]">Stop {index + 1}</p>
+                            <span className={["rounded-full border px-2.5 py-1 text-xs font-semibold", scheduleFlagBadgeClass(stop.scheduleFlag)].join(" ")}>
+                              {stop.scheduleFlag.replace("_", " ")}
+                            </span>
+                            {isFirstOvertimeStop ? (
+                              <span className="rounded-full border border-[#f3c6c6] bg-[#fff1f1] px-2.5 py-1 text-xs font-semibold text-[#a33a3a]">First overtime stop</span>
+                            ) : null}
+                          </div>
+                          <p className="mt-1 font-semibold text-[#173543]">{stop.customerName}</p>
+                          <div className="mt-2 grid gap-1 text-sm text-[#5c7483]">
+                            <p>Arrive {formatDateTime(stop.plannedArrivalTime)} • Depart {formatDateTime(stop.plannedDepartureTime)}</p>
+                            <p>Drive {stop.estimatedDriveMinutesFromPrevious} min • Visit {stop.estimatedVisitMinutes} min • Distance {(stop.legDistanceMeters / 1609.34).toFixed(1)} mi</p>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <button type="button" onClick={() => moveStop(index, -1)} disabled={index === 0} className="rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm text-[#42606f] transition hover:border-[#14b8a6] hover:text-[#0f766e] disabled:opacity-60">
+                            Up
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => moveStop(index, 1)}
+                            disabled={index === draftStops.length - 1}
+                            className="rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm text-[#42606f] transition hover:border-[#14b8a6] hover:text-[#0f766e] disabled:opacity-60"
+                          >
+                            Down
+                          </button>
+                          <button type="button" onClick={() => removeDraftStop(stop.customerId)} className="rounded-full border border-[#f2d1d1] bg-white px-3 py-1.5 text-sm text-[#9a3d3d] transition hover:bg-[#fff7f7]">
+                            Remove
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1133,51 +1201,27 @@ export default function SavedRoutePlannerPanel({
               );
             })}
 
+            {draftPlan && draftStops.length > 0 ? (
+              <div className="rounded-[20px] border border-[#d9e7ee] bg-[linear-gradient(180deg,#f8fcfd_0%,#eef6f9_100%)] px-3 py-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="rounded-full border border-[#d7e6ed] bg-white px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#607b89]">Return</p>
+                      <span className="rounded-full border border-[#d7e6ed] bg-white px-2.5 py-1 text-xs font-semibold text-[#355966]">HQ</span>
+                    </div>
+                    <p className="mt-1 font-semibold text-[#173543]">{JC_RAD_HQ.name}</p>
+                    <p className="mt-2 text-sm text-[#5c7483]">
+                      Final drive {draftPlan.returnDriveMinutes} min • ETA {formatDateTime(draftPlan.projectedReturnTime)}
+                    </p>
+                  </div>
+                  <p className="text-sm text-[#5c7483]">Explicit return-to-origin block for runner compatibility.</p>
+                </div>
+              </div>
+            ) : null}
+
             {draftStops.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-[#cfdde6] bg-[#fbfdfe] px-4 py-10 text-center text-sm text-[#5c7483]">
                 Finalize a route to review the optimized stop order and schedule.
-              </div>
-            ) : null}
-          </div>
-        </section>
-
-        <section className="rounded-[24px] border border-[#dbe8ef] bg-white p-4 shadow-sm">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Saved Routes</p>
-            <h3 className="mt-1 text-lg font-semibold text-[#173543]">Recent route plans</h3>
-          </div>
-
-          <div className="mt-4 space-y-3">
-            {savedRoutesState.map((route) => (
-              <div key={route.id} className="rounded-2xl border border-[#dbe8ef] bg-[#fbfdfe] p-3">
-                <div className="flex flex-col gap-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-semibold text-[#173543]">{route.name}</p>
-                    <span className="rounded-full border border-[#d7e6ed] bg-white px-2.5 py-1 text-xs font-semibold text-[#496574]">{route.status}</span>
-                  </div>
-                  <p className="text-sm text-[#5c7483]">
-                    {route.routeDate || "No date"} • {route.assignedUserLabel || "Unassigned rep"} • {route.stopCount} stops
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    <Link href={`/workspace/routes/run?routeId=${route.id}`} className="rounded-full bg-[#173543] px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-[#0f2a35]">
-                      Open Runner
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={() => void deleteSavedRoute(route.id)}
-                      disabled={busy !== null}
-                      className="rounded-full border border-[#f2d1d1] bg-white px-3 py-1.5 text-sm font-semibold text-[#9a3d3d] transition hover:bg-[#fff7f7] disabled:opacity-60"
-                    >
-                      {busy === "delete_route" ? "Deleting..." : "Erase Route"}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-
-            {savedRoutesState.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-[#cfdde6] bg-[#fbfdfe] px-4 py-10 text-center text-sm text-[#5c7483]">
-                No saved routes yet.
               </div>
             ) : null}
           </div>

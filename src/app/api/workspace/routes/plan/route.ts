@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { buildPlannedRoute } from "@/lib/routePlanning";
 import { getStaffContext } from "@/lib/getStaffContext";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 function asText(value: unknown): string | null {
   const text = String(value || "").trim();
@@ -11,6 +12,11 @@ function asNumber(value: unknown): number | null {
   if (value === null || value === undefined || value === "") return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function hasValidCoordinates(latitude: number | null, longitude: number | null) {
+  if (latitude === null || longitude === null) return false;
+  return Number.isFinite(latitude) && Number.isFinite(longitude) && Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180;
 }
 
 export async function POST(req: Request) {
@@ -48,8 +54,47 @@ export async function POST(req: Request) {
     })
     .filter((stop): stop is NonNullable<typeof stop> => Boolean(stop));
 
+  const customerIds = Array.from(new Set(normalizedStops.map((stop) => stop.customerId)));
+  if (customerIds.length === 0) {
+    const plan = await buildPlannedRoute({
+      stops: [],
+      routeDate,
+      startTime: plannedStartTime,
+      requiredReturnByTime: requiredReturnBy,
+      visitMinutes: stopDurationMinutes,
+      lunchMinutes,
+    });
+    return NextResponse.json({ ok: true, plan });
+  }
+
+  const supabase = createAdminClient();
+  const { data: customerRows, error: customerError } = await supabase
+    .from("customers")
+    .select("id, latitude, longitude, geocode_status")
+    .in("id", customerIds);
+
+  if (customerError) {
+    return NextResponse.json({ error: customerError.message }, { status: 500 });
+  }
+
+  const eligibleCustomerIds = new Set(
+    ((customerRows || []) as Array<Record<string, unknown>>)
+      .filter((row) => {
+        const geocodeStatus = asText(row.geocode_status);
+        const latitude = asNumber(row.latitude);
+        const longitude = asNumber(row.longitude);
+        if (!hasValidCoordinates(latitude, longitude)) return false;
+        if (geocodeStatus === "missing_address" || geocodeStatus === "failed" || geocodeStatus === "needs_review") return false;
+        return true;
+      })
+      .map((row) => asText(row.id))
+      .filter((value): value is string => Boolean(value))
+  );
+
+  const eligibleStops = normalizedStops.filter((stop) => eligibleCustomerIds.has(stop.customerId));
+
   const plan = await buildPlannedRoute({
-    stops: normalizedStops,
+    stops: eligibleStops,
     routeDate,
     startTime: plannedStartTime,
     requiredReturnByTime: requiredReturnBy,
