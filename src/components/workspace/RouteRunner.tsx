@@ -8,8 +8,11 @@ import type { RouteRepOption, TerritoryOption } from "@/lib/routeWorkspace";
 import RouteStopsMap from "@/components/workspace/RouteStopsMap";
 import {
   buildRouteStats,
+  buildTerritoryStats,
+  CoordinateCoverageFilter,
   formatDate,
   formatDateTime,
+  getCoordinateCoverageState,
   getRouteSearchText,
   normalizeMailtoHref,
   normalizeTelHref,
@@ -18,6 +21,8 @@ import {
   RouteViewMode,
   setQueryParam,
   sortCustomersForRoute,
+  sortTerritoryStats,
+  TerritorySortMode,
   titleCase,
   VISIT_OUTCOMES,
   visitStatusChipClass,
@@ -35,6 +40,8 @@ type RouteRunnerProps = {
     routeDay: string;
     territory: string;
     visitStatus: string;
+    coordinateStatus: string;
+    territorySort: string;
     view: RouteViewMode;
   };
 };
@@ -68,6 +75,17 @@ export default function RouteRunner({ customers, routeRepOptions, territoryOptio
   const [routeDayFilter, setRouteDayFilter] = useState(initialFilters.routeDay || getCurrentRouteDay());
   const [territoryFilter, setTerritoryFilter] = useState(initialFilters.territory || "all");
   const [visitStatusFilter, setVisitStatusFilter] = useState(initialFilters.visitStatus || "all");
+  const [coordinateStatusFilter, setCoordinateStatusFilter] = useState<CoordinateCoverageFilter>(
+    initialFilters.coordinateStatus === "has_coords" ||
+      initialFilters.coordinateStatus === "needs_coords" ||
+      initialFilters.coordinateStatus === "address_ready" ||
+      initialFilters.coordinateStatus === "missing_address"
+      ? initialFilters.coordinateStatus
+      : "all"
+  );
+  const [territorySort, setTerritorySort] = useState<TerritorySortMode>(
+    initialFilters.territorySort === "due_today" || initialFilters.territorySort === "follow_up_needed" ? initialFilters.territorySort : "account_count"
+  );
   const [viewMode, setViewMode] = useState<RouteViewMode>(initialFilters.view === "map" ? "map" : "list");
   const [referenceNow] = useState(() => Date.now());
   const deferredSearch = useDeferredValue(search);
@@ -88,12 +106,20 @@ export default function RouteRunner({ customers, routeRepOptions, territoryOptio
       if (routeDayFilter !== "all" && normalizeText(customer.routeDay) !== normalizeText(routeDayFilter)) return false;
       if (territoryFilter !== "all" && normalizeText(customer.territoryCode) !== normalizeText(territoryFilter)) return false;
       if (visitStatusFilter !== "all" && normalizeText(customer.visitStatus) !== normalizeText(visitStatusFilter)) return false;
+      if (coordinateStatusFilter === "needs_coords" && customer.latitude !== null && customer.longitude !== null) return false;
+      if (coordinateStatusFilter !== "all" && coordinateStatusFilter !== "needs_coords" && getCoordinateCoverageState(customer) !== coordinateStatusFilter) return false;
       return true;
     })
     .sort(sortCustomersForRoute);
 
   const currentRepLabel = routeRepOptions.find((option) => option.userId === currentUserId)?.label || "Current rep";
   const stats = buildRouteStats(visibleCustomers, referenceNow);
+  const territoryLabelMap = new Map(territoryOptions.map((option) => [option.code, option.label]));
+  const territorySections = sortTerritoryStats(buildTerritoryStats(visibleCustomers, referenceNow), territorySort).map((territory) => ({
+    ...territory,
+    label: territory.territoryKey === "UNASSIGNED" ? "Unassigned Territory" : territoryLabelMap.get(territory.territoryKey) || territory.territoryKey,
+    customers: [...territory.customers].sort(sortCustomersForRoute),
+  }));
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -102,11 +128,13 @@ export default function RouteRunner({ customers, routeRepOptions, territoryOptio
     setQueryParam(params, "routeDay", routeDayFilter);
     setQueryParam(params, "territory", territoryFilter);
     setQueryParam(params, "visitStatus", visitStatusFilter);
+    setQueryParam(params, "coordStatus", coordinateStatusFilter);
+    setQueryParam(params, "territorySort", territorySort, ["account_count", ""]);
     setQueryParam(params, "view", viewMode, ["list", ""]);
     if (focusCustomerId) params.set("customerId", focusCustomerId);
     const next = params.toString();
     router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false });
-  }, [focusCustomerId, pathname, routeDayFilter, router, scope, search, territoryFilter, viewMode, visitStatusFilter]);
+  }, [coordinateStatusFilter, focusCustomerId, pathname, routeDayFilter, router, scope, search, territoryFilter, territorySort, viewMode, visitStatusFilter]);
 
   return (
     <div className="space-y-5">
@@ -134,7 +162,7 @@ export default function RouteRunner({ customers, routeRepOptions, territoryOptio
       </section>
 
       <section className="rounded-[28px] border border-[#dbe8ef] bg-white p-5 shadow-[0_12px_32px_rgba(16,42,67,0.06)] lg:px-6">
-        <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,0.9fr))]">
+        <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-[minmax(0,1.4fr)_repeat(4,minmax(0,0.9fr))]">
           <label className="grid gap-1 text-sm text-[#4b6676]">
             <span className="font-medium">Search stops</span>
             <input
@@ -159,10 +187,31 @@ export default function RouteRunner({ customers, routeRepOptions, territoryOptio
 
           <SelectFilter label="Route Day" value={routeDayFilter} onChange={setRouteDayFilter} options={routeDays} />
           <SelectFilter label="Territory" value={territoryFilter} onChange={setTerritoryFilter} options={territoryOptions} />
+          <SelectFilter
+            label="Coordinates"
+            value={coordinateStatusFilter}
+            onChange={(value) => setCoordinateStatusFilter(value as CoordinateCoverageFilter)}
+            options={[
+              { value: "has_coords", label: "Map Ready" },
+              { value: "needs_coords", label: "Needs Coordinates" },
+              { value: "address_ready", label: "Has Address, Missing Coords" },
+              { value: "missing_address", label: "No Address, No Coords" },
+            ]}
+          />
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <SelectFilter label="Visit Status" value={visitStatusFilter} onChange={setVisitStatusFilter} options={visitStatuses} />
+          <SelectFilter
+            label="Territory Sort"
+            value={territorySort}
+            onChange={(value) => setTerritorySort(value as TerritorySortMode)}
+            options={[
+              { value: "account_count", label: "Account Count" },
+              { value: "due_today", label: "Due Today" },
+              { value: "follow_up_needed", label: "Follow-Up Needed" },
+            ]}
+          />
           <div className="inline-flex rounded-full border border-[#d0dde5] bg-white p-1">
             <button
               type="button"
@@ -199,9 +248,59 @@ export default function RouteRunner({ customers, routeRepOptions, territoryOptio
         />
       ) : null}
 
-      <section className={viewMode === "map" ? "hidden" : "grid gap-4"}>
-        {visibleCustomers.map((customer) => (
-          <RouteStopCard key={customer.id} customer={customer} />
+      <section className={viewMode === "map" ? "hidden" : "space-y-4"}>
+        {territorySections.length > 0 ? (
+          <nav className="rounded-[24px] border border-[#dbe8ef] bg-white p-4 shadow-[0_12px_32px_rgba(16,42,67,0.05)]">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Territory Jump</p>
+                <p className="mt-1 text-sm text-[#5c7483]">Work the runner territory-by-territory and jump directly into the next section.</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {territorySections.map((territory) => (
+                  <a
+                    key={territory.territoryKey}
+                    href={`#runner-territory-${territory.territoryKey}`}
+                    className="rounded-full border border-[#d5e1e8] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4a6575] transition hover:bg-white hover:text-[#173543]"
+                  >
+                    {territory.label} ({territory.accountCount})
+                  </a>
+                ))}
+              </div>
+            </div>
+          </nav>
+        ) : null}
+
+        {territorySections.map((territory) => (
+          <section
+            key={territory.territoryKey}
+            id={`runner-territory-${territory.territoryKey}`}
+            className="rounded-[28px] border border-[#dbe8ef] bg-white p-5 shadow-[0_12px_32px_rgba(16,42,67,0.06)]"
+          >
+            <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Territory</p>
+                <h3 className="mt-1 text-xl font-semibold text-[#173543]">{territory.label}</h3>
+                <p className="mt-1 text-sm text-[#5c7483]">
+                  {territory.accountCount} stops in scope • {territory.territoryKey === "UNASSIGNED" ? "Needs territory assignment" : territory.territoryKey}
+                </p>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-3 xl:min-w-[520px] xl:grid-cols-6">
+                <MiniMetric label="Accounts" value={territory.accountCount} />
+                <MiniMetric label="Due Today" value={territory.dueToday} />
+                <MiniMetric label="Visited Today" value={territory.visitedToday} />
+                <MiniMetric label="Follow-Up" value={territory.followUpNeeded} />
+                <MiniMetric label="No Coords" value={territory.noCoords} />
+                <MiniMetric label="No Rep" value={territory.unassignedRep} />
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-4">
+              {territory.customers.map((customer) => (
+                <RouteStopCard key={customer.id} customer={customer} />
+              ))}
+            </div>
+          </section>
         ))}
 
         {visibleCustomers.length === 0 ? (
@@ -239,6 +338,15 @@ function MetricLine({ label, value }: { label: string; value: string }) {
     <div className="flex items-center justify-between gap-3">
       <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7d95a3]">{label}</span>
       <span className="text-base font-semibold text-[#173543]">{value}</span>
+    </div>
+  );
+}
+
+function MiniMetric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-2xl border border-[#dbe8ef] bg-[#f8fbfc] px-3 py-2 text-sm">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7d95a3]">{label}</p>
+      <p className="mt-1 text-lg font-semibold text-[#173543]">{value}</p>
     </div>
   );
 }

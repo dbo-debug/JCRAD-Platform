@@ -33,6 +33,8 @@ export default async function WorkspaceRouteRunnerPage({
           routeDay: asQueryValue(params?.routeDay),
           territory: asQueryValue(params?.territory),
           visitStatus: asQueryValue(params?.visitStatus),
+          coordinateStatus: asQueryValue(params?.coordStatus),
+          territorySort: asQueryValue(params?.territorySort),
           view: asQueryValue(params?.view) === "map" ? "map" : "list",
         }}
       />

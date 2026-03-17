@@ -31,6 +31,8 @@ export default async function WorkspaceRoutesPage({
           rep: asQueryValue(params?.rep),
           visitStatus: asQueryValue(params?.visitStatus),
           priority: asQueryValue(params?.priority),
+          coordinateStatus: asQueryValue(params?.coordStatus),
+          territorySort: asQueryValue(params?.territorySort),
           view: asQueryValue(params?.view) === "map" ? "map" : "list",
         }}
       />

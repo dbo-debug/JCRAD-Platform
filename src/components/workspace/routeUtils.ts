@@ -1,6 +1,8 @@
 import type { CustomerSummary } from "@/lib/customerWorkspace";
 
 export type RouteViewMode = "list" | "map";
+export type CoordinateCoverageFilter = "all" | "has_coords" | "needs_coords" | "address_ready" | "missing_address";
+export type TerritorySortMode = "account_count" | "due_today" | "follow_up_needed";
 
 export type VisitOutcomeKey =
   | "met_buyer"
@@ -139,6 +141,15 @@ export function getRouteSearchText(customer: CustomerSummary) {
     .join(" ");
 }
 
+export function customerHasAddress(customer: CustomerSummary) {
+  return Boolean(customer.address1 || customer.city || customer.state || customer.postalCode);
+}
+
+export function getCoordinateCoverageState(customer: CustomerSummary): Exclude<CoordinateCoverageFilter, "all" | "needs_coords"> {
+  if (customer.latitude !== null && customer.longitude !== null) return "has_coords";
+  return customerHasAddress(customer) ? "address_ready" : "missing_address";
+}
+
 export function sortCustomersForRoute(left: CustomerSummary, right: CustomerSummary) {
   const dayDelta = getRouteDayRank(left.routeDay) - getRouteDayRank(right.routeDay);
   if (dayDelta !== 0) return dayDelta;
@@ -186,6 +197,88 @@ export function buildRouteStats(customers: CustomerSummary[], referenceNow: numb
     noTerritory,
     noCoords,
   };
+}
+
+export function getTerritoryKey(customer: CustomerSummary) {
+  return String(customer.territoryCode || "").trim() || "UNASSIGNED";
+}
+
+export function buildTerritoryStats(customers: CustomerSummary[], referenceNow: number) {
+  const startOfDay = new Date(referenceNow);
+  startOfDay.setHours(0, 0, 0, 0);
+  const startOfToday = startOfDay.getTime();
+  const endOfToday = startOfToday + 24 * 60 * 60 * 1000;
+
+  const territoryMap = new Map<
+    string,
+    {
+      territoryKey: string;
+      customers: CustomerSummary[];
+      accountCount: number;
+      dueToday: number;
+      visitedToday: number;
+      followUpNeeded: number;
+      noCoords: number;
+      unassignedRep: number;
+    }
+  >();
+
+  for (const customer of customers) {
+    const territoryKey = getTerritoryKey(customer);
+    const existing = territoryMap.get(territoryKey) || {
+      territoryKey,
+      customers: [],
+      accountCount: 0,
+      dueToday: 0,
+      visitedToday: 0,
+      followUpNeeded: 0,
+      noCoords: 0,
+      unassignedRep: 0,
+    };
+
+    existing.customers.push(customer);
+    existing.accountCount += 1;
+
+    const due = Date.parse(String(customer.nextVisitDueAt || ""));
+    if (Number.isFinite(due) && due >= startOfToday && due < endOfToday) existing.dueToday += 1;
+
+    const visitedAt = Date.parse(String(customer.lastVisitAt || ""));
+    if (Number.isFinite(visitedAt) && visitedAt >= startOfToday && visitedAt < endOfToday) existing.visitedToday += 1;
+
+    if (["needs_follow_up", "interested", "revisit_needed", "no_answer", "unavailable"].includes(normalizeText(customer.visitStatus))) {
+      existing.followUpNeeded += 1;
+    }
+
+    if (customer.latitude === null || customer.longitude === null) existing.noCoords += 1;
+    if (!customer.assignedRouteRepUserId) existing.unassignedRep += 1;
+
+    territoryMap.set(territoryKey, existing);
+  }
+
+  return Array.from(territoryMap.values());
+}
+
+export function sortTerritoryStats<
+  T extends {
+    territoryKey: string;
+    accountCount: number;
+    dueToday: number;
+    followUpNeeded: number;
+  },
+>(territories: T[], sortMode: TerritorySortMode) {
+  return [...territories].sort((left, right) => {
+    const metricDelta =
+      sortMode === "due_today"
+        ? right.dueToday - left.dueToday
+        : sortMode === "follow_up_needed"
+          ? right.followUpNeeded - left.followUpNeeded
+          : right.accountCount - left.accountCount;
+
+    if (metricDelta !== 0) return metricDelta;
+    if (left.territoryKey === "UNASSIGNED") return 1;
+    if (right.territoryKey === "UNASSIGNED") return -1;
+    return left.territoryKey.localeCompare(right.territoryKey);
+  });
 }
 
 export function setQueryParam(params: URLSearchParams, key: string, value: string, emptyValues: string[] = ["all", ""]) {

@@ -178,10 +178,19 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
 
   const mapHref = buildMapHref(props.address, latitude, longitude);
   const territoryMeta = props.territoryOptions.find((option) => option.code === territoryCode) || null;
+  const hasCoords = Boolean(latitude.trim() && longitude.trim());
+  const hasAddress = Boolean(String(props.address || "").trim());
+  const coordinateCoverageState = hasCoords ? "has_coords" : hasAddress ? "address_ready" : "missing_address";
+  const coordinateStatusLabel =
+    coordinateCoverageState === "has_coords"
+      ? "Map Ready"
+      : coordinateCoverageState === "address_ready"
+        ? "Has Address, Missing Coords"
+        : "No Address, Missing Coords";
   const missingRouteStates = [
     !territoryCode ? "No territory" : null,
     !routeDay ? "No route day" : null,
-    !latitude || !longitude ? "No coordinates" : null,
+    !hasCoords ? "No coordinates" : null,
   ].filter(Boolean) as string[];
   const hasRouteConfig = Boolean(
     territoryCode ||
@@ -464,6 +473,20 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
     }
   }
 
+  function handleGenerateCoordinates() {
+    if (!hasAddress) {
+      setError("Add an address before generating coordinates.");
+      setSuccess(null);
+      return;
+    }
+
+    setError(null);
+    if (mapHref) {
+      window.open(mapHref, "_blank", "noopener,noreferrer");
+    }
+    setSuccess("Geocode placeholder ready. Verify the location in Maps, then paste latitude and longitude into the route fields.");
+  }
+
   return (
     <div className="space-y-3">
       {error ? <p className="rounded-xl border border-[#f1d1d1] bg-[#fff5f5] px-3 py-2 text-sm text-[#991b1b]">{error}</p> : null}
@@ -504,7 +527,8 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
             <div className="flex flex-wrap gap-2">
               <StatusPill label={territoryCode ? `Territory ${territoryCode}` : "Territory Missing"} tone={territoryCode ? "ok" : "warn"} />
               <StatusPill label={routeDay ? `Route ${routeDay}` : "Route Day Missing"} tone={routeDay ? "ok" : "warn"} />
-              <StatusPill label={latitude && longitude ? "Coords Ready" : "Coords Missing"} tone={latitude && longitude ? "ok" : "warn"} />
+              <StatusPill label={hasCoords ? "Coords Ready" : "Coords Missing"} tone={hasCoords ? "ok" : "warn"} />
+              <StatusPill label={coordinateStatusLabel} tone={hasCoords ? "ok" : "warn"} />
               {visitStatus ? <StatusPill label={titleCase(visitStatus)} /> : null}
             </div>
 
@@ -668,6 +692,36 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
               <div className="mt-2 flex flex-wrap gap-2">
                 {missingRouteStates.length > 0 ? missingRouteStates.map((item) => <StatusPill key={item} label={item} tone="warn" />) : <StatusPill label="Route Ready" tone="ok" />}
               </div>
+            </div>
+
+            <div className="rounded-xl border border-[#dbe9ef] bg-white px-3 py-2.5">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8398a5]">Coordinate Status</p>
+                  <p className="mt-1 text-sm font-medium text-[#173543]">{coordinateStatusLabel}</p>
+                  <p className="mt-1 text-xs text-[#5c7483]">
+                    {hasCoords
+                      ? "Coordinates are ready for route mapping."
+                      : hasAddress
+                        ? "Address is present. Use Maps to verify the stop and paste confirmed coordinates."
+                        : "Add an address first before coordinates can be generated or verified."}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleGenerateCoordinates}
+                  disabled={!hasAddress}
+                  className="rounded-full border border-[#cfdde6] bg-white px-3 py-1.5 text-sm font-semibold text-[#21424d] transition hover:border-[#14b8a6] hover:text-[#0f766e] disabled:cursor-not-allowed disabled:border-[#d9e5eb] disabled:bg-[#f7fbfd] disabled:text-[#89a0ad]"
+                >
+                  {hasCoords ? "Review Coordinates" : "Generate Coordinates"}
+                </button>
+              </div>
+              {!hasCoords ? (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <StatusPill label="Needs Coordinates" tone="warn" />
+                  <StatusPill label={hasAddress ? "Address On File" : "Address Missing"} tone={hasAddress ? "neutral" : "warn"} />
+                </div>
+              ) : null}
             </div>
 
             <div className="rounded-xl border border-[#dbe9ef] bg-white px-3 py-2.5">
