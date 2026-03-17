@@ -100,16 +100,39 @@ function toDateTimeLocalValue(value: string | null | undefined) {
   return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
 }
 
-function buildMapHref(address: string | null, latitude: string, longitude: string) {
-  const lat = latitude.trim();
-  const lng = longitude.trim();
-  if (lat && lng) {
-    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${lat},${lng}`)}`;
+function parseCoordinate(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function hasValidCoordinates(latitude: string, longitude: string) {
+  const lat = parseCoordinate(latitude);
+  const lng = parseCoordinate(longitude);
+  if (lat === null || lng === null) return false;
+  return lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+}
+
+function buildAddressMapHref(args: {
+  geocodedAddress: string | null;
+  composedAddress: string | null;
+  latitude: string;
+  longitude: string;
+}) {
+  const addressQuery = String(args.geocodedAddress || args.composedAddress || "").trim();
+  if (addressQuery) {
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addressQuery)}`;
   }
-  if (address) {
-    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+  if (hasValidCoordinates(args.latitude, args.longitude)) {
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${args.latitude.trim()},${args.longitude.trim()}`)}`;
   }
   return null;
+}
+
+function buildCoordinateMapHref(latitude: string, longitude: string) {
+  if (!hasValidCoordinates(latitude, longitude)) return null;
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${latitude.trim()},${longitude.trim()}`)}`;
 }
 
 function addDaysDateValue(days: number) {
@@ -203,9 +226,15 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
   const [routeOutcomeTaskDueDate, setRouteOutcomeTaskDueDate] = useState("");
 
   const composedAddress = [address1, address2, [city, stateCode, postalCode].filter(Boolean).join(", ")].filter(Boolean).join(" • ") || null;
-  const mapHref = buildMapHref(composedAddress || props.address, latitude, longitude);
+  const addressMapHref = buildAddressMapHref({
+    geocodedAddress,
+    composedAddress: composedAddress || props.address,
+    latitude,
+    longitude,
+  });
+  const coordinateMapHref = buildCoordinateMapHref(latitude, longitude);
   const territoryMeta = props.territoryOptions.find((option) => option.code === territoryCode) || null;
-  const hasCoords = Boolean(latitude.trim() && longitude.trim());
+  const hasCoords = hasValidCoordinates(latitude, longitude);
   const hasAddress = Boolean(address1.trim() || city.trim() || stateCode.trim() || postalCode.trim());
   const coordinateCoverageState =
     hasCoords ? "has_coords" : geocodeStatus === "failed" ? "failed" : geocodeStatus === "needs_review" ? "needs_review" : hasAddress ? "address_ready" : "missing_address";
@@ -522,17 +551,27 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
   }
 
   function handleGenerateCoordinates() {
-    if (!hasAddress) {
-      setError("Add an address before generating coordinates.");
+    if (!addressMapHref) {
+      setError("Add an address or valid coordinates before opening Maps.");
       setSuccess(null);
       return;
     }
 
     setError(null);
-    if (mapHref) {
-      window.open(mapHref, "_blank", "noopener,noreferrer");
+    window.open(addressMapHref, "_blank", "noopener,noreferrer");
+    setSuccess("Maps opened with address context when available. Saved address changes will also attempt automatic geocoding on the server.");
+  }
+
+  function handleReviewCoordinates() {
+    if (!coordinateMapHref) {
+      setError("Valid latitude and longitude are required before reviewing coordinates.");
+      setSuccess(null);
+      return;
     }
-    setSuccess("Maps opened for coordinate review. Saved address changes will also attempt automatic geocoding on the server.");
+
+    setError(null);
+    window.open(coordinateMapHref, "_blank", "noopener,noreferrer");
+    setSuccess("Maps opened to review the raw coordinate pin.");
   }
 
   async function retryGeocode() {
@@ -575,17 +614,17 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
           description="Territory-driven stop planning, routing readiness, and field execution."
           action={
             <div className="flex flex-wrap items-center gap-2">
-              {mapHref ? (
+              {addressMapHref ? (
                 <a
-                  href={mapHref}
+                  href={addressMapHref}
                   target="_blank"
                   rel="noreferrer"
                   className="rounded-full border border-[#cfdde6] bg-white px-3 py-1.5 text-sm font-semibold text-[#21424d] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
                 >
-                  Open in Map
+                  Open in Maps
                 </a>
               ) : (
-                <span className="rounded-full border border-[#d9e5eb] bg-[#f7fbfd] px-3 py-1.5 text-sm text-[#89a0ad]">Open in Map</span>
+                <span className="rounded-full border border-[#d9e5eb] bg-[#f7fbfd] px-3 py-1.5 text-sm text-[#89a0ad]">Open in Maps</span>
               )}
               <button
                 type="button"
@@ -796,10 +835,18 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
                   <button
                     type="button"
                     onClick={handleGenerateCoordinates}
-                    disabled={!hasAddress}
+                    disabled={!addressMapHref}
                     className="rounded-full border border-[#cfdde6] bg-white px-3 py-1.5 text-sm font-semibold text-[#21424d] transition hover:border-[#14b8a6] hover:text-[#0f766e] disabled:cursor-not-allowed disabled:border-[#d9e5eb] disabled:bg-[#f7fbfd] disabled:text-[#89a0ad]"
                   >
-                    {hasCoords ? "Review Coordinates" : "Open in Maps"}
+                    Open in Maps
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleReviewCoordinates}
+                    disabled={!coordinateMapHref}
+                    className="rounded-full border border-[#cfdde6] bg-white px-3 py-1.5 text-sm font-semibold text-[#21424d] transition hover:border-[#14b8a6] hover:text-[#0f766e] disabled:cursor-not-allowed disabled:border-[#d9e5eb] disabled:bg-[#f7fbfd] disabled:text-[#89a0ad]"
+                  >
+                    Review Coordinates
                   </button>
                   <button
                     type="button"
