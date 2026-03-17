@@ -27,10 +27,13 @@ values
   ('CA-CENTRAL-VALLEY-SOUTH', 'South San Joaquin Valley', 'Central Valley', 'Wednesday'),
   ('CA-CENTRAL-COAST', 'Central Coast', 'Central Coast', 'Friday'),
   ('CA-LA-CORE', 'Los Angeles Core', 'Los Angeles', 'Monday'),
+  ('CA-LONG-BEACH', 'Long Beach', 'Los Angeles', 'Wednesday'),
   ('CA-SAN-GABRIEL', 'San Gabriel Valley', 'Los Angeles', 'Tuesday'),
+  ('CA-SAN-FERNANDO-VALLEY', 'San Fernando Valley', 'Los Angeles', 'Thursday'),
   ('CA-ORANGE-COUNTY', 'Orange County', 'South Coast', 'Wednesday'),
   ('CA-INLAND-EMPIRE', 'Inland Empire', 'Southland', 'Thursday'),
   ('CA-SAN-DIEGO', 'San Diego', 'South Coast', 'Friday'),
+  ('CA-NORTH-MENDOCINO', 'North Mendocino', 'North State', 'Tuesday'),
   ('CA-DESERT', 'Desert Cities & High Desert', 'Southland', 'Friday')
 on conflict (code) do update
 set
