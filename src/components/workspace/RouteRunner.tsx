@@ -124,7 +124,7 @@ export default function RouteRunner({ customers, routeRepOptions, territoryOptio
 
   const currentRepLabel = routeRepOptions.find((option) => option.userId === currentUserId)?.label || "Current rep";
   const stats = buildRouteStats(visibleCustomers, referenceNow);
-  const territoryLabelMap = new Map(territoryOptions.map((option) => [option.code, option.label]));
+  const territoryLabelMap = new Map(territoryOptions.map((option) => [option.value, option.label]));
   const routeRepLabelMap = new Map(routeRepOptions.map((option) => [option.userId, option.label]));
   const territorySections = sortTerritoryStats(buildTerritoryStats(visibleCustomers, referenceNow), territorySort)
     .map((territory) => ({

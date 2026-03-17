@@ -2,9 +2,18 @@ import Link from "next/link";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import CustomerWorkspaceIndex from "@/components/workspace/CustomerWorkspaceIndex";
 import { loadCustomerWorkspaceIndex } from "@/lib/customerWorkspace";
+import { loadRouteReferenceData } from "@/lib/routeWorkspace";
 
-export default async function WorkspaceCustomersPage() {
-  const { customers, metrics } = await loadCustomerWorkspaceIndex();
+function asQueryValue(value: string | string[] | undefined): string {
+  return Array.isArray(value) ? String(value[0] || "") : String(value || "");
+}
+
+export default async function WorkspaceCustomersPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const [{ customers, metrics }, { territoryOptions }, params] = await Promise.all([loadCustomerWorkspaceIndex(), loadRouteReferenceData(), searchParams]);
 
   return (
     <div className="mx-auto w-full max-w-[1440px] space-y-6 2xl:max-w-[1500px]">
@@ -21,8 +30,23 @@ export default async function WorkspaceCustomersPage() {
         <MetricCard label="Missing Primary Contact" value={metrics.missingPrimaryContact} />
         <MetricCard label="Without Contacts" value={metrics.customersWithoutContacts} />
       </section>
-
-      <CustomerWorkspaceIndex customers={customers} />
+      <CustomerWorkspaceIndex
+        customers={customers}
+        territoryOptions={territoryOptions}
+        initialFilters={{
+          q: asQueryValue(params?.q),
+          savedView: asQueryValue(params?.savedView),
+          territory: asQueryValue(params?.territory),
+          owner: asQueryValue(params?.owner),
+          status: asQueryValue(params?.status),
+          stage: asQueryValue(params?.stage),
+          contactCoverage: asQueryValue(params?.contactCoverage),
+          routeReadiness: asQueryValue(params?.routeReadiness),
+          orderState: asQueryValue(params?.orderState),
+          organizeBy: asQueryValue(params?.organizeBy),
+          sort: asQueryValue(params?.sort),
+        }}
+      />
     </div>
   );
 }

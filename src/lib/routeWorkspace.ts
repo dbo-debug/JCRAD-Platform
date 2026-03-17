@@ -20,10 +20,18 @@ export type RouteWorkspaceData = {
 };
 
 export async function loadRouteWorkspaceData(): Promise<RouteWorkspaceData> {
-  const [{ customers }, routeRepOptions, territories] = await Promise.all([loadCustomerWorkspaceIndex(), loadRouteRepOptions(), loadTerritories({ activeOnly: true })]);
+  const [{ customers }, referenceData] = await Promise.all([loadCustomerWorkspaceIndex(), loadRouteReferenceData()]);
 
   return {
     customers,
+    ...referenceData,
+  };
+}
+
+export async function loadRouteReferenceData(): Promise<Pick<RouteWorkspaceData, "routeRepOptions" | "territoryOptions">> {
+  const [routeRepOptions, territories] = await Promise.all([loadRouteRepOptions(), loadTerritories({ activeOnly: true })]);
+
+  return {
     routeRepOptions,
     territoryOptions: territories.map((territory) => ({
       value: territory.code,
