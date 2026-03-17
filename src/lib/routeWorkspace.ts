@@ -23,7 +23,7 @@ export async function loadRouteWorkspaceData(): Promise<RouteWorkspaceData> {
 async function loadRouteRepOptions(): Promise<RouteRepOption[]> {
   const supabase = createAdminClient();
   const [profilesRes, authUsersRes] = await Promise.all([
-    supabase.from("profiles").select("id, role, company_name, full_name").in("role", ["admin", "sales"]),
+    supabase.from("profiles").select("id, role, company_name").in("role", ["admin", "sales"]),
     supabase.auth.admin.listUsers({ page: 1, perPage: 1000 }),
   ]);
 
@@ -46,7 +46,7 @@ async function loadRouteRepOptions(): Promise<RouteRepOption[]> {
       const userId = String(profile.id || "").trim();
       if (!userId) return null;
 
-      const baseLabel = String(profile.full_name || profile.company_name || authEmailById.get(userId) || userId).trim();
+      const baseLabel = String(profile.company_name || authEmailById.get(userId) || userId).trim();
       const email = authEmailById.get(userId);
 
       return {

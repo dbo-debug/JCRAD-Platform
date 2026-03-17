@@ -29,6 +29,7 @@ export default function RoutePlannerIndex({ customers, routeRepOptions }: RouteP
   const [repFilter, setRepFilter] = useState("all");
   const [visitStatusFilter, setVisitStatusFilter] = useState("all");
   const [routePriorityFilter, setRoutePriorityFilter] = useState("all");
+  const [referenceNow] = useState(() => Date.now());
   const deferredSearch = useDeferredValue(search);
 
   const routeDays = uniqueOptions(customers.map((customer) => customer.routeDay));
@@ -60,7 +61,7 @@ export default function RoutePlannerIndex({ customers, routeRepOptions }: RouteP
   const visitedCount = visibleCustomers.filter((customer) => normalizeText(customer.visitStatus) === "visited").length;
   const dueNowCount = visibleCustomers.filter((customer) => {
     const due = Date.parse(String(customer.nextVisitDueAt || ""));
-    return Number.isFinite(due) && due <= Date.now();
+    return Number.isFinite(due) && due <= referenceNow;
   }).length;
 
   return (
