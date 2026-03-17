@@ -4,7 +4,7 @@ import {
   computeGoogleRouteSchedule,
   optimizeStopOrderWithGoogle,
 } from "@/lib/googleRouteServices";
-import { parseBusinessDateTime } from "@/lib/businessTime";
+import { getBusinessTimeParts, parseBusinessDateTime } from "@/lib/businessTime";
 
 export const JC_RAD_HQ = {
   name: "JC RAD HQ",
@@ -141,15 +141,23 @@ function buildFallbackOrder(stops: RoutePlanStopInput[]) {
 
 function maybeInsertLunch(args: {
   currentTime: Date;
+  shiftStartTime: Date;
+  completedStops: number;
   lunchInserted: boolean;
   remainingStops: number;
+  totalStops: number;
   lunchMinutes: number;
 }): LunchBlock | null {
   if (args.lunchInserted || args.remainingStops <= 0 || args.lunchMinutes <= 0) return null;
+  const minimumCompletedStops = args.totalStops >= 4 ? 2 : 1;
+  if (args.completedStops < minimumCompletedStops) return null;
 
-  const lunchThreshold = new Date(args.currentTime);
-  lunchThreshold.setHours(12, 0, 0, 0);
-  if (args.currentTime.getTime() < lunchThreshold.getTime()) return null;
+  const elapsedMinutes = Math.round((args.currentTime.getTime() - args.shiftStartTime.getTime()) / 60000);
+  const businessTime = getBusinessTimeParts(args.currentTime);
+  const businessMinutes = businessTime.hour * 60 + businessTime.minute;
+
+  // Evaluate lunch timing in LA business time so UTC conversion never injects lunch before the first real arrival.
+  if (businessMinutes < 12 * 60 && elapsedMinutes < 180) return null;
 
   const startTime = new Date(args.currentTime);
   const endTime = addMinutes(startTime, args.lunchMinutes);
@@ -273,8 +281,11 @@ function buildScheduledPlan(args: {
     cursor = addMinutes(cursor, args.legDriveMinutes[index] || 0);
     const lunchCandidate = maybeInsertLunch({
       currentTime: cursor,
+      shiftStartTime,
+      completedStops: index,
       lunchInserted: Boolean(lunchBlock),
       remainingStops: args.orderedStops.length - index,
+      totalStops: args.orderedStops.length,
       lunchMinutes: args.lunchMinutes,
     });
     if (lunchCandidate) {

@@ -21,6 +21,18 @@ function getPartsForZone(date: Date) {
   return Object.fromEntries(parts.filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
 }
 
+export function getBusinessTimeParts(date: Date) {
+  const parts = getPartsForZone(date);
+  return {
+    year: Number(parts.year),
+    month: Number(parts.month),
+    day: Number(parts.day),
+    hour: Number(parts.hour),
+    minute: Number(parts.minute),
+    second: Number(parts.second),
+  };
+}
+
 export function parseBusinessDateTime(args: { routeDate: string; time: string }) {
   const [year, month, day] = args.routeDate.split("-").map(Number);
   const [hours, minutes] = args.time.split(":").map(Number);
