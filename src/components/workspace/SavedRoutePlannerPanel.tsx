@@ -62,6 +62,13 @@ type PlannedRoute = {
   warning: string | null;
 };
 
+type RouteReadinessItem = {
+  queueId: string;
+  customer: CustomerSummary;
+  status: "included" | "route_ready" | "excluded";
+  reason: "missing_coordinates" | "missing_address" | "invalid_coordinates" | "not_eligible_for_current_planning_set" | "not_in_finalized_preview" | null;
+};
+
 function parseJsonSafe(res: Response): Promise<Record<string, unknown>> {
   const contentType = res.headers.get("content-type") || "";
   if (!contentType.includes("application/json")) return Promise.resolve({});
@@ -137,6 +144,24 @@ function routeStatusTone(args: { fitsWithinShift: boolean; previewNeedsRefresh: 
   };
 }
 
+function hasAnyAddress(customer: CustomerSummary) {
+  return Boolean(customer.address1 || customer.city || customer.state || customer.postalCode);
+}
+
+function hasValidCoordinates(customer: CustomerSummary) {
+  if (customer.latitude === null || customer.longitude === null) return false;
+  return Number.isFinite(customer.latitude) && Number.isFinite(customer.longitude) && Math.abs(customer.latitude) <= 90 && Math.abs(customer.longitude) <= 180;
+}
+
+function readinessReasonLabel(reason: RouteReadinessItem["reason"]) {
+  if (reason === "missing_address") return "Missing address";
+  if (reason === "missing_coordinates") return "Missing coordinates";
+  if (reason === "invalid_coordinates") return "Invalid coordinates";
+  if (reason === "not_eligible_for_current_planning_set") return "Not eligible for current planning set";
+  if (reason === "not_in_finalized_preview") return "Not included in finalized preview";
+  return "Included";
+}
+
 function deriveRouteTerritoryCode(stops: DraftStop[], explicitTerritoryCode: string) {
   if (explicitTerritoryCode) return explicitTerritoryCode;
   const territoryCodes = Array.from(new Set(stops.map((stop) => stop.territoryCode).filter((value): value is string => Boolean(value))));
@@ -190,6 +215,64 @@ export default function SavedRoutePlannerPanel({
   const suggestedTrimStops = (draftPlan?.suggestedTrimStopIds || [])
     .map((customerId) => draftPlan?.orderedStops.find((stop) => stop.customerId === customerId))
     .filter((stop): stop is DraftStop => Boolean(stop));
+  const previewIncludedIds = new Set((draftPlan?.orderedStops || []).map((stop) => stop.customerId));
+  const pendingRouteReadyStops = pendingStops.filter((stop) => hasValidCoordinates(stop.customer));
+  const pendingEligibleIds = new Set(pendingRouteReadyStops.slice(0, normalizedMaxStops).map((stop) => stop.customerId));
+  const readinessItems = pendingStops.map((stop) => {
+    if (!hasAnyAddress(stop.customer) || stop.customer.geocodeStatus === "missing_address") {
+      return {
+        queueId: stop.id,
+        customer: stop.customer,
+        status: "excluded",
+        reason: "missing_address",
+      } satisfies RouteReadinessItem;
+    }
+    if (stop.customer.latitude === null || stop.customer.longitude === null) {
+      return {
+        queueId: stop.id,
+        customer: stop.customer,
+        status: "excluded",
+        reason: "missing_coordinates",
+      } satisfies RouteReadinessItem;
+    }
+    if (!hasValidCoordinates(stop.customer)) {
+      return {
+        queueId: stop.id,
+        customer: stop.customer,
+        status: "excluded",
+        reason: "invalid_coordinates",
+      } satisfies RouteReadinessItem;
+    }
+    if (!pendingEligibleIds.has(stop.customerId)) {
+      return {
+        queueId: stop.id,
+        customer: stop.customer,
+        status: "excluded",
+        reason: "not_eligible_for_current_planning_set",
+      } satisfies RouteReadinessItem;
+    }
+    if (draftPlan && !previewIncludedIds.has(stop.customerId)) {
+      return {
+        queueId: stop.id,
+        customer: stop.customer,
+        status: "excluded",
+        reason: "not_in_finalized_preview",
+      } satisfies RouteReadinessItem;
+    }
+    return {
+      queueId: stop.id,
+      customer: stop.customer,
+      status: draftPlan && previewIncludedIds.has(stop.customerId) ? "included" : "route_ready",
+      reason: null,
+    } satisfies RouteReadinessItem;
+  });
+  const readinessCounts = {
+    queued: readinessItems.length,
+    routeReady: readinessItems.filter((item) => item.status === "route_ready" || item.status === "included").length,
+    excluded: readinessItems.filter((item) => item.status === "excluded").length,
+    included: readinessItems.filter((item) => item.status === "included").length,
+  };
+  const readinessExcludedItems = readinessItems.filter((item) => item.status === "excluded");
   const selectedPreviewStop = draftStops.find((stop) => stop.customerId === selectedPreviewStopId) || draftStops[0] || null;
   const saveBlockedByOvertime = Boolean(draftPlan && !draftPlan.fitsWithinShift && !overtimeApproved);
   const saveBlocked = saveBlockedByOvertime || previewNeedsRefresh;
@@ -563,7 +646,7 @@ export default function SavedRoutePlannerPanel({
                 disabled={busy !== null || pendingStops.length === 0}
                 className="rounded-full bg-[#173543] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#0f2a35] disabled:opacity-60"
               >
-                {busy === "generate_pending" ? "Finalizing..." : "Finalize Pending Route"}
+                {busy === "generate_pending" ? "Building Preview..." : "Build Pending Route Preview"}
               </button>
               <button
                 type="button"
@@ -661,7 +744,7 @@ export default function SavedRoutePlannerPanel({
                 disabled={busy !== null}
                 className="rounded-full border border-[#d0dde5] bg-white px-4 py-2.5 text-sm font-semibold text-[#21424d] transition hover:border-[#14b8a6] hover:text-[#0f766e] disabled:opacity-60"
               >
-                {busy === "generate_territory" ? "Finalizing..." : "Finalize Territory Route"}
+                {busy === "generate_territory" ? "Building Preview..." : "Build Territory Route Preview"}
               </button>
             </div>
             <p className="mt-3 text-sm text-[#5c7483]">
@@ -672,6 +755,96 @@ export default function SavedRoutePlannerPanel({
           {statusMessage ? <p className="mt-4 text-sm text-[#4f6877]">{statusMessage}</p> : null}
         </section>
       </div>
+
+      <section className="mt-5 rounded-[24px] border border-[#dbe8ef] bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Route Readiness</p>
+            <h3 className="mt-1 text-lg font-semibold text-[#173543]">Understand what the planner can use before you finalize</h3>
+            <p className="mt-1 text-sm text-[#5c7483]">
+              Pending stops move through this sequence: queued, route-ready, then included in the current preview. Anything excluded is called out here with a reason.
+            </p>
+          </div>
+          <div className="grid gap-2 rounded-2xl border border-[#dbe8ef] bg-[#fbfdfe] p-4 text-sm text-[#506877] sm:min-w-[240px]">
+            <MetricLine label="Queued Stops" value={String(readinessCounts.queued)} />
+            <MetricLine label="Route-Ready" value={String(readinessCounts.routeReady)} />
+            <MetricLine label="Excluded" value={String(readinessCounts.excluded)} />
+            {draftPlan ? <MetricLine label="In Preview" value={String(readinessCounts.included)} /> : null}
+          </div>
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-2 text-sm">
+          <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-[#4f6877]">Max stops in current planning set: {normalizedMaxStops}</span>
+          <span className="rounded-full border border-[#cfe8e4] bg-[#effaf7] px-3 py-1.5 text-[#0f766e]">Ready now: {readinessItems.filter((item) => item.status === "route_ready").length}</span>
+          {draftPlan ? (
+            <span className="rounded-full border border-[#d6ebea] bg-white px-3 py-1.5 text-[#355966]">Included in preview: {readinessCounts.included}</span>
+          ) : null}
+          {readinessExcludedItems.length > 0 ? (
+            <span className="rounded-full border border-[#f2ddb0] bg-[#fff9ea] px-3 py-1.5 text-[#9a640a]">Review excluded stops before building or saving</span>
+          ) : null}
+        </div>
+
+        <div className="mt-4 grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
+          <div className="rounded-[22px] border border-[#dbe8ef] bg-[#fbfdfe] p-4">
+            <div className="flex items-center justify-between gap-3">
+              <h4 className="text-sm font-semibold uppercase tracking-[0.12em] text-[#6f8897]">Current Planning Set</h4>
+              <span className="rounded-full border border-[#d7e6ed] bg-white px-2.5 py-1 text-xs font-semibold text-[#4f6877]">
+                {readinessItems.filter((item) => item.status !== "excluded").length}
+              </span>
+            </div>
+            <div className="mt-3 space-y-2">
+              {readinessItems
+                .filter((item) => item.status !== "excluded")
+                .map((item) => (
+                  <div key={item.queueId} className="rounded-xl border border-[#e1ebf1] bg-white px-3 py-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="font-semibold text-[#173543]">{item.customer.name}</p>
+                      <span
+                        className={[
+                          "rounded-full border px-2.5 py-1 text-xs font-semibold",
+                          item.status === "included" ? "border-[#cfe8e4] bg-[#effaf7] text-[#0f766e]" : "border-[#d7e6ed] bg-[#f8fbfc] text-[#4f6877]",
+                        ].join(" ")}
+                      >
+                        {item.status === "included" ? "Included in preview" : "Route-ready"}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-sm text-[#5c7483]">
+                      {item.customer.territoryCode || "Territory open"} • {item.customer.routeDay || "No route day"} • {item.customer.address1 || item.customer.city || "Address on file"}
+                    </p>
+                  </div>
+                ))}
+              {readinessItems.filter((item) => item.status !== "excluded").length === 0 ? (
+                <p className="text-sm text-[#5d7685]">No queued stops are route-ready yet.</p>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="rounded-[22px] border border-[#dbe8ef] bg-[#fbfdfe] p-4">
+            <div className="flex items-center justify-between gap-3">
+              <h4 className="text-sm font-semibold uppercase tracking-[0.12em] text-[#6f8897]">Excluded Stops</h4>
+              <span className="rounded-full border border-[#f2ddb0] bg-[#fff9ea] px-2.5 py-1 text-xs font-semibold text-[#9a640a]">
+                {readinessExcludedItems.length}
+              </span>
+            </div>
+            <div className="mt-3 space-y-2">
+              {readinessExcludedItems.map((item) => (
+                <div key={item.queueId} className="rounded-xl border border-[#f0dfba] bg-white px-3 py-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="font-semibold text-[#173543]">{item.customer.name}</p>
+                    <span className="rounded-full border border-[#f2ddb0] bg-[#fff9ea] px-2.5 py-1 text-xs font-semibold text-[#9a640a]">
+                      {readinessReasonLabel(item.reason)}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-sm text-[#5c7483]">
+                    {item.customer.address1 || item.customer.city || "No usable address"} • {item.customer.territoryCode || "Territory open"}
+                  </p>
+                </div>
+              ))}
+              {readinessExcludedItems.length === 0 ? <p className="text-sm text-[#5d7685]">No queued stops are excluded from the current planning set.</p> : null}
+            </div>
+          </div>
+        </div>
+      </section>
 
       <div className="mt-5 grid gap-5 xl:grid-cols-[1.25fr_0.75fr]">
         <section className="space-y-5">
