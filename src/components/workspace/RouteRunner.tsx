@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { startTransition, useDeferredValue, useEffect, useState } from "react";
 import type { CustomerSummary } from "@/lib/customerWorkspace";
 import type { RouteRepOption, TerritoryOption } from "@/lib/routeWorkspace";
+import RouteStopsMap from "@/components/workspace/RouteStopsMap";
 import {
   buildRouteStats,
   formatDate,
@@ -67,7 +68,7 @@ export default function RouteRunner({ customers, routeRepOptions, territoryOptio
   const [routeDayFilter, setRouteDayFilter] = useState(initialFilters.routeDay || getCurrentRouteDay());
   const [territoryFilter, setTerritoryFilter] = useState(initialFilters.territory || "all");
   const [visitStatusFilter, setVisitStatusFilter] = useState(initialFilters.visitStatus || "all");
-  const [viewMode] = useState<RouteViewMode>(initialFilters.view === "map" ? "map" : "list");
+  const [viewMode, setViewMode] = useState<RouteViewMode>(initialFilters.view === "map" ? "map" : "list");
   const [referenceNow] = useState(() => Date.now());
   const deferredSearch = useDeferredValue(search);
 
@@ -163,16 +164,19 @@ export default function RouteRunner({ customers, routeRepOptions, territoryOptio
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <SelectFilter label="Visit Status" value={visitStatusFilter} onChange={setVisitStatusFilter} options={visitStatuses} />
           <div className="inline-flex rounded-full border border-[#d0dde5] bg-white p-1">
-            <button type="button" className="rounded-full bg-[#173543] px-3 py-1.5 text-sm font-semibold text-white">
+            <button
+              type="button"
+              onClick={() => startTransition(() => setViewMode("list"))}
+              className={["rounded-full px-3 py-1.5 text-sm font-semibold transition", viewMode === "list" ? "bg-[#173543] text-white" : "text-[#7891a0] hover:text-[#173543]"].join(" ")}
+            >
               List
             </button>
             <button
               type="button"
-              disabled
-              className="rounded-full px-3 py-1.5 text-sm font-semibold text-[#7891a0] disabled:cursor-not-allowed"
-              title="Map mode is planned next."
+              onClick={() => startTransition(() => setViewMode("map"))}
+              className={["rounded-full px-3 py-1.5 text-sm font-semibold transition", viewMode === "map" ? "bg-[#173543] text-white" : "text-[#7891a0] hover:text-[#173543]"].join(" ")}
             >
-              Map Soon
+              Map
             </button>
           </div>
           <Link
@@ -185,12 +189,17 @@ export default function RouteRunner({ customers, routeRepOptions, territoryOptio
       </section>
 
       {viewMode === "map" ? (
-        <section className="rounded-[28px] border border-dashed border-[#d3e1e8] bg-white p-6 text-sm text-[#5d7685] shadow-[0_12px_32px_rgba(16,42,67,0.04)]">
-          Map mode is staged next. Runner filters and stop state are URL-backed already so the map/list toggle can be added without changing the workflow contract.
-        </section>
+        <RouteStopsMap
+          customers={visibleCustomers}
+          title="Runner Map"
+          description="See today’s filtered stop set as field-ready points, keep coordinate gaps visible, and jump into the full stop runner or account detail from the selected marker."
+          emptyLabel="No filtered runner stops have coordinates yet. Keep using list mode for those accounts until lat/long coverage is filled in."
+          secondaryActionLabel="Open Runner Card"
+          secondaryActionHref={(customerId) => `/workspace/routes/run?customerId=${customerId}`}
+        />
       ) : null}
 
-      <section className="grid gap-4">
+      <section className={viewMode === "map" ? "hidden" : "grid gap-4"}>
         {visibleCustomers.map((customer) => (
           <RouteStopCard key={customer.id} customer={customer} />
         ))}

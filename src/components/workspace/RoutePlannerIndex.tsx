@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { startTransition, useDeferredValue, useEffect, useState } from "react";
 import type { CustomerSummary } from "@/lib/customerWorkspace";
 import type { RouteRepOption, TerritoryOption } from "@/lib/routeWorkspace";
+import RouteStopsMap from "@/components/workspace/RouteStopsMap";
 import {
   buildRouteStats,
   formatDate,
@@ -45,7 +46,7 @@ export default function RoutePlannerIndex({ customers, routeRepOptions, territor
   const [repFilter, setRepFilter] = useState(initialFilters.rep || "all");
   const [visitStatusFilter, setVisitStatusFilter] = useState(initialFilters.visitStatus || "all");
   const [routePriorityFilter, setRoutePriorityFilter] = useState(initialFilters.priority || "all");
-  const [viewMode] = useState<RouteViewMode>(initialFilters.view === "map" ? "map" : "list");
+  const [viewMode, setViewMode] = useState<RouteViewMode>(initialFilters.view === "map" ? "map" : "list");
   const [referenceNow] = useState(() => Date.now());
   const deferredSearch = useDeferredValue(search);
 
@@ -131,16 +132,19 @@ export default function RoutePlannerIndex({ customers, routeRepOptions, territor
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <div className="inline-flex rounded-full border border-[#d0dde5] bg-white p-1">
-            <button type="button" className="rounded-full bg-[#173543] px-3 py-1.5 text-sm font-semibold text-white">
+            <button
+              type="button"
+              onClick={() => startTransition(() => setViewMode("list"))}
+              className={["rounded-full px-3 py-1.5 text-sm font-semibold transition", viewMode === "list" ? "bg-[#173543] text-white" : "text-[#7891a0] hover:text-[#173543]"].join(" ")}
+            >
               List
             </button>
             <button
               type="button"
-              disabled
-              className="rounded-full px-3 py-1.5 text-sm font-semibold text-[#7891a0] disabled:cursor-not-allowed"
-              title="Map mode is planned next."
+              onClick={() => startTransition(() => setViewMode("map"))}
+              className={["rounded-full px-3 py-1.5 text-sm font-semibold transition", viewMode === "map" ? "bg-[#173543] text-white" : "text-[#7891a0] hover:text-[#173543]"].join(" ")}
             >
-              Map Soon
+              Map
             </button>
           </div>
           <Link
@@ -169,12 +173,17 @@ export default function RoutePlannerIndex({ customers, routeRepOptions, territor
       </section>
 
       {viewMode === "map" ? (
-        <section className="rounded-[28px] border border-dashed border-[#d3e1e8] bg-white p-6 text-sm text-[#5d7685] shadow-[0_12px_32px_rgba(16,42,67,0.04)]">
-          Map mode is staged next. The planner is keeping list grouping, route stats, and URL-backed filters ready for the map/list toggle.
-        </section>
+        <RouteStopsMap
+          customers={visibleCustomers}
+          title="Map View"
+          description="Map the filtered stop set by customer coordinates, keep list-only stops visible when coordinates are missing, and jump directly into account detail or the route runner."
+          emptyLabel="No filtered stops have coordinates yet. Adjust filters or keep using the list workflow while location coverage is completed."
+          secondaryActionLabel="Run Stop"
+          secondaryActionHref={(customerId) => `/workspace/routes/run?customerId=${customerId}`}
+        />
       ) : null}
 
-      <section className="space-y-5">
+      <section className={viewMode === "map" ? "hidden" : "space-y-5"}>
         {Array.from(groupedCustomers.entries()).map(([group, groupCustomers]) => (
           <div key={group} className="space-y-3">
             <div className="flex items-center justify-between">
