@@ -130,3 +130,22 @@ export async function POST(req: Request) {
 
   return NextResponse.json({ ok: true, route_id: route.id });
 }
+
+export async function DELETE(req: Request) {
+  const staff = await getStaffContext();
+  if (!staff) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const body = await req.json().catch(() => ({}));
+  const routeId = asText(body.route_id);
+  if (!routeId) {
+    return NextResponse.json({ error: "route_id is required" }, { status: 400 });
+  }
+
+  const supabase = createAdminClient();
+  const { error } = await supabase.from("routes").delete().eq("id", routeId);
+  if (error) {
+    return NextResponse.json({ error: error.message || "Failed to delete route" }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true, route_id: routeId });
+}

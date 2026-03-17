@@ -188,8 +188,9 @@ export default function SavedRoutePlannerPanel({
   const [selectedPreviewStopId, setSelectedPreviewStopId] = useState<string | null>(null);
   const [overtimeApproved, setOvertimeApproved] = useState(false);
   const [previewNeedsRefresh, setPreviewNeedsRefresh] = useState(false);
+  const [savedRoutesState, setSavedRoutesState] = useState(savedRoutes);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [busy, setBusy] = useState<"generate_pending" | "generate_territory" | "save" | "queue" | "reoptimize" | null>(null);
+  const [busy, setBusy] = useState<"generate_pending" | "generate_territory" | "save" | "queue" | "reoptimize" | "delete_route" | null>(null);
 
   const selectedTerritory = territoryOptions.find((option) => option.value === territoryCode) || null;
   const coordinateReadyPendingStops = pendingStops.filter((stop) => stop.customer.latitude !== null && stop.customer.longitude !== null);
@@ -602,6 +603,32 @@ export default function SavedRoutePlannerPanel({
     }
   }
 
+  async function deleteSavedRoute(routeId: string) {
+    if (!routeId) return;
+    if (!window.confirm("Delete this saved route and all of its route stops?")) return;
+
+    setBusy("delete_route");
+    setStatusMessage(null);
+
+    try {
+      const res = await fetch("/api/workspace/routes", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ route_id: routeId }),
+      });
+      const json = await parseJsonSafe(res);
+      if (!res.ok) throw new Error(String(json.error || `Delete failed (${res.status})`));
+
+      setSavedRoutesState((current) => current.filter((route) => route.id !== routeId));
+      setStatusMessage("Deleted saved route.");
+      router.refresh();
+    } catch (error) {
+      setStatusMessage(error instanceof Error ? error.message : "Delete failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <section className="rounded-[28px] border border-[#d8e6ee] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbfd_100%)] p-5 shadow-[0_24px_60px_rgba(16,42,67,0.08)] lg:px-6">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
@@ -697,10 +724,27 @@ export default function SavedRoutePlannerPanel({
             <h3 className="mt-1 text-lg font-semibold text-[#173543]">Assign rep, date, start time, and save a finalized schedule</h3>
           </div>
 
+          <div className="mt-4 rounded-[22px] border border-[#dbe8ef] bg-[linear-gradient(180deg,#f8fcfd_0%,#f3f8fa_100%)] p-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7d95a3]">Leave Time</p>
+                <p className="mt-1 text-sm text-[#5c7483]">Set the field rep departure time before building the route preview. This directly drives all planned stop times.</p>
+              </div>
+              <div className="flex items-center gap-3 rounded-2xl border border-[#dbe8ef] bg-white px-4 py-3">
+                <span className="text-sm font-semibold text-[#173543]">Leave JC RAD HQ</span>
+                <input
+                  type="time"
+                  value={startTime}
+                  onChange={(event) => setStartTime(event.target.value)}
+                  className="rounded-xl border border-[#cedde6] bg-white px-3 py-2 text-sm font-semibold text-[#173543] outline-none transition focus:border-[#14b8a6]"
+                />
+              </div>
+            </div>
+          </div>
+
           <div className="mt-4 grid gap-4 lg:grid-cols-2 xl:grid-cols-1">
             <PlannerSelect label="Assigned Rep" value={assignedUserId} onChange={setAssignedUserId} options={routeRepOptions.map((option) => ({ value: option.userId, label: option.label }))} />
             <PlannerInput label="Route Date" type="date" value={routeDate} onChange={setRouteDate} />
-            <PlannerInput label="Start Time" type="time" value={startTime} onChange={setStartTime} />
             <PlannerInput label="Max Stops" type="number" value={maxStops} onChange={setMaxStops} min="1" max="40" />
             <PlannerSelect label="Territory Override" value={territoryCode} onChange={setTerritoryCode} options={territoryOptions.map((option) => ({ value: option.value, label: option.label }))} />
           </div>
@@ -1104,7 +1148,7 @@ export default function SavedRoutePlannerPanel({
           </div>
 
           <div className="mt-4 space-y-3">
-            {savedRoutes.map((route) => (
+            {savedRoutesState.map((route) => (
               <div key={route.id} className="rounded-2xl border border-[#dbe8ef] bg-[#fbfdfe] p-3">
                 <div className="flex flex-col gap-2">
                   <div className="flex flex-wrap items-center gap-2">
@@ -1118,12 +1162,20 @@ export default function SavedRoutePlannerPanel({
                     <Link href={`/workspace/routes/run?routeId=${route.id}`} className="rounded-full bg-[#173543] px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-[#0f2a35]">
                       Open Runner
                     </Link>
+                    <button
+                      type="button"
+                      onClick={() => void deleteSavedRoute(route.id)}
+                      disabled={busy !== null}
+                      className="rounded-full border border-[#f2d1d1] bg-white px-3 py-1.5 text-sm font-semibold text-[#9a3d3d] transition hover:bg-[#fff7f7] disabled:opacity-60"
+                    >
+                      {busy === "delete_route" ? "Deleting..." : "Erase Route"}
+                    </button>
                   </div>
                 </div>
               </div>
             ))}
 
-            {savedRoutes.length === 0 ? (
+            {savedRoutesState.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-[#cfdde6] bg-[#fbfdfe] px-4 py-10 text-center text-sm text-[#5c7483]">
                 No saved routes yet.
               </div>

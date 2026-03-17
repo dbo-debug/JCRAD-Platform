@@ -21,30 +21,28 @@ function getPartsForZone(date: Date) {
   return Object.fromEntries(parts.filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
 }
 
-function getBusinessOffsetMs(date: Date) {
-  const parts = getPartsForZone(date);
-  const asUtc = Date.UTC(
-    Number(parts.year),
-    Number(parts.month) - 1,
-    Number(parts.day),
-    Number(parts.hour),
-    Number(parts.minute),
-    Number(parts.second)
-  );
-
-  return asUtc - date.getTime();
-}
-
 export function parseBusinessDateTime(args: { routeDate: string; time: string }) {
   const [year, month, day] = args.routeDate.split("-").map(Number);
   const [hours, minutes] = args.time.split(":").map(Number);
-  let utcMs = Date.UTC(year, (month || 1) - 1, day || 1, hours || 0, minutes || 0, 0);
+  const targetLocalAsUtc = Date.UTC(year, (month || 1) - 1, day || 1, hours || 0, minutes || 0, 0);
+  let date = new Date(targetLocalAsUtc);
 
-  // Run twice so DST offsets settle correctly for the target business timezone.
-  utcMs -= getBusinessOffsetMs(new Date(utcMs));
-  utcMs -= getBusinessOffsetMs(new Date(utcMs));
+  for (let iteration = 0; iteration < 3; iteration += 1) {
+    const parts = getPartsForZone(date);
+    const currentLocalAsUtc = Date.UTC(
+      Number(parts.year),
+      Number(parts.month) - 1,
+      Number(parts.day),
+      Number(parts.hour),
+      Number(parts.minute),
+      Number(parts.second)
+    );
+    const deltaMs = targetLocalAsUtc - currentLocalAsUtc;
+    if (deltaMs === 0) break;
+    date = new Date(date.getTime() + deltaMs);
+  }
 
-  return new Date(utcMs);
+  return date;
 }
 
 function toBusinessDate(value: string | Date) {
