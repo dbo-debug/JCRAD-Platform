@@ -7,6 +7,7 @@ import type { CustomerSummary } from "@/lib/customerWorkspace";
 import type { PendingRouteStop } from "@/lib/routeStopQueue";
 import type { RouteRepOption, SavedRouteSummary, TerritoryOption } from "@/lib/routeWorkspace";
 import RouteStopsMap from "@/components/workspace/RouteStopsMap";
+import { formatBusinessDateTime, formatBusinessDateTimeLong } from "@/lib/businessTime";
 import { JC_RAD_HQ } from "@/lib/routePlanning";
 
 type SavedRoutePlannerPanelProps = {
@@ -76,22 +77,11 @@ function parseJsonSafe(res: Response): Promise<Record<string, unknown>> {
 }
 
 function formatDateTime(value: string | null) {
-  if (!value) return "Not set";
-  const parsed = Date.parse(value);
-  if (!Number.isFinite(parsed)) return "Not set";
-  return new Date(parsed).toLocaleString();
+  return formatBusinessDateTimeLong(value, "Not set");
 }
 
 function formatCompactDateTime(value: string | null) {
-  if (!value) return "Not set";
-  const parsed = Date.parse(value);
-  if (!Number.isFinite(parsed)) return "Not set";
-  return new Date(parsed).toLocaleString([], {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  return formatBusinessDateTime(value, "Not set");
 }
 
 function toTimeLabel(minutesFromMidnight: number) {

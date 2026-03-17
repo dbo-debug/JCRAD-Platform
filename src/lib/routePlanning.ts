@@ -4,6 +4,7 @@ import {
   computeGoogleRouteSchedule,
   optimizeStopOrderWithGoogle,
 } from "@/lib/googleRouteServices";
+import { parseBusinessDateTime } from "@/lib/businessTime";
 
 export const JC_RAD_HQ = {
   name: "JC RAD HQ",
@@ -91,7 +92,10 @@ function estimateDriveMinutes(miles: number) {
 }
 
 function parseStartDateTime(args: { routeDate: string; startTime: string }) {
-  return new Date(`${args.routeDate}T${args.startTime}:00`);
+  return parseBusinessDateTime({
+    routeDate: args.routeDate,
+    time: args.startTime,
+  });
 }
 
 function parseTimeText(value: string | null | undefined, fallback: string) {

@@ -1,4 +1,5 @@
 import type { CustomerSummary } from "@/lib/customerWorkspace";
+import { formatBusinessDate, formatBusinessDateTimeLong } from "@/lib/businessTime";
 
 export type RouteViewMode = "list" | "map";
 export type CoordinateCoverageFilter = "all" | "has_coords" | "needs_coords" | "address_ready" | "missing_address" | "failed" | "needs_review";
@@ -43,19 +44,11 @@ export function titleCase(value: string | null | undefined, fallback = "Unspecif
 }
 
 export function formatDate(value: string | null | undefined, fallback = "Not scheduled") {
-  const text = String(value || "").trim();
-  if (!text) return fallback;
-  const parsed = Date.parse(text);
-  if (!Number.isFinite(parsed)) return fallback;
-  return new Date(parsed).toLocaleDateString();
+  return formatBusinessDate(value || null, fallback);
 }
 
 export function formatDateTime(value: string | null | undefined, fallback = "Not recorded") {
-  const text = String(value || "").trim();
-  if (!text) return fallback;
-  const parsed = Date.parse(text);
-  if (!Number.isFinite(parsed)) return fallback;
-  return new Date(parsed).toLocaleString();
+  return formatBusinessDateTimeLong(value || null, fallback);
 }
 
 export function normalizeMailtoHref(value: string | null | undefined) {
