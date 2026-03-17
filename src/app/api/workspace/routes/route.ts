@@ -28,9 +28,11 @@ export async function POST(req: Request) {
   const status = asText(body.status) || "assigned";
   const notes = asText(body.notes);
   const maxStops = asNullableNumber(body.max_stops);
+  const lunchMinutes = asNullableNumber(body.lunch_minutes) || 0;
   const estimatedDriveMinutes = asNullableNumber(body.estimated_drive_minutes) || 0;
   const estimatedVisitMinutes = asNullableNumber(body.estimated_visit_minutes) || 0;
   const estimatedTotalMinutes = asNullableNumber(body.estimated_total_minutes) || 0;
+  const estimatedReturnTime = asText(body.estimated_return_time);
   const originLatitude = asNullableNumber(body.origin_latitude);
   const originLongitude = asNullableNumber(body.origin_longitude);
   const queueIds = Array.isArray(body.queue_ids)
@@ -61,6 +63,8 @@ export async function POST(req: Request) {
       return {
         customer_id: customerId,
         stop_order: index + 1,
+        planned_arrival_time: asText(stop?.planned_arrival_time),
+        planned_departure_time: asText(stop?.planned_departure_time),
         estimated_drive_minutes_from_previous: asNullableNumber(stop?.estimated_drive_minutes_from_previous) || 0,
         estimated_visit_minutes: asNullableNumber(stop?.estimated_visit_minutes) || 15,
         locked: stop?.locked === true,
@@ -89,9 +93,11 @@ export async function POST(req: Request) {
       status,
       planned_start_time: plannedStartTime,
       max_stops: maxStops,
+      lunch_minutes: lunchMinutes,
       estimated_drive_minutes: estimatedDriveMinutes,
       estimated_visit_minutes: estimatedVisitMinutes,
       estimated_total_minutes: estimatedTotalMinutes,
+      estimated_return_time: estimatedReturnTime,
       notes,
       created_by: staff.userId,
     })

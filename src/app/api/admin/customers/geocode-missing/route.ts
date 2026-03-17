@@ -15,6 +15,17 @@ function asNullableNumber(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function normalizeIds(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return Array.from(
+    new Set(
+      value
+        .map((item) => String(item || "").trim())
+        .filter(Boolean)
+    )
+  );
+}
+
 export async function POST(req: Request) {
   const supabase = await createServerClient();
   const { data: authData } = await supabase.auth.getUser();
@@ -30,21 +41,26 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
   const limitInput = Number(body.limit);
   const limit = Math.max(1, Math.min(50, Number.isFinite(limitInput) ? limitInput : 20));
-  const mode = body.mode === "retry_failed" ? "retry_failed" : "default";
+  const requestedCustomerIds = normalizeIds(body.customer_ids).slice(0, limit);
+  const mode = requestedCustomerIds.length > 0 ? "visible_results" : body.mode === "retry_failed" ? "retry_failed" : "default";
 
   const admin = createAdminClient();
   let query = admin
     .from("customers")
     .select("id, address_1, city, state, postal_code, latitude, longitude, geocode_status, last_geocoded_at, updated_at")
     .or("latitude.is.null,longitude.is.null")
-    .order("last_geocoded_at", { ascending: true, nullsFirst: true })
-    .order("updated_at", { ascending: true })
-    .limit(limit * 3);
+    .limit(requestedCustomerIds.length > 0 ? requestedCustomerIds.length : limit * 3);
 
-  if (mode === "retry_failed") {
+  if (mode === "visible_results") {
+    query = query.in("id", requestedCustomerIds);
+  } else if (mode === "retry_failed") {
     query = query.eq("geocode_status", "failed");
   } else {
     query = query.or("geocode_status.is.null,geocode_status.eq.missing_address");
+  }
+
+  if (mode !== "visible_results") {
+    query = query.order("last_geocoded_at", { ascending: true, nullsFirst: true }).order("updated_at", { ascending: true });
   }
 
   const { data, error } = await query;

@@ -34,7 +34,9 @@ export type SavedRouteSummary = {
   status: string;
   plannedStartTime: string | null;
   maxStops: number | null;
+  lunchMinutes: number | null;
   estimatedTotalMinutes: number | null;
+  estimatedReturnTime: string | null;
   stopCount: number;
   createdAt: string | null;
   updatedAt: string | null;
@@ -143,7 +145,7 @@ export async function loadSavedRoutes(): Promise<SavedRouteSummary[]> {
   const [routesRes, stopsRes, routeRepOptions] = await Promise.all([
     supabase
       .from("routes")
-      .select("id, name, territory_code, origin_name, origin_address, assigned_user_id, route_date, status, planned_start_time, max_stops, estimated_total_minutes, created_at, updated_at")
+      .select("id, name, territory_code, origin_name, origin_address, assigned_user_id, route_date, status, planned_start_time, max_stops, lunch_minutes, estimated_total_minutes, estimated_return_time, created_at, updated_at")
       .order("route_date", { ascending: false })
       .order("created_at", { ascending: false })
       .limit(40),
@@ -185,7 +187,9 @@ export async function loadSavedRoutes(): Promise<SavedRouteSummary[]> {
         status: asText(row.status) || "draft",
         plannedStartTime: asText(row.planned_start_time),
         maxStops: asNumber(row.max_stops),
+        lunchMinutes: asNumber(row.lunch_minutes),
         estimatedTotalMinutes: asNumber(row.estimated_total_minutes),
+        estimatedReturnTime: asText(row.estimated_return_time),
         stopCount: stopCountByRouteId.get(id) || 0,
         createdAt: asText(row.created_at),
         updatedAt: asText(row.updated_at),
@@ -203,7 +207,7 @@ export async function loadSavedRouteDetail(routeId: string): Promise<SavedRouteD
     supabase
       .from("routes")
       .select(
-        "id, name, territory_code, origin_name, origin_address, origin_latitude, origin_longitude, assigned_user_id, route_date, status, planned_start_time, max_stops, estimated_drive_minutes, estimated_visit_minutes, estimated_total_minutes, notes, created_at, updated_at"
+        "id, name, territory_code, origin_name, origin_address, origin_latitude, origin_longitude, assigned_user_id, route_date, status, planned_start_time, max_stops, lunch_minutes, estimated_drive_minutes, estimated_visit_minutes, estimated_total_minutes, estimated_return_time, notes, created_at, updated_at"
       )
       .eq("id", id)
       .maybeSingle(),
@@ -274,9 +278,11 @@ export async function loadSavedRouteDetail(routeId: string): Promise<SavedRouteD
     status: asText(routeRow.status) || "draft",
     plannedStartTime: asText(routeRow.planned_start_time),
     maxStops: asNumber(routeRow.max_stops),
+    lunchMinutes: asNumber(routeRow.lunch_minutes),
     estimatedDriveMinutes: asNumber(routeRow.estimated_drive_minutes),
     estimatedVisitMinutes: asNumber(routeRow.estimated_visit_minutes),
     estimatedTotalMinutes: asNumber(routeRow.estimated_total_minutes),
+    estimatedReturnTime: asText(routeRow.estimated_return_time),
     notes: asText(routeRow.notes),
     createdAt: asText(routeRow.created_at),
     updatedAt: asText(routeRow.updated_at),

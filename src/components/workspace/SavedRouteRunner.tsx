@@ -2,10 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { SavedRouteDetail, SavedRouteStop } from "@/lib/routeWorkspace";
 import {
-  formatDate,
   formatDateTime,
   normalizeMailtoHref,
   normalizeTelHref,
@@ -31,7 +30,56 @@ function addDaysDateValue(days: number) {
   return date.toISOString().slice(0, 10);
 }
 
+function toMs(value: string | null | undefined) {
+  const parsed = Date.parse(String(value || ""));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function formatDelta(minutes: number) {
+  if (Math.abs(minutes) <= 5) return "On time";
+  return minutes > 0 ? `${minutes} min behind` : `${Math.abs(minutes)} min ahead`;
+}
+
+function routeProgressTone(deltaMinutes: number) {
+  if (Math.abs(deltaMinutes) <= 5) return "text-[#16624b]";
+  return deltaMinutes > 0 ? "text-[#9a3d3d]" : "text-[#285ea8]";
+}
+
+function buildRouteProgress(route: SavedRouteDetail) {
+  const visitedStops = route.stops.filter((stop) => stop.stopStatus === "visited");
+  const now = Date.now();
+  const nextPendingStop = route.stops.find((stop) => stop.stopStatus !== "visited" && stop.stopStatus !== "skipped") || null;
+  const lastCompletedAt =
+    visitedStops
+      .map((stop) => toMs(stop.customer.lastVisitAt))
+      .filter((value): value is number => value !== null)
+      .sort((left, right) => right - left)[0] || null;
+
+  const baselineMs = lastCompletedAt || now;
+  const remainingStops = route.stops.filter((stop) => stop.stopStatus !== "visited" && stop.stopStatus !== "skipped");
+  const remainingVisitMinutes = remainingStops.reduce((sum, stop) => sum + (stop.estimatedVisitMinutes || 0), 0);
+  const routeStopDriveMinutes = route.stops.reduce((sum, stop) => sum + (stop.estimatedDriveMinutesFromPrevious || 0), 0);
+  const returnDriveMinutes = Math.max(0, (route.estimatedDriveMinutes || 0) - routeStopDriveMinutes);
+  const remainingDriveMinutes = remainingStops.reduce((sum, stop) => sum + (stop.estimatedDriveMinutesFromPrevious || 0), 0);
+  const projectedFinishMs = baselineMs + (remainingVisitMinutes + remainingDriveMinutes) * 60 * 1000;
+  const projectedReturnMs = projectedFinishMs + returnDriveMinutes * 60 * 1000;
+  const plannedReturnMs = toMs(route.estimatedReturnTime);
+  const progressDeltaMinutes = plannedReturnMs ? Math.round((projectedReturnMs - plannedReturnMs) / 60000) : 0;
+  const nextStopDeltaMinutes = nextPendingStop?.plannedArrivalTime ? Math.round((now - Date.parse(nextPendingStop.plannedArrivalTime)) / 60000) : 0;
+
+  return {
+    visitedCount: visitedStops.length,
+    remainingCount: remainingStops.length,
+    projectedFinishTime: new Date(projectedFinishMs).toISOString(),
+    projectedReturnTime: new Date(projectedReturnMs).toISOString(),
+    progressDeltaMinutes,
+    nextStopDeltaMinutes,
+  };
+}
+
 export default function SavedRouteRunner({ route }: SavedRouteRunnerProps) {
+  const progress = useMemo(() => buildRouteProgress(route), [route]);
+
   return (
     <div className="space-y-5">
       <section className="rounded-[28px] border border-[#d8e6ee] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbfd_100%)] p-5 shadow-[0_24px_60px_rgba(16,42,67,0.08)] lg:px-6">
@@ -47,11 +95,18 @@ export default function SavedRouteRunner({ route }: SavedRouteRunnerProps) {
             </p>
             {route.notes ? <p className="mt-2 text-sm text-[#5c7483]">{route.notes}</p> : null}
           </div>
-          <div className="grid w-full gap-2 rounded-2xl border border-[#dbe8ef] bg-white/90 p-4 text-sm text-[#506877] shadow-sm sm:max-w-[320px]">
+          <div className="grid w-full gap-2 rounded-2xl border border-[#dbe8ef] bg-white/90 p-4 text-sm text-[#506877] shadow-sm sm:max-w-[360px]">
             <MetricLine label="Start Time" value={route.plannedStartTime || "Not set"} />
             <MetricLine label="Drive Minutes" value={String(route.estimatedDriveMinutes || 0)} />
             <MetricLine label="Visit Minutes" value={String(route.estimatedVisitMinutes || 0)} />
-            <MetricLine label="Total Minutes" value={String(route.estimatedTotalMinutes || 0)} />
+            <MetricLine label="Lunch Minutes" value={String(route.lunchMinutes || 0)} />
+            <MetricLine label="Planned Return" value={route.estimatedReturnTime ? formatDateTime(route.estimatedReturnTime) : "Not set"} />
+            <MetricLine label="Projected Finish" value={formatDateTime(progress.projectedFinishTime)} />
+            <MetricLine label="Projected Return" value={formatDateTime(progress.projectedReturnTime)} />
+            <MetricLine label="Visited / Remaining" value={`${progress.visitedCount} / ${progress.remainingCount}`} />
+            <div className={["text-sm font-semibold", routeProgressTone(progress.progressDeltaMinutes)].join(" ")}>
+              Route status: {formatDelta(progress.progressDeltaMinutes)}
+            </div>
           </div>
         </div>
       </section>
@@ -81,6 +136,9 @@ function SavedRouteStopCard({ stop }: { stop: SavedRouteStop }) {
   const primaryContact = customer.primaryContacts[0] || null;
   const emailHref = normalizeMailtoHref(primaryContact?.email || customer.primaryContactEmail);
   const phoneHref = normalizeTelHref(primaryContact?.phone || customer.mainPhone);
+  const actualVisitMs = toMs(customer.lastVisitAt);
+  const plannedArrivalMs = toMs(stop.plannedArrivalTime);
+  const stopDeltaMinutes = actualVisitMs !== null && plannedArrivalMs !== null ? Math.round((actualVisitMs - plannedArrivalMs) / 60000) : null;
 
   async function updateRouteStop(stopStatus: "visited" | "skipped" | "ready") {
     const res = await fetch(`/api/workspace/routes/stops/${stop.id}`, {
@@ -267,18 +325,18 @@ function SavedRouteStopCard({ stop }: { stop: SavedRouteStop }) {
               ]}
             />
             <RunnerInfo
-              title="Timing"
+              title="Planned Timing"
               lines={[
-                `Drive ${stop.estimatedDriveMinutesFromPrevious ?? 0} min from previous`,
-                `Visit ${stop.estimatedVisitMinutes ?? 15} min`,
-                `Next due ${formatDate(customer.nextVisitDueAt)}`,
+                `Arrive ${formatDateTime(stop.plannedArrivalTime)}`,
+                `Depart ${formatDateTime(stop.plannedDepartureTime)}`,
+                `Drive ${stop.estimatedDriveMinutesFromPrevious ?? 0} min • Visit ${stop.estimatedVisitMinutes ?? 30} min`,
               ]}
             />
             <RunnerInfo
-              title="Visit Window"
+              title="Actual vs Plan"
               lines={[
-                `Last visit ${formatDateTime(customer.lastVisitAt)}`,
-                `Current status ${titleCase(customer.visitStatus, "Not set")}`,
+                `Actual ${formatDateTime(customer.lastVisitAt)}`,
+                stopDeltaMinutes === null ? "No actual timestamp yet" : formatDelta(stopDeltaMinutes),
                 customer.latitude !== null && customer.longitude !== null ? `Geo ${customer.latitude.toFixed(4)}, ${customer.longitude.toFixed(4)}` : "No coordinates yet",
               ]}
             />

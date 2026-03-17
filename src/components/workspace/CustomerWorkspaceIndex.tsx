@@ -243,6 +243,8 @@ export default function CustomerWorkspaceIndex({
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkStatusMessage, setBulkStatusMessage] = useState<string | null>(null);
   const [pendingStops, setPendingStops] = useState<PendingRouteStop[]>(initialPendingStops);
+  const [visibleGeocodeBusy, setVisibleGeocodeBusy] = useState(false);
+  const [visibleGeocodeStatus, setVisibleGeocodeStatus] = useState<string | null>(null);
 
   const statuses = Array.from(new Set(customers.map((customer) => customer.status).filter(Boolean))).sort((a, b) => a.localeCompare(b));
   const stages = Array.from(new Set(customers.map((customer) => customer.stage).filter((value): value is string => Boolean(value)))).sort((a, b) => a.localeCompare(b));
@@ -504,6 +506,37 @@ export default function CustomerWorkspaceIndex({
     });
   }
 
+  async function geocodeVisibleResults() {
+    if (staffRole !== "admin" || visibleCustomers.length === 0 || visibleGeocodeBusy) return;
+
+    setVisibleGeocodeBusy(true);
+    setVisibleGeocodeStatus(null);
+
+    try {
+      const res = await fetch("/api/admin/customers/geocode-missing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          limit: 50,
+          customer_ids: visibleCustomerIds.slice(0, 50),
+        }),
+      });
+      const json = await parseJsonSafe(res);
+      if (!res.ok) throw new Error(String(json.error || `Visible geocode failed (${res.status})`));
+
+      setVisibleGeocodeStatus(
+        `Processed visible results: attempted ${Number(json.attempted || 0)} • geocoded ${Number(json.geocoded || 0)} • failed ${Number(json.failed || 0)} • missing ${Number(
+          json.missing_address || 0
+        )}`
+      );
+      router.refresh();
+    } catch (error) {
+      setVisibleGeocodeStatus(error instanceof Error ? error.message : "Visible geocode failed");
+    } finally {
+      setVisibleGeocodeBusy(false);
+    }
+  }
+
   async function applyBulkAction() {
     if (selectedVisibleCustomers.length === 0 || bulkBusy) return;
     if (bulkAction.kind !== "add_to_pending_stops" && bulkAction.kind !== "remove_from_pending_stops" && !bulkAction.value) {
@@ -740,6 +773,17 @@ export default function CustomerWorkspaceIndex({
           >
             Reset filters
           </button>
+          {staffRole === "admin" ? (
+            <button
+              type="button"
+              onClick={() => void geocodeVisibleResults()}
+              disabled={visibleCustomers.length === 0 || visibleGeocodeBusy}
+              className="rounded-full border border-[#b9d5df] bg-white px-3 py-1.5 text-sm font-semibold text-[#21414d] transition hover:border-[#14b8a6] hover:text-[#0f766e] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {visibleGeocodeBusy ? "Geocoding Visible..." : "Geocode Visible Results"}
+            </button>
+          ) : null}
+          {visibleGeocodeStatus ? <span className="text-sm text-[#4f6877]">{visibleGeocodeStatus}</span> : null}
         </div>
       </section>
 
