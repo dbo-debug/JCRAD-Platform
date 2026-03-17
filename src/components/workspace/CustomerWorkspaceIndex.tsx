@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { startTransition, useEffect, useState } from "react";
 import type { CustomerSummary } from "@/lib/customerWorkspace";
-import type { TerritoryOption } from "@/lib/routeWorkspace";
+import type { RouteRepOption, TerritoryOption } from "@/lib/routeWorkspace";
 import {
   buildTerritoryStats,
   formatDate,
@@ -15,6 +15,8 @@ import {
 
 type CustomerWorkspaceIndexProps = {
   customers: CustomerSummary[];
+  staffRole: "admin" | "sales";
+  salesRepOptions: RouteRepOption[];
   territoryOptions: TerritoryOption[];
   initialFilters: {
     q: string;
@@ -31,6 +33,12 @@ type CustomerWorkspaceIndexProps = {
   };
 };
 
+type BulkActionKind = "assign_sales_rep" | "assign_territory" | "assign_route_day" | "add_to_route";
+type BulkActionState = {
+  kind: BulkActionKind;
+  value: string;
+};
+
 type SavedViewKey = "all" | "pipeline" | "unassigned" | "missing_primary" | "with_orders";
 type SortKey = "activity_desc" | "name_asc" | "name_desc" | "orders_desc" | "owner_asc";
 type ContactCoverageFilter = "all" | "has_contacts" | "missing_primary" | "no_contacts";
@@ -45,6 +53,19 @@ const SAVED_VIEWS: Array<{ key: SavedViewKey; label: string; description: string
   { key: "missing_primary", label: "Missing Primary Contact", description: "Accounts missing a primary contact." },
   { key: "with_orders", label: "Order History", description: "Accounts with at least one order." },
 ];
+const ROUTE_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const BULK_ACTIONS: Array<{ key: BulkActionKind; label: string }> = [
+  { key: "assign_sales_rep", label: "Assign Sales Rep" },
+  { key: "assign_territory", label: "Assign Territory" },
+  { key: "assign_route_day", label: "Assign Route Day" },
+  { key: "add_to_route", label: "Add to Route" },
+];
+
+async function parseJsonSafe(res: Response): Promise<Record<string, unknown>> {
+  const contentType = res.headers.get("content-type") || "";
+  if (!contentType.includes("application/json")) return {};
+  return res.json().catch(() => ({}));
+}
 
 function normalizeText(value: string | null | undefined) {
   return String(value || "").trim().toLowerCase();
@@ -145,7 +166,7 @@ function compareGroupLabels(left: string, right: string) {
   return left.localeCompare(right);
 }
 
-export default function CustomerWorkspaceIndex({ customers, territoryOptions, initialFilters }: CustomerWorkspaceIndexProps) {
+export default function CustomerWorkspaceIndex({ customers, staffRole, salesRepOptions, territoryOptions, initialFilters }: CustomerWorkspaceIndexProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [draftSearch, setDraftSearch] = useState(initialFilters.q);
@@ -195,6 +216,13 @@ export default function CustomerWorkspaceIndex({ customers, territoryOptions, in
       : "activity_desc"
   );
   const [referenceNow] = useState(() => Date.now());
+  const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
+  const [bulkAction, setBulkAction] = useState<BulkActionState>({
+    kind: staffRole === "admin" ? "assign_sales_rep" : "assign_territory",
+    value: "",
+  });
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkStatusMessage, setBulkStatusMessage] = useState<string | null>(null);
 
   const statuses = Array.from(new Set(customers.map((customer) => customer.status).filter(Boolean))).sort((a, b) => a.localeCompare(b));
   const stages = Array.from(new Set(customers.map((customer) => customer.stage).filter((value): value is string => Boolean(value)))).sort((a, b) => a.localeCompare(b));
@@ -258,6 +286,11 @@ export default function CustomerWorkspaceIndex({ customers, territoryOptions, in
       }
     }
   });
+
+  const visibleCustomerIds = visibleCustomers.map((customer) => customer.id);
+  const visibleCustomerIdsKey = visibleCustomerIds.join("|");
+  const selectedVisibleCustomers = visibleCustomers.filter((customer) => selectedCustomerIds.includes(customer.id));
+  const allVisibleSelected = visibleCustomers.length > 0 && selectedCustomerIds.length === visibleCustomers.length;
 
   const visibleWithContacts = visibleCustomers.filter((customer) => customer.contactCount > 0).length;
   const visibleWithOwners = visibleCustomers.filter((customer) => customer.assignedSalesName).length;
@@ -343,6 +376,32 @@ export default function CustomerWorkspaceIndex({ customers, territoryOptions, in
                 },
               ];
 
+  useEffect(() => {
+    const nextVisibleIds = new Set(visibleCustomerIds);
+    setSelectedCustomerIds((current) => current.filter((id) => nextVisibleIds.has(id)));
+  }, [visibleCustomerIds, visibleCustomerIdsKey]);
+
+  useEffect(() => {
+    if (staffRole === "admin") return;
+    if (bulkAction.kind === "assign_sales_rep") {
+      setBulkAction({ kind: "assign_territory", value: "" });
+    }
+  }, [bulkAction.kind, staffRole]);
+
+  function toggleCustomerSelection(customerId: string) {
+    setSelectedCustomerIds((current) => (current.includes(customerId) ? current.filter((id) => id !== customerId) : [...current, customerId]));
+  }
+
+  function selectAllVisible() {
+    setSelectedCustomerIds(visibleCustomerIds);
+    setBulkStatusMessage(null);
+  }
+
+  function clearSelection() {
+    setSelectedCustomerIds([]);
+    setBulkStatusMessage(null);
+  }
+
   function handleSearchSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     startTransition(() => setSearchQuery(draftSearch.trim()));
@@ -370,6 +429,73 @@ export default function CustomerWorkspaceIndex({ customers, territoryOptions, in
       setOrganizeBy("none");
       setSortKey("activity_desc");
     });
+  }
+
+  async function applyBulkAction() {
+    if (selectedVisibleCustomers.length === 0 || bulkBusy) return;
+    if (bulkAction.kind !== "add_to_route" && !bulkAction.value) {
+      setBulkStatusMessage("Choose a value before applying the bulk action.");
+      return;
+    }
+
+    setBulkBusy(true);
+    setBulkStatusMessage(null);
+
+    let successCount = 0;
+    let skippedCount = 0;
+
+    try {
+      for (const customer of selectedVisibleCustomers) {
+        let payload: Record<string, string | null>;
+
+        if (bulkAction.kind === "assign_sales_rep") {
+          payload = { assigned_sales_user_id: bulkAction.value || null };
+        } else if (bulkAction.kind === "assign_territory") {
+          payload = { territory_code: bulkAction.value || null };
+        } else if (bulkAction.kind === "assign_route_day") {
+          payload = { route_day: bulkAction.value || null };
+        } else {
+          const territory = territoryOptions.find((option) => option.value === customer.territoryCode) || null;
+          const territoryCode = customer.territoryCode || null;
+          const routeDay = customer.routeDay || territory?.routeDayDefault || null;
+
+          if (!territoryCode && !routeDay) {
+            skippedCount += 1;
+            continue;
+          }
+
+          payload = {
+            territory_code: territoryCode,
+            route_day: routeDay,
+            visit_status: customer.visitStatus || "due",
+          };
+        }
+
+        const res = await fetch(`/api/workspace/customers/${customer.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const json = await parseJsonSafe(res);
+        if (!res.ok) {
+          throw new Error(String(json.error || `Save failed for ${customer.name} (${res.status})`));
+        }
+
+        successCount += 1;
+      }
+
+      setBulkStatusMessage(
+        bulkAction.kind === "add_to_route"
+          ? `Updated ${successCount} account${successCount === 1 ? "" : "s"} for route planning${skippedCount ? `, skipped ${skippedCount} without territory/day` : ""}.`
+          : `Updated ${successCount} selected account${successCount === 1 ? "" : "s"}.`
+      );
+      setSelectedCustomerIds([]);
+      router.refresh();
+    } catch (error) {
+      setBulkStatusMessage(error instanceof Error ? error.message : "Bulk update failed");
+    } finally {
+      setBulkBusy(false);
+    }
   }
 
   return (
@@ -505,6 +631,9 @@ export default function CustomerWorkspaceIndex({ customers, territoryOptions, in
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4f6877]">
+            Selected {selectedCustomerIds.length}
+          </span>
+          <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4f6877]">
             Search mode: explicit apply
           </span>
           <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4f6877]">
@@ -512,13 +641,44 @@ export default function CustomerWorkspaceIndex({ customers, territoryOptions, in
           </span>
           <button
             type="button"
+            onClick={selectAllVisible}
+            disabled={visibleCustomers.length === 0}
+            className="rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {allVisibleSelected ? "All visible selected" : "Select all visible"}
+          </button>
+          <button
+            type="button"
+            onClick={clearSelection}
+            disabled={selectedCustomerIds.length === 0}
+            className="rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Clear selection
+          </button>
+          <button
+            type="button"
             onClick={resetFilters}
-            className="ml-auto rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543]"
+            className="rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543]"
           >
             Reset filters
           </button>
         </div>
       </section>
+
+      {selectedCustomerIds.length > 0 ? (
+        <BulkActionBar
+          action={bulkAction}
+          busy={bulkBusy}
+          selectedCount={selectedCustomerIds.length}
+          staffRole={staffRole}
+          salesRepOptions={salesRepOptions}
+          territoryOptions={territoryOptions}
+          statusMessage={bulkStatusMessage}
+          onActionChange={setBulkAction}
+          onApply={() => void applyBulkAction()}
+          onClear={clearSelection}
+        />
+      ) : null}
 
       {organizeBy === "territory" && sections.length > 0 ? (
         <nav className="rounded-[24px] border border-[#dbe8ef] bg-white p-4 shadow-[0_12px_32px_rgba(16,42,67,0.05)]">
@@ -557,7 +717,13 @@ export default function CustomerWorkspaceIndex({ customers, territoryOptions, in
 
             <div className="space-y-4">
               {section.customers.map((customer) => (
-                <CustomerCard key={customer.id} customer={customer} territoryOptions={territoryOptions} />
+                <CustomerCard
+                  key={customer.id}
+                  customer={customer}
+                  territoryOptions={territoryOptions}
+                  selected={selectedCustomerIds.includes(customer.id)}
+                  onToggleSelected={toggleCustomerSelection}
+                />
               ))}
             </div>
           </div>
@@ -574,7 +740,17 @@ export default function CustomerWorkspaceIndex({ customers, territoryOptions, in
   );
 }
 
-function CustomerCard({ customer, territoryOptions }: { customer: CustomerSummary; territoryOptions: TerritoryOption[] }) {
+function CustomerCard({
+  customer,
+  territoryOptions,
+  selected,
+  onToggleSelected,
+}: {
+  customer: CustomerSummary;
+  territoryOptions: TerritoryOption[];
+  selected: boolean;
+  onToggleSelected: (customerId: string) => void;
+}) {
   const primaryContact = customer.primaryContacts[0] || null;
   const activityCount = customer.counts.estimates + customer.counts.orders + customer.counts.packagingSubmissions + customer.counts.documents;
   const primaryEmailHref = normalizeMailtoHref(primaryContact?.email || customer.primaryContactEmail);
@@ -583,11 +759,20 @@ function CustomerCard({ customer, territoryOptions }: { customer: CustomerSummar
   const routeReadiness = getRouteReadiness(customer);
 
   return (
-    <article className="rounded-[28px] border border-[#d9e7ee] bg-white p-4 shadow-[0_14px_40px_rgba(16,42,67,0.05)] transition hover:-translate-y-0.5 hover:shadow-[0_20px_48px_rgba(16,42,67,0.08)] lg:p-5">
+    <article
+      className={[
+        "rounded-[28px] border bg-white p-4 shadow-[0_14px_40px_rgba(16,42,67,0.05)] transition hover:-translate-y-0.5 hover:shadow-[0_20px_48px_rgba(16,42,67,0.08)] lg:p-5",
+        selected ? "border-[#14b8a6] ring-2 ring-[#b8efe7]" : "border-[#d9e7ee]",
+      ].join(" ")}
+    >
       <div className="flex flex-col gap-4 2xl:flex-row 2xl:items-start 2xl:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-start">
             <div className="min-w-0 flex-1">
+              <label className="mb-3 inline-flex w-fit items-center gap-2 rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-sm font-medium text-[#35505d]">
+                <input type="checkbox" checked={selected} onChange={() => onToggleSelected(customer.id)} className="h-4 w-4 accent-[#14b8a6]" />
+                Select account
+              </label>
               <div className="flex flex-wrap items-center gap-2">
                 <Link href={`/workspace/customers/${customer.id}`} className="text-lg font-semibold text-[#173543] transition hover:text-[#0f766e]">
                   {customer.name}
@@ -712,7 +897,7 @@ function RouteActionButton({ customer, territoryOptions }: { customer: CustomerS
         }),
       });
 
-      const json = await res.json().catch(() => ({}));
+      const json = await parseJsonSafe(res);
       if (!res.ok) {
         throw new Error(String((json as { error?: string }).error || `Save failed (${res.status})`));
       }
@@ -741,6 +926,124 @@ function RouteActionButton({ customer, territoryOptions }: { customer: CustomerS
       </button>
       {statusMessage ? <p className="px-1 text-xs text-[#4f6877]">{statusMessage}</p> : null}
     </div>
+  );
+}
+
+function BulkActionBar({
+  action,
+  busy,
+  selectedCount,
+  staffRole,
+  salesRepOptions,
+  territoryOptions,
+  statusMessage,
+  onActionChange,
+  onApply,
+  onClear,
+}: {
+  action: BulkActionState;
+  busy: boolean;
+  selectedCount: number;
+  staffRole: "admin" | "sales";
+  salesRepOptions: RouteRepOption[];
+  territoryOptions: TerritoryOption[];
+  statusMessage: string | null;
+  onActionChange: (action: BulkActionState) => void;
+  onApply: () => void;
+  onClear: () => void;
+}) {
+  const availableActions = BULK_ACTIONS.filter((item) => (staffRole === "admin" ? true : item.key !== "assign_sales_rep"));
+  const valueLabel =
+    action.kind === "assign_sales_rep"
+      ? "Sales rep"
+      : action.kind === "assign_territory"
+        ? "Territory"
+        : action.kind === "assign_route_day"
+          ? "Route day"
+          : null;
+
+  return (
+    <section className="sticky top-4 z-10 rounded-[24px] border border-[#bfe8e2] bg-[linear-gradient(180deg,#f5fffd_0%,#ffffff_100%)] p-4 shadow-[0_18px_40px_rgba(16,42,67,0.08)]">
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#0f766e]">Bulk Actions</p>
+          <p className="mt-1 text-sm text-[#35505d]">
+            {selectedCount} selected account{selectedCount === 1 ? "" : "s"}
+          </p>
+          {statusMessage ? <p className="mt-1 text-xs text-[#4f6877]">{statusMessage}</p> : null}
+        </div>
+
+        <div className="flex flex-col gap-2 xl:flex-row xl:items-end">
+          <label className="grid gap-1 text-sm text-[#4b6676]">
+            <span className="font-medium">Action</span>
+            <select
+              value={action.kind}
+              onChange={(event) => onActionChange({ kind: event.target.value as BulkActionKind, value: "" })}
+              disabled={busy}
+              className="rounded-2xl border border-[#cedde6] bg-white px-4 py-3 text-sm text-[#173543] outline-none transition focus:border-[#14b8a6]"
+            >
+              {availableActions.map((item) => (
+                <option key={item.key} value={item.key}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {valueLabel ? (
+            <label className="grid gap-1 text-sm text-[#4b6676]">
+              <span className="font-medium">{valueLabel}</span>
+              <select
+                value={action.value}
+                onChange={(event) => onActionChange({ ...action, value: event.target.value })}
+                disabled={busy}
+                className="min-w-[220px] rounded-2xl border border-[#cedde6] bg-white px-4 py-3 text-sm text-[#173543] outline-none transition focus:border-[#14b8a6]"
+              >
+                <option value="">Select {valueLabel.toLowerCase()}</option>
+                {action.kind === "assign_sales_rep"
+                  ? salesRepOptions.map((option) => (
+                      <option key={option.userId} value={option.userId}>
+                        {option.label}
+                      </option>
+                    ))
+                  : action.kind === "assign_territory"
+                    ? territoryOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))
+                    : ROUTE_DAYS.map((routeDay) => (
+                        <option key={routeDay} value={routeDay}>
+                          {routeDay}
+                        </option>
+                      ))}
+              </select>
+            </label>
+          ) : (
+            <div className="rounded-2xl border border-[#d7e6ed] bg-white px-4 py-3 text-sm text-[#4f6877]">
+              Sets `visit_status` to `due` and fills route day from the territory default when available.
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={onApply}
+            disabled={busy}
+            className="rounded-full bg-[#173543] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#0f2a35] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {busy ? "Applying..." : "Apply"}
+          </button>
+          <button
+            type="button"
+            onClick={onClear}
+            disabled={busy}
+            className="rounded-full border border-[#d0dde5] bg-white px-4 py-3 text-sm font-semibold text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Clear
+          </button>
+        </div>
+      </div>
+    </section>
   );
 }
 

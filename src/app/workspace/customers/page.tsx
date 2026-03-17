@@ -3,6 +3,7 @@ import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import CustomerWorkspaceIndex from "@/components/workspace/CustomerWorkspaceIndex";
 import { loadCustomerWorkspaceIndex } from "@/lib/customerWorkspace";
 import { loadRouteReferenceData } from "@/lib/routeWorkspace";
+import { requireStaff } from "@/lib/requireStaff";
 
 function asQueryValue(value: string | string[] | undefined): string {
   return Array.isArray(value) ? String(value[0] || "") : String(value || "");
@@ -13,7 +14,12 @@ export default async function WorkspaceCustomersPage({
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const [{ customers, metrics }, { territoryOptions }, params] = await Promise.all([loadCustomerWorkspaceIndex(), loadRouteReferenceData(), searchParams]);
+  const [staff, { customers, metrics }, { territoryOptions, routeRepOptions }, params] = await Promise.all([
+    requireStaff(),
+    loadCustomerWorkspaceIndex(),
+    loadRouteReferenceData(),
+    searchParams,
+  ]);
 
   return (
     <div className="mx-auto w-full max-w-[1440px] space-y-6 2xl:max-w-[1500px]">
@@ -32,6 +38,8 @@ export default async function WorkspaceCustomersPage({
       </section>
       <CustomerWorkspaceIndex
         customers={customers}
+        staffRole={staff.role}
+        salesRepOptions={routeRepOptions}
         territoryOptions={territoryOptions}
         initialFilters={{
           q: asQueryValue(params?.q),
