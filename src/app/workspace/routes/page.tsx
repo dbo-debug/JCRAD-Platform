@@ -1,5 +1,6 @@
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import RoutePlannerIndex from "@/components/workspace/RoutePlannerIndex";
+import { requireStaff } from "@/lib/requireStaff";
 import { loadRouteWorkspaceData } from "@/lib/routeWorkspace";
 
 function asQueryValue(value: string | string[] | undefined): string {
@@ -11,8 +12,8 @@ export default async function WorkspaceRoutesPage({
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const params = await searchParams;
-  const { customers, routeRepOptions, territoryOptions } = await loadRouteWorkspaceData();
+  const staff = await requireStaff();
+  const [params, { customers, routeRepOptions, territoryOptions }] = await Promise.all([searchParams, loadRouteWorkspaceData()]);
 
   return (
     <div className="mx-auto w-full max-w-[1440px] space-y-6 2xl:max-w-[1500px]">
@@ -24,6 +25,7 @@ export default async function WorkspaceRoutesPage({
         customers={customers}
         routeRepOptions={routeRepOptions}
         territoryOptions={territoryOptions}
+        currentUserId={staff.userId}
         initialFilters={{
           q: asQueryValue(params?.q),
           routeDay: asQueryValue(params?.routeDay),
@@ -33,6 +35,7 @@ export default async function WorkspaceRoutesPage({
           priority: asQueryValue(params?.priority),
           coordinateStatus: asQueryValue(params?.coordStatus),
           territorySort: asQueryValue(params?.territorySort),
+          territoryFocus: asQueryValue(params?.territoryFocus),
           view: asQueryValue(params?.view) === "map" ? "map" : "list",
         }}
       />

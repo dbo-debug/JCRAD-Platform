@@ -3,6 +3,7 @@ import type { CustomerSummary } from "@/lib/customerWorkspace";
 export type RouteViewMode = "list" | "map";
 export type CoordinateCoverageFilter = "all" | "has_coords" | "needs_coords" | "address_ready" | "missing_address";
 export type TerritorySortMode = "account_count" | "due_today" | "follow_up_needed";
+export type TerritoryFocusMode = "all" | "my_territories" | "unassigned_territories" | "due_heavy" | "cleanup";
 
 export type VisitOutcomeKey =
   | "met_buyer"
@@ -220,6 +221,9 @@ export function buildTerritoryStats(customers: CustomerSummary[], referenceNow: 
       followUpNeeded: number;
       noCoords: number;
       unassignedRep: number;
+      noRouteDay: number;
+      ownerUserId: string | null;
+      ownerState: "owned" | "partial" | "mixed" | "unassigned";
     }
   >();
 
@@ -234,6 +238,9 @@ export function buildTerritoryStats(customers: CustomerSummary[], referenceNow: 
       followUpNeeded: 0,
       noCoords: 0,
       unassignedRep: 0,
+      noRouteDay: 0,
+      ownerUserId: null,
+      ownerState: "unassigned",
     };
 
     existing.customers.push(customer);
@@ -251,11 +258,25 @@ export function buildTerritoryStats(customers: CustomerSummary[], referenceNow: 
 
     if (customer.latitude === null || customer.longitude === null) existing.noCoords += 1;
     if (!customer.assignedRouteRepUserId) existing.unassignedRep += 1;
+    if (!customer.routeDay) existing.noRouteDay += 1;
 
     territoryMap.set(territoryKey, existing);
   }
 
-  return Array.from(territoryMap.values());
+  return Array.from(territoryMap.values()).map((territory) => {
+    const assignedRepIds = Array.from(new Set(territory.customers.map((customer) => customer.assignedRouteRepUserId).filter((value): value is string => Boolean(value))));
+
+    if (assignedRepIds.length === 0) {
+      return { ...territory, ownerUserId: null, ownerState: "unassigned" as const };
+    }
+    if (assignedRepIds.length === 1 && territory.unassignedRep === 0) {
+      return { ...territory, ownerUserId: assignedRepIds[0], ownerState: "owned" as const };
+    }
+    if (assignedRepIds.length === 1) {
+      return { ...territory, ownerUserId: assignedRepIds[0], ownerState: "partial" as const };
+    }
+    return { ...territory, ownerUserId: null, ownerState: "mixed" as const };
+  });
 }
 
 export function sortTerritoryStats<

@@ -35,6 +35,7 @@ export default async function WorkspaceRouteRunnerPage({
           visitStatus: asQueryValue(params?.visitStatus),
           coordinateStatus: asQueryValue(params?.coordStatus),
           territorySort: asQueryValue(params?.territorySort),
+          territoryFocus: asQueryValue(params?.territoryFocus),
           view: asQueryValue(params?.view) === "map" ? "map" : "list",
         }}
       />

@@ -22,6 +22,7 @@ import {
   setQueryParam,
   sortCustomersForRoute,
   sortTerritoryStats,
+  TerritoryFocusMode,
   TerritorySortMode,
   titleCase,
   VISIT_OUTCOMES,
@@ -42,6 +43,7 @@ type RouteRunnerProps = {
     visitStatus: string;
     coordinateStatus: string;
     territorySort: string;
+    territoryFocus: string;
     view: RouteViewMode;
   };
 };
@@ -86,6 +88,14 @@ export default function RouteRunner({ customers, routeRepOptions, territoryOptio
   const [territorySort, setTerritorySort] = useState<TerritorySortMode>(
     initialFilters.territorySort === "due_today" || initialFilters.territorySort === "follow_up_needed" ? initialFilters.territorySort : "account_count"
   );
+  const [territoryFocus, setTerritoryFocus] = useState<TerritoryFocusMode>(
+    initialFilters.territoryFocus === "my_territories" ||
+      initialFilters.territoryFocus === "unassigned_territories" ||
+      initialFilters.territoryFocus === "due_heavy" ||
+      initialFilters.territoryFocus === "cleanup"
+      ? initialFilters.territoryFocus
+      : "all"
+  );
   const [viewMode, setViewMode] = useState<RouteViewMode>(initialFilters.view === "map" ? "map" : "list");
   const [referenceNow] = useState(() => Date.now());
   const deferredSearch = useDeferredValue(search);
@@ -115,11 +125,21 @@ export default function RouteRunner({ customers, routeRepOptions, territoryOptio
   const currentRepLabel = routeRepOptions.find((option) => option.userId === currentUserId)?.label || "Current rep";
   const stats = buildRouteStats(visibleCustomers, referenceNow);
   const territoryLabelMap = new Map(territoryOptions.map((option) => [option.code, option.label]));
-  const territorySections = sortTerritoryStats(buildTerritoryStats(visibleCustomers, referenceNow), territorySort).map((territory) => ({
-    ...territory,
-    label: territory.territoryKey === "UNASSIGNED" ? "Unassigned Territory" : territoryLabelMap.get(territory.territoryKey) || territory.territoryKey,
-    customers: [...territory.customers].sort(sortCustomersForRoute),
-  }));
+  const routeRepLabelMap = new Map(routeRepOptions.map((option) => [option.userId, option.label]));
+  const territorySections = sortTerritoryStats(buildTerritoryStats(visibleCustomers, referenceNow), territorySort)
+    .map((territory) => ({
+      ...territory,
+      label: territory.territoryKey === "UNASSIGNED" ? "Unassigned Territory" : territoryLabelMap.get(territory.territoryKey) || territory.territoryKey,
+      ownerLabel: territory.ownerUserId ? routeRepLabelMap.get(territory.ownerUserId) || "Assigned rep" : null,
+      customers: [...territory.customers].sort(sortCustomersForRoute),
+    }))
+    .filter((territory) => {
+      if (territoryFocus === "my_territories") return territory.ownerUserId === currentUserId;
+      if (territoryFocus === "unassigned_territories") return territory.ownerState === "unassigned" || territory.unassignedRep > 0;
+      if (territoryFocus === "due_heavy") return territory.dueToday > 0;
+      if (territoryFocus === "cleanup") return territory.noCoords > 0 || territory.unassignedRep > 0 || territory.noRouteDay > 0;
+      return true;
+    });
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -130,11 +150,12 @@ export default function RouteRunner({ customers, routeRepOptions, territoryOptio
     setQueryParam(params, "visitStatus", visitStatusFilter);
     setQueryParam(params, "coordStatus", coordinateStatusFilter);
     setQueryParam(params, "territorySort", territorySort, ["account_count", ""]);
+    setQueryParam(params, "territoryFocus", territoryFocus);
     setQueryParam(params, "view", viewMode, ["list", ""]);
     if (focusCustomerId) params.set("customerId", focusCustomerId);
     const next = params.toString();
     router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false });
-  }, [coordinateStatusFilter, focusCustomerId, pathname, routeDayFilter, router, scope, search, territoryFilter, territorySort, viewMode, visitStatusFilter]);
+  }, [coordinateStatusFilter, focusCustomerId, pathname, routeDayFilter, router, scope, search, territoryFilter, territoryFocus, territorySort, viewMode, visitStatusFilter]);
 
   return (
     <div className="space-y-5">
@@ -202,6 +223,17 @@ export default function RouteRunner({ customers, routeRepOptions, territoryOptio
 
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <SelectFilter label="Visit Status" value={visitStatusFilter} onChange={setVisitStatusFilter} options={visitStatuses} />
+          <SelectFilter
+            label="Territory Focus"
+            value={territoryFocus}
+            onChange={(value) => setTerritoryFocus(value as TerritoryFocusMode)}
+            options={[
+              { value: "my_territories", label: "My Territories" },
+              { value: "unassigned_territories", label: "Unassigned Territories" },
+              { value: "due_heavy", label: "Most Due Today" },
+              { value: "cleanup", label: "Needs Cleanup" },
+            ]}
+          />
           <SelectFilter
             label="Territory Sort"
             value={territorySort}
@@ -284,6 +316,11 @@ export default function RouteRunner({ customers, routeRepOptions, territoryOptio
                 <p className="mt-1 text-sm text-[#5c7483]">
                   {territory.accountCount} stops in scope • {territory.territoryKey === "UNASSIGNED" ? "Needs territory assignment" : territory.territoryKey}
                 </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <TerritoryOwnerPill ownerState={territory.ownerState} ownerLabel={territory.ownerLabel} />
+                  {territory.unassignedRep > 0 ? <InlinePill tone="warn" label={`${territory.unassignedRep} without rep`} /> : null}
+                  {territory.noRouteDay > 0 ? <InlinePill tone="warn" label={`${territory.noRouteDay} without route day`} /> : null}
+                </div>
               </div>
               <div className="grid gap-2 sm:grid-cols-3 xl:min-w-[520px] xl:grid-cols-6">
                 <MiniMetric label="Accounts" value={territory.accountCount} />
@@ -292,6 +329,7 @@ export default function RouteRunner({ customers, routeRepOptions, territoryOptio
                 <MiniMetric label="Follow-Up" value={territory.followUpNeeded} />
                 <MiniMetric label="No Coords" value={territory.noCoords} />
                 <MiniMetric label="No Rep" value={territory.unassignedRep} />
+                <MiniMetric label="No Route Day" value={territory.noRouteDay} />
               </div>
             </div>
 
@@ -349,6 +387,24 @@ function MiniMetric({ label, value }: { label: string; value: number }) {
       <p className="mt-1 text-lg font-semibold text-[#173543]">{value}</p>
     </div>
   );
+}
+
+function TerritoryOwnerPill({ ownerState, ownerLabel }: { ownerState: "owned" | "partial" | "mixed" | "unassigned"; ownerLabel: string | null }) {
+  if (ownerState === "owned" && ownerLabel) return <InlinePill tone="ok" label={`Owned by ${ownerLabel}`} />;
+  if (ownerState === "partial" && ownerLabel) return <InlinePill tone="warn" label={`Primary rep ${ownerLabel}`} />;
+  if (ownerState === "mixed") return <InlinePill tone="neutral" label="Mixed rep ownership" />;
+  return <InlinePill tone="warn" label="Territory unassigned" />;
+}
+
+function InlinePill({ label, tone }: { label: string; tone: "neutral" | "warn" | "ok" }) {
+  const toneClass =
+    tone === "ok"
+      ? "border-[#bde8e4] bg-[#e9fbf9] text-[#0f766e]"
+      : tone === "warn"
+        ? "border-[#f1ddad] bg-[#fff9eb] text-[#9a6b00]"
+        : "border-[#d7e6ed] bg-[#f8fbfc] text-[#4f6877]";
+
+  return <span className={["rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em]", toneClass].join(" ")}>{label}</span>;
 }
 
 function RouteStopCard({ customer }: { customer: CustomerSummary }) {
