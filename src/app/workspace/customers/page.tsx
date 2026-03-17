@@ -39,6 +39,7 @@ export default async function WorkspaceCustomersPage({
       <CustomerWorkspaceIndex
         customers={customers}
         staffRole={staff.role}
+        currentUserId={staff.userId}
         salesRepOptions={routeRepOptions}
         territoryOptions={territoryOptions}
         initialFilters={{

@@ -52,6 +52,7 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
 
   const { id } = await context.params;
   const body = await req.json().catch(() => ({}));
+  const applyRoute = body.apply_route === true || body.apply_route === "true";
 
   const companyName = asText(body.company_name);
   const primaryContactEmail = asText(body.primary_contact_email);
@@ -104,6 +105,9 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
   if (longitude !== null && (longitude < -180 || longitude > 180)) {
     return NextResponse.json({ error: "longitude must be between -180 and 180" }, { status: 400 });
   }
+  if (applyRoute && (!territoryCode || !routeDay || !assignedRouteRepUserId)) {
+    return NextResponse.json({ error: "Applying a route requires territory_code, route_day, and assigned_route_rep_user_id" }, { status: 400 });
+  }
 
   const payload: Record<string, string | number | null> = {};
 
@@ -124,8 +128,12 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
     if ("assigned_sales_user_id" in body) payload.assigned_sales_user_id = assignedSalesUserId;
     if ("assigned_route_rep_user_id" in body) payload.assigned_route_rep_user_id = assignedRouteRepUserId;
   } else {
-    if ("company_name" in body || "assigned_sales_user_id" in body || "assigned_route_rep_user_id" in body) {
+    const isOwnRouteAssignment = applyRoute && "assigned_route_rep_user_id" in body && assignedRouteRepUserId === staff.userId;
+    if ("company_name" in body || "assigned_sales_user_id" in body || ("assigned_route_rep_user_id" in body && !isOwnRouteAssignment)) {
       return NextResponse.json({ error: "Only admins can update company or assignment fields" }, { status: 403 });
+    }
+    if (isOwnRouteAssignment) {
+      payload.assigned_route_rep_user_id = assignedRouteRepUserId;
     }
   }
 

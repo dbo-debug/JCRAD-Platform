@@ -112,7 +112,7 @@ export default function RouteRunner({ customers, routeRepOptions, territoryOptio
       if (focusCustomerId && customer.id !== focusCustomerId) return false;
       const query = normalizeText(deferredSearch);
       if (query && !getRouteSearchText(customer).includes(query)) return false;
-      if (scope === "mine" && customer.assignedRouteRepUserId !== currentUserId) return false;
+      if (!focusCustomerId && scope === "mine" && customer.assignedRouteRepUserId !== currentUserId) return false;
       if (routeDayFilter !== "all" && normalizeText(customer.routeDay) !== normalizeText(routeDayFilter)) return false;
       if (territoryFilter !== "all" && normalizeText(customer.territoryCode) !== normalizeText(territoryFilter)) return false;
       if (visitStatusFilter !== "all" && normalizeText(customer.visitStatus) !== normalizeText(visitStatusFilter)) return false;

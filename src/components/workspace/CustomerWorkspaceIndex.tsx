@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { startTransition, useEffect, useState } from "react";
 import type { CustomerSummary } from "@/lib/customerWorkspace";
 import type { RouteRepOption, TerritoryOption } from "@/lib/routeWorkspace";
@@ -16,6 +16,7 @@ import {
 type CustomerWorkspaceIndexProps = {
   customers: CustomerSummary[];
   staffRole: "admin" | "sales";
+  currentUserId: string;
   salesRepOptions: RouteRepOption[];
   territoryOptions: TerritoryOption[];
   initialFilters: {
@@ -37,12 +38,13 @@ type BulkActionKind = "assign_sales_rep" | "assign_territory" | "assign_route_da
 type BulkActionState = {
   kind: BulkActionKind;
   value: string;
+  routeRepUserId: string;
 };
 
 type SavedViewKey = "all" | "pipeline" | "unassigned" | "missing_primary" | "with_orders";
 type SortKey = "activity_desc" | "name_asc" | "name_desc" | "orders_desc" | "owner_asc";
 type ContactCoverageFilter = "all" | "has_contacts" | "missing_primary" | "no_contacts";
-type RouteReadinessFilter = "all" | "route_ready" | "no_territory" | "no_route_day" | "no_coords" | "address_ready";
+type RouteReadinessFilter = "all" | "route_ready" | "no_territory" | "no_route_day" | "no_route_rep" | "no_coords" | "address_ready";
 type OrderStateFilter = "all" | "has_orders" | "no_orders";
 type OrganizeBy = "none" | "territory" | "owner" | "route_day" | "stage";
 
@@ -60,6 +62,28 @@ const BULK_ACTIONS: Array<{ key: BulkActionKind; label: string }> = [
   { key: "assign_route_day", label: "Assign Route Day" },
   { key: "add_to_route", label: "Add to Route" },
 ];
+
+function sameIds(left: string[], right: string[]) {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+function buildRouteRunnerHref(customer: {
+  id: string;
+  territoryCode: string | null;
+  routeDay: string | null;
+  assignedRouteRepUserId?: string | null;
+}) {
+  const params = new URLSearchParams({
+    customerId: customer.id,
+    scope: "all",
+  });
+
+  if (customer.territoryCode) params.set("territory", customer.territoryCode);
+  if (customer.routeDay) params.set("routeDay", customer.routeDay);
+  if (customer.assignedRouteRepUserId) params.set("rep", customer.assignedRouteRepUserId);
+
+  return `/workspace/routes/run?${params.toString()}`;
+}
 
 async function parseJsonSafe(res: Response): Promise<Record<string, unknown>> {
   const contentType = res.headers.get("content-type") || "";
@@ -151,9 +175,10 @@ function getCustomerSearchText(customer: CustomerSummary) {
 
 function getRouteReadiness(customer: CustomerSummary): Exclude<RouteReadinessFilter, "all"> | "other" {
   const hasCoords = customer.latitude !== null && customer.longitude !== null;
-  if (customer.territoryCode && customer.routeDay && hasCoords) return "route_ready";
+  if (customer.territoryCode && customer.routeDay && customer.assignedRouteRepUserId && hasCoords) return "route_ready";
   if (!customer.territoryCode) return "no_territory";
   if (!customer.routeDay) return "no_route_day";
+  if (!customer.assignedRouteRepUserId) return "no_route_rep";
   const coordinateState = getCoordinateCoverageState(customer);
   if (coordinateState === "address_ready") return "address_ready";
   if (coordinateState !== "has_coords") return "no_coords";
@@ -166,9 +191,10 @@ function compareGroupLabels(left: string, right: string) {
   return left.localeCompare(right);
 }
 
-export default function CustomerWorkspaceIndex({ customers, staffRole, salesRepOptions, territoryOptions, initialFilters }: CustomerWorkspaceIndexProps) {
+export default function CustomerWorkspaceIndex({ customers, staffRole, currentUserId, salesRepOptions, territoryOptions, initialFilters }: CustomerWorkspaceIndexProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [draftSearch, setDraftSearch] = useState(initialFilters.q);
   const [searchQuery, setSearchQuery] = useState(initialFilters.q);
   const [savedView, setSavedView] = useState<SavedViewKey>(
@@ -194,6 +220,7 @@ export default function CustomerWorkspaceIndex({ customers, staffRole, salesRepO
     initialFilters.routeReadiness === "route_ready" ||
       initialFilters.routeReadiness === "no_territory" ||
       initialFilters.routeReadiness === "no_route_day" ||
+      initialFilters.routeReadiness === "no_route_rep" ||
       initialFilters.routeReadiness === "no_coords" ||
       initialFilters.routeReadiness === "address_ready"
       ? initialFilters.routeReadiness
@@ -220,6 +247,7 @@ export default function CustomerWorkspaceIndex({ customers, staffRole, salesRepO
   const [bulkAction, setBulkAction] = useState<BulkActionState>({
     kind: staffRole === "admin" ? "assign_sales_rep" : "assign_territory",
     value: "",
+    routeRepUserId: staffRole === "sales" ? currentUserId : "",
   });
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkStatusMessage, setBulkStatusMessage] = useState<string | null>(null);
@@ -243,8 +271,9 @@ export default function CustomerWorkspaceIndex({ customers, staffRole, salesRepO
     setQueryParam(params, "organizeBy", organizeBy, ["none", ""]);
     setQueryParam(params, "sort", sortKey, ["activity_desc", ""]);
     const next = params.toString();
+    if (next === searchParams.toString()) return;
     router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false });
-  }, [contactCoverage, orderState, organizeBy, ownerFilter, pathname, routeReadiness, router, savedView, searchQuery, sortKey, stageFilter, statusFilter, territoryFilter]);
+  }, [contactCoverage, orderState, organizeBy, ownerFilter, pathname, routeReadiness, router, savedView, searchParams, searchQuery, sortKey, stageFilter, statusFilter, territoryFilter]);
 
   let visibleCustomers = customers.filter((customer) => {
     const query = normalizeText(searchQuery);
@@ -288,9 +317,11 @@ export default function CustomerWorkspaceIndex({ customers, staffRole, salesRepO
   });
 
   const visibleCustomerIds = visibleCustomers.map((customer) => customer.id);
+  const visibleCustomerIdSet = new Set(visibleCustomerIds);
   const visibleCustomerIdsKey = visibleCustomerIds.join("|");
-  const selectedVisibleCustomers = visibleCustomers.filter((customer) => selectedCustomerIds.includes(customer.id));
-  const allVisibleSelected = visibleCustomers.length > 0 && selectedCustomerIds.length === visibleCustomers.length;
+  const selectedVisibleCustomerIds = selectedCustomerIds.filter((id) => visibleCustomerIdSet.has(id));
+  const selectedVisibleCustomers = visibleCustomers.filter((customer) => selectedVisibleCustomerIds.includes(customer.id));
+  const allVisibleSelected = visibleCustomers.length > 0 && selectedVisibleCustomerIds.length === visibleCustomers.length;
 
   const visibleWithContacts = visibleCustomers.filter((customer) => customer.contactCount > 0).length;
   const visibleWithOwners = visibleCustomers.filter((customer) => customer.assignedSalesName).length;
@@ -377,16 +408,24 @@ export default function CustomerWorkspaceIndex({ customers, staffRole, salesRepO
               ];
 
   useEffect(() => {
-    const nextVisibleIds = new Set(visibleCustomerIds);
-    setSelectedCustomerIds((current) => current.filter((id) => nextVisibleIds.has(id)));
-  }, [visibleCustomerIds, visibleCustomerIdsKey]);
+    const nextVisibleIds = new Set(visibleCustomerIdsKey ? visibleCustomerIdsKey.split("|") : []);
+    setSelectedCustomerIds((current) => {
+      const next = current.filter((id) => nextVisibleIds.has(id));
+      return sameIds(current, next) ? current : next;
+    });
+  }, [visibleCustomerIdsKey]);
 
   useEffect(() => {
     if (staffRole === "admin") return;
-    if (bulkAction.kind === "assign_sales_rep") {
-      setBulkAction({ kind: "assign_territory", value: "" });
-    }
-  }, [bulkAction.kind, staffRole]);
+    setBulkAction((current) => {
+      const nextKind = current.kind === "assign_sales_rep" ? "assign_territory" : current.kind;
+      const nextValue = current.kind === "assign_sales_rep" ? "" : current.value;
+      if (nextKind === current.kind && nextValue === current.value && current.routeRepUserId === currentUserId) {
+        return current;
+      }
+      return { ...current, kind: nextKind, value: nextValue, routeRepUserId: currentUserId };
+    });
+  }, [currentUserId, staffRole]);
 
   function toggleCustomerSelection(customerId: string) {
     setSelectedCustomerIds((current) => (current.includes(customerId) ? current.filter((id) => id !== customerId) : [...current, customerId]));
@@ -437,6 +476,10 @@ export default function CustomerWorkspaceIndex({ customers, staffRole, salesRepO
       setBulkStatusMessage("Choose a value before applying the bulk action.");
       return;
     }
+    if (bulkAction.kind === "add_to_route" && !bulkAction.routeRepUserId) {
+      setBulkStatusMessage("Choose a route rep before applying route assignments.");
+      return;
+    }
 
     setBulkBusy(true);
     setBulkStatusMessage(null);
@@ -459,14 +502,16 @@ export default function CustomerWorkspaceIndex({ customers, staffRole, salesRepO
           const territoryCode = customer.territoryCode || null;
           const routeDay = customer.routeDay || territory?.routeDayDefault || null;
 
-          if (!territoryCode && !routeDay) {
+          if (!territoryCode || !routeDay) {
             skippedCount += 1;
             continue;
           }
 
           payload = {
+            apply_route: "true",
             territory_code: territoryCode,
             route_day: routeDay,
+            assigned_route_rep_user_id: bulkAction.routeRepUserId,
             visit_status: customer.visitStatus || "due",
           };
         }
@@ -486,7 +531,7 @@ export default function CustomerWorkspaceIndex({ customers, staffRole, salesRepO
 
       setBulkStatusMessage(
         bulkAction.kind === "add_to_route"
-          ? `Updated ${successCount} account${successCount === 1 ? "" : "s"} for route planning${skippedCount ? `, skipped ${skippedCount} without territory/day` : ""}.`
+          ? `Updated ${successCount} account${successCount === 1 ? "" : "s"} for route planning${skippedCount ? `, skipped ${skippedCount} without territory and route day` : ""}.`
           : `Updated ${successCount} selected account${successCount === 1 ? "" : "s"}.`
       );
       setSelectedCustomerIds([]);
@@ -586,6 +631,7 @@ export default function CustomerWorkspaceIndex({ customers, staffRole, salesRepO
               { value: "route_ready", label: "Route Ready" },
               { value: "no_territory", label: "No Territory" },
               { value: "no_route_day", label: "No Route Day" },
+              { value: "no_route_rep", label: "No Route Rep" },
               { value: "no_coords", label: "No Coordinates" },
               { value: "address_ready", label: "Address Ready, No Coords" },
             ]}
@@ -631,7 +677,7 @@ export default function CustomerWorkspaceIndex({ customers, staffRole, salesRepO
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4f6877]">
-            Selected {selectedCustomerIds.length}
+            Selected {selectedVisibleCustomerIds.length} of {visibleCustomers.length} filtered
           </span>
           <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4f6877]">
             Search mode: explicit apply
@@ -645,15 +691,15 @@ export default function CustomerWorkspaceIndex({ customers, staffRole, salesRepO
             disabled={visibleCustomers.length === 0}
             className="rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {allVisibleSelected ? "All visible selected" : "Select all visible"}
+            {allVisibleSelected ? "All filtered selected" : `Select all filtered (${visibleCustomers.length})`}
           </button>
           <button
             type="button"
             onClick={clearSelection}
-            disabled={selectedCustomerIds.length === 0}
+            disabled={selectedVisibleCustomerIds.length === 0}
             className="rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Clear selection
+            Clear filtered selection
           </button>
           <button
             type="button"
@@ -665,11 +711,12 @@ export default function CustomerWorkspaceIndex({ customers, staffRole, salesRepO
         </div>
       </section>
 
-      {selectedCustomerIds.length > 0 ? (
+      {selectedVisibleCustomerIds.length > 0 ? (
         <BulkActionBar
           action={bulkAction}
           busy={bulkBusy}
-          selectedCount={selectedCustomerIds.length}
+          selectedCount={selectedVisibleCustomerIds.length}
+          currentUserId={currentUserId}
           staffRole={staffRole}
           salesRepOptions={salesRepOptions}
           territoryOptions={territoryOptions}
@@ -720,6 +767,9 @@ export default function CustomerWorkspaceIndex({ customers, staffRole, salesRepO
                 <CustomerCard
                   key={customer.id}
                   customer={customer}
+                  currentUserId={currentUserId}
+                  staffRole={staffRole}
+                  routeRepOptions={salesRepOptions}
                   territoryOptions={territoryOptions}
                   selected={selectedCustomerIds.includes(customer.id)}
                   onToggleSelected={toggleCustomerSelection}
@@ -742,11 +792,17 @@ export default function CustomerWorkspaceIndex({ customers, staffRole, salesRepO
 
 function CustomerCard({
   customer,
+  currentUserId,
+  staffRole,
+  routeRepOptions,
   territoryOptions,
   selected,
   onToggleSelected,
 }: {
   customer: CustomerSummary;
+  currentUserId: string;
+  staffRole: "admin" | "sales";
+  routeRepOptions: RouteRepOption[];
   territoryOptions: TerritoryOption[];
   selected: boolean;
   onToggleSelected: (customerId: string) => void;
@@ -761,20 +817,20 @@ function CustomerCard({
   return (
     <article
       className={[
-        "rounded-[28px] border bg-white p-4 shadow-[0_14px_40px_rgba(16,42,67,0.05)] transition hover:-translate-y-0.5 hover:shadow-[0_20px_48px_rgba(16,42,67,0.08)] lg:p-5",
+        "rounded-[22px] border bg-white p-3 shadow-[0_10px_24px_rgba(16,42,67,0.05)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(16,42,67,0.07)] lg:p-4",
         selected ? "border-[#14b8a6] ring-2 ring-[#b8efe7]" : "border-[#d9e7ee]",
       ].join(" ")}
     >
-      <div className="flex flex-col gap-4 2xl:flex-row 2xl:items-start 2xl:justify-between">
+      <div className="flex flex-col gap-3 2xl:flex-row 2xl:items-start 2xl:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-start">
             <div className="min-w-0 flex-1">
-              <label className="mb-3 inline-flex w-fit items-center gap-2 rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-sm font-medium text-[#35505d]">
+              <label className="mb-2 inline-flex w-fit items-center gap-2 rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-2.5 py-1 text-xs font-medium text-[#35505d]">
                 <input type="checkbox" checked={selected} onChange={() => onToggleSelected(customer.id)} className="h-4 w-4 accent-[#14b8a6]" />
                 Select account
               </label>
               <div className="flex flex-wrap items-center gap-2">
-                <Link href={`/workspace/customers/${customer.id}`} className="text-lg font-semibold text-[#173543] transition hover:text-[#0f766e]">
+                <Link href={`/workspace/customers/${customer.id}`} className="text-base font-semibold text-[#173543] transition hover:text-[#0f766e]">
                   {customer.name}
                 </Link>
                 <span className={["rounded-full border px-2.5 py-1 text-xs font-semibold", statusChipClass(customer.status)].join(" ")}>
@@ -791,14 +847,14 @@ function CustomerCard({
                 </span>
                 <RouteReadinessPill state={routeReadiness} />
               </div>
-              <p className="mt-2 text-sm text-[#5a7483]">
+              <p className="mt-1.5 text-sm text-[#5a7483]">
                 Owner {customer.assignedSalesName || "Unassigned"}
                 {customer.assignedSalesEmail ? ` • ${customer.assignedSalesEmail}` : ""}
                 {customer.assignedRouteRepName ? ` • Route Rep ${customer.assignedRouteRepName}` : ""}
               </p>
             </div>
 
-            <div className="grid w-full gap-2 rounded-2xl border border-[#e1ebf1] bg-[#fbfdfe] p-3 text-sm text-[#53707f] xl:max-w-[250px] xl:flex-none">
+            <div className="grid w-full gap-1.5 rounded-2xl border border-[#e1ebf1] bg-[#fbfdfe] p-2.5 text-sm text-[#53707f] xl:max-w-[240px] xl:flex-none">
               <div className="flex items-center justify-between gap-3">
                 <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[#8198a5]">Activity</span>
                 <span className="font-semibold text-[#173543]">{activityCount} linked</span>
@@ -812,7 +868,7 @@ function CustomerCard({
             </div>
           </div>
 
-          <div className="mt-4 grid gap-3 xl:grid-cols-2 2xl:grid-cols-[1.2fr_1fr_1fr_1fr]">
+          <div className="mt-3 grid gap-2 lg:grid-cols-2 2xl:grid-cols-[1.15fr_1fr_1fr]">
             <InfoBlock
               label="Primary Contact"
               title={primaryContact?.name || "No primary contact"}
@@ -847,7 +903,6 @@ function CustomerCard({
               label="Last Activity"
               title={formatDate(customer.lastActivityAt)}
               lines={[
-                customer.website || "No website on file",
                 customer.mainPhone || "No account phone on file",
                 customer.updatedAt ? `Updated ${formatDate(customer.updatedAt)}` : null,
               ]}
@@ -862,7 +917,13 @@ function CustomerCard({
           >
             Open Account
           </Link>
-          <RouteActionButton customer={customer} territoryOptions={territoryOptions} />
+          <RouteActionButton
+            customer={customer}
+            currentUserId={currentUserId}
+            staffRole={staffRole}
+            routeRepOptions={routeRepOptions}
+            territoryOptions={territoryOptions}
+          />
           <QuickAction href={primaryEmailHref} label="Email Primary" />
           <QuickAction href={phoneHref} label="Call Account" />
           <QuickAction href={websiteHref} label="Visit Website" external />
@@ -872,17 +933,40 @@ function CustomerCard({
   );
 }
 
-function RouteActionButton({ customer, territoryOptions }: { customer: CustomerSummary; territoryOptions: TerritoryOption[] }) {
+function RouteActionButton({
+  customer,
+  currentUserId,
+  staffRole,
+  routeRepOptions,
+  territoryOptions,
+}: {
+  customer: CustomerSummary;
+  currentUserId: string;
+  staffRole: "admin" | "sales";
+  routeRepOptions: RouteRepOption[];
+  territoryOptions: TerritoryOption[];
+}) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [routeRepUserId, setRouteRepUserId] = useState(customer.assignedRouteRepUserId || (staffRole === "sales" ? currentUserId : ""));
+  const selectableRouteRepOptions =
+    staffRole === "sales" ? routeRepOptions.filter((option) => option.userId === currentUserId) : routeRepOptions;
   const territory = territoryOptions.find((option) => option.value === customer.territoryCode) || null;
   const nextRouteDay = customer.routeDay || territory?.routeDayDefault || null;
-  const canAddToRoute = Boolean(customer.territoryCode || customer.routeDay);
-  const hasRouteConfig = Boolean(customer.territoryCode || customer.routeDay || customer.visitStatus || customer.assignedRouteRepUserId || customer.routePriority);
+  const effectiveRouteRepUserId = staffRole === "sales" ? currentUserId : routeRepUserId || customer.assignedRouteRepUserId || "";
+  const canApplyRoute = Boolean(customer.territoryCode && nextRouteDay && effectiveRouteRepUserId);
+  const routeHref = canApplyRoute
+    ? buildRouteRunnerHref({
+        id: customer.id,
+        territoryCode: customer.territoryCode,
+        routeDay: nextRouteDay,
+        assignedRouteRepUserId: effectiveRouteRepUserId,
+      })
+    : null;
 
   async function handleAddToRoute() {
-    if (!canAddToRoute) return;
+    if (!canApplyRoute) return;
     setBusy(true);
     setStatusMessage(null);
 
@@ -891,8 +975,10 @@ function RouteActionButton({ customer, territoryOptions }: { customer: CustomerS
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          apply_route: true,
           territory_code: customer.territoryCode,
           route_day: nextRouteDay,
+          assigned_route_rep_user_id: effectiveRouteRepUserId,
           visit_status: customer.visitStatus || "due",
         }),
       });
@@ -902,7 +988,7 @@ function RouteActionButton({ customer, territoryOptions }: { customer: CustomerS
         throw new Error(String((json as { error?: string }).error || `Save failed (${res.status})`));
       }
 
-      setStatusMessage(hasRouteConfig ? "Route updated." : "Added to route.");
+      setStatusMessage("Route applied.");
       router.refresh();
     } catch (error) {
       setStatusMessage(error instanceof Error ? error.message : "Route update failed");
@@ -913,17 +999,38 @@ function RouteActionButton({ customer, territoryOptions }: { customer: CustomerS
 
   return (
     <div className="space-y-1">
+      <label className="grid gap-1 text-sm text-[#4b6676]">
+        <span className="text-xs font-medium uppercase tracking-[0.12em] text-[#7d95a3]">Route Rep</span>
+        <select
+          value={effectiveRouteRepUserId}
+          onChange={(event) => setRouteRepUserId(event.target.value)}
+          disabled={busy || staffRole === "sales"}
+          className="rounded-2xl border border-[#cedde6] bg-white px-3 py-2 text-sm text-[#173543] outline-none transition focus:border-[#14b8a6]"
+        >
+          <option value="">Select route rep</option>
+          {selectableRouteRepOptions.map((option) => (
+            <option key={option.userId} value={option.userId}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
       <button
         type="button"
         onClick={() => void handleAddToRoute()}
-        disabled={!canAddToRoute || busy}
+        disabled={!canApplyRoute || busy}
         className={[
           "inline-flex items-center justify-center rounded-full px-4 py-2.5 text-sm font-semibold transition",
-          canAddToRoute ? "border border-[#cddbe4] bg-white text-[#21424d] hover:border-[#14b8a6] hover:text-[#0f766e]" : "border border-[#d9e5eb] bg-[#f7fbfd] text-[#89a0ad]",
+          canApplyRoute ? "border border-[#cddbe4] bg-white text-[#21424d] hover:border-[#14b8a6] hover:text-[#0f766e]" : "border border-[#d9e5eb] bg-[#f7fbfd] text-[#89a0ad]",
         ].join(" ")}
       >
-        {busy ? "Saving..." : canAddToRoute ? "Add to Route" : "Needs Territory/Day"}
+        {busy ? "Saving..." : canApplyRoute ? "Apply Route" : "Needs Territory, Day, Rep"}
       </button>
+      {routeHref ? (
+        <Link href={routeHref} className="inline-flex px-1 text-xs font-medium text-[#0f766e] transition hover:text-[#0b5f58]">
+          Open in Route Runner
+        </Link>
+      ) : null}
       {statusMessage ? <p className="px-1 text-xs text-[#4f6877]">{statusMessage}</p> : null}
     </div>
   );
@@ -933,6 +1040,7 @@ function BulkActionBar({
   action,
   busy,
   selectedCount,
+  currentUserId,
   staffRole,
   salesRepOptions,
   territoryOptions,
@@ -944,6 +1052,7 @@ function BulkActionBar({
   action: BulkActionState;
   busy: boolean;
   selectedCount: number;
+  currentUserId: string;
   staffRole: "admin" | "sales";
   salesRepOptions: RouteRepOption[];
   territoryOptions: TerritoryOption[];
@@ -953,6 +1062,8 @@ function BulkActionBar({
   onClear: () => void;
 }) {
   const availableActions = BULK_ACTIONS.filter((item) => (staffRole === "admin" ? true : item.key !== "assign_sales_rep"));
+  const selectableRouteRepOptions =
+    staffRole === "sales" ? salesRepOptions.filter((option) => option.userId === currentUserId) : salesRepOptions;
   const valueLabel =
     action.kind === "assign_sales_rep"
       ? "Sales rep"
@@ -961,6 +1072,7 @@ function BulkActionBar({
         : action.kind === "assign_route_day"
           ? "Route day"
           : null;
+  const needsRouteRep = action.kind === "add_to_route";
 
   return (
     <section className="sticky top-4 z-10 rounded-[24px] border border-[#bfe8e2] bg-[linear-gradient(180deg,#f5fffd_0%,#ffffff_100%)] p-4 shadow-[0_18px_40px_rgba(16,42,67,0.08)]">
@@ -978,7 +1090,7 @@ function BulkActionBar({
             <span className="font-medium">Action</span>
             <select
               value={action.kind}
-              onChange={(event) => onActionChange({ kind: event.target.value as BulkActionKind, value: "" })}
+              onChange={(event) => onActionChange({ ...action, kind: event.target.value as BulkActionKind, value: "" })}
               disabled={busy}
               className="rounded-2xl border border-[#cedde6] bg-white px-4 py-3 text-sm text-[#173543] outline-none transition focus:border-[#14b8a6]"
             >
@@ -1020,10 +1132,27 @@ function BulkActionBar({
               </select>
             </label>
           ) : (
-            <div className="rounded-2xl border border-[#d7e6ed] bg-white px-4 py-3 text-sm text-[#4f6877]">
-              Sets `visit_status` to `due` and fills route day from the territory default when available.
-            </div>
+            <div className="rounded-2xl border border-[#d7e6ed] bg-white px-4 py-3 text-sm text-[#4f6877]">Requires existing territory and route day. Sets `visit_status` to `due` if blank.</div>
           )}
+
+          {needsRouteRep ? (
+            <label className="grid gap-1 text-sm text-[#4b6676]">
+              <span className="font-medium">Route rep</span>
+              <select
+                value={action.routeRepUserId}
+                onChange={(event) => onActionChange({ ...action, routeRepUserId: event.target.value })}
+                disabled={busy || staffRole === "sales"}
+                className="min-w-[220px] rounded-2xl border border-[#cedde6] bg-white px-4 py-3 text-sm text-[#173543] outline-none transition focus:border-[#14b8a6]"
+              >
+                <option value="">Select route rep</option>
+                {selectableRouteRepOptions.map((option) => (
+                  <option key={option.userId} value={option.userId}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
 
           <button
             type="button"
@@ -1090,10 +1219,10 @@ function MetricLine({ label, value }: { label: string; value: string }) {
 
 function InfoBlock({ label, title, lines }: { label: string; title: string; lines: Array<string | null> }) {
   return (
-    <div className="rounded-2xl border border-[#e1ebf1] bg-[#fbfdfe] p-4">
+    <div className="rounded-2xl border border-[#e1ebf1] bg-[#fbfdfe] p-3">
       <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7f96a3]">{label}</p>
-      <p className="mt-2 font-semibold text-[#173543]">{title}</p>
-      <div className="mt-2 space-y-1 text-sm text-[#56717f]">
+      <p className="mt-1.5 font-semibold text-[#173543]">{title}</p>
+      <div className="mt-1.5 space-y-1 text-sm text-[#56717f]">
         {lines.filter(Boolean).map((line) => (
           <p key={line}>{line}</p>
         ))}
@@ -1127,7 +1256,7 @@ function RouteReadinessPill({ state }: { state: ReturnType<typeof getRouteReadin
   const toneClass =
     state === "route_ready"
       ? "border-[#bde8e4] bg-[#e9fbf9] text-[#0f766e]"
-      : state === "no_territory" || state === "no_route_day"
+      : state === "no_territory" || state === "no_route_day" || state === "no_route_rep"
         ? "border-[#f1ddad] bg-[#fff9eb] text-[#9a6b00]"
         : "border-[#d7e6ed] bg-[#f8fbfc] text-[#4f6877]";
 
@@ -1136,8 +1265,10 @@ function RouteReadinessPill({ state }: { state: ReturnType<typeof getRouteReadin
       ? "Route Ready"
       : state === "no_territory"
         ? "No Territory"
-        : state === "no_route_day"
+      : state === "no_route_day"
           ? "No Route Day"
+          : state === "no_route_rep"
+            ? "No Route Rep"
           : state === "address_ready"
             ? "Address Ready"
             : state === "no_coords"

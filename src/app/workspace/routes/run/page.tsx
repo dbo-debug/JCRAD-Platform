@@ -14,6 +14,7 @@ export default async function WorkspaceRouteRunnerPage({
 }) {
   const staff = await requireStaff();
   const [{ customers, routeRepOptions, territoryOptions }, params] = await Promise.all([loadRouteWorkspaceData(), searchParams]);
+  const focusCustomerId = asQueryValue(params?.customerId) || undefined;
 
   return (
     <div className="mx-auto w-full max-w-[1440px] space-y-6 2xl:max-w-[1500px]">
@@ -26,10 +27,10 @@ export default async function WorkspaceRouteRunnerPage({
         routeRepOptions={routeRepOptions}
         territoryOptions={territoryOptions}
         currentUserId={staff.userId}
-        focusCustomerId={asQueryValue(params?.customerId) || undefined}
+        focusCustomerId={focusCustomerId}
         initialFilters={{
           q: asQueryValue(params?.q),
-          scope: asQueryValue(params?.scope) === "all" ? "all" : "mine",
+          scope: focusCustomerId ? "all" : asQueryValue(params?.scope) === "all" ? "all" : "mine",
           routeDay: asQueryValue(params?.routeDay),
           territory: asQueryValue(params?.territory),
           visitStatus: asQueryValue(params?.visitStatus),
