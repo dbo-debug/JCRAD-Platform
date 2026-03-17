@@ -41,7 +41,7 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
 
   const supabase = createAdminClient();
   const [salesProfilesRes, authUsersRes] = await Promise.all([
-    supabase.from("profiles").select("id, role, company_name, full_name").in("role", ["admin", "sales"]),
+    supabase.from("profiles").select("id, role, company_name").in("role", ["admin", "sales"]),
     supabase.auth.admin.listUsers({ page: 1, perPage: 1000 }),
   ]);
 
@@ -53,7 +53,7 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
   );
   const salesOptions = ((salesProfilesRes.data || []) as Array<Record<string, unknown>>).map((profile) => {
     const userId = String(profile.id || "");
-    const label = String(profile.full_name || profile.company_name || authEmailById.get(userId) || userId);
+    const label = String(profile.company_name || authEmailById.get(userId) || userId);
     const email = authEmailById.get(userId);
     return {
       userId,

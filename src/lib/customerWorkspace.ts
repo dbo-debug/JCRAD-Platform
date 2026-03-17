@@ -12,12 +12,22 @@ export type CustomerSummary = {
   stage: string | null;
   areaZone: string | null;
   territoryCode: string | null;
+  routeDay: string | null;
+  visitStatus: string | null;
+  lastVisitAt: string | null;
+  nextVisitDueAt: string | null;
+  routePriority: number | null;
+  latitude: number | null;
+  longitude: number | null;
   website: string | null;
   mainPhone: string | null;
   primaryContactEmail: string | null;
   assignedSalesUserId: string | null;
   assignedSalesName: string | null;
   assignedSalesEmail: string | null;
+  assignedRouteRepUserId: string | null;
+  assignedRouteRepName: string | null;
+  assignedRouteRepEmail: string | null;
   createdAt: string | null;
   updatedAt: string | null;
   contactCount: number;
@@ -152,6 +162,15 @@ function firstText(...values: Array<unknown>): string | null {
   return null;
 }
 
+function firstNumber(...values: Array<unknown>): number | null {
+  for (const value of values) {
+    if (value === null || value === undefined || value === "") continue;
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
 function formatProfileName(profile: GenericRow | null | undefined): string | null {
   return firstText(profile?.full_name, profile?.company_name, profile?.email);
 }
@@ -264,7 +283,17 @@ async function fetchAllTableRows(args: {
 
     const { data, error } = await query;
     if (error) {
-      if (args.optionalRelation && error.code === "42P01") {
+      const errorMessage = String(error.message || "").toLowerCase();
+      const errorDetails = String((error as { details?: unknown }).details || "").toLowerCase();
+      const isMissingOptionalRelation =
+        error.code === "42P01" ||
+        error.code === "PGRST205" ||
+        errorMessage.includes("relation") && errorMessage.includes("does not exist") ||
+        errorMessage.includes("schema cache") ||
+        errorDetails.includes("relation") && errorDetails.includes("does not exist") ||
+        errorDetails.includes("schema cache");
+
+      if (args.optionalRelation && isMissingOptionalRelation) {
         return [];
       }
       throw new Error(error.message);
@@ -332,7 +361,7 @@ async function loadWorkspaceData(): Promise<WorkspaceData> {
       .order("created_at", { ascending: false })
       .limit(5000),
     supabase.from("customer_documents").select("*").order("created_at", { ascending: false }).limit(5000),
-    fetchAllTableRows({ supabase, table: "profiles", columns: "id, role, company_name, full_name" }),
+    fetchAllTableRows({ supabase, table: "profiles", columns: "id, role, company_name" }),
   ]);
 
   const responses = [estimatesRes, ordersRes, packagingRes, customerDocumentsRes];
@@ -603,6 +632,8 @@ function buildCustomerSummary({
 
   const assignedSalesUserId = firstText(customer.assigned_sales_user_id, customer.owner_user_id);
   const assignedSalesProfile = assignedSalesUserId ? profileById.get(assignedSalesUserId) : null;
+  const assignedRouteRepUserId = firstText(customer.assigned_route_rep_user_id);
+  const assignedRouteRepProfile = assignedRouteRepUserId ? profileById.get(assignedRouteRepUserId) : null;
   const primaryContacts = contacts
     .filter((row) => row.is_primary === true)
     .slice(0, 2)
@@ -644,12 +675,22 @@ function buildCustomerSummary({
     stage: firstText(customer.stage),
     areaZone: firstText(customer.area_zone),
     territoryCode: firstText(customer.territory_code),
+    routeDay: firstText(customer.route_day),
+    visitStatus: firstText(customer.visit_status),
+    lastVisitAt: firstText(customer.last_visit_at),
+    nextVisitDueAt: firstText(customer.next_visit_due_at),
+    routePriority: firstNumber(customer.route_priority),
+    latitude: firstNumber(customer.latitude),
+    longitude: firstNumber(customer.longitude),
     website: firstText(customer.website),
     mainPhone: firstText(customer.main_phone),
     primaryContactEmail: firstText(customer.primary_contact_email),
     assignedSalesUserId,
     assignedSalesName: formatProfileName(assignedSalesProfile),
     assignedSalesEmail: firstText(authUserById.get(assignedSalesUserId || "")?.email),
+    assignedRouteRepUserId,
+    assignedRouteRepName: formatProfileName(assignedRouteRepProfile),
+    assignedRouteRepEmail: firstText(authUserById.get(assignedRouteRepUserId || "")?.email),
     createdAt: firstText(customer.created_at) || null,
     updatedAt: firstText(customer.updated_at) || null,
     contactCount: contacts.length,
