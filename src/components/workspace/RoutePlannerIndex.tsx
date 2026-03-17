@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { startTransition, useDeferredValue, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { startTransition, useDeferredValue, useEffect, useState } from "react";
 import type { CustomerSummary } from "@/lib/customerWorkspace";
-import type { RouteRepOption } from "@/lib/routeWorkspace";
+import type { RouteRepOption, TerritoryOption } from "@/lib/routeWorkspace";
 import {
+  buildRouteStats,
   formatDate,
   formatDateTime,
   getRouteSearchText,
@@ -12,6 +14,8 @@ import {
   normalizeTelHref,
   normalizeText,
   priorityChipClass,
+  RouteViewMode,
+  setQueryParam,
   sortCustomersForRoute,
   titleCase,
   visitStatusChipClass,
@@ -20,20 +24,32 @@ import {
 type RoutePlannerIndexProps = {
   customers: CustomerSummary[];
   routeRepOptions: RouteRepOption[];
+  territoryOptions: TerritoryOption[];
+  initialFilters: {
+    q: string;
+    routeDay: string;
+    territory: string;
+    rep: string;
+    visitStatus: string;
+    priority: string;
+    view: RouteViewMode;
+  };
 };
 
-export default function RoutePlannerIndex({ customers, routeRepOptions }: RoutePlannerIndexProps) {
-  const [search, setSearch] = useState("");
-  const [routeDayFilter, setRouteDayFilter] = useState("all");
-  const [territoryFilter, setTerritoryFilter] = useState("all");
-  const [repFilter, setRepFilter] = useState("all");
-  const [visitStatusFilter, setVisitStatusFilter] = useState("all");
-  const [routePriorityFilter, setRoutePriorityFilter] = useState("all");
+export default function RoutePlannerIndex({ customers, routeRepOptions, territoryOptions, initialFilters }: RoutePlannerIndexProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const [search, setSearch] = useState(initialFilters.q);
+  const [routeDayFilter, setRouteDayFilter] = useState(initialFilters.routeDay || "all");
+  const [territoryFilter, setTerritoryFilter] = useState(initialFilters.territory || "all");
+  const [repFilter, setRepFilter] = useState(initialFilters.rep || "all");
+  const [visitStatusFilter, setVisitStatusFilter] = useState(initialFilters.visitStatus || "all");
+  const [routePriorityFilter, setRoutePriorityFilter] = useState(initialFilters.priority || "all");
+  const [viewMode] = useState<RouteViewMode>(initialFilters.view === "map" ? "map" : "list");
   const [referenceNow] = useState(() => Date.now());
   const deferredSearch = useDeferredValue(search);
 
   const routeDays = uniqueOptions(customers.map((customer) => customer.routeDay));
-  const territories = uniqueOptions(customers.map((customer) => customer.territoryCode));
   const visitStatuses = uniqueOptions(customers.map((customer) => customer.visitStatus));
   const routePriorities = uniqueOptions(customers.map((customer) => (customer.routePriority === null ? null : String(customer.routePriority))));
 
@@ -58,11 +74,20 @@ export default function RoutePlannerIndex({ customers, routeRepOptions }: RouteP
     groupedCustomers.set(key, existing);
   }
 
-  const visitedCount = visibleCustomers.filter((customer) => normalizeText(customer.visitStatus) === "visited").length;
-  const dueNowCount = visibleCustomers.filter((customer) => {
-    const due = Date.parse(String(customer.nextVisitDueAt || ""));
-    return Number.isFinite(due) && due <= referenceNow;
-  }).length;
+  const stats = buildRouteStats(visibleCustomers, referenceNow);
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    setQueryParam(params, "q", search.trim(), [""]);
+    setQueryParam(params, "routeDay", routeDayFilter);
+    setQueryParam(params, "territory", territoryFilter);
+    setQueryParam(params, "rep", repFilter);
+    setQueryParam(params, "visitStatus", visitStatusFilter);
+    setQueryParam(params, "priority", routePriorityFilter);
+    setQueryParam(params, "view", viewMode, ["list", ""]);
+    const next = params.toString();
+    router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false });
+  }, [pathname, repFilter, routeDayFilter, routePriorityFilter, router, search, territoryFilter, viewMode, visitStatusFilter]);
 
   return (
     <div className="space-y-5">
@@ -76,9 +101,11 @@ export default function RoutePlannerIndex({ customers, routeRepOptions }: RouteP
             </p>
           </div>
           <div className="grid w-full gap-3 rounded-2xl border border-[#dbe8ef] bg-white/85 p-4 shadow-sm sm:max-w-[320px] xl:w-[320px] xl:flex-none">
-            <MetricLine label="Visible stops" value={String(visibleCustomers.length)} />
-            <MetricLine label="Visited" value={String(visitedCount)} />
-            <MetricLine label="Due now" value={String(dueNowCount)} />
+            <MetricLine label="Due Today" value={String(stats.dueToday)} />
+            <MetricLine label="Visited Today" value={String(stats.visitedToday)} />
+            <MetricLine label="Follow-Up Needed" value={String(stats.followUpNeeded)} />
+            <MetricLine label="No Territory" value={String(stats.noTerritory)} />
+            <MetricLine label="No Coords" value={String(stats.noCoords)} />
           </div>
         </div>
       </section>
@@ -96,13 +123,26 @@ export default function RoutePlannerIndex({ customers, routeRepOptions }: RouteP
           </label>
 
           <FilterSelect label="Route Day" value={routeDayFilter} onChange={setRouteDayFilter} options={routeDays} />
-          <FilterSelect label="Territory" value={territoryFilter} onChange={setTerritoryFilter} options={territories} />
+          <FilterSelect label="Territory" value={territoryFilter} onChange={setTerritoryFilter} options={territoryOptions} />
           <FilterSelect label="Assigned Rep" value={repFilter} onChange={setRepFilter} options={routeRepOptions.map((option) => ({ value: option.userId, label: option.label }))} />
           <FilterSelect label="Visit Status" value={visitStatusFilter} onChange={setVisitStatusFilter} options={visitStatuses} />
           <FilterSelect label="Priority" value={routePriorityFilter} onChange={setRoutePriorityFilter} options={routePriorities} />
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
+          <div className="inline-flex rounded-full border border-[#d0dde5] bg-white p-1">
+            <button type="button" className="rounded-full bg-[#173543] px-3 py-1.5 text-sm font-semibold text-white">
+              List
+            </button>
+            <button
+              type="button"
+              disabled
+              className="rounded-full px-3 py-1.5 text-sm font-semibold text-[#7891a0] disabled:cursor-not-allowed"
+              title="Map mode is planned next."
+            >
+              Map Soon
+            </button>
+          </div>
           <Link
             href="/workspace/routes/run"
             className="inline-flex rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95"
@@ -127,6 +167,12 @@ export default function RoutePlannerIndex({ customers, routeRepOptions }: RouteP
           </button>
         </div>
       </section>
+
+      {viewMode === "map" ? (
+        <section className="rounded-[28px] border border-dashed border-[#d3e1e8] bg-white p-6 text-sm text-[#5d7685] shadow-[0_12px_32px_rgba(16,42,67,0.04)]">
+          Map mode is staged next. The planner is keeping list grouping, route stats, and URL-backed filters ready for the map/list toggle.
+        </section>
+      ) : null}
 
       <section className="space-y-5">
         {Array.from(groupedCustomers.entries()).map(([group, groupCustomers]) => (
@@ -185,7 +231,11 @@ export default function RoutePlannerIndex({ customers, routeRepOptions }: RouteP
                       <InfoBlock
                         label="Visit Cadence"
                         title={`Next due ${formatDate(customer.nextVisitDueAt)}`}
-                        lines={[`Last visit ${formatDateTime(customer.lastVisitAt)}`, customer.latitude !== null && customer.longitude !== null ? `Geo ${customer.latitude.toFixed(4)}, ${customer.longitude.toFixed(4)}` : "No coordinates yet"]}
+                        lines={[
+                          `Last visit ${formatDateTime(customer.lastVisitAt)}`,
+                          `Priority ${customer.routePriority ?? "None"} • Territory ${customer.territoryCode || "Unassigned"}`,
+                          customer.latitude !== null && customer.longitude !== null ? `Geo ${customer.latitude.toFixed(4)}, ${customer.longitude.toFixed(4)}` : "No coordinates yet",
+                        ]}
                       />
                     </div>
 

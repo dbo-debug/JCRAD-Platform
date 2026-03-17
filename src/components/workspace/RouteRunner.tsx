@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { startTransition, useDeferredValue, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { startTransition, useDeferredValue, useEffect, useState } from "react";
 import type { CustomerSummary } from "@/lib/customerWorkspace";
-import type { RouteRepOption } from "@/lib/routeWorkspace";
+import type { RouteRepOption, TerritoryOption } from "@/lib/routeWorkspace";
 import {
+  buildRouteStats,
   formatDate,
   formatDateTime,
   getRouteSearchText,
@@ -13,16 +14,33 @@ import {
   normalizeTelHref,
   normalizeText,
   priorityChipClass,
+  RouteViewMode,
+  setQueryParam,
   sortCustomersForRoute,
   titleCase,
+  VISIT_OUTCOMES,
   visitStatusChipClass,
 } from "@/components/workspace/routeUtils";
 
 type RouteRunnerProps = {
   customers: CustomerSummary[];
   routeRepOptions: RouteRepOption[];
+  territoryOptions: TerritoryOption[];
   currentUserId: string;
   focusCustomerId?: string;
+  initialFilters: {
+    q: string;
+    scope: "mine" | "all";
+    routeDay: string;
+    territory: string;
+    visitStatus: string;
+    view: RouteViewMode;
+  };
+};
+
+type SelectOption = {
+  value: string;
+  label: string;
 };
 
 async function parseJsonSafe(res: Response): Promise<Record<string, unknown>> {
@@ -35,17 +53,30 @@ function getCurrentRouteDay() {
   return new Intl.DateTimeFormat("en-US", { weekday: "long" }).format(new Date());
 }
 
-export default function RouteRunner({ customers, routeRepOptions, currentUserId, focusCustomerId }: RouteRunnerProps) {
-  const [search, setSearch] = useState("");
-  const [scope, setScope] = useState<"mine" | "all">("mine");
-  const [routeDayFilter, setRouteDayFilter] = useState(getCurrentRouteDay());
-  const [territoryFilter, setTerritoryFilter] = useState("all");
-  const [visitStatusFilter, setVisitStatusFilter] = useState("all");
+function addDaysDateValue(days: number) {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+export default function RouteRunner({ customers, routeRepOptions, territoryOptions, currentUserId, focusCustomerId, initialFilters }: RouteRunnerProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const [search, setSearch] = useState(initialFilters.q);
+  const [scope, setScope] = useState<"mine" | "all">(initialFilters.scope);
+  const [routeDayFilter, setRouteDayFilter] = useState(initialFilters.routeDay || getCurrentRouteDay());
+  const [territoryFilter, setTerritoryFilter] = useState(initialFilters.territory || "all");
+  const [visitStatusFilter, setVisitStatusFilter] = useState(initialFilters.visitStatus || "all");
+  const [viewMode] = useState<RouteViewMode>(initialFilters.view === "map" ? "map" : "list");
+  const [referenceNow] = useState(() => Date.now());
   const deferredSearch = useDeferredValue(search);
 
-  const routeDays = Array.from(new Set(customers.map((customer) => String(customer.routeDay || "").trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b));
-  const territories = Array.from(new Set(customers.map((customer) => String(customer.territoryCode || "").trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b));
-  const visitStatuses = Array.from(new Set(customers.map((customer) => String(customer.visitStatus || "").trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b));
+  const routeDays = Array.from(new Set(customers.map((customer) => String(customer.routeDay || "").trim()).filter(Boolean)))
+    .sort((a, b) => a.localeCompare(b))
+    .map((option) => ({ value: option, label: titleCase(option) }));
+  const visitStatuses = Array.from(new Set(customers.map((customer) => String(customer.visitStatus || "").trim()).filter(Boolean)))
+    .sort((a, b) => a.localeCompare(b))
+    .map((option) => ({ value: option, label: titleCase(option) }));
 
   const visibleCustomers = [...customers]
     .filter((customer) => {
@@ -61,6 +92,20 @@ export default function RouteRunner({ customers, routeRepOptions, currentUserId,
     .sort(sortCustomersForRoute);
 
   const currentRepLabel = routeRepOptions.find((option) => option.userId === currentUserId)?.label || "Current rep";
+  const stats = buildRouteStats(visibleCustomers, referenceNow);
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    setQueryParam(params, "q", search.trim(), [""]);
+    setQueryParam(params, "scope", scope, ["mine", ""]);
+    setQueryParam(params, "routeDay", routeDayFilter);
+    setQueryParam(params, "territory", territoryFilter);
+    setQueryParam(params, "visitStatus", visitStatusFilter);
+    setQueryParam(params, "view", viewMode, ["list", ""]);
+    if (focusCustomerId) params.set("customerId", focusCustomerId);
+    const next = params.toString();
+    router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false });
+  }, [focusCustomerId, pathname, routeDayFilter, router, scope, search, territoryFilter, viewMode, visitStatusFilter]);
 
   return (
     <div className="space-y-5">
@@ -76,8 +121,13 @@ export default function RouteRunner({ customers, routeRepOptions, currentUserId,
           <div className="rounded-2xl border border-[#dbe8ef] bg-white/85 p-4 text-sm text-[#506877] shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7d95a3]">Scoped Rep</p>
             <p className="mt-1 text-lg font-semibold text-[#173543]">{currentRepLabel}</p>
-            <p className="mt-3 text-xs font-semibold uppercase tracking-[0.12em] text-[#7d95a3]">Visible Stops</p>
-            <p className="mt-1 text-2xl font-semibold text-[#173543]">{visibleCustomers.length}</p>
+            <div className="mt-3 grid gap-2">
+              <MetricLine label="Due Today" value={String(stats.dueToday)} />
+              <MetricLine label="Visited Today" value={String(stats.visitedToday)} />
+              <MetricLine label="Follow-Up Needed" value={String(stats.followUpNeeded)} />
+              <MetricLine label="No Territory" value={String(stats.noTerritory)} />
+              <MetricLine label="No Coords" value={String(stats.noCoords)} />
+            </div>
           </div>
         </div>
       </section>
@@ -107,11 +157,24 @@ export default function RouteRunner({ customers, routeRepOptions, currentUserId,
           </label>
 
           <SelectFilter label="Route Day" value={routeDayFilter} onChange={setRouteDayFilter} options={routeDays} />
-          <SelectFilter label="Territory" value={territoryFilter} onChange={setTerritoryFilter} options={territories} />
+          <SelectFilter label="Territory" value={territoryFilter} onChange={setTerritoryFilter} options={territoryOptions} />
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <SelectFilter label="Visit Status" value={visitStatusFilter} onChange={setVisitStatusFilter} options={visitStatuses} />
+          <div className="inline-flex rounded-full border border-[#d0dde5] bg-white p-1">
+            <button type="button" className="rounded-full bg-[#173543] px-3 py-1.5 text-sm font-semibold text-white">
+              List
+            </button>
+            <button
+              type="button"
+              disabled
+              className="rounded-full px-3 py-1.5 text-sm font-semibold text-[#7891a0] disabled:cursor-not-allowed"
+              title="Map mode is planned next."
+            >
+              Map Soon
+            </button>
+          </div>
           <Link
             href="/workspace/routes"
             className="ml-auto inline-flex rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543]"
@@ -120,6 +183,12 @@ export default function RouteRunner({ customers, routeRepOptions, currentUserId,
           </Link>
         </div>
       </section>
+
+      {viewMode === "map" ? (
+        <section className="rounded-[28px] border border-dashed border-[#d3e1e8] bg-white p-6 text-sm text-[#5d7685] shadow-[0_12px_32px_rgba(16,42,67,0.04)]">
+          Map mode is staged next. Runner filters and stop state are URL-backed already so the map/list toggle can be added without changing the workflow contract.
+        </section>
+      ) : null}
 
       <section className="grid gap-4">
         {visibleCustomers.map((customer) => (
@@ -136,17 +205,7 @@ export default function RouteRunner({ customers, routeRepOptions, currentUserId,
   );
 }
 
-function SelectFilter({
-  label,
-  value,
-  onChange,
-  options,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  options: string[];
-}) {
+function SelectFilter({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: SelectOption[] }) {
   return (
     <label className="grid gap-1 text-sm text-[#4b6676]">
       <span className="font-medium">{label}</span>
@@ -157,8 +216,8 @@ function SelectFilter({
       >
         <option value="all">All</option>
         {options.map((option) => (
-          <option key={option} value={option}>
-            {titleCase(option)}
+          <option key={option.value} value={option.value}>
+            {option.label}
           </option>
         ))}
       </select>
@@ -166,9 +225,18 @@ function SelectFilter({
   );
 }
 
+function MetricLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7d95a3]">{label}</span>
+      <span className="text-base font-semibold text-[#173543]">{value}</span>
+    </div>
+  );
+}
+
 function RouteStopCard({ customer }: { customer: CustomerSummary }) {
   const router = useRouter();
-  const [busyAction, setBusyAction] = useState<"visit" | "log" | "task" | null>(null);
+  const [busyAction, setBusyAction] = useState<"visit" | "log" | "task" | "outcome" | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [visitStatus, setVisitStatus] = useState(customer.visitStatus || "visited");
@@ -176,10 +244,49 @@ function RouteStopCard({ customer }: { customer: CustomerSummary }) {
   const [visitNotes, setVisitNotes] = useState("");
   const [taskTitle, setTaskTitle] = useState("");
   const [taskDueDate, setTaskDueDate] = useState("");
+  const [autoCreateTask, setAutoCreateTask] = useState(false);
 
   const primaryContact = customer.primaryContacts[0] || null;
   const emailHref = normalizeMailtoHref(primaryContact?.email || customer.primaryContactEmail);
   const phoneHref = normalizeTelHref(primaryContact?.phone || customer.mainPhone);
+
+  async function submitVisit(payload: Record<string, unknown>, successMessage: string) {
+    const res = await fetch(`/api/workspace/customers/${customer.id}/visit`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const json = await parseJsonSafe(res);
+    if (!res.ok) throw new Error(String(json.error || `Save failed (${res.status})`));
+    setStatusMessage(successMessage);
+    setVisitNotes("");
+    router.refresh();
+  }
+
+  async function submitTask(taskOverrides?: { title?: string; dueDate?: string | null }) {
+    const title = String(taskOverrides?.title || taskTitle).trim();
+    if (!title) {
+      throw new Error("Enter a follow-up title first.");
+    }
+
+    const dueDate = taskOverrides?.dueDate === undefined ? taskDueDate : taskOverrides.dueDate;
+    const res = await fetch(`/api/workspace/customers/${customer.id}/tasks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title,
+        due_date: dueDate || null,
+        assigned_user_id: customer.assignedRouteRepUserId || null,
+        priority: customer.routePriority,
+      }),
+    });
+    const json = await parseJsonSafe(res);
+    if (!res.ok) throw new Error(String(json.error || `Save failed (${res.status})`));
+
+    setTaskTitle("");
+    setTaskDueDate("");
+    setAutoCreateTask(false);
+  }
 
   async function runAction(action: "visit" | "log", summary: string) {
     setBusyAction(action);
@@ -187,24 +294,63 @@ function RouteStopCard({ customer }: { customer: CustomerSummary }) {
     setStatusMessage(null);
 
     try {
-      const res = await fetch(`/api/workspace/customers/${customer.id}/visit`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      await submitVisit(
+        {
           mark_visited: action === "visit",
           activity_type: action === "visit" ? "visit_completed" : "visit_logged",
           summary,
           notes: visitNotes || null,
           visit_status: visitStatus || null,
           next_visit_due_at: nextVisitDueAt || null,
-        }),
-      });
-      const json = await parseJsonSafe(res);
-      if (!res.ok) throw new Error(String(json.error || `Save failed (${res.status})`));
+        },
+        action === "visit" ? "Visit recorded." : "Visit activity logged."
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setBusyAction(null);
+    }
+  }
 
-      setStatusMessage(action === "visit" ? "Visit recorded." : "Visit activity logged.");
-      setVisitNotes("");
-      router.refresh();
+  async function applyOutcome(outcome: (typeof VISIT_OUTCOMES)[number]) {
+    setBusyAction("outcome");
+    setError(null);
+    setStatusMessage(null);
+
+    try {
+      const outcomeDueDate = nextVisitDueAt || "";
+      const shouldPreserveBlankNextVisit = outcome.nextVisitDays === null && !outcomeDueDate;
+      const defaultTaskTitle =
+        outcome.key === "interested"
+          ? `Follow up with ${customer.name}`
+          : outcome.key === "revisit_needed"
+            ? `Revisit ${customer.name}`
+            : outcome.key === "sample_drop"
+              ? `Check in after sample drop for ${customer.name}`
+              : outcome.key === "met_buyer"
+                ? `Send recap to ${customer.name}`
+                : "";
+
+      await submitVisit(
+        {
+          outcome: outcome.key,
+          summary: `${outcome.label} at ${customer.name}`,
+          notes: visitNotes || null,
+          next_visit_due_at: outcomeDueDate || null,
+          preserve_blank_next_visit: shouldPreserveBlankNextVisit,
+        },
+        `${outcome.label} recorded.`
+      );
+      if (autoCreateTask) {
+        await submitTask({ title: taskTitle || defaultTaskTitle, dueDate: outcomeDueDate || (outcome.nextVisitDays !== null ? addDaysDateValue(outcome.nextVisitDays) : null) });
+        setStatusMessage(`${outcome.label} recorded and follow-up task created.`);
+      }
+      setVisitStatus(outcome.visitStatus);
+      if (!outcomeDueDate && outcome.nextVisitDays !== null) {
+        const nextDate = new Date();
+        nextDate.setDate(nextDate.getDate() + outcome.nextVisitDays);
+        setNextVisitDueAt(nextDate.toISOString().slice(0, 10));
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
     } finally {
@@ -213,31 +359,12 @@ function RouteStopCard({ customer }: { customer: CustomerSummary }) {
   }
 
   async function createFollowUpTask() {
-    if (!taskTitle.trim()) {
-      setError("Enter a follow-up title first.");
-      return;
-    }
-
     setBusyAction("task");
     setError(null);
     setStatusMessage(null);
 
     try {
-      const res = await fetch(`/api/workspace/customers/${customer.id}/tasks`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: taskTitle,
-          due_date: taskDueDate || null,
-          assigned_user_id: customer.assignedRouteRepUserId || null,
-          priority: customer.routePriority,
-        }),
-      });
-      const json = await parseJsonSafe(res);
-      if (!res.ok) throw new Error(String(json.error || `Save failed (${res.status})`));
-
-      setTaskTitle("");
-      setTaskDueDate("");
+      await submitTask();
       setStatusMessage("Follow-up task created.");
       router.refresh();
     } catch (err) {
@@ -267,9 +394,30 @@ function RouteStopCard({ customer }: { customer: CustomerSummary }) {
           </p>
 
           <div className="mt-3 grid gap-3 md:grid-cols-3">
-            <RunnerInfo title="Primary Contact" lines={[primaryContact?.name || "No primary contact", primaryContact?.phone || customer.mainPhone || "No phone", primaryContact?.email || customer.primaryContactEmail || "No email"]} />
-            <RunnerInfo title="Visit Window" lines={[`Next due ${formatDate(customer.nextVisitDueAt)}`, `Last visit ${formatDateTime(customer.lastVisitAt)}`]} />
-            <RunnerInfo title="Routing" lines={[customer.latitude !== null && customer.longitude !== null ? `Geo ${customer.latitude.toFixed(4)}, ${customer.longitude.toFixed(4)}` : "No coordinates yet", customer.status ? `Account ${titleCase(customer.status)}` : null]} />
+            <RunnerInfo
+              title="Primary Contact"
+              lines={[
+                primaryContact?.name || "No primary contact",
+                primaryContact?.phone || customer.mainPhone || "No phone",
+                primaryContact?.email || customer.primaryContactEmail || "No email",
+              ]}
+            />
+            <RunnerInfo
+              title="Visit Window"
+              lines={[
+                `Next due ${formatDate(customer.nextVisitDueAt)}`,
+                `Last visit ${formatDateTime(customer.lastVisitAt)}`,
+                `Current status ${titleCase(customer.visitStatus, "Not set")}`,
+              ]}
+            />
+            <RunnerInfo
+              title="Routing"
+              lines={[
+                `Priority ${customer.routePriority ?? "None"} • Territory ${customer.territoryCode || "Unassigned"}`,
+                customer.mainPhone ? `Main line ${customer.mainPhone}` : "No main line",
+                customer.latitude !== null && customer.longitude !== null ? `Geo ${customer.latitude.toFixed(4)}, ${customer.longitude.toFixed(4)}` : "No coordinates yet",
+              ]}
+            />
           </div>
         </div>
 
@@ -293,6 +441,26 @@ function RouteStopCard({ customer }: { customer: CustomerSummary }) {
       <div className="mt-4 grid gap-4 xl:grid-cols-[1.2fr_0.9fr]">
         <section className="rounded-2xl border border-[#e1ebf1] bg-[#fbfdfe] p-4">
           <h3 className="text-sm font-semibold text-[#173543]">Visit Actions</h3>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {VISIT_OUTCOMES.map((outcome) => (
+              <button
+                key={outcome.key}
+                type="button"
+                onClick={() => void applyOutcome(outcome)}
+                disabled={busyAction !== null}
+                className={["rounded-full border px-3 py-1.5 text-sm font-semibold disabled:opacity-60", outcome.accentClass].join(" ")}
+              >
+                {busyAction === "outcome" ? "Saving..." : outcome.label}
+              </button>
+            ))}
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2 text-xs text-[#5b7382]">
+            {VISIT_OUTCOMES.map((outcome) => (
+              <span key={outcome.key} className="rounded-full border border-[#d7e6ed] bg-white px-2 py-1">
+                {outcome.label}: {outcome.nextVisitDays === null ? "keeps due date" : `${outcome.nextVisitDays}d follow-up`}
+              </span>
+            ))}
+          </div>
           <div className="mt-3 grid gap-3 md:grid-cols-2">
             <label className="grid gap-1 text-sm text-[#4b6676]">
               <span>Status after stop</span>
@@ -353,6 +521,10 @@ function RouteStopCard({ customer }: { customer: CustomerSummary }) {
 
         <section className="rounded-2xl border border-[#e1ebf1] bg-[#fbfdfe] p-4">
           <h3 className="text-sm font-semibold text-[#173543]">Follow-up Task</h3>
+          <label className="mt-3 flex items-center gap-2 text-sm text-[#4b6676]">
+            <input type="checkbox" checked={autoCreateTask} onChange={(event) => setAutoCreateTask(event.target.checked)} className="h-4 w-4 rounded border-[#cfdde6] text-[#14b8a6]" />
+            <span>Create task on next outcome</span>
+          </label>
           <label className="mt-3 grid gap-1 text-sm text-[#4b6676]">
             <span>Task title</span>
             <input

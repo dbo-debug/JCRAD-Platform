@@ -1,5 +1,30 @@
 import type { CustomerSummary } from "@/lib/customerWorkspace";
 
+export type RouteViewMode = "list" | "map";
+
+export type VisitOutcomeKey =
+  | "met_buyer"
+  | "no_answer"
+  | "unavailable"
+  | "sample_drop"
+  | "interested"
+  | "revisit_needed";
+
+export const VISIT_OUTCOMES: Array<{
+  key: VisitOutcomeKey;
+  label: string;
+  visitStatus: string;
+  nextVisitDays: number | null;
+  accentClass: string;
+}> = [
+  { key: "met_buyer", label: "Met Buyer", visitStatus: "met_buyer", nextVisitDays: null, accentClass: "border-[#b7e4d7] bg-[#edf9f3] text-[#16624b]" },
+  { key: "no_answer", label: "No Answer", visitStatus: "no_answer", nextVisitDays: 2, accentClass: "border-[#f4ddb0] bg-[#fff6df] text-[#946200]" },
+  { key: "unavailable", label: "Unavailable", visitStatus: "unavailable", nextVisitDays: 3, accentClass: "border-[#f1ddad] bg-[#fff9eb] text-[#9a6b00]" },
+  { key: "sample_drop", label: "Sample Drop", visitStatus: "sample_drop", nextVisitDays: null, accentClass: "border-[#cfe1ff] bg-[#eef5ff] text-[#285ea8]" },
+  { key: "interested", label: "Interested", visitStatus: "interested", nextVisitDays: 2, accentClass: "border-[#bfe8ef] bg-[#edfafe] text-[#0c6b79]" },
+  { key: "revisit_needed", label: "Revisit Needed", visitStatus: "revisit_needed", nextVisitDays: 7, accentClass: "border-[#ffd2d2] bg-[#fff0f0] text-[#9a3d3d]" },
+];
+
 export function normalizeText(value: string | null | undefined) {
   return String(value || "").trim().toLowerCase();
 }
@@ -49,14 +74,20 @@ export function normalizeTelHref(value: string | null | undefined) {
 export function visitStatusChipClass(status: string | null | undefined) {
   switch (normalizeText(status)) {
     case "visited":
+    case "met_buyer":
+    case "sample_drop":
       return "border-[#b7e4d7] bg-[#edf9f3] text-[#16624b]";
     case "due":
     case "scheduled":
+    case "interested":
       return "border-[#cfe1ff] bg-[#eef5ff] text-[#285ea8]";
     case "overdue":
+    case "no_answer":
+    case "unavailable":
       return "border-[#f4ddb0] bg-[#fff6df] text-[#946200]";
     case "skipped":
     case "needs_follow_up":
+    case "revisit_needed":
       return "border-[#ffd2d2] bg-[#fff0f0] text-[#9a3d3d]";
     default:
       return "border-[#d7e6ed] bg-[#f8fbfc] text-[#4a6575]";
@@ -123,4 +154,44 @@ export function sortCustomersForRoute(left: CustomerSummary, right: CustomerSumm
   }
 
   return left.name.localeCompare(right.name);
+}
+
+export function buildRouteStats(customers: CustomerSummary[], referenceNow: number) {
+  const startOfDay = new Date(referenceNow);
+  startOfDay.setHours(0, 0, 0, 0);
+  const startOfToday = startOfDay.getTime();
+  const endOfToday = startOfToday + 24 * 60 * 60 * 1000;
+
+  const dueToday = customers.filter((customer) => {
+    const due = Date.parse(String(customer.nextVisitDueAt || ""));
+    return Number.isFinite(due) && due >= startOfToday && due < endOfToday;
+  }).length;
+
+  const visitedToday = customers.filter((customer) => {
+    const visitedAt = Date.parse(String(customer.lastVisitAt || ""));
+    return Number.isFinite(visitedAt) && visitedAt >= startOfToday && visitedAt < endOfToday;
+  }).length;
+
+  const followUpNeeded = customers.filter((customer) =>
+    ["needs_follow_up", "interested", "revisit_needed", "no_answer", "unavailable"].includes(normalizeText(customer.visitStatus))
+  ).length;
+
+  const noTerritory = customers.filter((customer) => !customer.territoryCode).length;
+  const noCoords = customers.filter((customer) => customer.latitude === null || customer.longitude === null).length;
+
+  return {
+    dueToday,
+    visitedToday,
+    followUpNeeded,
+    noTerritory,
+    noCoords,
+  };
+}
+
+export function setQueryParam(params: URLSearchParams, key: string, value: string, emptyValues: string[] = ["all", ""]) {
+  if (emptyValues.includes(value)) {
+    params.delete(key);
+    return;
+  }
+  params.set(key, value);
 }

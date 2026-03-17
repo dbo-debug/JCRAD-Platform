@@ -1,11 +1,19 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { VISIT_OUTCOMES } from "@/components/workspace/routeUtils";
 
 type StaffOption = {
   userId: string;
   label: string;
+};
+
+type TerritoryOption = {
+  code: string;
+  label: string;
+  routeDayDefault: string | null;
 };
 
 type PrimaryContact = {
@@ -22,10 +30,41 @@ type CustomerDetailManagerProps = {
   stage: string | null;
   primaryContactEmail: string | null;
   assignedSalesUserId: string | null;
+  territoryCode: string | null;
+  routeDay: string | null;
+  assignedRouteRepUserId: string | null;
+  routePriority: number | null;
+  visitStatus: string | null;
+  lastVisitAt: string | null;
+  nextVisitDueAt: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  address: string | null;
   staffRole: "admin" | "sales";
   salesOptions: StaffOption[];
+  routeRepOptions: StaffOption[];
+  territoryOptions: TerritoryOption[];
   primaryContact: PrimaryContact | null;
 };
+
+const ROUTE_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const VISIT_STATUS_OPTIONS = [
+  "due",
+  "scheduled",
+  "visited",
+  "overdue",
+  "skipped",
+  "needs_follow_up",
+  "met_buyer",
+  "no_answer",
+  "unavailable",
+  "sample_drop",
+  "interested",
+  "revisit_needed",
+];
+
+const sectionClass = "rounded-2xl border border-[#dbe9ef] bg-white p-4 shadow-sm";
+const inputClass = "rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a]";
 
 async function parseJsonSafe(res: Response): Promise<Record<string, unknown>> {
   const contentType = res.headers.get("content-type") || "";
@@ -33,9 +72,70 @@ async function parseJsonSafe(res: Response): Promise<Record<string, unknown>> {
   return res.json().catch(() => ({}));
 }
 
+function titleCase(value: string | null | undefined, fallback = "Unspecified") {
+  const text = String(value || "").trim();
+  if (!text) return fallback;
+  return text
+    .split(/[_\s]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function toDateTimeLocalValue(value: string | null | undefined) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  const date = new Date(text);
+  if (Number.isNaN(date.getTime())) return "";
+  const offsetMs = date.getTimezoneOffset() * 60 * 1000;
+  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
+}
+
+function buildMapHref(address: string | null, latitude: string, longitude: string) {
+  const lat = latitude.trim();
+  const lng = longitude.trim();
+  if (lat && lng) {
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${lat},${lng}`)}`;
+  }
+  if (address) {
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+  }
+  return null;
+}
+
+function addDaysDateValue(days: number) {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function StatusPill({ label, tone = "neutral" }: { label: string; tone?: "neutral" | "warn" | "ok" }) {
+  const toneClass =
+    tone === "ok"
+      ? "border-[#bde8e4] bg-[#e9fbf9] text-[#0f766e]"
+      : tone === "warn"
+        ? "border-[#f1ddad] bg-[#fff9eb] text-[#9a6b00]"
+        : "border-[#d7e6ed] bg-[#f8fbfc] text-[#4f6877]";
+
+  return <span className={["rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em]", toneClass].join(" ")}>{label}</span>;
+}
+
+function SectionHeader({ title, description, action }: { title: string; description?: string; action?: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <h2 className="text-base font-semibold text-[#173543]">{title}</h2>
+        {description ? <p className="mt-1 text-sm text-[#5c7483]">{description}</p> : null}
+      </div>
+      {action}
+    </div>
+  );
+}
+
 export default function CustomerDetailManager(props: CustomerDetailManagerProps) {
   const router = useRouter();
   const [accountBusy, setAccountBusy] = useState(false);
+  const [routeBusy, setRouteBusy] = useState(false);
   const [contactBusy, setContactBusy] = useState(false);
   const [noteBusy, setNoteBusy] = useState(false);
   const [activityBusy, setActivityBusy] = useState(false);
@@ -49,6 +149,16 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
   const [primaryContactEmail, setPrimaryContactEmail] = useState(props.primaryContactEmail || "");
   const [assignedSalesUserId, setAssignedSalesUserId] = useState(props.assignedSalesUserId || "");
 
+  const [territoryCode, setTerritoryCode] = useState(props.territoryCode || "");
+  const [routeDay, setRouteDay] = useState(props.routeDay || "");
+  const [assignedRouteRepUserId, setAssignedRouteRepUserId] = useState(props.assignedRouteRepUserId || "");
+  const [routePriority, setRoutePriority] = useState(props.routePriority === null ? "" : String(props.routePriority));
+  const [visitStatus, setVisitStatus] = useState(props.visitStatus || "");
+  const [lastVisitAt, setLastVisitAt] = useState(toDateTimeLocalValue(props.lastVisitAt));
+  const [nextVisitDueAt, setNextVisitDueAt] = useState(toDateTimeLocalValue(props.nextVisitDueAt));
+  const [latitude, setLatitude] = useState(props.latitude === null ? "" : String(props.latitude));
+  const [longitude, setLongitude] = useState(props.longitude === null ? "" : String(props.longitude));
+
   const [contactName, setContactName] = useState(props.primaryContact?.name || "");
   const [contactEmail, setContactEmail] = useState(props.primaryContact?.email || "");
   const [contactPhone, setContactPhone] = useState(props.primaryContact?.phone || "");
@@ -61,6 +171,29 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
   const [taskDueDate, setTaskDueDate] = useState("");
   const [taskAssignedUserId, setTaskAssignedUserId] = useState(props.assignedSalesUserId || "");
   const [taskPriority, setTaskPriority] = useState("2");
+  const [routeOutcomeBusy, setRouteOutcomeBusy] = useState<string | null>(null);
+  const [routeOutcomeTaskEnabled, setRouteOutcomeTaskEnabled] = useState(false);
+  const [routeOutcomeTaskTitle, setRouteOutcomeTaskTitle] = useState("");
+  const [routeOutcomeTaskDueDate, setRouteOutcomeTaskDueDate] = useState("");
+
+  const mapHref = buildMapHref(props.address, latitude, longitude);
+  const territoryMeta = props.territoryOptions.find((option) => option.code === territoryCode) || null;
+  const missingRouteStates = [
+    !territoryCode ? "No territory" : null,
+    !routeDay ? "No route day" : null,
+    !latitude || !longitude ? "No coordinates" : null,
+  ].filter(Boolean) as string[];
+  const hasRouteConfig = Boolean(
+    territoryCode ||
+      routeDay ||
+      assignedRouteRepUserId ||
+      routePriority ||
+      visitStatus ||
+      lastVisitAt ||
+      nextVisitDueAt ||
+      latitude ||
+      longitude
+  );
 
   async function refreshWithMessage(message: string) {
     setSuccess(message);
@@ -92,6 +225,37 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
       setError(err instanceof Error ? err.message : "Save failed");
     } finally {
       setAccountBusy(false);
+    }
+  }
+
+  async function saveRouteOps() {
+    setRouteBusy(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const res = await fetch(`/api/workspace/customers/${props.customerId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          territory_code: territoryCode || null,
+          route_day: routeDay || null,
+          assigned_route_rep_user_id: assignedRouteRepUserId || null,
+          route_priority: routePriority ? Number(routePriority) : null,
+          visit_status: visitStatus || null,
+          last_visit_at: lastVisitAt || null,
+          next_visit_due_at: nextVisitDueAt || null,
+          latitude: latitude || null,
+          longitude: longitude || null,
+        }),
+      });
+      const json = await parseJsonSafe(res);
+      if (!res.ok) throw new Error(String(json.error || `Save failed (${res.status})`));
+      await refreshWithMessage(hasRouteConfig ? "Route plan updated." : "Customer added to route planning.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setRouteBusy(false);
     }
   }
 
@@ -159,15 +323,8 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
     setSuccess(null);
 
     try {
-      let details: Record<string, unknown> | undefined;
       const trimmedDetails = activityDetails.trim();
-      if (trimmedDetails) {
-        try {
-          details = { notes: trimmedDetails };
-        } catch {
-          throw new Error("Activity details are invalid.");
-        }
-      }
+      const details = trimmedDetails ? { notes: trimmedDetails } : undefined;
 
       const res = await fetch(`/api/workspace/customers/${props.customerId}/activity`, {
         method: "POST",
@@ -224,159 +381,451 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
     }
   }
 
+  async function createTaskRequest(task: { title: string; dueDate?: string | null; assignedUserId?: string | null; priority?: number | null }) {
+    const res = await fetch(`/api/workspace/customers/${props.customerId}/tasks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: task.title,
+        due_date: task.dueDate || null,
+        assigned_user_id: (task.assignedUserId ?? taskAssignedUserId) || null,
+        priority: task.priority ?? (taskPriority ? Number(taskPriority) : null),
+      }),
+    });
+    const json = await parseJsonSafe(res);
+    if (!res.ok) throw new Error(String(json.error || `Save failed (${res.status})`));
+  }
+
+  async function applyRouteOutcome(outcome: (typeof VISIT_OUTCOMES)[number]) {
+    setRouteOutcomeBusy(outcome.key);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const preserveBlankNextVisit = outcome.nextVisitDays === null && !nextVisitDueAt;
+      const res = await fetch(`/api/workspace/customers/${props.customerId}/visit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          outcome: outcome.key,
+          summary: `${outcome.label} at ${props.companyName}`,
+          notes: null,
+          next_visit_due_at: nextVisitDueAt || null,
+          preserve_blank_next_visit: preserveBlankNextVisit,
+        }),
+      });
+      const json = await parseJsonSafe(res);
+      if (!res.ok) throw new Error(String(json.error || `Save failed (${res.status})`));
+
+      const nextVisit = String(json.next_visit_due_at || "").trim();
+      const nextStatus = String(json.visit_status || outcome.visitStatus).trim();
+      const lastVisit = String(json.last_visit_at || "").trim();
+
+      setVisitStatus(nextStatus || outcome.visitStatus);
+      if (nextVisit) {
+        setNextVisitDueAt(toDateTimeLocalValue(nextVisit));
+      } else if (preserveBlankNextVisit) {
+        setNextVisitDueAt("");
+      }
+      if (lastVisit) {
+        setLastVisitAt(toDateTimeLocalValue(lastVisit));
+      }
+
+      if (routeOutcomeTaskEnabled) {
+        const defaultTaskTitle =
+          outcome.key === "interested"
+            ? `Follow up with ${props.companyName}`
+            : outcome.key === "revisit_needed"
+              ? `Revisit ${props.companyName}`
+              : outcome.key === "sample_drop"
+                ? `Check in after sample drop for ${props.companyName}`
+                : outcome.key === "met_buyer"
+                  ? `Send recap to ${props.companyName}`
+                  : `Follow up with ${props.companyName}`;
+
+        await createTaskRequest({
+          title: routeOutcomeTaskTitle.trim() || defaultTaskTitle,
+          dueDate: routeOutcomeTaskDueDate || (outcome.nextVisitDays !== null ? addDaysDateValue(outcome.nextVisitDays) : null),
+          assignedUserId: assignedRouteRepUserId || taskAssignedUserId || null,
+          priority: routePriority ? Number(routePriority) : taskPriority ? Number(taskPriority) : null,
+        });
+        setRouteOutcomeTaskTitle("");
+        setRouteOutcomeTaskDueDate("");
+        setRouteOutcomeTaskEnabled(false);
+        await refreshWithMessage(`${outcome.label} recorded and follow-up task created.`);
+        return;
+      }
+
+      await refreshWithMessage(`${outcome.label} recorded.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setRouteOutcomeBusy(null);
+    }
+  }
+
   return (
-    <div className="space-y-4">
-      <section className="rounded-2xl border border-[#dbe9ef] bg-white p-5 shadow-sm">
-        <h2 className="text-lg font-semibold text-[#173543]">Account Management</h2>
-        <div className="mt-4 grid gap-3 md:grid-cols-2">
-          <label className="grid gap-1 text-sm text-[#4a6575]">
-            <span>Company Name</span>
-            <input
-              value={companyName}
-              onChange={(e) => setCompanyName(e.target.value)}
-              disabled={props.staffRole !== "admin" || accountBusy}
-              className="rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a]"
-            />
-          </label>
+    <div className="space-y-3">
+      {error ? <p className="rounded-xl border border-[#f1d1d1] bg-[#fff5f5] px-3 py-2 text-sm text-[#991b1b]">{error}</p> : null}
+      {success ? <p className="rounded-xl border border-[#bfe8df] bg-[#effcf8] px-3 py-2 text-sm text-[#0f766e]">{success}</p> : null}
 
-          <label className="grid gap-1 text-sm text-[#4a6575]">
-            <span>Primary Contact Email</span>
-            <input
-              value={primaryContactEmail}
-              onChange={(e) => setPrimaryContactEmail(e.target.value)}
-              disabled={accountBusy}
-              className="rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a]"
-            />
-          </label>
-
-          <label className="grid gap-1 text-sm text-[#4a6575]">
-            <span>Status</span>
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              disabled={accountBusy}
-              className="rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a]"
-            >
-              {["active", "prospect", "lead", "on_hold", "inactive"].map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="grid gap-1 text-sm text-[#4a6575]">
-            <span>Stage</span>
-            <select
-              value={stage}
-              onChange={(e) => setStage(e.target.value)}
-              disabled={accountBusy}
-              className="rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a]"
-            >
-              {["new", "qualified", "active", "paused", "closed"].map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="grid gap-1 text-sm text-[#4a6575] md:col-span-2">
-            <span>Assigned Sales Rep</span>
-            <select
-              value={assignedSalesUserId}
-              onChange={(e) => setAssignedSalesUserId(e.target.value)}
-              disabled={props.staffRole !== "admin" || accountBusy}
-              className="rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a]"
-            >
-              <option value="">Unassigned</option>
-              {props.salesOptions.map((option) => (
-                <option key={option.userId} value={option.userId}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-        <div className="mt-4">
-          <button
-            type="button"
-            onClick={() => void saveAccount()}
-            disabled={accountBusy}
-            className="rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-          >
-            {accountBusy ? "Saving..." : "Save Account"}
-          </button>
-        </div>
-      </section>
-
-      <section className="rounded-2xl border border-[#dbe9ef] bg-white p-5 shadow-sm">
-        <h2 className="text-lg font-semibold text-[#173543]">Primary Contact</h2>
-        <div className="mt-4 grid gap-3 md:grid-cols-2">
-          <label className="grid gap-1 text-sm text-[#4a6575]">
-            <span>Name</span>
-            <input value={contactName} onChange={(e) => setContactName(e.target.value)} disabled={contactBusy} className="rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a]" />
-          </label>
-          <label className="grid gap-1 text-sm text-[#4a6575]">
-            <span>Title</span>
-            <input value={contactTitle} onChange={(e) => setContactTitle(e.target.value)} disabled={contactBusy} className="rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a]" />
-          </label>
-          <label className="grid gap-1 text-sm text-[#4a6575]">
-            <span>Email</span>
-            <input value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} disabled={contactBusy} className="rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a]" />
-          </label>
-          <label className="grid gap-1 text-sm text-[#4a6575]">
-            <span>Phone</span>
-            <input value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} disabled={contactBusy} className="rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a]" />
-          </label>
-        </div>
-        <div className="mt-4">
-          <button
-            type="button"
-            onClick={() => void savePrimaryContact()}
-            disabled={contactBusy}
-            className="rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-          >
-            {contactBusy ? "Saving..." : "Save Primary Contact"}
-          </button>
-        </div>
-      </section>
-
-      <section className="rounded-2xl border border-[#dbe9ef] bg-white p-5 shadow-sm">
-        <h2 className="text-lg font-semibold text-[#173543]">Add Internal Note</h2>
-        <textarea
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          rows={4}
-          disabled={noteBusy}
-          className="mt-4 w-full rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a]"
-          placeholder="Add relationship context, follow-up notes, or handoff details."
+      <section className={sectionClass}>
+        <SectionHeader
+          title="Route & Field Ops"
+          description="Territory-driven stop planning, routing readiness, and field execution."
+          action={
+            <div className="flex flex-wrap items-center gap-2">
+              {mapHref ? (
+                <a
+                  href={mapHref}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-full border border-[#cfdde6] bg-white px-3 py-1.5 text-sm font-semibold text-[#21424d] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
+                >
+                  Open in Map
+                </a>
+              ) : (
+                <span className="rounded-full border border-[#d9e5eb] bg-[#f7fbfd] px-3 py-1.5 text-sm text-[#89a0ad]">Open in Map</span>
+              )}
+              <button
+                type="button"
+                onClick={() => void saveRouteOps()}
+                disabled={routeBusy}
+                className="rounded-full bg-[#173543] px-3.5 py-1.5 text-sm font-semibold text-white disabled:opacity-60"
+              >
+                {routeBusy ? "Saving..." : hasRouteConfig ? "Update Route" : "Add to Route"}
+              </button>
+            </div>
+          }
         />
-        <div className="mt-4 flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => void createNote()}
-            disabled={noteBusy}
-            className="rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-          >
-            {noteBusy ? "Saving..." : "Add Note"}
-          </button>
-          {error ? <p className="text-sm text-[#991b1b]">{error}</p> : null}
-          {success ? <p className="text-sm text-[#0f766e]">{success}</p> : null}
+
+        <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1.65fr)_minmax(280px,0.95fr)]">
+          <div className="space-y-3">
+            <div className="flex flex-wrap gap-2">
+              <StatusPill label={territoryCode ? `Territory ${territoryCode}` : "Territory Missing"} tone={territoryCode ? "ok" : "warn"} />
+              <StatusPill label={routeDay ? `Route ${routeDay}` : "Route Day Missing"} tone={routeDay ? "ok" : "warn"} />
+              <StatusPill label={latitude && longitude ? "Coords Ready" : "Coords Missing"} tone={latitude && longitude ? "ok" : "warn"} />
+              {visitStatus ? <StatusPill label={titleCase(visitStatus)} /> : null}
+            </div>
+
+            <div className="rounded-2xl border border-[#e1ebf1] bg-[#fbfdfe] p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-sm font-semibold text-[#173543]">Quick Visit Outcomes</p>
+                  <p className="mt-1 text-xs text-[#5c7483]">One tap updates visit status, logs activity, and applies default follow-up timing.</p>
+                </div>
+                <label className="flex items-center gap-2 text-sm text-[#4a6575]">
+                  <input
+                    type="checkbox"
+                    checked={routeOutcomeTaskEnabled}
+                    onChange={(event) => setRouteOutcomeTaskEnabled(event.target.checked)}
+                    className="h-4 w-4 rounded border-[#cfdde6] text-[#14b8a6]"
+                  />
+                  <span>Create task</span>
+                </label>
+              </div>
+
+              {routeOutcomeTaskEnabled ? (
+                <div className="mt-3 grid gap-3 md:grid-cols-[minmax(0,1.2fr)_180px]">
+                  <label className="grid gap-1 text-sm text-[#4a6575]">
+                    <span>Task Title</span>
+                    <input value={routeOutcomeTaskTitle} onChange={(event) => setRouteOutcomeTaskTitle(event.target.value)} className={inputClass} placeholder={`Follow up with ${props.companyName}`} />
+                  </label>
+                  <label className="grid gap-1 text-sm text-[#4a6575]">
+                    <span>Due Date</span>
+                    <input type="date" value={routeOutcomeTaskDueDate} onChange={(event) => setRouteOutcomeTaskDueDate(event.target.value)} className={inputClass} />
+                  </label>
+                </div>
+              ) : null}
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                {VISIT_OUTCOMES.map((outcome) => (
+                  <button
+                    key={outcome.key}
+                    type="button"
+                    onClick={() => void applyRouteOutcome(outcome)}
+                    disabled={routeBusy || routeOutcomeBusy !== null}
+                    className={["rounded-full border px-3 py-1.5 text-sm font-semibold disabled:opacity-60", outcome.accentClass].join(" ")}
+                  >
+                    {routeOutcomeBusy === outcome.key ? "Saving..." : outcome.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-12">
+              <label className="grid gap-1 text-sm text-[#4a6575] xl:col-span-5">
+                <span>Territory</span>
+                <select
+                  value={territoryCode}
+                  onChange={(event) => {
+                    const nextCode = event.target.value;
+                    const territory = props.territoryOptions.find((option) => option.code === nextCode) || null;
+                    setTerritoryCode(nextCode);
+                    if (!routeDay && territory?.routeDayDefault) {
+                      setRouteDay(territory.routeDayDefault);
+                    }
+                  }}
+                  disabled={routeBusy}
+                  className={inputClass}
+                >
+                  <option value="">Unassigned</option>
+                  {props.territoryOptions.map((option) => (
+                    <option key={option.code} value={option.code}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="grid gap-1 text-sm text-[#4a6575] xl:col-span-3">
+                <span>Route Day</span>
+                <select value={routeDay} onChange={(event) => setRouteDay(event.target.value)} disabled={routeBusy} className={inputClass}>
+                  <option value="">Unassigned</option>
+                  {ROUTE_DAYS.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="grid gap-1 text-sm text-[#4a6575] xl:col-span-4">
+                <span>Assigned Route Rep</span>
+                <select
+                  value={assignedRouteRepUserId}
+                  onChange={(event) => setAssignedRouteRepUserId(event.target.value)}
+                  disabled={props.staffRole !== "admin" || routeBusy}
+                  className={inputClass}
+                >
+                  <option value="">Unassigned</option>
+                  {props.routeRepOptions.map((option) => (
+                    <option key={option.userId} value={option.userId}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="grid gap-1 text-sm text-[#4a6575] xl:col-span-3">
+                <span>Priority</span>
+                <select value={routePriority} onChange={(event) => setRoutePriority(event.target.value)} disabled={routeBusy} className={inputClass}>
+                  <option value="">Unassigned</option>
+                  {["1", "2", "3", "4", "5"].map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="grid gap-1 text-sm text-[#4a6575] xl:col-span-4">
+                <span>Visit Status</span>
+                <select value={visitStatus} onChange={(event) => setVisitStatus(event.target.value)} disabled={routeBusy} className={inputClass}>
+                  <option value="">Unassigned</option>
+                  {VISIT_STATUS_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {titleCase(option)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="grid gap-1 text-sm text-[#4a6575] xl:col-span-5">
+                <span>Next Visit Due</span>
+                <input type="datetime-local" value={nextVisitDueAt} onChange={(event) => setNextVisitDueAt(event.target.value)} disabled={routeBusy} className={inputClass} />
+              </label>
+
+              <label className="grid gap-1 text-sm text-[#4a6575] xl:col-span-5">
+                <span>Last Visit</span>
+                <input type="datetime-local" value={lastVisitAt} onChange={(event) => setLastVisitAt(event.target.value)} disabled={routeBusy} className={inputClass} />
+              </label>
+
+              <label className="grid gap-1 text-sm text-[#4a6575] xl:col-span-3">
+                <span>Latitude</span>
+                <input type="number" step="0.000001" value={latitude} onChange={(event) => setLatitude(event.target.value)} disabled={routeBusy} className={inputClass} />
+              </label>
+
+              <label className="grid gap-1 text-sm text-[#4a6575] xl:col-span-4">
+                <span>Longitude</span>
+                <input type="number" step="0.000001" value={longitude} onChange={(event) => setLongitude(event.target.value)} disabled={routeBusy} className={inputClass} />
+              </label>
+            </div>
+          </div>
+
+          <aside className="grid gap-3 rounded-2xl border border-[#e1ebf1] bg-[#fbfdfe] p-3 text-sm text-[#4a6575]">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8398a5]">Routing Snapshot</p>
+              <div className="mt-2 space-y-1.5">
+                <p className="font-medium text-[#173543]">{territoryMeta?.label || "Territory not assigned"}</p>
+                <p>{routeDay ? `Default run day: ${routeDay}` : "Route day still open"}</p>
+                <p>{assignedRouteRepUserId ? "Route rep assigned" : "No route rep assigned"}</p>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-[#dbe9ef] bg-white px-3 py-2.5">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8398a5]">Coverage Gaps</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {missingRouteStates.length > 0 ? missingRouteStates.map((item) => <StatusPill key={item} label={item} tone="warn" />) : <StatusPill label="Route Ready" tone="ok" />}
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-[#dbe9ef] bg-white px-3 py-2.5">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8398a5]">Address</p>
+              <p className="mt-1 text-sm text-[#456271]">{props.address || "No address on file"}</p>
+            </div>
+          </aside>
         </div>
       </section>
 
-      <section className="rounded-2xl border border-[#dbe9ef] bg-white p-5 shadow-sm">
-        <h2 className="text-lg font-semibold text-[#173543]">Log Activity</h2>
-        <div className="mt-4 grid gap-3 md:grid-cols-2">
+      <div className="grid gap-3 xl:grid-cols-2">
+        <section className={sectionClass}>
+          <SectionHeader title="Account Management" />
+          <div className="mt-3 grid gap-3 md:grid-cols-2">
+            <label className="grid gap-1 text-sm text-[#4a6575]">
+              <span>Company Name</span>
+              <input value={companyName} onChange={(e) => setCompanyName(e.target.value)} disabled={props.staffRole !== "admin" || accountBusy} className={inputClass} />
+            </label>
+
+            <label className="grid gap-1 text-sm text-[#4a6575]">
+              <span>Primary Contact Email</span>
+              <input value={primaryContactEmail} onChange={(e) => setPrimaryContactEmail(e.target.value)} disabled={accountBusy} className={inputClass} />
+            </label>
+
+            <label className="grid gap-1 text-sm text-[#4a6575]">
+              <span>Status</span>
+              <select value={status} onChange={(e) => setStatus(e.target.value)} disabled={accountBusy} className={inputClass}>
+                {["active", "prospect", "lead", "on_hold", "inactive"].map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="grid gap-1 text-sm text-[#4a6575]">
+              <span>Stage</span>
+              <select value={stage} onChange={(e) => setStage(e.target.value)} disabled={accountBusy} className={inputClass}>
+                {["new", "qualified", "active", "paused", "closed"].map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="grid gap-1 text-sm text-[#4a6575] md:col-span-2">
+              <span>Assigned Sales Rep</span>
+              <select value={assignedSalesUserId} onChange={(e) => setAssignedSalesUserId(e.target.value)} disabled={props.staffRole !== "admin" || accountBusy} className={inputClass}>
+                <option value="">Unassigned</option>
+                {props.salesOptions.map((option) => (
+                  <option key={option.userId} value={option.userId}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <div className="mt-3">
+            <button type="button" onClick={() => void saveAccount()} disabled={accountBusy} className="rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+              {accountBusy ? "Saving..." : "Save Account"}
+            </button>
+          </div>
+        </section>
+
+        <section className={sectionClass}>
+          <SectionHeader title="Primary Contact" />
+          <div className="mt-3 grid gap-3 md:grid-cols-2">
+            <label className="grid gap-1 text-sm text-[#4a6575]">
+              <span>Name</span>
+              <input value={contactName} onChange={(e) => setContactName(e.target.value)} disabled={contactBusy} className={inputClass} />
+            </label>
+            <label className="grid gap-1 text-sm text-[#4a6575]">
+              <span>Title</span>
+              <input value={contactTitle} onChange={(e) => setContactTitle(e.target.value)} disabled={contactBusy} className={inputClass} />
+            </label>
+            <label className="grid gap-1 text-sm text-[#4a6575]">
+              <span>Email</span>
+              <input value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} disabled={contactBusy} className={inputClass} />
+            </label>
+            <label className="grid gap-1 text-sm text-[#4a6575]">
+              <span>Phone</span>
+              <input value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} disabled={contactBusy} className={inputClass} />
+            </label>
+          </div>
+          <div className="mt-3">
+            <button type="button" onClick={() => void savePrimaryContact()} disabled={contactBusy} className="rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+              {contactBusy ? "Saving..." : "Save Primary Contact"}
+            </button>
+          </div>
+        </section>
+      </div>
+
+      <div className="grid gap-3 xl:grid-cols-2">
+        <section className={sectionClass}>
+          <SectionHeader title="Add Internal Note" />
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            rows={3}
+            disabled={noteBusy}
+            className="mt-3 w-full rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a]"
+            placeholder="Add relationship context, follow-up notes, or handoff details."
+          />
+          <div className="mt-3">
+            <button type="button" onClick={() => void createNote()} disabled={noteBusy} className="rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+              {noteBusy ? "Saving..." : "Add Note"}
+            </button>
+          </div>
+        </section>
+
+        <section className={sectionClass}>
+          <SectionHeader title="Create Task" />
+          <div className="mt-3 grid gap-3 md:grid-cols-2">
+            <label className="grid gap-1 text-sm text-[#4a6575] md:col-span-2">
+              <span>Title</span>
+              <input value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} disabled={taskBusy} className={inputClass} placeholder="Send updated pricing sheet." />
+            </label>
+            <label className="grid gap-1 text-sm text-[#4a6575]">
+              <span>Due Date</span>
+              <input type="date" value={taskDueDate} onChange={(e) => setTaskDueDate(e.target.value)} disabled={taskBusy} className={inputClass} />
+            </label>
+            <label className="grid gap-1 text-sm text-[#4a6575]">
+              <span>Priority</span>
+              <select value={taskPriority} onChange={(e) => setTaskPriority(e.target.value)} disabled={taskBusy} className={inputClass}>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+              </select>
+            </label>
+            <label className="grid gap-1 text-sm text-[#4a6575] md:col-span-2">
+              <span>Assigned To</span>
+              <select value={taskAssignedUserId} onChange={(e) => setTaskAssignedUserId(e.target.value)} disabled={taskBusy} className={inputClass}>
+                <option value="">Unassigned</option>
+                {props.salesOptions.map((option) => (
+                  <option key={option.userId} value={option.userId}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <div className="mt-3">
+            <button type="button" onClick={() => void createTask()} disabled={taskBusy} className="rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+              {taskBusy ? "Saving..." : "Create Task"}
+            </button>
+          </div>
+        </section>
+      </div>
+
+      <section className={sectionClass}>
+        <SectionHeader title="Log Activity" />
+        <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-[0.8fr_1.2fr]">
           <label className="grid gap-1 text-sm text-[#4a6575]">
             <span>Activity Type</span>
-            <select
-              value={activityType}
-              onChange={(e) => setActivityType(e.target.value)}
-              disabled={activityBusy}
-              className="rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a]"
-            >
+            <select value={activityType} onChange={(e) => setActivityType(e.target.value)} disabled={activityBusy} className={inputClass}>
               {["note", "call", "email", "meeting", "task_update"].map((option) => (
                 <option key={option} value={option}>
                   {option}
@@ -386,104 +835,24 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
           </label>
           <label className="grid gap-1 text-sm text-[#4a6575]">
             <span>Summary</span>
-            <input
-              value={activitySummary}
-              onChange={(e) => setActivitySummary(e.target.value)}
-              disabled={activityBusy}
-              className="rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a]"
-              placeholder="Called buyer to confirm next steps."
-            />
+            <input value={activitySummary} onChange={(e) => setActivitySummary(e.target.value)} disabled={activityBusy} className={inputClass} placeholder="Called buyer to confirm next steps." />
           </label>
           <label className="grid gap-1 text-sm text-[#4a6575] md:col-span-2">
             <span>Details</span>
             <textarea
               value={activityDetails}
               onChange={(e) => setActivityDetails(e.target.value)}
-              rows={4}
+              rows={3}
               disabled={activityBusy}
               className="rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a]"
               placeholder="Optional context for the timeline entry."
             />
           </label>
         </div>
-        <div className="mt-4">
-          <button
-            type="button"
-            onClick={() => void createActivity()}
-            disabled={activityBusy}
-            className="rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-          >
+        <div className="mt-3">
+          <button type="button" onClick={() => void createActivity()} disabled={activityBusy} className="rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
             {activityBusy ? "Saving..." : "Log Activity"}
           </button>
-        </div>
-      </section>
-
-      <section className="rounded-2xl border border-[#dbe9ef] bg-white p-5 shadow-sm">
-        <h2 className="text-lg font-semibold text-[#173543]">Create Task</h2>
-        <div className="mt-4 grid gap-3 md:grid-cols-2">
-          <label className="grid gap-1 text-sm text-[#4a6575] md:col-span-2">
-            <span>Title</span>
-            <input
-              value={taskTitle}
-              onChange={(e) => setTaskTitle(e.target.value)}
-              disabled={taskBusy}
-              className="rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a]"
-              placeholder="Send updated pricing sheet."
-            />
-          </label>
-          <label className="grid gap-1 text-sm text-[#4a6575]">
-            <span>Due Date</span>
-            <input
-              type="date"
-              value={taskDueDate}
-              onChange={(e) => setTaskDueDate(e.target.value)}
-              disabled={taskBusy}
-              className="rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a]"
-            />
-          </label>
-          <label className="grid gap-1 text-sm text-[#4a6575]">
-            <span>Priority</span>
-            <select
-              value={taskPriority}
-              onChange={(e) => setTaskPriority(e.target.value)}
-              disabled={taskBusy}
-              className="rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a]"
-            >
-              <option value="1">1</option>
-              <option value="2">2</option>
-              <option value="3">3</option>
-              <option value="4">4</option>
-              <option value="5">5</option>
-            </select>
-          </label>
-          <label className="grid gap-1 text-sm text-[#4a6575] md:col-span-2">
-            <span>Assigned To</span>
-            <select
-              value={taskAssignedUserId}
-              onChange={(e) => setTaskAssignedUserId(e.target.value)}
-              disabled={taskBusy}
-              className="rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a]"
-            >
-              <option value="">Unassigned</option>
-              {props.salesOptions.map((option) => (
-                <option key={option.userId} value={option.userId}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-        <div className="mt-4 flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => void createTask()}
-            disabled={taskBusy}
-            className="rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-          >
-            {taskBusy ? "Saving..." : "Create Task"}
-          </button>
-          {error ? <p className="text-sm text-[#991b1b]">{error}</p> : null}
-          {success ? <p className="text-sm text-[#0f766e]">{success}</p> : null}
         </div>
       </section>
     </div>

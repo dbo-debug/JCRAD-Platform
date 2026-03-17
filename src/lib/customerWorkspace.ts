@@ -17,6 +17,11 @@ export type CustomerSummary = {
   lastVisitAt: string | null;
   nextVisitDueAt: string | null;
   routePriority: number | null;
+  address1: string | null;
+  address2: string | null;
+  city: string | null;
+  state: string | null;
+  postalCode: string | null;
   latitude: number | null;
   longitude: number | null;
   website: string | null;
@@ -680,6 +685,11 @@ function buildCustomerSummary({
     lastVisitAt: firstText(customer.last_visit_at),
     nextVisitDueAt: firstText(customer.next_visit_due_at),
     routePriority: firstNumber(customer.route_priority),
+    address1: firstText(customer.address_1),
+    address2: firstText(customer.address_2),
+    city: firstText(customer.city),
+    state: firstText(customer.state),
+    postalCode: firstText(customer.postal_code),
     latitude: firstNumber(customer.latitude),
     longitude: firstNumber(customer.longitude),
     website: firstText(customer.website),

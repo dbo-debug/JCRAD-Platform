@@ -1,22 +1,35 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { loadCustomerWorkspaceIndex, type CustomerSummary } from "@/lib/customerWorkspace";
+import { formatTerritoryOptionLabel, loadTerritories } from "@/lib/territories";
 
 export type RouteRepOption = {
   userId: string;
   label: string;
 };
 
+export type TerritoryOption = {
+  value: string;
+  label: string;
+  routeDayDefault: string | null;
+};
+
 export type RouteWorkspaceData = {
   customers: CustomerSummary[];
   routeRepOptions: RouteRepOption[];
+  territoryOptions: TerritoryOption[];
 };
 
 export async function loadRouteWorkspaceData(): Promise<RouteWorkspaceData> {
-  const [{ customers }, routeRepOptions] = await Promise.all([loadCustomerWorkspaceIndex(), loadRouteRepOptions()]);
+  const [{ customers }, routeRepOptions, territories] = await Promise.all([loadCustomerWorkspaceIndex(), loadRouteRepOptions(), loadTerritories({ activeOnly: true })]);
 
   return {
     customers,
     routeRepOptions,
+    territoryOptions: territories.map((territory) => ({
+      value: territory.code,
+      label: formatTerritoryOptionLabel(territory),
+      routeDayDefault: territory.routeDayDefault,
+    })),
   };
 }
 

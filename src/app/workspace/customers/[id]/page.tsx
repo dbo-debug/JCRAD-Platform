@@ -5,6 +5,7 @@ import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import CustomerDetailManager from "@/components/workspace/CustomerDetailManager";
 import { loadCustomerWorkspaceDetail } from "@/lib/customerWorkspace";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { formatTerritoryOptionLabel, loadTerritories } from "@/lib/territories";
 import { requireStaff } from "@/lib/requireStaff";
 
 function formatDate(value: unknown): string {
@@ -33,6 +34,18 @@ function getActivityNotes(details: Record<string, unknown> | null): string | nul
   return text || null;
 }
 
+function formatAddress(customer: {
+  address1: string | null;
+  address2: string | null;
+  city: string | null;
+  state: string | null;
+  postalCode: string | null;
+}) {
+  const lineOne = [customer.address1, customer.address2].filter(Boolean).join(", ");
+  const lineTwo = [customer.city, customer.state, customer.postalCode].filter(Boolean).join(", ");
+  return [lineOne, lineTwo].filter(Boolean).join(" • ") || null;
+}
+
 export default async function WorkspaceCustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const staff = await requireStaff();
   const { id } = await params;
@@ -40,9 +53,10 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
   if (!detail) notFound();
 
   const supabase = createAdminClient();
-  const [salesProfilesRes, authUsersRes] = await Promise.all([
+  const [salesProfilesRes, authUsersRes, territories] = await Promise.all([
     supabase.from("profiles").select("id, role, company_name").in("role", ["admin", "sales"]),
     supabase.auth.admin.listUsers({ page: 1, perPage: 1000 }),
+    loadTerritories({ activeOnly: true }),
   ]);
 
   const authEmailById = new Map(
@@ -61,9 +75,15 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
     };
   });
   const primaryContact = detail.contacts.find((contact) => contact.isPrimary) || null;
+  const territoryOptions = territories.map((territory) => ({
+    code: territory.code,
+    label: formatTerritoryOptionLabel(territory),
+    routeDayDefault: territory.routeDayDefault,
+  }));
+  const address = formatAddress(detail.customer);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <AdminPageHeader
         title={detail.customer.name}
         description="Operational customer account workspace for staff. Relationship fields are editable here while estimates, orders, files, and submissions remain read-only."
@@ -77,7 +97,7 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
         }
       />
 
-      <section className="grid gap-4 lg:grid-cols-5">
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <SummaryCard label="Status" value={detail.customer.status} />
         <SummaryCard label="Stage" value={detail.customer.stage || "Not set"} />
         <SummaryCard label="Assigned Sales" value={detail.customer.assignedSalesName || "Unassigned"} helper={detail.customer.assignedSalesEmail || undefined} />
@@ -85,7 +105,7 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
         <SummaryCard label="Last Activity" value={formatDate(detail.customer.lastActivityAt)} />
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[1.1fr_1fr]">
+      <section className="grid gap-3 2xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.9fr)]">
         <CustomerDetailManager
           customerId={detail.customer.id}
           companyName={detail.customer.name}
@@ -93,13 +113,25 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
           stage={detail.customer.stage}
           primaryContactEmail={detail.customer.primaryContactEmail}
           assignedSalesUserId={detail.customer.assignedSalesUserId}
+          territoryCode={detail.customer.territoryCode}
+          routeDay={detail.customer.routeDay}
+          assignedRouteRepUserId={detail.customer.assignedRouteRepUserId}
+          routePriority={detail.customer.routePriority}
+          visitStatus={detail.customer.visitStatus}
+          lastVisitAt={detail.customer.lastVisitAt}
+          nextVisitDueAt={detail.customer.nextVisitDueAt}
+          latitude={detail.customer.latitude}
+          longitude={detail.customer.longitude}
+          address={address}
           staffRole={staff.role}
           salesOptions={salesOptions}
+          routeRepOptions={salesOptions}
+          territoryOptions={territoryOptions}
           primaryContact={primaryContact}
         />
 
         <Panel title="Activity Timeline">
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             {detail.activity.map((item) => (
               <ActivityCard key={item.id} item={item} />
             ))}
@@ -108,11 +140,11 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
         </Panel>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[1.3fr_1fr]">
+      <section className="grid gap-3 xl:grid-cols-[1.15fr_0.95fr]">
         <Panel title="Contacts">
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             {detail.contacts.map((contact) => (
-              <div key={contact.id} className="rounded-xl border border-[#dbe9ef] bg-[#f9fcfd] px-4 py-3">
+              <div key={contact.id} className="rounded-xl border border-[#dbe9ef] bg-[#f9fcfd] px-3 py-2.5">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="font-semibold text-[#173543]">{contact.name}</p>
                   {contact.isPrimary ? (
@@ -130,9 +162,9 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
         </Panel>
 
         <Panel title="Customer Users">
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             {detail.users.map((user) => (
-              <div key={user.userId} className="rounded-xl border border-[#dbe9ef] bg-[#f9fcfd] px-4 py-3">
+              <div key={user.userId} className="rounded-xl border border-[#dbe9ef] bg-[#f9fcfd] px-3 py-2.5">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="font-semibold text-[#173543]">{user.fullName}</p>
                   <span className="rounded-full border border-[#d7e6ed] bg-white px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#4f6877]">
@@ -152,7 +184,7 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
         </Panel>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-1">
+      <section className="grid gap-3 xl:grid-cols-1">
         <Panel title="Estimates">
           <RecordTable
             rows={detail.estimates}
@@ -166,7 +198,7 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
         </Panel>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-2">
+      <section className="grid gap-3 xl:grid-cols-2">
         <Panel title="Orders">
           <RecordTable
             rows={detail.orders}
@@ -192,11 +224,11 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
         </Panel>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-2">
+      <section className="grid gap-3 2xl:grid-cols-3">
         <Panel title="Task List">
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             {detail.tasks.map((task) => (
-              <div key={task.id} className="rounded-xl border border-[#dbe9ef] bg-[#f9fcfd] px-4 py-3">
+              <div key={task.id} className="rounded-xl border border-[#dbe9ef] bg-[#f9fcfd] px-3 py-2.5">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="font-semibold text-[#173543]">{task.title}</p>
                   <span className="rounded-full border border-[#d7e6ed] bg-white px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#4f6877]">
@@ -223,9 +255,9 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
         </Panel>
 
         <Panel title="Customer Documents">
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             {detail.documents.map((doc) => (
-              <div key={doc.id} className="rounded-xl border border-[#dbe9ef] bg-[#f9fcfd] px-4 py-3">
+              <div key={doc.id} className="rounded-xl border border-[#dbe9ef] bg-[#f9fcfd] px-3 py-2.5">
                 <p className="font-semibold text-[#173543]">
                   {String(doc.title || doc.file_name || doc.name || `Document ${doc.id.slice(0, 8)}`)}
                 </p>
@@ -239,9 +271,9 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
         </Panel>
 
         <Panel title="Internal Notes">
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             {detail.notes.map((note) => (
-              <div key={note.id} className="rounded-xl border border-[#dbe9ef] bg-[#f9fcfd] px-4 py-3">
+              <div key={note.id} className="rounded-xl border border-[#dbe9ef] bg-[#f9fcfd] px-3 py-2.5">
                 <p className="whitespace-pre-wrap text-sm text-[#173543]">{note.note}</p>
                 <p className="mt-2 text-xs text-[#5d7685]">
                   {note.authorName || "Unknown author"} • {formatDate(note.createdAt)}
@@ -258,9 +290,9 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
 
 function SummaryCard({ label, value, helper }: { label: string; value: string; helper?: string }) {
   return (
-    <div className="rounded-2xl border border-[#dbe9ef] bg-white p-5 shadow-sm">
+    <div className="rounded-2xl border border-[#dbe9ef] bg-white p-4 shadow-sm">
       <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#5d7685]">{label}</p>
-      <p className="mt-2 text-lg font-semibold text-[#173543]">{value}</p>
+      <p className="mt-1.5 text-base font-semibold text-[#173543]">{value}</p>
       {helper ? <p className="mt-1 text-sm text-[#4a6575]">{helper}</p> : null}
     </div>
   );
@@ -281,7 +313,7 @@ function ActivityCard({
   const notes = getActivityNotes(item.details);
 
   return (
-    <div className="rounded-xl border border-[#dbe9ef] bg-[#f9fcfd] px-4 py-3">
+    <div className="rounded-xl border border-[#dbe9ef] bg-[#f9fcfd] px-3 py-2.5">
       <p className="font-semibold text-[#173543]">{item.summary}</p>
       <p className="mt-1 text-sm text-[#4a6575]">
         {item.actorName || "System"} • {formatDate(item.createdAt)}
@@ -296,15 +328,15 @@ function ActivityCard({
 
 function Panel({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="rounded-2xl border border-[#dbe9ef] bg-white p-5 shadow-sm">
-      <h2 className="text-lg font-semibold text-[#173543]">{title}</h2>
-      <div className="mt-4">{children}</div>
+    <section className="rounded-2xl border border-[#dbe9ef] bg-white p-4 shadow-sm">
+      <h2 className="text-base font-semibold text-[#173543]">{title}</h2>
+      <div className="mt-3">{children}</div>
     </section>
   );
 }
 
 function EmptyState({ label }: { label: string }) {
-  return <div className="rounded-xl border border-dashed border-[#d3e1e8] bg-[#f9fcfd] px-4 py-6 text-sm text-[#5d7685]">{label}</div>;
+  return <div className="rounded-xl border border-dashed border-[#d3e1e8] bg-[#f9fcfd] px-3 py-4 text-sm text-[#5d7685]">{label}</div>;
 }
 
 function RecordTable({
@@ -320,18 +352,18 @@ function RecordTable({
         <thead className="bg-[#f7fbfd] text-left text-[#5b7382]">
           <tr>
             {columns.map((column) => (
-              <th key={column.key} className="px-4 py-3 font-semibold">
+              <th key={column.key} className="px-3 py-2.5 font-semibold">
                 {column.label}
               </th>
             ))}
-            <th className="px-4 py-3 font-semibold">Linkage</th>
+            <th className="px-3 py-2.5 font-semibold">Linkage</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-[#eef3f6]">
           {rows.map((row) => (
             <tr key={row.id}>
               {columns.map((column) => (
-                <td key={column.key} className="px-4 py-3 text-[#4f6877]">
+                <td key={column.key} className="px-3 py-2.5 text-[#4f6877]">
                   {column.key === "id" ? (
                     <span className="font-semibold text-[#173543]">#{String(row[column.key] || "").slice(0, 8)}</span>
                   ) : column.format ? (
@@ -341,7 +373,7 @@ function RecordTable({
                   )}
                 </td>
               ))}
-              <td className="px-4 py-3">
+              <td className="px-3 py-2.5">
                 <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-[#4f6877]">
                   {matchLabel(String(row.matchType || ""))}
                 </span>
