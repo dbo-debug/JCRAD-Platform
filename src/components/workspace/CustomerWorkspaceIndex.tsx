@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { startTransition, useEffect, useState } from "react";
 import type { CustomerSummary } from "@/lib/customerWorkspace";
+import { isRouteEligibleCustomer } from "@/lib/routeEligibility";
 import type { PendingRouteStop } from "@/lib/routeStopQueue";
 import type { RouteRepOption, TerritoryOption } from "@/lib/routeWorkspace";
 import {
@@ -158,8 +159,7 @@ function getCustomerSearchText(customer: CustomerSummary) {
 }
 
 function getRouteReadiness(customer: CustomerSummary): Exclude<RouteReadinessFilter, "all"> | "other" {
-  const hasCoords = customer.latitude !== null && customer.longitude !== null;
-  if (customer.territoryCode && customer.routeDay && customer.assignedRouteRepUserId && hasCoords) return "route_ready";
+  if (customer.territoryCode && customer.routeDay && customer.assignedRouteRepUserId && isRouteEligibleCustomer(customer)) return "route_ready";
   if (!customer.territoryCode) return "no_territory";
   if (!customer.routeDay) return "no_route_day";
   if (!customer.assignedRouteRepUserId) return "no_route_rep";

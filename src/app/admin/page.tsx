@@ -1,8 +1,13 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
+import { loadCustomerWorkspaceIndex } from "@/lib/customerWorkspace";
+import { getRouteEligibilityReason, isRouteEligibleCustomer } from "@/lib/routeEligibility";
+import { loadSavedRoutes } from "@/lib/routeWorkspace";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { normalizePackagingCategory, type PackagingCategory } from "@/lib/packaging/category";
+
+export const dynamic = "force-dynamic";
 
 type EstimateRow = {
   id: string;
@@ -43,9 +48,51 @@ type PlatformEventRow = {
   created_at: string | null;
 };
 
+type CustomerTaskRow = {
+  id: string;
+  customer_id: string | null;
+  title: string | null;
+  due_date: string | null;
+  status: string | null;
+};
+
 const APPROVED_VERIFICATION_STATUSES = new Set(["approved", "verified"]);
 const FOLLOW_UP_VERIFICATION_STATUSES = new Set(["rejected", "needs_review", "follow_up", "failed"]);
 const CLOSED_ORDER_STATUSES = new Set(["fulfilled", "completed", "cancelled", "rejected", "closed"]);
+const CLOSED_TASK_STATUSES = new Set(["completed", "closed", "cancelled"]);
+
+const MODULE_CARDS = [
+  {
+    title: "Customers",
+    description: "CRM records, segment builder, geocode cleanup, and pending-stop staging.",
+    href: "/workspace/customers",
+  },
+  {
+    title: "Routes",
+    description: "Route command center, itinerary controls, and route runner handoff.",
+    href: "/workspace/routes",
+  },
+  {
+    title: "Tasks",
+    description: "Follow-up workload across customers and field execution.",
+    href: "/workspace/tasks",
+  },
+  {
+    title: "Orders",
+    description: "Order progression and approval tracking.",
+    href: "/admin/orders",
+  },
+  {
+    title: "Menu",
+    description: "Live commercial menu and estimate entry path.",
+    href: "/menu",
+  },
+  {
+    title: "Packaging",
+    description: "Packaging operations, reviews, and catalog maintenance.",
+    href: "/admin/packaging",
+  },
+] as const;
 
 function normalizeStatus(value: unknown): string {
   return String(value || "").trim().toLowerCase();
@@ -133,8 +180,9 @@ function metadataSummary(metadata: Record<string, unknown> | null): string {
 
 export default async function AdminDashboardPage() {
   const supabase = createAdminClient();
+  const referenceNow = Date.parse(new Date().toISOString());
 
-  const [estimateRes, orderRes, submissionRes, profileRes, eventRes] = await Promise.all([
+  const [estimateRes, orderRes, submissionRes, profileRes, eventRes, routeStopQueueRes, taskRes, customerIndex, savedRoutes] = await Promise.all([
     supabase
       .from("estimates")
       .select("id, status, total, customer_name, customer_email, packaging_review_pending, created_at, updated_at")
@@ -156,6 +204,14 @@ export default async function AdminDashboardPage() {
       .select("id, event_type, user_email, metadata, created_at")
       .order("created_at", { ascending: false })
       .limit(20),
+    supabase.from("route_stop_queue").select("id"),
+    supabase
+      .from("customer_tasks")
+      .select("id, customer_id, title, due_date, status")
+      .order("created_at", { ascending: false })
+      .limit(2000),
+    loadCustomerWorkspaceIndex(),
+    loadSavedRoutes(),
   ]);
 
   const estimates = (estimateRes.data || []) as EstimateRow[];
@@ -163,6 +219,19 @@ export default async function AdminDashboardPage() {
   const submissions = (submissionRes.data || []) as PackagingSubmissionRow[];
   const profiles = (profileRes.data || []) as ProfileRow[];
   const platformEvents = (eventRes.data || []) as PlatformEventRow[];
+  const customerTasks = (taskRes.data || []) as CustomerTaskRow[];
+  const customers = customerIndex.customers;
+
+  const routeReadyAccounts = customers.filter((customer) => isRouteEligibleCustomer(customer));
+  const blockedByGeocode = customers.filter((customer) => getRouteEligibilityReason(customer) !== null);
+  const pendingStopsCount = (routeStopQueueRes.data || []).length;
+  const activeRoutes = savedRoutes.filter((route) => ["assigned", "in_progress"].includes(normalizeStatus(route.status)));
+  const openTasks = customerTasks.filter((task) => !CLOSED_TASK_STATUSES.has(normalizeStatus(task.status)));
+  const customersNeedingFollowUp = new Set(openTasks.map((task) => String(task.customer_id || "").trim()).filter(Boolean)).size;
+  const overdueTaskCount = openTasks.filter((task) => {
+    const due = Date.parse(String(task.due_date || ""));
+    return Number.isFinite(due) && due < referenceNow;
+  }).length;
 
   const draftEstimates = estimates.filter((row) => {
     const status = normalizeStatus(row.status);
@@ -207,6 +276,18 @@ export default async function AdminDashboardPage() {
 
   const actionItems = [
     {
+      label: "Pending route stops",
+      count: pendingStopsCount,
+      href: "/workspace/routes",
+      tone: "neutral",
+    },
+    {
+      label: "Accounts blocked by geocode",
+      count: blockedByGeocode.length,
+      href: "/workspace/customers",
+      tone: "warn",
+    },
+    {
       label: "Packaging submissions need review",
       count: packagingPending.length,
       href: "/admin/packaging/submissions",
@@ -225,9 +306,9 @@ export default async function AdminDashboardPage() {
       tone: "neutral",
     },
     {
-      label: "Draft estimates awaiting conversion",
-      count: draftEstimates.length,
-      href: "/admin",
+      label: "Customers needing follow-up tasks",
+      count: customersNeedingFollowUp,
+      href: "/workspace/tasks",
       tone: "neutral",
     },
   ] as const;
@@ -237,15 +318,47 @@ export default async function AdminDashboardPage() {
   const hasSubmissionError = Boolean(submissionRes.error);
   const hasProfileError = Boolean(profileRes.error);
   const hasEventError = Boolean(eventRes.error);
+  const hasTaskError = Boolean(taskRes.error);
+  const hasRouteQueueError = Boolean(routeStopQueueRes.error);
 
   return (
     <div className="space-y-6">
       <AdminPageHeader
-        title="Admin Dashboard"
-        description="Operational control panel for estimates, packaging review, onboarding, and order progression."
+        title="Command Center"
+        description="Unified admin and operations dashboard for customers, routes, tasks, orders, menu, packaging, and route execution."
       />
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-8">
+        <MetricCard
+          label="Route-Ready Accounts"
+          value={routeReadyAccounts.length}
+          href="/workspace/customers"
+          helper="Same eligibility rules as the planner"
+        />
+        <MetricCard
+          label="Blocked By Geocode"
+          value={blockedByGeocode.length}
+          href="/workspace/customers"
+          helper="Address, coord, or geocode issue"
+        />
+        <MetricCard
+          label="Pending Stops"
+          value={pendingStopsCount}
+          href="/workspace/routes"
+          helper="Queued for route planning"
+        />
+        <MetricCard
+          label="Saved Routes"
+          value={savedRoutes.length}
+          href="/workspace/routes"
+          helper={`${activeRoutes.length} active`}
+        />
+        <MetricCard
+          label="Open Tasks"
+          value={openTasks.length}
+          href="/workspace/tasks"
+          helper={`${overdueTaskCount} overdue`}
+        />
         <MetricCard
           label="Draft Estimates"
           value={draftEstimates.length}
@@ -272,7 +385,7 @@ export default async function AdminDashboardPage() {
         />
       </section>
 
-      {(hasEstimateError || hasOrderError || hasSubmissionError || hasProfileError || hasEventError) ? (
+      {(hasEstimateError || hasOrderError || hasSubmissionError || hasProfileError || hasEventError || hasTaskError || hasRouteQueueError) ? (
         <div className="rounded-xl border border-[#f3d2d2] bg-[#fff4f4] px-4 py-3 text-sm text-[#991b1b]">
           Some dashboard data is unavailable right now. Refresh after backend sync.
         </div>
@@ -281,10 +394,28 @@ export default async function AdminDashboardPage() {
       <section className="grid gap-4 xl:grid-cols-5">
         <div className="space-y-4 xl:col-span-3">
           <Panel
+            title="Unified Modules"
+            description="Major platform modules now sit under one internal shell."
+          >
+            <div className="grid gap-3 md:grid-cols-2">
+              {MODULE_CARDS.map((card) => (
+                <Link
+                  key={card.href}
+                  href={card.href}
+                  className="rounded-lg border border-[#dbe9ef] bg-white px-4 py-3 transition hover:border-[#14b8a6] hover:bg-[#f6fbfd]"
+                >
+                  <p className="font-semibold text-[#173543]">{card.title}</p>
+                  <p className="mt-1 text-sm text-[#5b7382]">{card.description}</p>
+                </Link>
+              ))}
+            </div>
+          </Panel>
+
+          <Panel
             title="Action Items"
             description="Queues that need attention now."
-            href="/admin/packaging/submissions"
-            hrefLabel="Open review queues"
+            href="/workspace/routes"
+            hrefLabel="Open operations"
           >
             <div className="space-y-2">
               {actionItems.map((item) => (
@@ -304,6 +435,46 @@ export default async function AdminDashboardPage() {
                   </span>
                 </Link>
               ))}
+            </div>
+          </Panel>
+
+          <Panel
+            title="Field Operations Summary"
+            description="Current route planning and execution readiness."
+            href="/workspace/routes"
+            hrefLabel="Open routes"
+          >
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-lg border border-[#dbe9ef] bg-white px-3 py-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#5d7685]">Route pipeline</p>
+                <p className="mt-2 text-sm text-[#173543]">
+                  {routeReadyAccounts.length} route-ready accounts • {pendingStopsCount} pending stops • {savedRoutes.length} saved routes
+                </p>
+              </div>
+              <div className="rounded-lg border border-[#dbe9ef] bg-white px-3 py-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#5d7685]">Active execution</p>
+                <p className="mt-2 text-sm text-[#173543]">
+                  {activeRoutes.length} active routes • {customersNeedingFollowUp} customers with open follow-up tasks
+                </p>
+              </div>
+            </div>
+            <div className="mt-3 space-y-2">
+              {activeRoutes.slice(0, 4).map((route) => (
+                <Link
+                  key={route.id}
+                  href={`/workspace/routes/run?routeId=${route.id}`}
+                  className="flex items-center justify-between rounded-lg border border-[#dbe9ef] bg-white px-3 py-2 text-sm transition hover:border-[#14b8a6] hover:bg-[#f6fbfd]"
+                >
+                  <div>
+                    <p className="font-semibold text-[#173543]">{route.name}</p>
+                    <p className="text-xs text-[#5b7382]">
+                      {route.routeDate || "No date"} • {route.assignedUserLabel || "Unassigned rep"} • {route.stopCount} stops
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-[#eef7f6] px-2 py-0.5 text-xs font-semibold text-[#0f766e]">{route.status}</span>
+                </Link>
+              ))}
+              {activeRoutes.length === 0 ? <p className="text-sm text-[#5b7382]">No active routes right now.</p> : null}
             </div>
           </Panel>
 
@@ -405,6 +576,30 @@ export default async function AdminDashboardPage() {
               {pendingCustomers.length === 0 ? (
                 <p className="text-sm text-[#5b7382]">No pending customer approvals.</p>
               ) : null}
+            </div>
+          </Panel>
+
+          <Panel
+            title="Task Follow-Up Visibility"
+            description="Open follow-up workload across customer accounts."
+            href="/workspace/tasks"
+            hrefLabel="Open tasks"
+          >
+            <div className="grid grid-cols-3 gap-2">
+              <StatusPill label="Open" value={openTasks.length} tone="warn" />
+              <StatusPill label="Overdue" value={overdueTaskCount} tone="bad" />
+              <StatusPill label="Customers" value={customersNeedingFollowUp} tone="ok" />
+            </div>
+            <div className="mt-3 space-y-2">
+              {openTasks.slice(0, 4).map((task) => (
+                <div key={task.id} className="rounded-lg border border-[#dbe9ef] bg-white px-3 py-2 text-sm">
+                  <p className="font-semibold text-[#173543]">{task.title || "Untitled task"}</p>
+                  <p className="text-xs text-[#5b7382]">
+                    {normalizeStatus(task.status) || "open"} • due {formatDate(task.due_date)}
+                  </p>
+                </div>
+              ))}
+              {openTasks.length === 0 ? <p className="text-sm text-[#5b7382]">No open customer tasks.</p> : null}
             </div>
           </Panel>
 

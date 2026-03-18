@@ -120,6 +120,7 @@ export function canUseGoogleRouteServices() {
 
 export async function optimizeStopOrderWithGoogle(args: {
   origin: LatLng;
+  destination?: LatLng;
   stops: OptimizeStop[];
   routeDateTimeIso: string;
   serviceDurationMinutes?: number;
@@ -127,6 +128,7 @@ export async function optimizeStopOrderWithGoogle(args: {
   const projectId = asText(process.env.GOOGLE_ROUTE_OPTIMIZATION_PROJECT_ID);
   if (!projectId) throw new Error("Missing GOOGLE_ROUTE_OPTIMIZATION_PROJECT_ID");
   if (args.stops.length === 0) return { orderedStopIds: [] as string[], provider: "google-route-optimization" };
+  if (args.stops.length === 1) return { orderedStopIds: [args.stops[0].stopId], provider: "google-route-optimization" };
 
   const accessToken = await getGoogleOAuthAccessToken();
   if (!accessToken) throw new Error("Google Route Optimization OAuth credentials are not configured");
@@ -158,7 +160,7 @@ export async function optimizeStopOrderWithGoogle(args: {
           {
             label: "jc-rad-daily-route",
             startLocation: args.origin,
-            endLocation: args.origin,
+            endLocation: args.destination || args.origin,
             costPerHour: 1,
           },
         ],

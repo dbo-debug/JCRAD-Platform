@@ -19,6 +19,11 @@ const DEFAULT_SHIFT_START_TIME = "09:00";
 const DEFAULT_REQUIRED_RETURN_TIME = "16:30";
 const TIGHT_RETURN_BUFFER_MINUTES = 30;
 
+type RouteAnchorPoint = {
+  latitude: number;
+  longitude: number;
+};
+
 export type RoutePlanStopInput = {
   customerId: string;
   customerName: string;
@@ -27,6 +32,7 @@ export type RoutePlanStopInput = {
   latitude: number;
   longitude: number;
   queueId?: string | null;
+  locked?: boolean;
 };
 
 export type PlannedRouteStop = {
@@ -35,6 +41,7 @@ export type PlannedRouteStop = {
   territoryCode: string | null;
   routeDay: string | null;
   queueId: string | null;
+  locked: boolean;
   stopOrder: number;
   plannedArrivalTime: string;
   plannedDepartureTime: string;
@@ -107,11 +114,11 @@ function addMinutes(date: Date, minutes: number) {
   return new Date(date.getTime() + minutes * 60 * 1000);
 }
 
-function buildFallbackOrder(stops: RoutePlanStopInput[]) {
+function buildFallbackOrder(stops: RoutePlanStopInput[], start: RouteAnchorPoint = JC_RAD_HQ) {
   const remaining = [...stops];
   const orderedStops: RoutePlanStopInput[] = [];
-  let currentLatitude = JC_RAD_HQ.latitude;
-  let currentLongitude = JC_RAD_HQ.longitude;
+  let currentLatitude = start.latitude;
+  let currentLongitude = start.longitude;
 
   while (remaining.length > 0) {
     let nearestIndex = 0;
@@ -137,6 +144,94 @@ function buildFallbackOrder(stops: RoutePlanStopInput[]) {
   }
 
   return orderedStops;
+}
+
+async function orderUnlockedSegment(args: {
+  stops: RoutePlanStopInput[];
+  routeDateTimeIso: string;
+  visitMinutes: number;
+  start: RouteAnchorPoint;
+  end: RouteAnchorPoint;
+}) {
+  if (args.stops.length <= 1) return args.stops;
+
+  if (canUseGoogleRouteOptimization()) {
+    try {
+      const optimizedOrder = await optimizeStopOrderWithGoogle({
+        origin: args.start,
+        destination: args.end,
+        stops: args.stops.map((stop) => ({
+          stopId: stop.customerId,
+          latitude: stop.latitude,
+          longitude: stop.longitude,
+        })),
+        routeDateTimeIso: args.routeDateTimeIso,
+        serviceDurationMinutes: args.visitMinutes,
+      });
+
+      const stopById = new Map(args.stops.map((stop) => [stop.customerId, stop]));
+      const orderedStops = optimizedOrder.orderedStopIds.map((id) => stopById.get(id)).filter((stop): stop is RoutePlanStopInput => Boolean(stop));
+      if (orderedStops.length === args.stops.length) return orderedStops;
+      return [...orderedStops, ...args.stops.filter((stop) => !optimizedOrder.orderedStopIds.includes(stop.customerId))];
+    } catch {
+      return buildFallbackOrder(args.stops, args.start);
+    }
+  }
+
+  return buildFallbackOrder(args.stops, args.start);
+}
+
+async function buildAnchoredStopOrder(args: {
+  stops: RoutePlanStopInput[];
+  routeDateTimeIso: string;
+  visitMinutes: number;
+}) {
+  if (args.stops.length <= 1) return { orderedStops: args.stops, optimizationSkipped: args.stops.every((stop) => stop.locked === true) };
+
+  const lockedIndexes = args.stops
+    .map((stop, index) => (stop.locked ? index : -1))
+    .filter((index) => index >= 0);
+
+  if (lockedIndexes.length === 0) {
+    return { orderedStops: await orderUnlockedSegment({ stops: args.stops, routeDateTimeIso: args.routeDateTimeIso, visitMinutes: args.visitMinutes, start: JC_RAD_HQ, end: JC_RAD_HQ }), optimizationSkipped: false };
+  }
+
+  if (lockedIndexes.length === args.stops.length) {
+    return { orderedStops: args.stops, optimizationSkipped: true };
+  }
+
+  const orderedStops: RoutePlanStopInput[] = [];
+  let previousLockedIndex = -1;
+
+  for (const lockedIndex of [...lockedIndexes, args.stops.length]) {
+    const unlockedSegment = args.stops.slice(previousLockedIndex + 1, lockedIndex).filter((stop) => !stop.locked);
+    const startAnchor =
+      previousLockedIndex >= 0
+        ? { latitude: args.stops[previousLockedIndex].latitude, longitude: args.stops[previousLockedIndex].longitude }
+        : JC_RAD_HQ;
+    const endAnchor =
+      lockedIndex < args.stops.length
+        ? { latitude: args.stops[lockedIndex].latitude, longitude: args.stops[lockedIndex].longitude }
+        : JC_RAD_HQ;
+
+    if (unlockedSegment.length > 0) {
+      const orderedSegment = await orderUnlockedSegment({
+        stops: unlockedSegment,
+        routeDateTimeIso: args.routeDateTimeIso,
+        visitMinutes: args.visitMinutes,
+        start: startAnchor,
+        end: endAnchor,
+      });
+      orderedStops.push(...orderedSegment);
+    }
+
+    if (lockedIndex < args.stops.length) {
+      orderedStops.push(args.stops[lockedIndex]);
+    }
+    previousLockedIndex = lockedIndex;
+  }
+
+  return { orderedStops, optimizationSkipped: false };
 }
 
 function maybeInsertLunch(args: {
@@ -304,6 +399,7 @@ function buildScheduledPlan(args: {
       territoryCode: stop.territoryCode,
       routeDay: stop.routeDay,
       queueId: stop.queueId || null,
+      locked: stop.locked === true,
       stopOrder: index + 1,
       plannedArrivalTime: plannedArrivalTime.toISOString(),
       plannedDepartureTime: plannedDepartureTime.toISOString(),
@@ -393,38 +489,22 @@ export async function buildPlannedRoute(args: {
   let orderedStopsForPlanning = trimmedStops;
   let googlePlanningWarning: string | null = null;
 
-  // Use Google Route Optimization for stop order only when its OAuth/project credentials are configured.
-  if (canUseGoogleRouteOptimization()) {
-    try {
-      const optimizedOrder = await optimizeStopOrderWithGoogle({
-        origin: {
-          latitude: JC_RAD_HQ.latitude,
-          longitude: JC_RAD_HQ.longitude,
-        },
-        stops: trimmedStops.map((stop) => ({
-          stopId: stop.customerId,
-          latitude: stop.latitude,
-          longitude: stop.longitude,
-        })),
-        routeDateTimeIso,
-        serviceDurationMinutes: visitMinutes,
-      });
+  try {
+    const anchoredOrder = await buildAnchoredStopOrder({
+      stops: trimmedStops,
+      routeDateTimeIso,
+      visitMinutes,
+    });
+    orderedStopsForPlanning = anchoredOrder.orderedStops;
 
-      const stopById = new Map(trimmedStops.map((stop) => [stop.customerId, stop]));
-      const orderedStops = optimizedOrder.orderedStopIds.map((id) => stopById.get(id)).filter((stop): stop is RoutePlanStopInput => Boolean(stop));
-      orderedStopsForPlanning =
-        orderedStops.length === trimmedStops.length
-          ? orderedStops
-          : [...orderedStops, ...trimmedStops.filter((stop) => !optimizedOrder.orderedStopIds.includes(stop.customerId))];
-    } catch (error) {
-      orderedStopsForPlanning = buildFallbackOrder(trimmedStops);
-      googlePlanningWarning = error instanceof Error ? error.message : "Google route optimization failed";
+    if (anchoredOrder.optimizationSkipped) {
+      googlePlanningWarning = "All stops are locked. Preserved the current itinerary order and refreshed timing only.";
+    } else if (!canUseGoogleRouteOptimization() && canUseGoogleRouteServices()) {
+      googlePlanningWarning = "Google route optimization is not configured. Used heuristic ordering while preserving locked anchors.";
     }
-  } else {
-    orderedStopsForPlanning = buildFallbackOrder(trimmedStops);
-    if (canUseGoogleRouteServices()) {
-      googlePlanningWarning = "Google route optimization is not configured. Used heuristic stop order with Google road timing.";
-    }
+  } catch (error) {
+    orderedStopsForPlanning = trimmedStops;
+    googlePlanningWarning = error instanceof Error ? error.message : "Google route optimization failed";
   }
 
   // Prefer Google Routes for road geometry and leg timing whenever the server routes key is available.

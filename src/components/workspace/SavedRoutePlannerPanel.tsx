@@ -9,6 +9,7 @@ import type { RouteRepOption, SavedRouteSummary, TerritoryOption } from "@/lib/r
 import RouteStopsMap from "@/components/workspace/RouteStopsMap";
 import { formatBusinessDateTime, formatBusinessDateTimeLong } from "@/lib/businessTime";
 import { JC_RAD_HQ } from "@/lib/routePlanning";
+import { getRouteEligibilityReason, isRouteEligibleCustomer } from "@/lib/routeEligibility";
 
 type SavedRoutePlannerPanelProps = {
   customers: CustomerSummary[];
@@ -25,6 +26,7 @@ type DraftStop = {
   territoryCode: string | null;
   routeDay: string | null;
   queueId: string | null;
+  locked: boolean;
   stopOrder: number;
   plannedArrivalTime: string;
   plannedDepartureTime: string;
@@ -113,6 +115,10 @@ function scheduleFlagBadgeClass(flag: DraftStop["scheduleFlag"]) {
   return "border-[#cfe8e4] bg-[#effaf7] text-[#0f766e]";
 }
 
+function lockBadgeClass(locked: boolean) {
+  return locked ? "border-[#d7d2f4] bg-[#f7f4ff] text-[#5f4aa5]" : "border-[#d7e6ed] bg-white text-[#607b89]";
+}
+
 function routeStatusTone(args: { fitsWithinShift: boolean; previewNeedsRefresh: boolean; overtimeApproved: boolean }) {
   if (args.previewNeedsRefresh) {
     return {
@@ -139,30 +145,6 @@ function routeStatusTone(args: { fitsWithinShift: boolean; previewNeedsRefresh: 
     className: "border-[#cfe8e4] bg-[#effaf7] text-[#0f766e]",
     detail: "Preview is current and the route fits within shift.",
   };
-}
-
-function hasAnyAddress(customer: CustomerSummary) {
-  return Boolean(customer.address1 || customer.city || customer.state || customer.postalCode);
-}
-
-function hasValidCoordinates(customer: CustomerSummary) {
-  if (customer.latitude === null || customer.longitude === null) return false;
-  return Number.isFinite(customer.latitude) && Number.isFinite(customer.longitude) && Math.abs(customer.latitude) <= 90 && Math.abs(customer.longitude) <= 180;
-}
-
-function isRouteEligibleCustomer(customer: CustomerSummary) {
-  if (!hasAnyAddress(customer) || customer.geocodeStatus === "missing_address") return false;
-  if (!hasValidCoordinates(customer)) return false;
-  if (customer.geocodeStatus === "failed" || customer.geocodeStatus === "needs_review") return false;
-  return true;
-}
-
-function getRouteEligibilityReason(customer: CustomerSummary): RouteReadinessItem["reason"] {
-  if (!hasAnyAddress(customer) || customer.geocodeStatus === "missing_address") return "missing_address";
-  if (customer.latitude === null || customer.longitude === null) return "missing_coordinates";
-  if (!hasValidCoordinates(customer)) return "invalid_coordinates";
-  if (customer.geocodeStatus === "failed" || customer.geocodeStatus === "needs_review") return "geocode_needs_attention";
-  return null;
 }
 
 function readinessReasonLabel(reason: RouteReadinessItem["reason"]) {
@@ -295,6 +277,7 @@ export default function SavedRoutePlannerPanel({
           latitude: customer.latitude,
           longitude: customer.longitude,
           queue_id: stop.queueId,
+          locked: stop.locked,
         };
       })
       .filter((stop): stop is NonNullable<typeof stop> => Boolean(stop));
@@ -455,6 +438,20 @@ export default function SavedRoutePlannerPanel({
     setStatusMessage("Stop order changed. Re-optimize route to refresh schedule and overtime calculations before saving.");
   }
 
+  function toggleStopLock(customerId: string) {
+    const nextStops = draftStops.map((stop) => (stop.customerId === customerId ? { ...stop, locked: !stop.locked } : stop));
+    const toggledStop = nextStops.find((stop) => stop.customerId === customerId) || null;
+    setDraftStops(nextStops);
+    setDraftPlan((current) => (current ? { ...current, orderedStops: nextStops } : current));
+    setOvertimeApproved(false);
+    setPreviewNeedsRefresh(true);
+    setStatusMessage(
+      toggledStop?.locked
+        ? `${toggledStop.customerName} locked in place. Re-optimize to preserve this anchor while optimizing the remaining stops.`
+        : `${toggledStop?.customerName || "Stop"} unlocked. Re-optimize to let the planner move it again.`
+    );
+  }
+
   async function removePendingStop(queueId: string) {
     setBusy("queue");
     setStatusMessage(null);
@@ -572,7 +569,7 @@ export default function SavedRoutePlannerPanel({
             estimated_drive_minutes_from_previous: stop.estimatedDriveMinutesFromPrevious,
             estimated_visit_minutes: stop.estimatedVisitMinutes,
             stop_status: "planned",
-            locked: false,
+            locked: stop.locked,
           })),
         }),
       });
@@ -970,11 +967,17 @@ export default function SavedRoutePlannerPanel({
                 <p className="mt-1 text-sm text-[#5c7483]">Trim stops, re-optimize after manual edits, or explicitly approve overtime for this local finalization session.</p>
                 {draftPlan?.warning ? <p className="mt-1 text-sm text-[#946200]">{draftPlan.warning}</p> : null}
                 {previewNeedsRefresh ? <p className="mt-1 text-sm text-[#946200]">Preview is stale after manual order changes. Re-optimize before saving.</p> : null}
+                {draftStops.some((stop) => stop.locked) ? (
+                  <p className="mt-1 text-sm text-[#5f4aa5]">
+                    Locked stops stay anchored during re-optimization. Unlocked stops are reordered around them while locked stops keep their relative order.
+                  </p>
+                ) : null}
               </div>
               <div className="grid min-w-[260px] gap-2 rounded-2xl border border-[#dbe8ef] bg-[#fbfdfe] p-3 text-sm">
                 <MetricLine label="Save Status" value={!draftPlan ? "Locked" : saveBlocked ? "Blocked" : "Ready"} />
                 <MetricLine label="Selected Stop" value={selectedPreviewStop ? `${selectedPreviewStop.stopOrder}` : "None"} />
                 <MetricLine label="Route Provider" value={draftPlan ? (draftPlan.provider === "google" ? "Google" : "Fallback") : "Not set"} />
+                <MetricLine label="Locked Stops" value={String(draftStops.filter((stop) => stop.locked).length)} />
               </div>
             </div>
 
@@ -1168,6 +1171,9 @@ export default function SavedRoutePlannerPanel({
                             <span className={["rounded-full border px-2.5 py-1 text-xs font-semibold", scheduleFlagBadgeClass(stop.scheduleFlag)].join(" ")}>
                               {stop.scheduleFlag.replace("_", " ")}
                             </span>
+                            <span className={["rounded-full border px-2.5 py-1 text-xs font-semibold", lockBadgeClass(stop.locked)].join(" ")}>
+                              {stop.locked ? "Locked" : "Unlocked"}
+                            </span>
                             {isFirstOvertimeStop ? (
                               <span className="rounded-full border border-[#f3c6c6] bg-[#fff1f1] px-2.5 py-1 text-xs font-semibold text-[#a33a3a]">First overtime stop</span>
                             ) : null}
@@ -1179,6 +1185,18 @@ export default function SavedRoutePlannerPanel({
                           </div>
                         </div>
                         <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => toggleStopLock(stop.customerId)}
+                            className={[
+                              "rounded-full border px-3 py-1.5 text-sm transition",
+                              stop.locked
+                                ? "border-[#d7d2f4] bg-[#f7f4ff] text-[#5f4aa5] hover:bg-[#f1ecff]"
+                                : "border-[#d0dde5] bg-white text-[#42606f] hover:border-[#14b8a6] hover:text-[#0f766e]",
+                            ].join(" ")}
+                          >
+                            {stop.locked ? "Unlock" : "Lock Stop"}
+                          </button>
                           <button type="button" onClick={() => moveStop(index, -1)} disabled={index === 0} className="rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm text-[#42606f] transition hover:border-[#14b8a6] hover:text-[#0f766e] disabled:opacity-60">
                             Up
                           </button>

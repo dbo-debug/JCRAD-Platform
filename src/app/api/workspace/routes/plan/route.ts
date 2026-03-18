@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { buildPlannedRoute } from "@/lib/routePlanning";
 import { getStaffContext } from "@/lib/getStaffContext";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isRouteEligibleCustomer } from "@/lib/routeEligibility";
 
 function asText(value: unknown): string | null {
   const text = String(value || "").trim();
@@ -12,11 +13,6 @@ function asNumber(value: unknown): number | null {
   if (value === null || value === undefined || value === "") return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
-}
-
-function hasValidCoordinates(latitude: number | null, longitude: number | null) {
-  if (latitude === null || longitude === null) return false;
-  return Number.isFinite(latitude) && Number.isFinite(longitude) && Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180;
 }
 
 export async function POST(req: Request) {
@@ -50,6 +46,7 @@ export async function POST(req: Request) {
         latitude,
         longitude,
         queueId: asText(stop.queue_id),
+        locked: stop.locked === true,
       };
     })
     .filter((stop): stop is NonNullable<typeof stop> => Boolean(stop));
@@ -70,7 +67,7 @@ export async function POST(req: Request) {
   const supabase = createAdminClient();
   const { data: customerRows, error: customerError } = await supabase
     .from("customers")
-    .select("id, latitude, longitude, geocode_status")
+    .select("id, address_1, city, state, postal_code, latitude, longitude, geocode_status")
     .in("id", customerIds);
 
   if (customerError) {
@@ -80,12 +77,15 @@ export async function POST(req: Request) {
   const eligibleCustomerIds = new Set(
     ((customerRows || []) as Array<Record<string, unknown>>)
       .filter((row) => {
-        const geocodeStatus = asText(row.geocode_status);
-        const latitude = asNumber(row.latitude);
-        const longitude = asNumber(row.longitude);
-        if (!hasValidCoordinates(latitude, longitude)) return false;
-        if (geocodeStatus === "missing_address" || geocodeStatus === "failed" || geocodeStatus === "needs_review") return false;
-        return true;
+        return isRouteEligibleCustomer({
+          address1: asText(row.address_1),
+          city: asText(row.city),
+          state: asText(row.state),
+          postalCode: asText(row.postal_code),
+          latitude: asNumber(row.latitude),
+          longitude: asNumber(row.longitude),
+          geocodeStatus: asText(row.geocode_status) as "geocoded" | "missing_address" | "failed" | "needs_review" | null,
+        });
       })
       .map((row) => asText(row.id))
       .filter((value): value is string => Boolean(value))
