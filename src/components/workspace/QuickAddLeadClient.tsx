@@ -51,6 +51,11 @@ const INTEREST_OPTIONS = [
   { value: "samples", label: "Samples" },
 ];
 
+const INPUT_CLASS =
+  "min-h-[56px] w-full rounded-[24px] border border-[#cfe0e8] bg-white px-4 text-base text-[#173543] outline-none transition focus:border-[#14b8a6]";
+const TEXTAREA_CLASS =
+  "w-full rounded-[24px] border border-[#cfe0e8] bg-white px-4 py-4 text-base text-[#173543] outline-none transition focus:border-[#14b8a6]";
+
 function buildInitialForm(currentUserId: string): FormState {
   return {
     accountName: "",
@@ -141,7 +146,7 @@ export default function QuickAddLeadClient(props: QuickAddLeadClientProps) {
 
   if (result) {
     return (
-      <section className="mx-auto max-w-2xl rounded-[28px] border border-[#cfe1e8] bg-white p-5 shadow-[0_18px_45px_rgba(16,42,67,0.08)] sm:p-7">
+      <section className="mx-auto max-w-xl rounded-[28px] border border-[#cfe1e8] bg-white p-5 shadow-[0_18px_45px_rgba(16,42,67,0.08)] sm:p-7">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#0f766e]">Lead Captured</p>
@@ -155,27 +160,29 @@ export default function QuickAddLeadClient(props: QuickAddLeadClientProps) {
           </span>
         </div>
 
-        <div className="mt-6 grid gap-3 sm:grid-cols-3">
+        <div className="mt-6 space-y-3">
           <button
             type="button"
             onClick={resetForm}
-            className="rounded-full bg-[#14b8a6] px-4 py-3 text-sm font-semibold text-white transition hover:opacity-95"
+            className="min-h-[56px] w-full rounded-full bg-[#14b8a6] px-4 py-3 text-base font-semibold text-white transition hover:opacity-95"
           >
             Add Another Lead
           </button>
-          <Link
-            href={`/workspace/customers/${result.customerId}`}
-            className="rounded-full border border-[#c7dce5] bg-white px-4 py-3 text-center text-sm font-semibold text-[#23414e] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
-          >
-            Open Customer
-          </Link>
-          <button
-            type="button"
-            onClick={handleCopyLink}
-            className="rounded-full border border-[#c7dce5] bg-[#f8fbfc] px-4 py-3 text-sm font-semibold text-[#23414e] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
-          >
-            {copied ? "Start Link Copied" : "Copy Direct Link"}
-          </button>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Link
+              href={`/workspace/customers/${result.customerId}`}
+              className="min-h-[52px] rounded-full border border-[#c7dce5] bg-white px-4 py-3 text-center text-sm font-semibold text-[#23414e] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
+            >
+              Open Customer
+            </Link>
+            <button
+              type="button"
+              onClick={handleCopyLink}
+              className="min-h-[52px] rounded-full border border-[#c7dce5] bg-[#f8fbfc] px-4 py-3 text-sm font-semibold text-[#23414e] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
+            >
+              {copied ? "Start Link Copied" : "Copy Direct Link"}
+            </button>
+          </div>
         </div>
 
         <div className="mt-5 rounded-2xl border border-[#d7e6ed] bg-[#f8fbfc] p-4">
@@ -187,107 +194,73 @@ export default function QuickAddLeadClient(props: QuickAddLeadClientProps) {
   }
 
   return (
-    <section className="mx-auto max-w-2xl">
+    <section className="mx-auto max-w-xl">
       <div className="rounded-[32px] border border-[#d5e4eb] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbfd_100%)] p-5 shadow-[0_18px_45px_rgba(16,42,67,0.08)] sm:p-7">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Event Capture</p>
-            <h2 className="mt-1 text-2xl font-semibold text-[#173543]">Quick Add Lead</h2>
-            <p className="mt-2 max-w-xl text-sm text-[#5b7382]">
-              Built for fast booth capture. Save straight into CRM, tag the lead as Hall of Flowers, and text the start link automatically.
-            </p>
-          </div>
-          <div className="rounded-2xl border border-[#d7e6ed] bg-white px-4 py-3 text-right">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7891a0]">Capture Pace</p>
-            <p className="mt-1 text-sm font-semibold text-[#173543]">{completionSeconds}</p>
-          </div>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Event Capture</p>
+          <h2 className="mt-1 text-2xl font-semibold text-[#173543]">Quick Add Lead</h2>
+          <p className="mt-2 text-sm text-[#5b7382]">Fast booth handoff form. Keep it simple, save the lead, then text the start link.</p>
+          <p className="mt-3 inline-flex rounded-full border border-[#d7e6ed] bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-[#5b7382]">
+            {completionSeconds}
+          </p>
         </div>
 
         <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Account / Store Name" required>
-              <input
-                value={form.accountName}
-                onChange={(event) => setForm((current) => ({ ...current, accountName: event.target.value }))}
-                placeholder="Store or account name"
-                className="h-12 w-full rounded-2xl border border-[#cfe0e8] bg-white px-4 text-base text-[#173543] outline-none transition focus:border-[#14b8a6]"
-                required
-              />
-            </Field>
-            <Field label="Mobile Phone" required>
-              <input
-                inputMode="tel"
-                autoComplete="tel"
-                value={form.mobilePhone}
-                onChange={(event) => setForm((current) => ({ ...current, mobilePhone: event.target.value }))}
-                placeholder="(555) 555-5555"
-                className="h-12 w-full rounded-2xl border border-[#cfe0e8] bg-white px-4 text-base text-[#173543] outline-none transition focus:border-[#14b8a6]"
-                required
-              />
-            </Field>
-          </div>
+          <Field label="Account / Store Name" required>
+            <input
+              value={form.accountName}
+              onChange={(event) => setForm((current) => ({ ...current, accountName: event.target.value }))}
+              placeholder="Store or account name"
+              className={INPUT_CLASS}
+              required
+            />
+          </Field>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Contact Name">
-              <input
-                value={form.contactName}
-                onChange={(event) => setForm((current) => ({ ...current, contactName: event.target.value }))}
-                placeholder="Buyer or rep name"
-                className="h-12 w-full rounded-2xl border border-[#cfe0e8] bg-white px-4 text-base text-[#173543] outline-none transition focus:border-[#14b8a6]"
-              />
-            </Field>
-            <Field label="Email">
-              <input
-                type="email"
-                autoComplete="email"
-                value={form.email}
-                onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
-                placeholder="name@store.com"
-                className="h-12 w-full rounded-2xl border border-[#cfe0e8] bg-white px-4 text-base text-[#173543] outline-none transition focus:border-[#14b8a6]"
-              />
-            </Field>
-          </div>
+          <Field label="Contact Name">
+            <input
+              value={form.contactName}
+              onChange={(event) => setForm((current) => ({ ...current, contactName: event.target.value }))}
+              placeholder="Buyer or rep name"
+              className={INPUT_CLASS}
+            />
+          </Field>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="City">
-              <input
-                value={form.city}
-                onChange={(event) => setForm((current) => ({ ...current, city: event.target.value }))}
-                placeholder="Los Angeles"
-                className="h-12 w-full rounded-2xl border border-[#cfe0e8] bg-white px-4 text-base text-[#173543] outline-none transition focus:border-[#14b8a6]"
-              />
-            </Field>
-            <Field label="Interest">
-              <select
-                value={form.interest}
-                onChange={(event) => setForm((current) => ({ ...current, interest: event.target.value }))}
-                className="h-12 w-full rounded-2xl border border-[#cfe0e8] bg-white px-4 text-base text-[#173543] outline-none transition focus:border-[#14b8a6]"
-              >
-                {INTEREST_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </Field>
-          </div>
+          <Field label="Mobile Phone" required>
+            <input
+              inputMode="tel"
+              autoComplete="tel"
+              value={form.mobilePhone}
+              onChange={(event) => setForm((current) => ({ ...current, mobilePhone: event.target.value }))}
+              placeholder="(555) 555-5555"
+              className={INPUT_CLASS}
+              required
+            />
+          </Field>
 
-          {props.canAssignOwner ? (
-            <Field label="Owner / Rep">
-              <select
-                value={form.ownerUserId}
-                onChange={(event) => setForm((current) => ({ ...current, ownerUserId: event.target.value }))}
-                className="h-12 w-full rounded-2xl border border-[#cfe0e8] bg-white px-4 text-base text-[#173543] outline-none transition focus:border-[#14b8a6]"
-              >
-                <option value="">Unassigned</option>
-                {props.ownerOptions.map((option) => (
-                  <option key={option.userId} value={option.userId}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </Field>
-          ) : null}
+          <Field label="Email">
+            <input
+              type="email"
+              autoComplete="email"
+              value={form.email}
+              onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
+              placeholder="name@store.com"
+              className={INPUT_CLASS}
+            />
+          </Field>
+
+          <Field label="Interest">
+            <select
+              value={form.interest}
+              onChange={(event) => setForm((current) => ({ ...current, interest: event.target.value }))}
+              className={INPUT_CLASS}
+            >
+              {INTEREST_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </Field>
 
           <Field label="Notes">
             <textarea
@@ -295,34 +268,70 @@ export default function QuickAddLeadClient(props: QuickAddLeadClientProps) {
               value={form.notes}
               onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))}
               placeholder="What they want, timing, sample asks, pricing context."
-              className="w-full rounded-2xl border border-[#cfe0e8] bg-white px-4 py-3 text-base text-[#173543] outline-none transition focus:border-[#14b8a6]"
+              className={TEXTAREA_CLASS}
             />
           </Field>
 
-          <label className="flex items-center justify-between gap-4 rounded-2xl border border-[#d7e6ed] bg-[#f8fbfc] px-4 py-3">
-            <div>
-              <p className="text-sm font-semibold text-[#173543]">Hot Lead</p>
-              <p className="text-xs text-[#5b7382]">Creates a follow-up task automatically for this event lead.</p>
+          <details className="rounded-[24px] border border-[#d7e6ed] bg-[#f8fbfc] px-4 py-3">
+            <summary className="cursor-pointer list-none text-sm font-semibold text-[#173543]">
+              More options
+              <span className="ml-2 text-xs font-medium uppercase tracking-[0.12em] text-[#7891a0]">Optional</span>
+            </summary>
+            <div className="mt-4 space-y-4">
+              <Field label="City">
+                <input
+                  value={form.city}
+                  onChange={(event) => setForm((current) => ({ ...current, city: event.target.value }))}
+                  placeholder="Los Angeles"
+                  className={INPUT_CLASS}
+                />
+              </Field>
+
+              {props.canAssignOwner ? (
+                <Field label="Owner / Rep">
+                  <select
+                    value={form.ownerUserId}
+                    onChange={(event) => setForm((current) => ({ ...current, ownerUserId: event.target.value }))}
+                    className={INPUT_CLASS}
+                  >
+                    <option value="">Unassigned</option>
+                    {props.ownerOptions.map((option) => (
+                      <option key={option.userId} value={option.userId}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              ) : null}
+
+              <label className="flex items-center justify-between gap-4 rounded-[24px] border border-[#d7e6ed] bg-white px-4 py-4">
+                <div>
+                  <p className="text-sm font-semibold text-[#173543]">Hot Lead</p>
+                  <p className="text-xs text-[#5b7382]">Creates a follow-up task automatically for this event lead.</p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={form.hotLead}
+                  onChange={(event) => setForm((current) => ({ ...current, hotLead: event.target.checked }))}
+                  className="h-6 w-6 rounded border-[#b4ccd8] text-[#14b8a6] focus:ring-[#14b8a6]"
+                />
+              </label>
             </div>
-            <input
-              type="checkbox"
-              checked={form.hotLead}
-              onChange={(event) => setForm((current) => ({ ...current, hotLead: event.target.checked }))}
-              className="h-5 w-5 rounded border-[#b4ccd8] text-[#14b8a6] focus:ring-[#14b8a6]"
-            />
-          </label>
+          </details>
 
-          {error ? <p className="rounded-2xl border border-[#f0c8c8] bg-[#fff6f6] px-4 py-3 text-sm text-[#9f2d2d]">{error}</p> : null}
+          {error ? <p className="rounded-[24px] border border-[#f0c8c8] bg-[#fff6f6] px-4 py-3 text-sm text-[#9f2d2d]">{error}</p> : null}
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#7891a0]">Source defaults to `hall_of_flowers`</p>
+          <div className="sticky bottom-3 z-10 rounded-[28px] border border-[#cfe0e8] bg-[rgba(255,255,255,0.96)] p-3 shadow-[0_12px_30px_rgba(16,42,67,0.08)] backdrop-blur">
             <button
               type="submit"
               disabled={submitting}
-              className="rounded-full bg-[#14b8a6] px-5 py-3 text-sm font-semibold text-white transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+              className="min-h-[58px] w-full rounded-full bg-[#14b8a6] px-5 py-3 text-base font-semibold text-white transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {submitting ? "Saving Lead..." : "Save Lead + Send SMS"}
             </button>
+            <p className="mt-2 text-center text-[11px] font-medium uppercase tracking-[0.12em] text-[#7891a0]">
+              Source tag `hall_of_flowers` is applied automatically
+            </p>
           </div>
         </form>
       </div>
@@ -340,7 +349,7 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <label className="block space-y-2">
+    <label className="block space-y-2.5">
       <span className="text-sm font-semibold text-[#173543]">
         {label}
         {required ? <span className="ml-1 text-[#0f766e]">*</span> : null}
