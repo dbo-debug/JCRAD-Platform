@@ -56,14 +56,6 @@ type HotLeadFilter = "all" | "hot" | "not_hot";
 type TaskStateFilter = "all" | "has_open_task" | "no_open_task" | "overdue_task";
 type OrganizeBy = "none" | "territory" | "owner" | "route_day" | "stage";
 
-const SAVED_VIEWS: Array<{ key: SavedViewKey; label: string; description: string }> = [
-  { key: "all", label: "All Accounts", description: "Full CRM account list." },
-  { key: "pipeline", label: "Pipeline", description: "Active accounts moving through sales." },
-  { key: "unassigned", label: "Unassigned", description: "Accounts missing an owner." },
-  { key: "missing_primary", label: "Missing Primary Contact", description: "Accounts missing a primary contact." },
-  { key: "with_orders", label: "Order History", description: "Accounts with at least one order." },
-  { key: "hall_of_flowers", label: "Hall of Flowers Leads", description: "Event quick-add leads captured into CRM." },
-];
 const ROUTE_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const BULK_ACTIONS: Array<{ key: BulkActionKind; label: string }> = [
   { key: "assign_sales_rep", label: "Assign Sales Rep" },
@@ -187,6 +179,14 @@ function followUpChipClass(customer: CustomerSummary) {
   if (!customer.hasOpenTask) return "border-[#e1d7d3] bg-[#f5f1ef] text-[#6f5b54]";
   if (customer.overdueTaskCount > 0) return "border-[#f1ddad] bg-[#fff9eb] text-[#9a6b00]";
   return "border-[#bde8e4] bg-[#e9fbf9] text-[#0f766e]";
+}
+
+type WorkspacePresetKey = "all" | "hall_of_flowers" | "hot_leads" | "no_task" | "overdue";
+
+function denseButtonClass(tone: "primary" | "secondary" = "secondary") {
+  return tone === "primary"
+    ? "inline-flex h-9 items-center justify-center rounded-full bg-[#173543] px-3.5 text-sm font-semibold text-white transition hover:bg-[#0f2a35]"
+    : "inline-flex h-9 items-center justify-center rounded-full border border-[#d0dde5] bg-white px-3.5 text-sm font-medium text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543]";
 }
 
 function getRouteReadiness(customer: CustomerSummary): Exclude<RouteReadinessFilter, "all"> | "other" {
@@ -399,6 +399,13 @@ export default function CustomerWorkspaceIndex({
   const hotLeadCount = visibleCustomers.filter((customer) => customer.isHotLead).length;
   const routeReadyCount = visibleCustomers.filter((customer) => getRouteReadiness(customer) === "route_ready").length;
   const visibleWithOrders = visibleCustomers.filter((customer) => customer.counts.orders > 0).length;
+  const navCounts = {
+    all: customers.length,
+    hallOfFlowers: customers.filter((customer) => customer.isHallOfFlowersLead).length,
+    hotLeads: customers.filter((customer) => customer.isHotLead).length,
+    noTask: customers.filter((customer) => !customer.hasOpenTask).length,
+    overdue: customers.filter((customer) => customer.overdueTaskCount > 0).length,
+  };
   const territoryStats = buildTerritoryStats(visibleCustomers, referenceNow);
 
   const sections =
@@ -566,6 +573,42 @@ export default function CustomerWorkspaceIndex({
     });
   }
 
+  function clearConflictingFilters() {
+    setHotLeadFilter("all");
+    setTaskStateFilter("all");
+    setOwnerFilter("all");
+    setTerritoryFilter("all");
+  }
+
+  function applyWorkspacePreset(preset: WorkspacePresetKey) {
+    startTransition(() => {
+      setDraftSearch("");
+      setSearchQuery("");
+      clearConflictingFilters();
+      setSavedView("all");
+      setSourceFilter("all");
+      setImportSourceFilter("all");
+
+      if (preset === "hall_of_flowers") {
+        setSavedView("hall_of_flowers");
+        setSourceFilter("hall_of_flowers");
+        setImportSourceFilter("event_quick_add");
+        return;
+      }
+      if (preset === "hot_leads") {
+        setHotLeadFilter("hot");
+        return;
+      }
+      if (preset === "no_task") {
+        setTaskStateFilter("no_open_task");
+        return;
+      }
+      if (preset === "overdue") {
+        setTaskStateFilter("overdue_task");
+      }
+    });
+  }
+
   function resetFilters() {
     startTransition(() => {
       setDraftSearch("");
@@ -687,117 +730,100 @@ export default function CustomerWorkspaceIndex({
   }
 
   return (
-    <div className="mx-auto max-w-[1360px] space-y-5">
-      <section className="rounded-[28px] border border-[#d8e6ee] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbfd_100%)] p-5 shadow-[0_24px_60px_rgba(16,42,67,0.08)] lg:px-6">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-          <div className="max-w-[820px]">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6c8797]">Segment Builder</p>
-            <h2 className="mt-2 text-2xl font-semibold text-[#173543]">Reusable audience and action workspace for customers, routes, and future campaigns</h2>
-            <p className="mt-2 max-w-3xl text-sm text-[#5c7483]">
-              Build customer segments by territory, owner, route day, stage, and order behavior. This workspace is designed to support rep assignment, route inclusion, and future audience actions without changing the data model.
-            </p>
+    <div className="mx-auto grid max-w-[1440px] gap-5 xl:grid-cols-[240px_minmax(0,1fr)]">
+      <aside className="xl:sticky xl:top-4 xl:self-start">
+        <section className="rounded-[24px] border border-[#d8e6ee] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbfd_100%)] p-4 shadow-[0_16px_38px_rgba(16,42,67,0.08)]">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6c8797]">Customer Views</p>
+          <div className="mt-3 space-y-2">
+            {[
+              { key: "all" as const, label: "All Accounts", count: navCounts.all },
+              { key: "hall_of_flowers" as const, label: "Hall of Flowers", count: navCounts.hallOfFlowers },
+              { key: "hot_leads" as const, label: "Hot Leads", count: navCounts.hotLeads },
+              { key: "no_task" as const, label: "No Task", count: navCounts.noTask },
+              { key: "overdue" as const, label: "Overdue", count: navCounts.overdue },
+            ].map((item) => {
+              const active =
+                (item.key === "all" &&
+                  savedView === "all" &&
+                  sourceFilter === "all" &&
+                  importSourceFilter === "all" &&
+                  hotLeadFilter === "all" &&
+                  taskStateFilter === "all") ||
+                (item.key === "hall_of_flowers" && savedView === "hall_of_flowers" && sourceFilter === "hall_of_flowers") ||
+                (item.key === "hot_leads" && hotLeadFilter === "hot") ||
+                (item.key === "no_task" && taskStateFilter === "no_open_task") ||
+                (item.key === "overdue" && taskStateFilter === "overdue_task");
+
+              return (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => applyWorkspacePreset(item.key)}
+                  className={[
+                    "flex w-full items-center justify-between rounded-2xl border px-3 py-3 text-left text-sm transition",
+                    active ? "border-[#14b8a6] bg-[#effcf9] text-[#0f766e]" : "border-[#dbe8ef] bg-white text-[#35505d] hover:border-[#97c7c1] hover:bg-[#f4fbfa]",
+                  ].join(" ")}
+                >
+                  <span className="font-semibold">{item.label}</span>
+                  <span className="rounded-full border border-current/15 px-2 py-0.5 text-xs">{item.count}</span>
+                </button>
+              );
+            })}
           </div>
-          <div className="grid w-full gap-3 rounded-2xl border border-[#dbe8ef] bg-white/85 p-4 shadow-sm sm:max-w-[320px] xl:w-[320px] xl:flex-none">
-            <MetricLine label="Visible Accounts" value={String(visibleCustomers.length)} />
-            <MetricLine label="With Contacts" value={String(visibleWithContacts)} />
+
+          <div className="mt-4 grid gap-2 rounded-2xl border border-[#dbe8ef] bg-white/80 p-3">
+            <MetricLine label="Visible" value={String(visibleCustomers.length)} />
             <MetricLine label="Assigned" value={String(visibleWithOwners)} />
-            <MetricLine label="Hall of Flowers" value={String(hallOfFlowersCount)} />
-            <MetricLine label="Hot Leads" value={String(hotLeadCount)} />
+            <MetricLine label="Contacts" value={String(visibleWithContacts)} />
             <MetricLine label="Route Ready" value={String(routeReadyCount)} />
-            <MetricLine label="With Orders" value={String(visibleWithOrders)} />
+            <MetricLine label="Orders" value={String(visibleWithOrders)} />
           </div>
-        </div>
+        </section>
+      </aside>
 
-        <div className="mt-5 flex flex-wrap gap-2">
-          {SAVED_VIEWS.map((view) => {
-            const active = savedView === view.key;
-            return (
-              <button
-                key={view.key}
-                type="button"
-                onClick={() => startTransition(() => setSavedView(view.key))}
-                className={[
-                  "rounded-full border px-3 py-2 text-sm transition",
-                  active ? "border-[#14b8a6] bg-[#14b8a6] text-white shadow-sm" : "border-[#d0e0e8] bg-white text-[#35505d] hover:border-[#97c7c1] hover:bg-[#f4fbfa]",
-                ].join(" ")}
-                title={view.description}
-              >
-                {view.label}
-              </button>
-            );
-          })}
-        </div>
+      <div className="space-y-4">
+        <section className="rounded-[24px] border border-[#d8e6ee] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbfd_100%)] p-4 shadow-[0_16px_38px_rgba(16,42,67,0.08)]">
+          <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-[760px]">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6c8797]">Customer Workspace</p>
+              <h2 className="mt-1 text-xl font-semibold text-[#173543]">Dense operational queue for follow-up, ownership, and route prep</h2>
+              <p className="mt-1 text-sm text-[#5c7483]">
+                Filter CRM accounts quickly, work Hall of Flowers follow-up in place, and keep the current segment URL shareable.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full border border-[#d7e6ed] bg-white px-3 py-1.5 text-sm text-[#4f6877]">{visibleCustomers.length} visible</span>
+              <span className="rounded-full border border-[#f1ddad] bg-[#fff9eb] px-3 py-1.5 text-sm text-[#8a5b00]">{hallOfFlowersCount} Hall of Flowers</span>
+              <span className="rounded-full border border-[#ffd3cf] bg-[#fff2f0] px-3 py-1.5 text-sm text-[#b44b40]">{hotLeadCount} hot</span>
+            </div>
+          </div>
+        </section>
 
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() =>
-              startTransition(() => {
-                setSavedView("hall_of_flowers");
-                setSourceFilter("hall_of_flowers");
-                setImportSourceFilter("event_quick_add");
-              })
-            }
-            className="rounded-full border border-[#f1ddad] bg-[#fff9eb] px-3 py-2 text-sm font-medium text-[#8a5b00] transition hover:border-[#e5c57d] hover:bg-[#fff4d9]"
-          >
-            Hall of Flowers Leads
-          </button>
-          <button
-            type="button"
-            onClick={() =>
-              startTransition(() => {
-                setSavedView("hall_of_flowers");
-                setSourceFilter("hall_of_flowers");
-                setImportSourceFilter("event_quick_add");
-                setHotLeadFilter("hot");
-              })
-            }
-            className="rounded-full border border-[#ffd3cf] bg-[#fff2f0] px-3 py-2 text-sm font-medium text-[#b44b40] transition hover:border-[#f2b2ab] hover:bg-[#ffe7e3]"
-          >
-            Hall of Flowers + Hot Lead
-          </button>
-          <button
-            type="button"
-            onClick={() =>
-              startTransition(() => {
-                setSavedView("hall_of_flowers");
-                setSourceFilter("hall_of_flowers");
-                setImportSourceFilter("event_quick_add");
-                setTaskStateFilter("no_open_task");
-              })
-            }
-            className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-2 text-sm font-medium text-[#4a6575] transition hover:border-[#b4c9d6] hover:bg-white"
-          >
-            Hall of Flowers + No Task
-          </button>
-        </div>
-      </section>
-
-      <section className="rounded-[28px] border border-[#dbe8ef] bg-white p-5 shadow-[0_12px_32px_rgba(16,42,67,0.06)] lg:px-6">
-        <form onSubmit={handleSearchSubmit} className="grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_140px_120px]">
+        <section className="sticky top-4 z-20 rounded-[24px] border border-[#dbe8ef] bg-white/95 p-4 shadow-[0_16px_34px_rgba(16,42,67,0.10)] backdrop-blur">
+          <form onSubmit={handleSearchSubmit} className="grid gap-3 xl:grid-cols-[minmax(280px,1.4fr)_120px_120px]">
           <label className="grid gap-1 text-sm text-[#4b6676]">
             <span className="font-medium">Search accounts</span>
             <input
               value={draftSearch}
               onChange={(event) => setDraftSearch(event.target.value)}
               placeholder="Search account, contact, city, source, territory, route day, phone, website"
-              className="rounded-2xl border border-[#cedde6] bg-[#fbfdfe] px-4 py-3 text-sm text-[#173543] outline-none transition focus:border-[#14b8a6] focus:bg-white"
+              className="h-10 rounded-2xl border border-[#cedde6] bg-[#fbfdfe] px-4 text-sm text-[#173543] outline-none transition focus:border-[#14b8a6] focus:bg-white"
             />
           </label>
 
-          <button type="submit" className="mt-auto rounded-full bg-[#173543] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#0f2a35]">
+          <button type="submit" className={`${denseButtonClass("primary")} mt-auto`}>
             Search
           </button>
           <button
             type="button"
             onClick={handleClearSearch}
-            className="mt-auto rounded-full border border-[#d0dde5] bg-white px-4 py-3 text-sm font-semibold text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543]"
+            className={`${denseButtonClass()} mt-auto`}
           >
             Clear
           </button>
         </form>
 
-        <div className="mt-4 grid gap-4 lg:grid-cols-2 2xl:grid-cols-[repeat(6,minmax(0,1fr))]">
+        <div className="mt-3 grid gap-3 xl:grid-cols-[repeat(6,minmax(0,1fr))]">
           <FilterSelect
             label="Source"
             value={sourceFilter}
@@ -816,7 +842,7 @@ export default function CustomerWorkspaceIndex({
           <FilterSelect label="Stage" value={stageFilter} onChange={setStageFilter} options={stages.map((stage) => ({ value: stage, label: titleCase(stage) }))} />
         </div>
 
-        <div className="mt-4 grid gap-4 lg:grid-cols-2 2xl:grid-cols-[repeat(6,minmax(0,1fr))]">
+        <div className="mt-3 grid gap-3 xl:grid-cols-[repeat(6,minmax(0,1fr))]">
           <FilterSelect
             label="Hot Lead"
             value={hotLeadFilter}
@@ -859,9 +885,6 @@ export default function CustomerWorkspaceIndex({
               { value: "address_ready", label: "Address Ready, No Coords" },
             ]}
           />
-        </div>
-
-        <div className="mt-4 grid gap-4 lg:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
           <FilterSelect
             label="Has Orders"
             value={orderState}
@@ -883,6 +906,9 @@ export default function CustomerWorkspaceIndex({
             ]}
             allowAllLabel="None"
           />
+        </div>
+
+        <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
           <FilterSelect
             label="Sort"
             value={sortKey}
@@ -896,9 +922,35 @@ export default function CustomerWorkspaceIndex({
             ]}
             allowAllLabel={null}
           />
+          <div className="flex flex-wrap items-end gap-2">
+            <button
+              type="button"
+              onClick={selectAllVisible}
+              disabled={visibleCustomers.length === 0}
+              className={denseButtonClass()}
+            >
+              {allVisibleSelected ? "All selected" : `Select ${visibleCustomers.length}`}
+            </button>
+            <button type="button" onClick={clearSelection} disabled={selectedVisibleCustomerIds.length === 0} className={denseButtonClass()}>
+              Clear
+            </button>
+            <button type="button" onClick={resetFilters} className={denseButtonClass()}>
+              Reset filters
+            </button>
+            {staffRole === "admin" ? (
+              <button
+                type="button"
+                onClick={() => void geocodeVisibleResults()}
+                disabled={visibleCustomers.length === 0 || visibleGeocodeBusy}
+                className={denseButtonClass()}
+              >
+                {visibleGeocodeBusy ? "Geocoding..." : "Geocode visible"}
+              </button>
+            ) : null}
+          </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-2">
+        <div className="mt-3 flex flex-wrap items-center gap-2">
           <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4f6877]">
             Selected {selectedVisibleCustomerIds.length} of {visibleCustomers.length} filtered
           </span>
@@ -911,39 +963,6 @@ export default function CustomerWorkspaceIndex({
           <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4f6877]">
             Organize by {organizeBy === "none" ? "none" : titleCase(organizeBy)}
           </span>
-          <button
-            type="button"
-            onClick={selectAllVisible}
-            disabled={visibleCustomers.length === 0}
-            className="rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543] disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {allVisibleSelected ? "All filtered selected" : `Select all filtered (${visibleCustomers.length})`}
-          </button>
-          <button
-            type="button"
-            onClick={clearSelection}
-            disabled={selectedVisibleCustomerIds.length === 0}
-            className="rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543] disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            Clear filtered selection
-          </button>
-          <button
-            type="button"
-            onClick={resetFilters}
-            className="rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543]"
-          >
-            Reset filters
-          </button>
-          {staffRole === "admin" ? (
-            <button
-              type="button"
-              onClick={() => void geocodeVisibleResults()}
-              disabled={visibleCustomers.length === 0 || visibleGeocodeBusy}
-              className="rounded-full border border-[#b9d5df] bg-white px-3 py-1.5 text-sm font-semibold text-[#21414d] transition hover:border-[#14b8a6] hover:text-[#0f766e] disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {visibleGeocodeBusy ? "Geocoding Visible..." : "Geocode Visible Results"}
-            </button>
-          ) : null}
           {visibleGeocodeStatus ? <span className="text-sm text-[#4f6877]">{visibleGeocodeStatus}</span> : null}
         </div>
       </section>
@@ -980,12 +999,12 @@ export default function CustomerWorkspaceIndex({
         </nav>
       ) : null}
 
-      <section className="space-y-5">
+      <section className="space-y-4">
         {sections.map((section) => (
           <div
             key={section.key}
             id={organizeBy === "territory" ? `customer-segment-${section.key}` : undefined}
-            className={organizeBy === "none" ? "" : "rounded-[28px] border border-[#dbe8ef] bg-white p-5 shadow-[0_12px_32px_rgba(16,42,67,0.06)]"}
+            className={organizeBy === "none" ? "" : "rounded-[24px] border border-[#dbe8ef] bg-white p-4 shadow-[0_12px_32px_rgba(16,42,67,0.06)]"}
           >
             {organizeBy !== "none" ? (
               <div className="mb-4 flex flex-col gap-2 xl:flex-row xl:items-end xl:justify-between">
@@ -1020,6 +1039,7 @@ export default function CustomerWorkspaceIndex({
           </div>
         ) : null}
       </section>
+      </div>
     </div>
   );
 }
@@ -1048,135 +1068,74 @@ function CustomerCard({
   return (
     <article
       className={[
-        "rounded-[22px] border bg-white p-3 shadow-[0_10px_24px_rgba(16,42,67,0.05)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(16,42,67,0.07)] lg:p-4",
+        "rounded-[20px] border bg-white px-3 py-2.5 shadow-[0_8px_18px_rgba(16,42,67,0.05)] transition hover:border-[#b9d5df] hover:shadow-[0_12px_24px_rgba(16,42,67,0.07)]",
         selected || pendingSelected ? "border-[#14b8a6] ring-2 ring-[#b8efe7]" : "border-[#d9e7ee]",
       ].join(" ")}
     >
-      <div className="flex flex-col gap-3 2xl:flex-row 2xl:items-start 2xl:justify-between">
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-col gap-3 xl:flex-row xl:items-start">
-            <div className="min-w-0 flex-1">
-              <label className="mb-2 inline-flex w-fit items-center gap-2 rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-2.5 py-1 text-xs font-medium text-[#35505d]">
-                <input type="checkbox" checked={selected} onChange={() => onToggleSelected(customer.id)} className="h-4 w-4 accent-[#14b8a6]" />
-                Select account
-              </label>
-              <div className="flex flex-wrap items-center gap-2">
-                <Link href={`/workspace/customers/${customer.id}`} className="text-base font-semibold text-[#173543] transition hover:text-[#0f766e]">
-                  {customer.name}
-                </Link>
-                <span className={["rounded-full border px-2.5 py-1 text-xs font-semibold", statusChipClass(customer.status)].join(" ")}>
-                  {titleCase(customer.status)}
-                </span>
-                <span className={["rounded-full border px-2.5 py-1 text-xs font-semibold", stageChipClass(customer.stage)].join(" ")}>
-                  {titleCase(customer.stage, "No Stage")}
-                </span>
-                {customer.isHallOfFlowersLead ? (
-                  <span className="rounded-full border border-[#f1ddad] bg-[#fff9eb] px-2.5 py-1 text-xs font-semibold text-[#8a5b00]">Hall of Flowers</span>
-                ) : null}
-                {customer.isHotLead ? (
-                  <span className="rounded-full border border-[#ffd3cf] bg-[#fff2f0] px-2.5 py-1 text-xs font-semibold text-[#b44b40]">Hot Lead</span>
-                ) : null}
-                {(customer.source || customer.importSource) && !customer.isHallOfFlowersLead ? (
-                  <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-2.5 py-1 text-xs font-semibold text-[#496574]">
-                    {customer.source ? formatSourceLabel(customer.source) : formatSourceLabel(customer.importSource)}
-                  </span>
-                ) : null}
-                <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-2.5 py-1 text-xs font-semibold text-[#496574]">
-                  {customer.territoryCode ? `Territory ${customer.territoryCode}` : "Territory Open"}
-                </span>
-                <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-2.5 py-1 text-xs font-semibold text-[#496574]">
-                  {customer.routeDay ? `Route ${customer.routeDay}` : "No Route Day"}
-                </span>
-                {pendingSelected ? (
-                  <span className="rounded-full border border-[#bfe8e2] bg-[#f5fffd] px-2.5 py-1 text-xs font-semibold text-[#0f766e]">Pending Stop</span>
-                ) : null}
-                <span className={["rounded-full border px-2.5 py-1 text-xs font-semibold", followUpChipClass(customer)].join(" ")}>
-                  {followUpState}
-                </span>
-                <RouteReadinessPill state={routeReadiness} />
-              </div>
-              <p className="mt-1.5 text-sm text-[#5a7483]">
-                Owner {customer.assignedSalesName || "Unassigned"}
-                {customer.assignedSalesEmail ? ` • ${customer.assignedSalesEmail}` : ""}
-                {customer.assignedRouteRepName ? ` • Route Rep ${customer.assignedRouteRepName}` : ""}
-                {customer.city ? ` • ${customer.city}` : ""}
-              </p>
-            </div>
-
-            <div className="grid w-full gap-1.5 rounded-2xl border border-[#e1ebf1] bg-[#fbfdfe] p-2.5 text-sm text-[#53707f] xl:max-w-[240px] xl:flex-none">
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[#8198a5]">Activity</span>
-                <span className="font-semibold text-[#173543]">{activityCount} linked</span>
-              </div>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-                <span>Orders {customer.counts.orders}</span>
-                <span>Estimates {customer.counts.estimates}</span>
-                <span>Packaging {customer.counts.packagingSubmissions}</span>
-                <span>Docs {customer.counts.documents}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-3 grid gap-2 lg:grid-cols-2 2xl:grid-cols-[1.15fr_1fr_1fr]">
-            <InfoBlock
-              label="Primary Contact"
-              title={primaryContact?.name || "No primary contact"}
-              lines={[
-                primaryContact?.title || null,
-                primaryContact?.email || customer.primaryContactEmail || "No contact email",
-                primaryContact?.phone || customer.mainPhone || null,
-              ]}
-            />
-
-            <InfoBlock
-              label="Coverage"
-              title={customer.city || `${customer.contactCount} contact${customer.contactCount === 1 ? "" : "s"}`}
-              lines={[
-                `${customer.contactCount} contact${customer.contactCount === 1 ? "" : "s"}`,
-                `${customer.memberUsers.length} internal member${customer.memberUsers.length === 1 ? "" : "s"}`,
-                customer.areaZone ? `Area ${customer.areaZone}` : "Area unassigned",
-                customer.territoryCode ? `Territory ${customer.territoryCode}` : "Territory open",
-              ]}
-            />
-
-            <InfoBlock
-              label="Routing"
-              title={customer.routeDay ? `Route ${customer.routeDay}` : "No route day"}
-              lines={[
-                customer.visitStatus ? `Visit ${titleCase(customer.visitStatus)}` : "Visit status open",
-                customer.latitude !== null && customer.longitude !== null ? `Geo ${customer.latitude.toFixed(4)}, ${customer.longitude.toFixed(4)}` : "No coordinates yet",
-                customer.nextVisitDueAt ? `Next due ${formatDate(customer.nextVisitDueAt)}` : null,
-              ]}
-            />
-
-            <InfoBlock
-              label="Follow-Up"
-              title={followUpState}
-              lines={[
-                customer.source ? `Source ${formatSourceLabel(customer.source)}` : null,
-                customer.importSource ? `Imported via ${formatSourceLabel(customer.importSource)}` : null,
-                customer.mainPhone || "No account phone on file",
-                customer.updatedAt ? `Updated ${formatDate(customer.updatedAt)}` : null,
-              ]}
-            />
-          </div>
+      <div className="flex flex-col gap-3 xl:grid xl:min-h-[86px] xl:grid-cols-[minmax(0,28px)_minmax(0,1.6fr)_minmax(240px,0.85fr)_minmax(230px,0.8fr)_auto] xl:items-center">
+        <div className="flex items-center">
+          <input type="checkbox" checked={selected} onChange={() => onToggleSelected(customer.id)} className="h-4 w-4 accent-[#14b8a6]" />
         </div>
 
-        <div className="flex w-full flex-col gap-2 sm:max-w-[220px] 2xl:w-[220px] 2xl:flex-none">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <Link href={`/workspace/customers/${customer.id}`} className="truncate text-sm font-semibold text-[#173543] transition hover:text-[#0f766e]">
+              {customer.name}
+            </Link>
+            <span className={["rounded-full border px-2 py-0.5 text-[11px] font-semibold", statusChipClass(customer.status)].join(" ")}>{titleCase(customer.status)}</span>
+            <span className={["rounded-full border px-2 py-0.5 text-[11px] font-semibold", stageChipClass(customer.stage)].join(" ")}>{titleCase(customer.stage, "No Stage")}</span>
+            {customer.isHallOfFlowersLead ? (
+              <span className="rounded-full border border-[#f1ddad] bg-[#fff9eb] px-2 py-0.5 text-[11px] font-semibold text-[#8a5b00]">Hall of Flowers</span>
+            ) : null}
+            {customer.isHotLead ? (
+              <span className="rounded-full border border-[#ffd3cf] bg-[#fff2f0] px-2 py-0.5 text-[11px] font-semibold text-[#b44b40]">Hot Lead</span>
+            ) : null}
+            <span className={["rounded-full border px-2 py-0.5 text-[11px] font-semibold", followUpChipClass(customer)].join(" ")}>{followUpState}</span>
+            {pendingSelected ? <span className="rounded-full border border-[#bfe8e2] bg-[#f5fffd] px-2 py-0.5 text-[11px] font-semibold text-[#0f766e]">Pending Stop</span> : null}
+          </div>
+          <p className="mt-1 truncate text-sm text-[#5a7483]">
+            {primaryContact?.name || "No primary contact"}
+            {primaryContact?.phone || customer.mainPhone ? ` • ${primaryContact?.phone || customer.mainPhone}` : ""}
+            {primaryContact?.email || customer.primaryContactEmail ? ` • ${primaryContact?.email || customer.primaryContactEmail}` : ""}
+          </p>
+        </div>
+
+        <div className="min-w-0 text-sm text-[#56717f]">
+          <p className="truncate">
+            Owner {customer.assignedSalesName || "Unassigned"}
+            {customer.city ? ` • ${customer.city}` : ""}
+          </p>
+          <p className="mt-1 truncate text-xs text-[#7a909d]">
+            {customer.territoryCode ? `Territory ${customer.territoryCode}` : "Territory open"}
+            {customer.routeDay ? ` • ${customer.routeDay}` : " • No route day"}
+            {customer.source ? ` • ${formatSourceLabel(customer.source)}` : ""}
+          </p>
+        </div>
+
+        <div className="min-w-0 text-sm text-[#56717f]">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-[#7a909d]">
+            <RouteReadinessPill state={routeReadiness} />
+            <span>{activityCount} linked</span>
+            <span>{customer.counts.orders} orders</span>
+            <span>{customer.contactCount} contacts</span>
+          </div>
+          <p className="mt-1 truncate text-xs text-[#7a909d]">
+            {customer.nextVisitDueAt ? `Next visit ${formatDate(customer.nextVisitDueAt)}` : "No next visit"}
+            {customer.updatedAt ? ` • Updated ${formatDate(customer.updatedAt)}` : ""}
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <RouteActionButton customer={customer} pendingSelected={pendingSelected} onTogglePendingSelected={onTogglePendingSelected} />
+          <QuickAction href={phoneHref} label="Call" />
+          <QuickAction href={primaryEmailHref} label="Email" />
           <Link
             href={`/workspace/customers/${customer.id}`}
-            className="inline-flex items-center justify-center rounded-full bg-[#173543] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#0f2a35]"
+            className={denseButtonClass("primary")}
           >
-            Open Account
+            Open
           </Link>
-          <RouteActionButton
-            customer={customer}
-            pendingSelected={pendingSelected}
-            onTogglePendingSelected={onTogglePendingSelected}
-          />
-          <QuickAction href={primaryEmailHref} label="Email Primary" />
-          <QuickAction href={phoneHref} label="Call Account" />
-          <QuickAction href={websiteHref} label="Visit Website" external />
+          <QuickAction href={websiteHref} label="Site" external />
         </div>
       </div>
     </article>
@@ -1213,26 +1172,26 @@ function RouteActionButton({
   }
 
   return (
-    <div className="space-y-1">
+    <div className="flex items-center gap-2">
       <button
         type="button"
         onClick={() => void handlePendingToggle()}
         disabled={busy}
         className={[
-          "inline-flex items-center justify-center rounded-full px-4 py-2.5 text-sm font-semibold transition",
+          "inline-flex h-9 items-center justify-center rounded-full px-3.5 text-sm font-semibold transition",
           pendingSelected
             ? "border border-[#bfe8e2] bg-[#f5fffd] text-[#0f766e] hover:border-[#14b8a6]"
             : "border border-[#cddbe4] bg-white text-[#21424d] hover:border-[#14b8a6] hover:text-[#0f766e]",
         ].join(" ")}
       >
-        {busy ? "Saving..." : pendingSelected ? "Remove from Pending Stops" : "Add to Pending Stops"}
+        {busy ? "Saving..." : pendingSelected ? "Pending" : "Queue"}
       </button>
       {routeHref ? (
-        <Link href={routeHref} className="inline-flex px-1 text-xs font-medium text-[#0f766e] transition hover:text-[#0b5f58]">
-          Open Pending Stops
+        <Link href={routeHref} className="inline-flex h-9 items-center rounded-full border border-[#bfe8e2] px-3 text-sm font-medium text-[#0f766e] transition hover:text-[#0b5f58]">
+          Pending
         </Link>
       ) : null}
-      {statusMessage ? <p className="px-1 text-xs text-[#4f6877]">{statusMessage}</p> : null}
+      {statusMessage ? <p className="text-xs text-[#4f6877]">{statusMessage}</p> : null}
     </div>
   );
 }
@@ -1288,7 +1247,7 @@ function BulkActionBar({
               value={action.kind}
               onChange={(event) => onActionChange({ ...action, kind: event.target.value as BulkActionKind, value: "" })}
               disabled={busy}
-              className="rounded-2xl border border-[#cedde6] bg-white px-4 py-3 text-sm text-[#173543] outline-none transition focus:border-[#14b8a6]"
+              className="h-10 rounded-2xl border border-[#cedde6] bg-white px-4 text-sm text-[#173543] outline-none transition focus:border-[#14b8a6]"
             >
               {availableActions.map((item) => (
                 <option key={item.key} value={item.key}>
@@ -1305,7 +1264,7 @@ function BulkActionBar({
                 value={action.value}
                 onChange={(event) => onActionChange({ ...action, value: event.target.value })}
                 disabled={busy}
-                className="min-w-[220px] rounded-2xl border border-[#cedde6] bg-white px-4 py-3 text-sm text-[#173543] outline-none transition focus:border-[#14b8a6]"
+                className="h-10 min-w-[220px] rounded-2xl border border-[#cedde6] bg-white px-4 text-sm text-[#173543] outline-none transition focus:border-[#14b8a6]"
               >
                 <option value="">Select {valueLabel.toLowerCase()}</option>
                 {action.kind === "assign_sales_rep"
@@ -1335,7 +1294,7 @@ function BulkActionBar({
             type="button"
             onClick={onApply}
             disabled={busy}
-            className="rounded-full bg-[#173543] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#0f2a35] disabled:cursor-not-allowed disabled:opacity-60"
+            className="h-10 rounded-full bg-[#173543] px-4 text-sm font-semibold text-white transition hover:bg-[#0f2a35] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {busy ? "Applying..." : "Apply"}
           </button>
@@ -1343,7 +1302,7 @@ function BulkActionBar({
             type="button"
             onClick={onClear}
             disabled={busy}
-            className="rounded-full border border-[#d0dde5] bg-white px-4 py-3 text-sm font-semibold text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543] disabled:cursor-not-allowed disabled:opacity-60"
+            className="h-10 rounded-full border border-[#d0dde5] bg-white px-4 text-sm font-semibold text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543] disabled:cursor-not-allowed disabled:opacity-60"
           >
             Clear
           </button>
@@ -1394,20 +1353,6 @@ function MetricLine({ label, value }: { label: string; value: string }) {
   );
 }
 
-function InfoBlock({ label, title, lines }: { label: string; title: string; lines: Array<string | null> }) {
-  return (
-    <div className="rounded-2xl border border-[#e1ebf1] bg-[#fbfdfe] p-3">
-      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7f96a3]">{label}</p>
-      <p className="mt-1.5 font-semibold text-[#173543]">{title}</p>
-      <div className="mt-1.5 space-y-1 text-sm text-[#56717f]">
-        {lines.filter(Boolean).map((line) => (
-          <p key={line}>{line}</p>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function QuickAction({ href, label, external = false }: { href: string | null; label: string; external?: boolean }) {
   if (!href) {
     return (
@@ -1422,7 +1367,7 @@ function QuickAction({ href, label, external = false }: { href: string | null; l
       href={href}
       target={external ? "_blank" : undefined}
       rel={external ? "noreferrer" : undefined}
-      className="inline-flex items-center justify-center rounded-full border border-[#cddbe4] bg-white px-4 py-2.5 text-sm font-medium text-[#21424d] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
+      className="inline-flex h-9 items-center justify-center rounded-full border border-[#cddbe4] bg-white px-3.5 text-sm font-medium text-[#21424d] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
     >
       {label}
     </a>

@@ -141,6 +141,22 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
         <SummaryCard label="Last Activity" value={formatDate(detail.customer.lastActivityAt)} />
       </section>
 
+      <section className="rounded-2xl border border-[#dbe9ef] bg-white p-3 shadow-sm">
+        <div className="flex flex-wrap gap-2">
+          {["Overview", "Activity", "Tasks", "Routing", "Notes"].map((tab, index) => (
+            <span
+              key={tab}
+              className={[
+                "inline-flex h-9 items-center rounded-full border px-3.5 text-sm font-medium",
+                index === 0 ? "border-[#14b8a6] bg-[#effcf9] text-[#0f766e]" : "border-[#d7e6ed] bg-[#f8fbfc] text-[#4f6877]",
+              ].join(" ")}
+            >
+              {tab}
+            </span>
+          ))}
+        </div>
+      </section>
+
       <section className="grid gap-3 2xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.9fr)]">
         <CustomerDetailManager
           customerId={detail.customer.id}
