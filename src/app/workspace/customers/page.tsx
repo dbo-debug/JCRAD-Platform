@@ -49,6 +49,10 @@ export default async function WorkspaceCustomersPage({
         initialFilters={{
           q: asQueryValue(params?.q),
           savedView: asQueryValue(params?.savedView),
+          source: asQueryValue(params?.source),
+          importSource: asQueryValue(params?.importSource),
+          hotLead: asQueryValue(params?.hotLead),
+          taskState: asQueryValue(params?.taskState),
           territory: asQueryValue(params?.territory),
           owner: asQueryValue(params?.owner),
           status: asQueryValue(params?.status),

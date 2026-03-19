@@ -10,6 +10,10 @@ export type CustomerSummary = {
   name: string;
   status: string;
   stage: string | null;
+  source: string | null;
+  importSource: string | null;
+  isHallOfFlowersLead: boolean;
+  isHotLead: boolean;
   areaZone: string | null;
   territoryCode: string | null;
   routeDay: string | null;
@@ -39,6 +43,11 @@ export type CustomerSummary = {
   assignedRouteRepEmail: string | null;
   createdAt: string | null;
   updatedAt: string | null;
+  openTaskCount: number;
+  overdueTaskCount: number;
+  hasOpenTask: boolean;
+  nextTaskDueAt: string | null;
+  latestTaskStatus: string | null;
   contactCount: number;
   primaryContacts: Array<{
     id: string;
@@ -159,6 +168,8 @@ function normalizeText(value: unknown): string {
   return String(value || "").trim().toLowerCase();
 }
 
+const CLOSED_TASK_STATUSES = new Set(["completed", "closed", "cancelled"]);
+
 function uniqueStrings(values: Array<unknown>): string[] {
   return Array.from(new Set(values.map((value) => String(value || "").trim()).filter(Boolean)));
 }
@@ -178,6 +189,12 @@ function firstNumber(...values: Array<unknown>): number | null {
     if (Number.isFinite(parsed)) return parsed;
   }
   return null;
+}
+
+function hasHotLeadFlag(details: unknown): boolean {
+  if (!details || typeof details !== "object" || Array.isArray(details)) return false;
+  const value = (details as Record<string, unknown>).hot_lead;
+  return value === true || value === "true" || value === 1 || value === "1";
 }
 
 function formatProfileName(profile: GenericRow | null | undefined): string | null {
@@ -611,6 +628,8 @@ function buildCustomerSummary({
   const customerId = String(customer.id || "").trim();
   const contacts = data.customerContacts.filter((row) => String(row.customer_id || "").trim() === customerId);
   const memberships = data.customerUsers.filter((row) => String(row.customer_id || "").trim() === customerId);
+  const activityRows = data.customerActivity.filter((row) => String(row.customer_id || "").trim() === customerId);
+  const taskRows = data.customerTasks.filter((row) => String(row.customer_id || "").trim() === customerId);
   const identifiers = getCustomerIdentifiers({
     customer,
     contacts,
@@ -667,11 +686,39 @@ function buildCustomerSummary({
     };
   });
 
+  const source = firstText(customer.source);
+  const importSource = firstText(customer.import_source);
+  const isHallOfFlowersLead = normalizeText(source) === "hall_of_flowers" || normalizeText(importSource) === "event_quick_add";
+  const isHotLead =
+    activityRows.some((row) => hasHotLeadFlag(row.details)) ||
+    taskRows.some((row) => normalizeText(row.title).includes("hall of flowers lead") && !CLOSED_TASK_STATUSES.has(normalizeText(row.status)));
+  const openTasks = taskRows
+    .filter((row) => !CLOSED_TASK_STATUSES.has(normalizeText(row.status)) && !firstText(row.completed_at))
+    .sort((a, b) => {
+      const aDue = Date.parse(String(firstText(a.due_date) || ""));
+      const bDue = Date.parse(String(firstText(b.due_date) || ""));
+      if (Number.isFinite(aDue) || Number.isFinite(bDue)) {
+        return (Number.isFinite(aDue) ? aDue : Number.MAX_SAFE_INTEGER) - (Number.isFinite(bDue) ? bDue : Number.MAX_SAFE_INTEGER);
+      }
+      const aCreated = Date.parse(String(firstText(a.created_at) || ""));
+      const bCreated = Date.parse(String(firstText(b.created_at) || ""));
+      return (Number.isFinite(aCreated) ? aCreated : Number.MAX_SAFE_INTEGER) - (Number.isFinite(bCreated) ? bCreated : Number.MAX_SAFE_INTEGER);
+    });
+  const referenceNow = Date.now();
+  const overdueTaskCount = openTasks.filter((row) => {
+    const due = Date.parse(String(firstText(row.due_date) || ""));
+    return Number.isFinite(due) && due < referenceNow;
+  }).length;
+  const nextTaskDueAt = firstText(openTasks[0]?.due_date) || null;
+  const latestTaskStatus = firstText(openTasks[0]?.status, taskRows[0]?.status) || null;
+
   const lastActivityAt = uniqueStrings([
     ...linkedEstimates.map((row) => row.updatedAt || row.createdAt),
     ...linkedOrders.map((row) => row.updatedAt || row.createdAt),
     ...linkedPackaging.map((row) => row.updatedAt || row.createdAt),
     ...linkedDocuments.map((row) => row.updatedAt || row.createdAt),
+    ...activityRows.map((row) => firstText(row.created_at)),
+    ...taskRows.map((row) => firstText(row.created_at, row.completed_at, row.due_date)),
   ])
     .map((value) => ({ value, time: Date.parse(value) }))
     .filter((row) => Number.isFinite(row.time))
@@ -682,6 +729,10 @@ function buildCustomerSummary({
     name: getCustomerName(customer),
     status: getCustomerStatus(customer),
     stage: firstText(customer.stage),
+    source,
+    importSource,
+    isHallOfFlowersLead,
+    isHotLead,
     areaZone: firstText(customer.area_zone),
     territoryCode: firstText(customer.territory_code),
     routeDay: firstText(customer.route_day),
@@ -711,6 +762,11 @@ function buildCustomerSummary({
     assignedRouteRepEmail: firstText(authUserById.get(assignedRouteRepUserId || "")?.email),
     createdAt: firstText(customer.created_at) || null,
     updatedAt: firstText(customer.updated_at) || null,
+    openTaskCount: openTasks.length,
+    overdueTaskCount,
+    hasOpenTask: openTasks.length > 0,
+    nextTaskDueAt,
+    latestTaskStatus,
     contactCount: contacts.length,
     primaryContacts,
     memberUsers,

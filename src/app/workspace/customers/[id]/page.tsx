@@ -34,6 +34,21 @@ function getActivityNotes(details: Record<string, unknown> | null): string | nul
   return text || null;
 }
 
+function hasHotLeadFlag(details: Record<string, unknown> | null): boolean {
+  const value = details?.hot_lead;
+  return value === true || value === "true" || value === 1 || value === "1";
+}
+
+function formatSourceLabel(value: string | null | undefined, fallback = "Unspecified"): string {
+  const text = String(value || "").trim();
+  if (!text) return fallback;
+  return text
+    .split(/[_\s-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
 function formatAddress(customer: {
   address1: string | null;
   address2: string | null;
@@ -97,10 +112,31 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
         }
       />
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="flex flex-wrap gap-2">
+        {detail.customer.isHallOfFlowersLead ? <HeaderBadge tone="event" label="Hall of Flowers" /> : null}
+        {detail.customer.isHotLead ? <HeaderBadge tone="hot" label="Hot Lead" /> : null}
+        {detail.customer.source ? <HeaderBadge label={`Source ${formatSourceLabel(detail.customer.source)}`} /> : null}
+        {detail.customer.importSource ? <HeaderBadge label={`Import ${formatSourceLabel(detail.customer.importSource)}`} /> : null}
+        <HeaderBadge
+          tone={detail.customer.hasOpenTask ? (detail.customer.overdueTaskCount > 0 ? "warn" : "ok") : "neutral"}
+          label={
+            detail.customer.hasOpenTask
+              ? detail.customer.overdueTaskCount > 0
+                ? `${detail.customer.overdueTaskCount} overdue task${detail.customer.overdueTaskCount === 1 ? "" : "s"}`
+                : detail.customer.nextTaskDueAt
+                  ? `Follow-up due ${formatDate(detail.customer.nextTaskDueAt)}`
+                  : `${detail.customer.openTaskCount} open task${detail.customer.openTaskCount === 1 ? "" : "s"}`
+              : "No open follow-up task"
+          }
+        />
+      </div>
+
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
         <SummaryCard label="Status" value={detail.customer.status} />
         <SummaryCard label="Stage" value={detail.customer.stage || "Not set"} />
         <SummaryCard label="Assigned Sales" value={detail.customer.assignedSalesName || "Unassigned"} helper={detail.customer.assignedSalesEmail || undefined} />
+        <SummaryCard label="City" value={detail.customer.city || "Not set"} />
+        <SummaryCard label="Source" value={formatSourceLabel(detail.customer.source)} helper={detail.customer.importSource ? `Import ${formatSourceLabel(detail.customer.importSource)}` : undefined} />
         <SummaryCard label="Primary Email" value={detail.customer.primaryContactEmail || "Not set"} />
         <SummaryCard label="Last Activity" value={formatDate(detail.customer.lastActivityAt)} />
       </section>
@@ -307,6 +343,27 @@ function SummaryCard({ label, value, helper }: { label: string; value: string; h
   );
 }
 
+function HeaderBadge({
+  label,
+  tone = "neutral",
+}: {
+  label: string;
+  tone?: "neutral" | "ok" | "warn" | "event" | "hot";
+}) {
+  const toneClass =
+    tone === "ok"
+      ? "border-[#bde8e4] bg-[#e9fbf9] text-[#0f766e]"
+      : tone === "warn"
+        ? "border-[#f1ddad] bg-[#fff9eb] text-[#9a6b00]"
+        : tone === "event"
+          ? "border-[#f1ddad] bg-[#fff9eb] text-[#8a5b00]"
+          : tone === "hot"
+            ? "border-[#ffd3cf] bg-[#fff2f0] text-[#b44b40]"
+            : "border-[#d7e6ed] bg-[#f8fbfc] text-[#4f6877]";
+
+  return <span className={["rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em]", toneClass].join(" ")}>{label}</span>;
+}
+
 function ActivityCard({
   item,
 }: {
@@ -320,10 +377,15 @@ function ActivityCard({
   };
 }) {
   const notes = getActivityNotes(item.details);
+  const hotLead = hasHotLeadFlag(item.details);
 
   return (
     <div className="rounded-xl border border-[#dbe9ef] bg-[#f9fcfd] px-3 py-2.5">
-      <p className="font-semibold text-[#173543]">{item.summary}</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="font-semibold text-[#173543]">{item.summary}</p>
+        {hotLead ? <HeaderBadge tone="hot" label="Hot Lead" /> : null}
+        {item.activityType === "event_quick_add" ? <HeaderBadge tone="event" label="Hall of Flowers" /> : null}
+      </div>
       <p className="mt-1 text-sm text-[#4a6575]">
         {item.actorName || "System"} • {formatDate(item.createdAt)}
       </p>

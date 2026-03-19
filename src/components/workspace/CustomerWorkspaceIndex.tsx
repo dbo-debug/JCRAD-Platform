@@ -25,6 +25,10 @@ type CustomerWorkspaceIndexProps = {
   initialFilters: {
     q: string;
     savedView: string;
+    source: string;
+    importSource: string;
+    hotLead: string;
+    taskState: string;
     territory: string;
     owner: string;
     status: string;
@@ -43,11 +47,13 @@ type BulkActionState = {
   value: string;
 };
 
-type SavedViewKey = "all" | "pipeline" | "unassigned" | "missing_primary" | "with_orders";
+type SavedViewKey = "all" | "pipeline" | "unassigned" | "missing_primary" | "with_orders" | "hall_of_flowers";
 type SortKey = "activity_desc" | "name_asc" | "name_desc" | "orders_desc" | "owner_asc";
 type ContactCoverageFilter = "all" | "has_contacts" | "missing_primary" | "no_contacts";
 type RouteReadinessFilter = "all" | "route_ready" | "no_territory" | "no_route_day" | "no_route_rep" | "no_coords" | "address_ready";
 type OrderStateFilter = "all" | "has_orders" | "no_orders";
+type HotLeadFilter = "all" | "hot" | "not_hot";
+type TaskStateFilter = "all" | "has_open_task" | "no_open_task" | "overdue_task";
 type OrganizeBy = "none" | "territory" | "owner" | "route_day" | "stage";
 
 const SAVED_VIEWS: Array<{ key: SavedViewKey; label: string; description: string }> = [
@@ -56,6 +62,7 @@ const SAVED_VIEWS: Array<{ key: SavedViewKey; label: string; description: string
   { key: "unassigned", label: "Unassigned", description: "Accounts missing an owner." },
   { key: "missing_primary", label: "Missing Primary Contact", description: "Accounts missing a primary contact." },
   { key: "with_orders", label: "Order History", description: "Accounts with at least one order." },
+  { key: "hall_of_flowers", label: "Hall of Flowers Leads", description: "Event quick-add leads captured into CRM." },
 ];
 const ROUTE_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const BULK_ACTIONS: Array<{ key: BulkActionKind; label: string }> = [
@@ -142,6 +149,11 @@ function stageChipClass(stage: string | null) {
 function getCustomerSearchText(customer: CustomerSummary) {
   return [
     customer.name,
+    customer.city,
+    customer.source,
+    customer.importSource,
+    customer.isHotLead ? "hot lead" : null,
+    customer.isHallOfFlowersLead ? "hall of flowers" : null,
     customer.primaryContactEmail,
     customer.assignedSalesName,
     customer.assignedSalesEmail,
@@ -156,6 +168,25 @@ function getCustomerSearchText(customer: CustomerSummary) {
     .map((value) => normalizeText(value))
     .filter(Boolean)
     .join(" ");
+}
+
+function formatSourceLabel(value: string | null | undefined, fallback = "Unspecified") {
+  const text = String(value || "").trim();
+  if (!text) return fallback;
+  return titleCase(text.replace(/-/g, "_"));
+}
+
+function getFollowUpState(customer: CustomerSummary) {
+  if (!customer.hasOpenTask) return "No Open Task";
+  if (customer.overdueTaskCount > 0) return "Task Overdue";
+  if (customer.nextTaskDueAt) return `Due ${formatDate(customer.nextTaskDueAt)}`;
+  return titleCase(customer.latestTaskStatus, "Open Task");
+}
+
+function followUpChipClass(customer: CustomerSummary) {
+  if (!customer.hasOpenTask) return "border-[#e1d7d3] bg-[#f5f1ef] text-[#6f5b54]";
+  if (customer.overdueTaskCount > 0) return "border-[#f1ddad] bg-[#fff9eb] text-[#9a6b00]";
+  return "border-[#bde8e4] bg-[#e9fbf9] text-[#0f766e]";
 }
 
 function getRouteReadiness(customer: CustomerSummary): Exclude<RouteReadinessFilter, "all"> | "other" {
@@ -193,8 +224,19 @@ export default function CustomerWorkspaceIndex({
     initialFilters.savedView === "pipeline" ||
       initialFilters.savedView === "unassigned" ||
       initialFilters.savedView === "missing_primary" ||
-      initialFilters.savedView === "with_orders"
+      initialFilters.savedView === "with_orders" ||
+      initialFilters.savedView === "hall_of_flowers"
       ? initialFilters.savedView
+      : "all"
+  );
+  const [sourceFilter, setSourceFilter] = useState(initialFilters.source || "all");
+  const [importSourceFilter, setImportSourceFilter] = useState(initialFilters.importSource || "all");
+  const [hotLeadFilter, setHotLeadFilter] = useState<HotLeadFilter>(
+    initialFilters.hotLead === "hot" || initialFilters.hotLead === "not_hot" ? initialFilters.hotLead : "all"
+  );
+  const [taskStateFilter, setTaskStateFilter] = useState<TaskStateFilter>(
+    initialFilters.taskState === "has_open_task" || initialFilters.taskState === "no_open_task" || initialFilters.taskState === "overdue_task"
+      ? initialFilters.taskState
       : "all"
   );
   const [territoryFilter, setTerritoryFilter] = useState(initialFilters.territory || "all");
@@ -249,12 +291,18 @@ export default function CustomerWorkspaceIndex({
   const statuses = Array.from(new Set(customers.map((customer) => customer.status).filter(Boolean))).sort((a, b) => a.localeCompare(b));
   const stages = Array.from(new Set(customers.map((customer) => customer.stage).filter((value): value is string => Boolean(value)))).sort((a, b) => a.localeCompare(b));
   const owners = Array.from(new Set(customers.map((customer) => customer.assignedSalesName).filter((value): value is string => Boolean(value)))).sort((a, b) => a.localeCompare(b));
+  const sources = Array.from(new Set(customers.map((customer) => customer.source).filter((value): value is string => Boolean(value)))).sort((a, b) => a.localeCompare(b));
+  const importSources = Array.from(new Set(customers.map((customer) => customer.importSource).filter((value): value is string => Boolean(value)))).sort((a, b) => a.localeCompare(b));
   const territoryLabelMap = new Map(territoryOptions.map((option) => [option.value, option.label]));
 
   useEffect(() => {
     const params = new URLSearchParams();
     setQueryParam(params, "q", searchQuery.trim(), [""]);
     setQueryParam(params, "savedView", savedView, ["all", ""]);
+    setQueryParam(params, "source", sourceFilter);
+    setQueryParam(params, "importSource", importSourceFilter);
+    setQueryParam(params, "hotLead", hotLeadFilter);
+    setQueryParam(params, "taskState", taskStateFilter);
     setQueryParam(params, "territory", territoryFilter);
     setQueryParam(params, "owner", ownerFilter);
     setQueryParam(params, "status", statusFilter);
@@ -267,11 +315,37 @@ export default function CustomerWorkspaceIndex({
     const next = params.toString();
     if (next === searchParams.toString()) return;
     router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false });
-  }, [contactCoverage, orderState, organizeBy, ownerFilter, pathname, routeReadiness, router, savedView, searchParams, searchQuery, sortKey, stageFilter, statusFilter, territoryFilter]);
+  }, [
+    contactCoverage,
+    hotLeadFilter,
+    importSourceFilter,
+    orderState,
+    organizeBy,
+    ownerFilter,
+    pathname,
+    routeReadiness,
+    router,
+    savedView,
+    searchParams,
+    searchQuery,
+    sortKey,
+    sourceFilter,
+    stageFilter,
+    statusFilter,
+    taskStateFilter,
+    territoryFilter,
+  ]);
 
   let visibleCustomers = customers.filter((customer) => {
     const query = normalizeText(searchQuery);
     if (query && !getCustomerSearchText(customer).includes(query)) return false;
+    if (sourceFilter !== "all" && (customer.source || "") !== sourceFilter) return false;
+    if (importSourceFilter !== "all" && (customer.importSource || "") !== importSourceFilter) return false;
+    if (hotLeadFilter === "hot" && !customer.isHotLead) return false;
+    if (hotLeadFilter === "not_hot" && customer.isHotLead) return false;
+    if (taskStateFilter === "has_open_task" && !customer.hasOpenTask) return false;
+    if (taskStateFilter === "no_open_task" && customer.hasOpenTask) return false;
+    if (taskStateFilter === "overdue_task" && customer.overdueTaskCount === 0) return false;
     if (territoryFilter !== "all" && (customer.territoryCode || "") !== territoryFilter) return false;
     if (ownerFilter !== "all" && (customer.assignedSalesName || "") !== ownerFilter) return false;
     if (statusFilter !== "all" && customer.status !== statusFilter) return false;
@@ -287,6 +361,7 @@ export default function CustomerWorkspaceIndex({
     if (savedView === "unassigned" && customer.assignedSalesName) return false;
     if (savedView === "missing_primary" && customer.primaryContacts.length > 0) return false;
     if (savedView === "with_orders" && customer.counts.orders === 0) return false;
+    if (savedView === "hall_of_flowers" && !customer.isHallOfFlowersLead) return false;
 
     return true;
   });
@@ -320,6 +395,8 @@ export default function CustomerWorkspaceIndex({
 
   const visibleWithContacts = visibleCustomers.filter((customer) => customer.contactCount > 0).length;
   const visibleWithOwners = visibleCustomers.filter((customer) => customer.assignedSalesName).length;
+  const hallOfFlowersCount = visibleCustomers.filter((customer) => customer.isHallOfFlowersLead).length;
+  const hotLeadCount = visibleCustomers.filter((customer) => customer.isHotLead).length;
   const routeReadyCount = visibleCustomers.filter((customer) => getRouteReadiness(customer) === "route_ready").length;
   const visibleWithOrders = visibleCustomers.filter((customer) => customer.counts.orders > 0).length;
   const territoryStats = buildTerritoryStats(visibleCustomers, referenceNow);
@@ -494,6 +571,10 @@ export default function CustomerWorkspaceIndex({
       setDraftSearch("");
       setSearchQuery("");
       setSavedView("all");
+      setSourceFilter("all");
+      setImportSourceFilter("all");
+      setHotLeadFilter("all");
+      setTaskStateFilter("all");
       setTerritoryFilter("all");
       setOwnerFilter("all");
       setStatusFilter("all");
@@ -620,6 +701,8 @@ export default function CustomerWorkspaceIndex({
             <MetricLine label="Visible Accounts" value={String(visibleCustomers.length)} />
             <MetricLine label="With Contacts" value={String(visibleWithContacts)} />
             <MetricLine label="Assigned" value={String(visibleWithOwners)} />
+            <MetricLine label="Hall of Flowers" value={String(hallOfFlowersCount)} />
+            <MetricLine label="Hot Leads" value={String(hotLeadCount)} />
             <MetricLine label="Route Ready" value={String(routeReadyCount)} />
             <MetricLine label="With Orders" value={String(visibleWithOrders)} />
           </div>
@@ -644,6 +727,50 @@ export default function CustomerWorkspaceIndex({
             );
           })}
         </div>
+
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() =>
+              startTransition(() => {
+                setSavedView("hall_of_flowers");
+                setSourceFilter("hall_of_flowers");
+                setImportSourceFilter("event_quick_add");
+              })
+            }
+            className="rounded-full border border-[#f1ddad] bg-[#fff9eb] px-3 py-2 text-sm font-medium text-[#8a5b00] transition hover:border-[#e5c57d] hover:bg-[#fff4d9]"
+          >
+            Hall of Flowers Leads
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              startTransition(() => {
+                setSavedView("hall_of_flowers");
+                setSourceFilter("hall_of_flowers");
+                setImportSourceFilter("event_quick_add");
+                setHotLeadFilter("hot");
+              })
+            }
+            className="rounded-full border border-[#ffd3cf] bg-[#fff2f0] px-3 py-2 text-sm font-medium text-[#b44b40] transition hover:border-[#f2b2ab] hover:bg-[#ffe7e3]"
+          >
+            Hall of Flowers + Hot Lead
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              startTransition(() => {
+                setSavedView("hall_of_flowers");
+                setSourceFilter("hall_of_flowers");
+                setImportSourceFilter("event_quick_add");
+                setTaskStateFilter("no_open_task");
+              })
+            }
+            className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-2 text-sm font-medium text-[#4a6575] transition hover:border-[#b4c9d6] hover:bg-white"
+          >
+            Hall of Flowers + No Task
+          </button>
+        </div>
       </section>
 
       <section className="rounded-[28px] border border-[#dbe8ef] bg-white p-5 shadow-[0_12px_32px_rgba(16,42,67,0.06)] lg:px-6">
@@ -653,7 +780,7 @@ export default function CustomerWorkspaceIndex({
             <input
               value={draftSearch}
               onChange={(event) => setDraftSearch(event.target.value)}
-              placeholder="Search account, contact, territory, route day, phone, website"
+              placeholder="Search account, contact, city, source, territory, route day, phone, website"
               className="rounded-2xl border border-[#cedde6] bg-[#fbfdfe] px-4 py-3 text-sm text-[#173543] outline-none transition focus:border-[#14b8a6] focus:bg-white"
             />
           </label>
@@ -671,10 +798,44 @@ export default function CustomerWorkspaceIndex({
         </form>
 
         <div className="mt-4 grid gap-4 lg:grid-cols-2 2xl:grid-cols-[repeat(6,minmax(0,1fr))]">
+          <FilterSelect
+            label="Source"
+            value={sourceFilter}
+            onChange={setSourceFilter}
+            options={sources.map((source) => ({ value: source, label: formatSourceLabel(source) }))}
+          />
+          <FilterSelect
+            label="Import Source"
+            value={importSourceFilter}
+            onChange={setImportSourceFilter}
+            options={importSources.map((source) => ({ value: source, label: formatSourceLabel(source) }))}
+          />
           <FilterSelect label="Territory" value={territoryFilter} onChange={setTerritoryFilter} options={territoryOptions.map((option) => ({ value: option.value, label: option.label }))} />
           <FilterSelect label="Owner" value={ownerFilter} onChange={setOwnerFilter} options={owners.map((owner) => ({ value: owner, label: owner }))} />
           <FilterSelect label="Status" value={statusFilter} onChange={setStatusFilter} options={statuses.map((status) => ({ value: status, label: titleCase(status) }))} />
           <FilterSelect label="Stage" value={stageFilter} onChange={setStageFilter} options={stages.map((stage) => ({ value: stage, label: titleCase(stage) }))} />
+        </div>
+
+        <div className="mt-4 grid gap-4 lg:grid-cols-2 2xl:grid-cols-[repeat(6,minmax(0,1fr))]">
+          <FilterSelect
+            label="Hot Lead"
+            value={hotLeadFilter}
+            onChange={(value) => setHotLeadFilter(value as HotLeadFilter)}
+            options={[
+              { value: "hot", label: "Hot Lead" },
+              { value: "not_hot", label: "Not Hot Lead" },
+            ]}
+          />
+          <FilterSelect
+            label="Follow-Up"
+            value={taskStateFilter}
+            onChange={(value) => setTaskStateFilter(value as TaskStateFilter)}
+            options={[
+              { value: "has_open_task", label: "Has Open Task" },
+              { value: "no_open_task", label: "No Open Task" },
+              { value: "overdue_task", label: "Overdue Task" },
+            ]}
+          />
           <FilterSelect
             label="Contact Coverage"
             value={contactCoverage}
@@ -882,6 +1043,7 @@ function CustomerCard({
   const phoneHref = normalizeTelHref(primaryContact?.phone || customer.mainPhone);
   const websiteHref = normalizeWebsiteHref(customer.website);
   const routeReadiness = getRouteReadiness(customer);
+  const followUpState = getFollowUpState(customer);
 
   return (
     <article
@@ -908,6 +1070,17 @@ function CustomerCard({
                 <span className={["rounded-full border px-2.5 py-1 text-xs font-semibold", stageChipClass(customer.stage)].join(" ")}>
                   {titleCase(customer.stage, "No Stage")}
                 </span>
+                {customer.isHallOfFlowersLead ? (
+                  <span className="rounded-full border border-[#f1ddad] bg-[#fff9eb] px-2.5 py-1 text-xs font-semibold text-[#8a5b00]">Hall of Flowers</span>
+                ) : null}
+                {customer.isHotLead ? (
+                  <span className="rounded-full border border-[#ffd3cf] bg-[#fff2f0] px-2.5 py-1 text-xs font-semibold text-[#b44b40]">Hot Lead</span>
+                ) : null}
+                {(customer.source || customer.importSource) && !customer.isHallOfFlowersLead ? (
+                  <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-2.5 py-1 text-xs font-semibold text-[#496574]">
+                    {customer.source ? formatSourceLabel(customer.source) : formatSourceLabel(customer.importSource)}
+                  </span>
+                ) : null}
                 <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-2.5 py-1 text-xs font-semibold text-[#496574]">
                   {customer.territoryCode ? `Territory ${customer.territoryCode}` : "Territory Open"}
                 </span>
@@ -917,12 +1090,16 @@ function CustomerCard({
                 {pendingSelected ? (
                   <span className="rounded-full border border-[#bfe8e2] bg-[#f5fffd] px-2.5 py-1 text-xs font-semibold text-[#0f766e]">Pending Stop</span>
                 ) : null}
+                <span className={["rounded-full border px-2.5 py-1 text-xs font-semibold", followUpChipClass(customer)].join(" ")}>
+                  {followUpState}
+                </span>
                 <RouteReadinessPill state={routeReadiness} />
               </div>
               <p className="mt-1.5 text-sm text-[#5a7483]">
                 Owner {customer.assignedSalesName || "Unassigned"}
                 {customer.assignedSalesEmail ? ` • ${customer.assignedSalesEmail}` : ""}
                 {customer.assignedRouteRepName ? ` • Route Rep ${customer.assignedRouteRepName}` : ""}
+                {customer.city ? ` • ${customer.city}` : ""}
               </p>
             </div>
 
@@ -953,8 +1130,9 @@ function CustomerCard({
 
             <InfoBlock
               label="Coverage"
-              title={`${customer.contactCount} contact${customer.contactCount === 1 ? "" : "s"}`}
+              title={customer.city || `${customer.contactCount} contact${customer.contactCount === 1 ? "" : "s"}`}
               lines={[
+                `${customer.contactCount} contact${customer.contactCount === 1 ? "" : "s"}`,
                 `${customer.memberUsers.length} internal member${customer.memberUsers.length === 1 ? "" : "s"}`,
                 customer.areaZone ? `Area ${customer.areaZone}` : "Area unassigned",
                 customer.territoryCode ? `Territory ${customer.territoryCode}` : "Territory open",
@@ -972,9 +1150,11 @@ function CustomerCard({
             />
 
             <InfoBlock
-              label="Last Activity"
-              title={formatDate(customer.lastActivityAt)}
+              label="Follow-Up"
+              title={followUpState}
               lines={[
+                customer.source ? `Source ${formatSourceLabel(customer.source)}` : null,
+                customer.importSource ? `Imported via ${formatSourceLabel(customer.importSource)}` : null,
                 customer.mainPhone || "No account phone on file",
                 customer.updatedAt ? `Updated ${formatDate(customer.updatedAt)}` : null,
               ]}
