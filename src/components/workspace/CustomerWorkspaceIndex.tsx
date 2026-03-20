@@ -57,6 +57,7 @@ type TaskStateFilter = "all" | "has_open_task" | "no_open_task" | "overdue_task"
 type OrganizeBy = "none" | "territory" | "owner" | "route_day" | "stage";
 
 const ROUTE_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const WORKSPACE_STICKY_TOP_CLASS = "top-[calc(var(--workspace-header-offset,5rem)+1rem)]";
 const BULK_ACTIONS: Array<{ key: BulkActionKind; label: string }> = [
   { key: "assign_sales_rep", label: "Assign Sales Rep" },
   { key: "assign_territory", label: "Assign Territory" },
@@ -752,19 +753,21 @@ export default function CustomerWorkspaceIndex({
     }
   }
 
+  const viewNavItems = [
+    { key: "all" as const, label: "All Accounts", count: navCounts.all },
+    { key: "hall_of_flowers" as const, label: "Hall of Flowers", count: navCounts.hallOfFlowers },
+    { key: "hot_leads" as const, label: "Hot Leads", count: navCounts.hotLeads },
+    { key: "no_task" as const, label: "No Task", count: navCounts.noTask },
+    { key: "overdue" as const, label: "Overdue", count: navCounts.overdue },
+  ];
+
   return (
-    <div className="mx-auto grid max-w-[1440px] gap-4 xl:grid-cols-[200px_minmax(0,1fr)]">
-      <aside>
-        <section className="rounded-[20px] border border-[#d8e6ee] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbfd_100%)] p-3.5 shadow-[0_10px_22px_rgba(16,42,67,0.06)]">
+    <div className="grid min-w-0 gap-5 xl:grid-cols-[260px_minmax(0,1fr)] 2xl:grid-cols-[280px_minmax(0,1fr)]">
+      <aside className="min-w-0 xl:sticky xl:self-start xl:top-[calc(var(--workspace-header-offset,5rem)+1rem)]">
+        <section className="rounded-[24px] border border-[#d8e6ee] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbfd_100%)] p-4 shadow-[0_10px_22px_rgba(16,42,67,0.06)]">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6c8797]">Customer Views</p>
-          <div className="mt-2.5 space-y-1.5">
-            {[
-              { key: "all" as const, label: "All Accounts", count: navCounts.all },
-              { key: "hall_of_flowers" as const, label: "Hall of Flowers", count: navCounts.hallOfFlowers },
-              { key: "hot_leads" as const, label: "Hot Leads", count: navCounts.hotLeads },
-              { key: "no_task" as const, label: "No Task", count: navCounts.noTask },
-              { key: "overdue" as const, label: "Overdue", count: navCounts.overdue },
-            ].map((item) => {
+          <div className="mt-3 space-y-2">
+            {viewNavItems.map((item) => {
               const active =
                 (item.key === "all" &&
                   savedView === "all" &&
@@ -783,7 +786,7 @@ export default function CustomerWorkspaceIndex({
                   type="button"
                   onClick={() => applyWorkspacePreset(item.key)}
                   className={[
-                    "flex w-full items-center justify-between rounded-2xl border px-3 py-2.5 text-left text-sm transition",
+                    "flex w-full items-center justify-between rounded-2xl border px-3 py-3 text-left text-sm transition",
                     active ? "border-[#14b8a6] bg-[#effcf9] text-[#0f766e]" : "border-[#dbe8ef] bg-white text-[#35505d] hover:border-[#97c7c1] hover:bg-[#f4fbfa]",
                   ].join(" ")}
                 >
@@ -794,7 +797,7 @@ export default function CustomerWorkspaceIndex({
             })}
           </div>
 
-          <div className="mt-3 grid gap-1.5 rounded-2xl border border-[#dbe8ef] bg-white/80 p-3">
+          <div className="mt-4 grid gap-2 rounded-[20px] border border-[#dbe8ef] bg-white/90 p-3">
             <MetricLine label="Visible" value={String(visibleCustomers.length)} />
             <MetricLine label="Assigned" value={String(visibleWithOwners)} />
             <MetricLine label="Contacts" value={String(visibleWithContacts)} />
@@ -804,14 +807,14 @@ export default function CustomerWorkspaceIndex({
         </section>
       </aside>
 
-      <div className="space-y-3">
-        <section className="rounded-[24px] border border-[#d8e6ee] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbfd_100%)] p-4 shadow-[0_12px_28px_rgba(16,42,67,0.07)]">
-          <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
+      <div className="min-w-0 space-y-4">
+        <section className="rounded-[28px] border border-[#d8e6ee] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbfd_100%)] p-5 shadow-[0_12px_28px_rgba(16,42,67,0.07)]">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-[760px]">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6c8797]">Customer Workspace</p>
-              <h2 className="mt-1 text-xl font-semibold text-[#173543]">Dense operational queue for follow-up, ownership, and route prep</h2>
+              <h2 className="mt-1 text-xl font-semibold text-[#173543]">Operational account queue for follow-up, ownership, and route prep</h2>
               <p className="mt-1 text-sm text-[#5c7483]">
-                Filter CRM accounts quickly, work Hall of Flowers follow-up in place, and keep the current segment URL shareable.
+                Work the segment here, then open the account page for deeper edits, history, and operational detail.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -822,14 +825,14 @@ export default function CustomerWorkspaceIndex({
           </div>
         </section>
 
-        <section className="sticky top-0 z-20 rounded-[16px] border border-[#dbe8ef] bg-white/95 p-2 shadow-[0_8px_18px_rgba(16,42,67,0.08)] backdrop-blur">
-          <div className="grid gap-2 lg:grid-cols-[minmax(220px,1.8fr)_150px_140px_150px_150px_auto] lg:items-center">
+        <section className={["sticky z-30 space-y-3 rounded-[24px] border border-[#dbe8ef] bg-white/95 p-3 shadow-[0_10px_22px_rgba(16,42,67,0.08)] backdrop-blur supports-[backdrop-filter]:bg-white/90 xl:px-4 xl:py-4", WORKSPACE_STICKY_TOP_CLASS].join(" ")}>
+          <div className="grid gap-2 xl:grid-cols-[minmax(260px,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] xl:items-center">
             <input
               value={draftSearch}
               onChange={(event) => setDraftSearch(event.target.value)}
               aria-label="Search accounts"
               placeholder="Search accounts, contacts, city, phone"
-              className="h-9 rounded-full border border-[#cedde6] bg-[#fbfdfe] px-4 text-sm text-[#173543] outline-none transition focus:border-[#14b8a6] focus:bg-white"
+              className="h-10 rounded-full border border-[#cedde6] bg-[#fbfdfe] px-4 text-sm text-[#173543] outline-none transition focus:border-[#14b8a6] focus:bg-white"
             />
             <select value={sourceFilter} onChange={(event) => startTransition(() => setSourceFilter(event.target.value))} aria-label="Source" className={toolbarSelectClass()}>
               <option value="all">All Sources</option>
@@ -860,187 +863,181 @@ export default function CustomerWorkspaceIndex({
             <button type="button" onClick={() => setShowAdvancedFilters((current) => !current)} className={denseButtonClass()}>
               More Filters{advancedFilterCount > 0 ? ` (${advancedFilterCount})` : ""}
             </button>
-        </div>
+          </div>
 
-        {showAdvancedFilters ? (
-          <section className="rounded-[20px] border border-[#dbe8ef] bg-[#f8fbfc] p-3 shadow-[0_8px_18px_rgba(16,42,67,0.05)]">
-          <div className="grid gap-3 xl:grid-cols-[repeat(6,minmax(0,1fr))]">
-            <FilterSelect
-              label="Territory"
-              value={territoryFilter}
-              onChange={setTerritoryFilter}
-              options={territoryOptions.map((option) => ({ value: option.value, label: option.label }))}
-            />
-            <FilterSelect label="Owner" value={ownerFilter} onChange={setOwnerFilter} options={owners.map((owner) => ({ value: owner, label: owner }))} />
-            <FilterSelect label="Status" value={statusFilter} onChange={setStatusFilter} options={statuses.map((status) => ({ value: status, label: titleCase(status) }))} />
-            <FilterSelect label="Stage" value={stageFilter} onChange={setStageFilter} options={stages.map((stage) => ({ value: stage, label: titleCase(stage) }))} />
-            <FilterSelect
-              label="Route Readiness"
-              value={routeReadiness}
-              onChange={(value) => setRouteReadiness(value as RouteReadinessFilter)}
-              options={[
-                { value: "route_ready", label: "Route Ready" },
-                { value: "no_territory", label: "No Territory" },
-                { value: "no_route_day", label: "No Route Day" },
-                { value: "no_route_rep", label: "No Route Rep" },
-                { value: "no_coords", label: "No Coordinates" },
-                { value: "address_ready", label: "Address Ready, No Coords" },
-              ]}
-            />
-            <FilterSelect
-              label="Has Orders"
-              value={orderState}
-              onChange={(value) => setOrderState(value as OrderStateFilter)}
-              options={[
-                { value: "has_orders", label: "Has Orders" },
-                { value: "no_orders", label: "No Orders" },
-              ]}
-            />
-            <FilterSelect
-              label="Contact Coverage"
-              value={contactCoverage}
-              onChange={(value) => setContactCoverage(value as ContactCoverageFilter)}
-              options={[
-                { value: "has_contacts", label: "Has Contacts" },
-                { value: "missing_primary", label: "Missing Primary" },
-                { value: "no_contacts", label: "No Contacts" },
-              ]}
-            />
-            <FilterSelect
-              label="Organize By"
-              value={organizeBy}
-              onChange={(value) => setOrganizeBy(value as OrganizeBy)}
-              options={[
-                { value: "territory", label: "Territory" },
-                { value: "owner", label: "Owner" },
-                { value: "route_day", label: "Route Day" },
-                { value: "stage", label: "Stage" },
-              ]}
-              allowAllLabel="None"
-            />
+          {showAdvancedFilters ? (
+            <section className="rounded-[20px] border border-[#dbe8ef] bg-[#f8fbfc] p-3 shadow-[0_8px_18px_rgba(16,42,67,0.05)]">
+              <div className="grid gap-3 xl:grid-cols-[repeat(4,minmax(0,1fr))] 2xl:grid-cols-[repeat(6,minmax(0,1fr))]">
+                <FilterSelect
+                  label="Territory"
+                  value={territoryFilter}
+                  onChange={setTerritoryFilter}
+                  options={territoryOptions.map((option) => ({ value: option.value, label: option.label }))}
+                />
+                <FilterSelect label="Owner" value={ownerFilter} onChange={setOwnerFilter} options={owners.map((owner) => ({ value: owner, label: owner }))} />
+                <FilterSelect label="Status" value={statusFilter} onChange={setStatusFilter} options={statuses.map((status) => ({ value: status, label: titleCase(status) }))} />
+                <FilterSelect label="Stage" value={stageFilter} onChange={setStageFilter} options={stages.map((stage) => ({ value: stage, label: titleCase(stage) }))} />
+                <FilterSelect
+                  label="Route Readiness"
+                  value={routeReadiness}
+                  onChange={(value) => setRouteReadiness(value as RouteReadinessFilter)}
+                  options={[
+                    { value: "route_ready", label: "Route Ready" },
+                    { value: "no_territory", label: "No Territory" },
+                    { value: "no_route_day", label: "No Route Day" },
+                    { value: "no_route_rep", label: "No Route Rep" },
+                    { value: "no_coords", label: "No Coordinates" },
+                    { value: "address_ready", label: "Address Ready, No Coords" },
+                  ]}
+                />
+                <FilterSelect
+                  label="Has Orders"
+                  value={orderState}
+                  onChange={(value) => setOrderState(value as OrderStateFilter)}
+                  options={[
+                    { value: "has_orders", label: "Has Orders" },
+                    { value: "no_orders", label: "No Orders" },
+                  ]}
+                />
+                <FilterSelect
+                  label="Contact Coverage"
+                  value={contactCoverage}
+                  onChange={(value) => setContactCoverage(value as ContactCoverageFilter)}
+                  options={[
+                    { value: "has_contacts", label: "Has Contacts" },
+                    { value: "missing_primary", label: "Missing Primary" },
+                    { value: "no_contacts", label: "No Contacts" },
+                  ]}
+                />
+                <FilterSelect
+                  label="Organize By"
+                  value={organizeBy}
+                  onChange={(value) => setOrganizeBy(value as OrganizeBy)}
+                  options={[
+                    { value: "territory", label: "Territory" },
+                    { value: "owner", label: "Owner" },
+                    { value: "route_day", label: "Route Day" },
+                    { value: "stage", label: "Stage" },
+                  ]}
+                  allowAllLabel="None"
+                />
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <button type="button" onClick={handleClearSearch} className={denseButtonClass()}>
+                  Clear search
+                </button>
+                <button type="button" onClick={resetFilters} className={denseButtonClass()}>
+                  Reset filters
+                </button>
+                <button type="button" onClick={selectAllVisible} disabled={visibleCustomers.length === 0} className={denseButtonClass()}>
+                  {allVisibleSelected ? "All selected" : `Select ${visibleCustomers.length}`}
+                </button>
+                <button type="button" onClick={clearSelection} disabled={selectedCustomerIds.length === 0} className={denseButtonClass()}>
+                  Clear selection
+                </button>
+                {staffRole === "admin" ? (
+                  <button
+                    type="button"
+                    onClick={() => void geocodeVisibleResults()}
+                    disabled={visibleCustomers.length === 0 || visibleGeocodeBusy}
+                    className={denseButtonClass()}
+                  >
+                    {visibleGeocodeBusy ? "Geocoding..." : "Geocode visible"}
+                  </button>
+                ) : null}
+              </div>
+            </section>
+          ) : null}
+
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4f6877]">
+              Selected {selectedVisibleCustomerIds.length} of {visibleCustomers.length}
+            </span>
+            <span className="rounded-full border border-[#bfe8e2] bg-[#f5fffd] px-3 py-1.5 text-sm font-medium text-[#0f766e]">
+              Pending Stops {pendingStops.length}
+            </span>
+            <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4f6877]">
+              Sort {titleCase(sortKey.replace("_", " "))}
+            </span>
+            <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4f6877]">
+              URL state synced
+            </span>
+            {visibleGeocodeStatus ? <span className="text-sm text-[#4f6877]">{visibleGeocodeStatus}</span> : null}
           </div>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <button type="button" onClick={handleClearSearch} className={denseButtonClass()}>
-              Clear search
-            </button>
-            <button type="button" onClick={resetFilters} className={denseButtonClass()}>
-              Reset filters
-            </button>
-            <button
-              type="button"
-              onClick={selectAllVisible}
-              disabled={visibleCustomers.length === 0}
-              className={denseButtonClass()}
-            >
-              {allVisibleSelected ? "All selected" : `Select ${visibleCustomers.length}`}
-            </button>
-            <button type="button" onClick={clearSelection} disabled={selectedCustomerIds.length === 0} className={denseButtonClass()}>
-              Clear selection
-            </button>
-            {staffRole === "admin" ? (
-              <button
-                type="button"
-                onClick={() => void geocodeVisibleResults()}
-                disabled={visibleCustomers.length === 0 || visibleGeocodeBusy}
-                className={denseButtonClass()}
-              >
-                {visibleGeocodeBusy ? "Geocoding..." : "Geocode visible"}
-              </button>
-            ) : null}
-          </div>
-          </section>
+        </section>
+
+        {selectedVisibleCustomerIds.length > 0 ? (
+          <BulkActionBar
+            action={bulkAction}
+            busy={bulkBusy}
+            selectedCount={selectedVisibleCustomerIds.length}
+            staffRole={staffRole}
+            salesRepOptions={salesRepOptions}
+            territoryOptions={territoryOptions}
+            statusMessage={bulkStatusMessage}
+            onActionChange={setBulkAction}
+            onApply={() => void applyBulkAction()}
+            onClear={clearSelection}
+          />
         ) : null}
 
-        <div className="mt-1 flex flex-wrap items-center gap-2">
-          <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4f6877]">
-            Selected {selectedVisibleCustomerIds.length} of {visibleCustomers.length} filtered
-          </span>
-          <span className="rounded-full border border-[#bfe8e2] bg-[#f5fffd] px-3 py-1.5 text-sm font-medium text-[#0f766e]">
-            Pending Stops {pendingStops.length}
-          </span>
-          <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4f6877]">
-            Search updates automatically
-          </span>
-          <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4f6877]">
-            Sort {titleCase(sortKey.replace("_", " "))}
-          </span>
-          {visibleGeocodeStatus ? <span className="text-sm text-[#4f6877]">{visibleGeocodeStatus}</span> : null}
-        </div>
-      </section>
+        {organizeBy === "territory" && sections.length > 0 ? (
+          <nav className="rounded-[24px] border border-[#dbe8ef] bg-white p-4 shadow-[0_12px_32px_rgba(16,42,67,0.05)]">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Territory Jump</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {sections.map((section) => (
+                <a
+                  key={section.key}
+                  href={`#customer-segment-${section.key}`}
+                  className="rounded-full border border-[#d5e1e8] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4a6575] transition hover:bg-white hover:text-[#173543]"
+                >
+                  {section.label} ({section.customers.length})
+                </a>
+              ))}
+            </div>
+          </nav>
+        ) : null}
 
-      {selectedVisibleCustomerIds.length > 0 ? (
-        <BulkActionBar
-          action={bulkAction}
-          busy={bulkBusy}
-          selectedCount={selectedVisibleCustomerIds.length}
-          staffRole={staffRole}
-          salesRepOptions={salesRepOptions}
-          territoryOptions={territoryOptions}
-          statusMessage={bulkStatusMessage}
-          onActionChange={setBulkAction}
-          onApply={() => void applyBulkAction()}
-          onClear={clearSelection}
-        />
-      ) : null}
-
-      {organizeBy === "territory" && sections.length > 0 ? (
-        <nav className="rounded-[24px] border border-[#dbe8ef] bg-white p-4 shadow-[0_12px_32px_rgba(16,42,67,0.05)]">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Territory Jump</p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {sections.map((section) => (
-              <a
-                key={section.key}
-                href={`#customer-segment-${section.key}`}
-                className="rounded-full border border-[#d5e1e8] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4a6575] transition hover:bg-white hover:text-[#173543]"
-              >
-                {section.label} ({section.customers.length})
-              </a>
-            ))}
-          </div>
-        </nav>
-      ) : null}
-
-      <section className="space-y-4">
-        {sections.map((section) => (
-          <div
-            key={section.key}
-            id={organizeBy === "territory" ? `customer-segment-${section.key}` : undefined}
-            className={organizeBy === "none" ? "" : "rounded-[24px] border border-[#dbe8ef] bg-white p-4 shadow-[0_12px_32px_rgba(16,42,67,0.06)]"}
-          >
-            {organizeBy !== "none" ? (
-              <div className="mb-4 flex flex-col gap-2 xl:flex-row xl:items-end xl:justify-between">
+        <section className="space-y-4">
+          {sections.map((section) => (
+            <div
+              key={section.key}
+              id={organizeBy === "territory" ? `customer-segment-${section.key}` : undefined}
+              className="rounded-[28px] border border-[#dbe8ef] bg-white p-4 shadow-[0_12px_32px_rgba(16,42,67,0.06)]"
+            >
+              <div className="mb-4 flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">{titleCase(organizeBy.replace("_", " "))}</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">
+                    {organizeBy === "none" ? "Results" : titleCase(organizeBy.replace("_", " "))}
+                  </p>
                   <h3 className="mt-1 text-xl font-semibold text-[#173543]">{section.label}</h3>
                   <p className="mt-1 text-sm text-[#5c7483]">{section.description}</p>
                 </div>
                 <div className="rounded-2xl border border-[#dbe8ef] bg-[#f8fbfc] px-4 py-3 text-sm text-[#4f6877]">{section.statLine}</div>
               </div>
-            ) : null}
 
-            <div className="space-y-2">
-              <ResultsColumnHeader />
-              {section.customers.map((customer) => (
-                <CustomerCard
-                  key={customer.id}
-                  customer={customer}
-                  selected={selectedCustomerIds.includes(customer.id)}
-                  pendingSelected={pendingCustomerIdSet.has(customer.id)}
-                  onToggleSelected={toggleCustomerSelection}
-                  onTogglePendingSelected={togglePendingStop}
-                />
-              ))}
+              <div className="grid gap-3 xl:grid-cols-2 2xl:grid-cols-3">
+                {section.customers.map((customer) => (
+                  <CustomerCard
+                    key={customer.id}
+                    customer={customer}
+                    selected={selectedCustomerIds.includes(customer.id)}
+                    pendingSelected={pendingCustomerIdSet.has(customer.id)}
+                    onToggleSelected={toggleCustomerSelection}
+                    onTogglePendingSelected={togglePendingStop}
+                  />
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
 
-        {visibleCustomers.length === 0 ? (
-          <div className="rounded-[28px] border border-dashed border-[#cfdde6] bg-white px-6 py-16 text-center">
-            <p className="text-lg font-semibold text-[#173543]">No accounts match the current segment.</p>
-            <p className="mt-2 text-sm text-[#5c7483]">Adjust the search, filters, or organization mode to widen the workspace.</p>
-          </div>
-        ) : null}
-      </section>
+          {visibleCustomers.length === 0 ? (
+            <div className="rounded-[28px] border border-dashed border-[#cfdde6] bg-white px-6 py-16 text-center">
+              <p className="text-lg font-semibold text-[#173543]">No accounts match the current segment.</p>
+              <p className="mt-2 text-sm text-[#5c7483]">Adjust the search, filters, or organization mode to widen the workspace.</p>
+            </div>
+          ) : null}
+        </section>
       </div>
     </div>
   );
@@ -1066,107 +1063,99 @@ function CustomerCard({
   const websiteHref = normalizeWebsiteHref(customer.website);
   const routeReadiness = getRouteReadiness(customer);
   const followUpState = getFollowUpState(customer);
+  const metadataLine = [
+    customer.source ? formatSourceLabel(customer.source) : null,
+    customer.importSource ? `Import ${formatSourceLabel(customer.importSource)}` : null,
+    customer.nextVisitDueAt ? `Visit ${formatDate(customer.nextVisitDueAt)}` : customer.updatedAt ? `Updated ${formatDate(customer.updatedAt)}` : null,
+  ]
+    .filter(Boolean)
+    .join(" • ");
 
   return (
     <article
       className={[
-        "rounded-[18px] border bg-white px-3 py-2.5 shadow-[0_6px_14px_rgba(16,42,67,0.04)] transition hover:border-[#b9d5df] hover:shadow-[0_10px_20px_rgba(16,42,67,0.06)]",
+        "flex h-full flex-col rounded-[24px] border bg-[linear-gradient(180deg,#ffffff_0%,#fbfdfe_100%)] p-4 shadow-[0_8px_18px_rgba(16,42,67,0.05)] transition hover:border-[#b9d5df] hover:shadow-[0_14px_28px_rgba(16,42,67,0.08)]",
         selected || pendingSelected ? "border-[#14b8a6] ring-2 ring-[#b8efe7]" : "border-[#d9e7ee]",
       ].join(" ")}
     >
-      <div className="grid gap-3 lg:min-h-[88px] lg:grid-cols-[28px_minmax(0,2fr)_minmax(220px,1.15fr)_minmax(220px,1fr)_auto] lg:items-center">
-        <div className="flex items-center self-start pt-1 lg:self-center lg:pt-0">
-          <input type="checkbox" checked={selected} onChange={() => onToggleSelected(customer.id)} className="h-4 w-4 accent-[#14b8a6]" />
-        </div>
-
-        <div className="min-w-0 space-y-1.5">
-          <div className="flex min-w-0 items-center gap-2">
-            <Link href={`/workspace/customers/${customer.id}`} className="truncate text-sm font-semibold text-[#173543] transition hover:text-[#0f766e] lg:text-[15px]">
-              {customer.name}
-            </Link>
-            <span className={["hidden rounded-full border px-2 py-0.5 text-[11px] font-semibold xl:inline-flex", statusChipClass(customer.status)].join(" ")}>
-              {titleCase(customer.status)}
-            </span>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-3">
+          <div className="pt-1">
+            <input type="checkbox" checked={selected} onChange={() => onToggleSelected(customer.id)} className="h-4 w-4 accent-[#14b8a6]" />
           </div>
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className={["rounded-full border px-2 py-0.5 text-[11px] font-semibold xl:hidden", statusChipClass(customer.status)].join(" ")}>
-              {titleCase(customer.status)}
-            </span>
-            <span className={["rounded-full border px-2 py-0.5 text-[11px] font-semibold", stageChipClass(customer.stage)].join(" ")}>
-              {titleCase(customer.stage, "No Stage")}
-            </span>
-            {customer.isHallOfFlowersLead ? (
-              <span className="rounded-full border border-[#f1ddad] bg-[#fff9eb] px-2 py-0.5 text-[11px] font-semibold text-[#8a5b00]">Hall of Flowers</span>
-            ) : null}
-            {customer.isHotLead ? (
-              <span className="rounded-full border border-[#ffd3cf] bg-[#fff2f0] px-2 py-0.5 text-[11px] font-semibold text-[#b44b40]">Hot Lead</span>
-            ) : null}
-            <span className={["rounded-full border px-2 py-0.5 text-[11px] font-semibold", followUpChipClass(customer)].join(" ")}>{followUpState}</span>
-            {pendingSelected ? <span className="rounded-full border border-[#bfe8e2] bg-[#f5fffd] px-2 py-0.5 text-[11px] font-semibold text-[#0f766e]">Pending Stop</span> : null}
-          </div>
-          <p className="truncate text-sm text-[#5a7483]">
-            {customer.city || "No city"}
-            {primaryContact?.name ? ` • ${primaryContact.name}` : ""}
-          </p>
-          <p className="truncate text-xs text-[#7a909d]">
-            {primaryContact?.phone || customer.mainPhone || "No phone"}
-            {primaryContact?.email || customer.primaryContactEmail ? ` • ${primaryContact?.email || customer.primaryContactEmail}` : ""}
-          </p>
-        </div>
-
-        <div className="min-w-0 space-y-1 text-sm text-[#56717f]">
-          <p className="truncate font-medium text-[#294653]">{customer.assignedSalesName || "Unassigned owner"}</p>
-          <div className="flex flex-wrap items-center gap-1.5">
-            {customer.source ? (
-              <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-2 py-0.5 text-[11px] font-medium text-[#4f6877]">
-                {formatSourceLabel(customer.source)}
+          <div className="min-w-0 space-y-2">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <Link href={`/workspace/customers/${customer.id}`} className="truncate text-base font-semibold text-[#173543] transition hover:text-[#0f766e]">
+                {customer.name}
+              </Link>
+              <span className={["rounded-full border px-2 py-0.5 text-[11px] font-semibold", statusChipClass(customer.status)].join(" ")}>
+                {titleCase(customer.status)}
               </span>
-            ) : null}
-            <RouteReadinessPill state={routeReadiness} />
+              <span className={["rounded-full border px-2 py-0.5 text-[11px] font-semibold", stageChipClass(customer.stage)].join(" ")}>
+                {titleCase(customer.stage, "No Stage")}
+              </span>
+            </div>
+            <p className="text-sm text-[#5a7483]">
+              {[customer.city || "No city", customer.territoryCode ? `Territory ${customer.territoryCode}` : "Territory open", customer.assignedSalesName || "Unassigned owner"]
+                .filter(Boolean)
+                .join(" • ")}
+            </p>
           </div>
-          <p className="truncate text-xs text-[#7a909d]">
-            {customer.territoryCode ? `Territory ${customer.territoryCode}` : "Territory open"}
-            {customer.routeDay ? ` • ${customer.routeDay}` : " • No route day"}
+        </div>
+
+        <RouteActionButton customer={customer} pendingSelected={pendingSelected} onTogglePendingSelected={onTogglePendingSelected} />
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {customer.isHallOfFlowersLead ? (
+          <span className="rounded-full border border-[#f1ddad] bg-[#fff9eb] px-2 py-0.5 text-[11px] font-semibold text-[#8a5b00]">Hall of Flowers</span>
+        ) : null}
+        {customer.isHotLead ? (
+          <span className="rounded-full border border-[#ffd3cf] bg-[#fff2f0] px-2 py-0.5 text-[11px] font-semibold text-[#b44b40]">Hot Lead</span>
+        ) : null}
+        <span className={["rounded-full border px-2 py-0.5 text-[11px] font-semibold", followUpChipClass(customer)].join(" ")}>{followUpState}</span>
+        <RouteReadinessPill state={routeReadiness} />
+        {customer.counts.orders > 0 ? (
+          <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-2 py-0.5 text-[11px] font-semibold text-[#4f6877]">
+            {customer.counts.orders} order{customer.counts.orders === 1 ? "" : "s"}
+          </span>
+        ) : null}
+        {pendingSelected ? <span className="rounded-full border border-[#bfe8e2] bg-[#f5fffd] px-2 py-0.5 text-[11px] font-semibold text-[#0f766e]">Pending Stop</span> : null}
+      </div>
+
+      <div className="mt-3 grid gap-3 text-sm text-[#56717f] sm:grid-cols-2">
+        <div className="min-w-0 rounded-[18px] border border-[#e3edf2] bg-[#f8fbfc] px-3 py-2.5">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#7a909d]">Coverage</p>
+          <p className="mt-1 truncate font-medium text-[#294653]">{primaryContact?.name || "No primary contact"}</p>
+          <p className="mt-1 truncate text-xs text-[#7a909d]">
+            {primaryContact?.email || customer.primaryContactEmail || "No email"}
+            {(primaryContact?.phone || customer.mainPhone) ? ` • ${primaryContact?.phone || customer.mainPhone}` : ""}
+          </p>
+        </div>
+
+        <div className="min-w-0 rounded-[18px] border border-[#e3edf2] bg-[#f8fbfc] px-3 py-2.5">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#7a909d]">Routing</p>
+          <p className="mt-1 truncate font-medium text-[#294653]">
+            {customer.routeDay || "No route day"}
             {customer.assignedRouteRepName ? ` • ${customer.assignedRouteRepName}` : ""}
           </p>
-        </div>
-
-        <div className="min-w-0 space-y-1 text-sm text-[#56717f]">
-          <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-[#7a909d]">
-            <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-2 py-0.5">{activityCount} linked</span>
-            <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-2 py-0.5">{customer.counts.orders} orders</span>
-            <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-2 py-0.5">{customer.contactCount} contacts</span>
-          </div>
-          <p className="truncate text-sm text-[#294653]">{customer.hasOpenTask ? "Follow-up active" : "No open follow-up"}</p>
-          <p className="truncate text-xs text-[#7a909d]">
-            {customer.nextVisitDueAt ? `Next visit ${formatDate(customer.nextVisitDueAt)}` : "No next visit"}
-            {customer.updatedAt ? ` • Updated ${formatDate(customer.updatedAt)}` : ""}
+          <p className="mt-1 truncate text-xs text-[#7a909d]">
+            {customer.contactCount} contacts • {activityCount} linked records
           </p>
         </div>
+      </div>
 
-        <div className="flex flex-wrap items-center justify-start gap-2 lg:justify-end">
-          <RouteActionButton customer={customer} pendingSelected={pendingSelected} onTogglePendingSelected={onTogglePendingSelected} />
-          <QuickAction href={phoneHref} label="Call" />
-          <QuickAction href={primaryEmailHref} label="Email" />
-          <Link href={`/workspace/customers/${customer.id}`} className={denseButtonClass("primary")}>
-            Open
-          </Link>
-          <QuickAction href={websiteHref} label="Site" external />
-        </div>
+      <p className="mt-3 truncate text-sm text-[#5c7483]">{metadataLine || "No recent metadata yet."}</p>
+
+      <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-[#e6eef3] pt-3">
+        <QuickAction href={phoneHref} label="Call" />
+        <QuickAction href={primaryEmailHref} label="Email" />
+        <QuickAction href={websiteHref} label="Site" external />
+        <Link href={`/workspace/customers/${customer.id}`} className={denseButtonClass("primary")}>
+          Open Account
+        </Link>
       </div>
     </article>
-  );
-}
-
-function ResultsColumnHeader() {
-  return (
-    <div className="hidden items-center gap-3 rounded-[16px] border border-[#dbe8ef] bg-[#f7fbfd] px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#76909f] lg:grid lg:grid-cols-[28px_minmax(0,2fr)_minmax(220px,1.15fr)_minmax(220px,1fr)_auto]">
-      <span />
-      <span>Account</span>
-      <span>Ownership / Source / Routing</span>
-      <span>Follow-Up / Activity</span>
-      <span className="text-right">Actions</span>
-    </div>
   );
 }
 

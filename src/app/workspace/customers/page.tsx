@@ -25,7 +25,7 @@ export default async function WorkspaceCustomersPage({
   const pendingStops = await loadPendingRouteStops({ userId: staff.userId, customers });
 
   return (
-    <div className="mx-auto w-full max-w-[1440px] space-y-6 2xl:max-w-[1500px]">
+    <div className="mx-auto w-full max-w-[1520px] space-y-6">
       <AdminPageHeader
         title="Customers"
         description="CRM workspace for account ownership, contact coverage, pipeline management, and sales follow-up. Google Sheets imports feed this system, but CRM records are now the source of truth."
