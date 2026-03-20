@@ -41,7 +41,7 @@ type CustomerWorkspaceIndexProps = {
   };
 };
 
-type BulkActionKind = "assign_sales_rep" | "assign_territory" | "assign_route_day" | "add_to_pending_stops" | "remove_from_pending_stops";
+type BulkActionKind = "assign_sales_rep" | "assign_territory" | "assign_route_day" | "add_to_pending_stops" | "remove_from_pending_stops" | "convert_to_source";
 type BulkActionState = {
   kind: BulkActionKind;
   value: string;
@@ -64,6 +64,7 @@ const BULK_ACTIONS: Array<{ key: BulkActionKind; label: string }> = [
   { key: "assign_route_day", label: "Assign Route Day" },
   { key: "add_to_pending_stops", label: "Add to Pending Stops" },
   { key: "remove_from_pending_stops", label: "Remove from Pending Stops" },
+  { key: "convert_to_source", label: "Convert to Source" },
 ];
 
 function sameIds(left: string[], right: string[]) {
@@ -687,7 +688,12 @@ export default function CustomerWorkspaceIndex({
 
   async function applyBulkAction() {
     if (selectedVisibleCustomers.length === 0 || bulkBusy) return;
-    if (bulkAction.kind !== "add_to_pending_stops" && bulkAction.kind !== "remove_from_pending_stops" && !bulkAction.value) {
+    if (
+      bulkAction.kind !== "add_to_pending_stops" &&
+      bulkAction.kind !== "remove_from_pending_stops" &&
+      bulkAction.kind !== "convert_to_source" &&
+      !bulkAction.value
+    ) {
       setBulkStatusMessage("Choose a value before applying the bulk action.");
       return;
     }
@@ -709,6 +715,24 @@ export default function CustomerWorkspaceIndex({
             selectedVisibleCustomers.length === 1 ? "" : "s"
           } ${bulkAction.kind === "add_to_pending_stops" ? "to" : "from"} pending stops.`
         );
+        setSelectedCustomerIds([]);
+        router.refresh();
+        return;
+      }
+
+      if (bulkAction.kind === "convert_to_source") {
+        const res = await fetch("/api/workspace/customers/convert-to-sources", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ customer_ids: selectedVisibleCustomers.map((customer) => customer.id) }),
+        });
+        const json = await parseJsonSafe(res);
+        if (!res.ok) {
+          throw new Error(String(json.error || `Conversion failed (${res.status})`));
+        }
+
+        const converted = Number(json.converted || selectedVisibleCustomers.length);
+        setBulkStatusMessage(`Converted ${converted} selected account${converted === 1 ? "" : "s"} into Sources.`);
         setSelectedCustomerIds([]);
         router.refresh();
         return;
@@ -1231,7 +1255,9 @@ function BulkActionBar({
   onApply: () => void;
   onClear: () => void;
 }) {
-  const availableActions = BULK_ACTIONS.filter((item) => (staffRole === "admin" ? true : item.key !== "assign_sales_rep"));
+  const availableActions = BULK_ACTIONS.filter((item) =>
+    staffRole === "admin" ? true : item.key !== "assign_sales_rep" && item.key !== "convert_to_source"
+  );
   const valueLabel =
     action.kind === "assign_sales_rep"
       ? "Sales rep"
@@ -1299,7 +1325,11 @@ function BulkActionBar({
               </select>
             </label>
           ) : (
-            <div className="rounded-2xl border border-[#d7e6ed] bg-white px-4 py-3 text-sm text-[#4f6877]">Queues or removes the current filtered selection for route generation.</div>
+            <div className="rounded-2xl border border-[#d7e6ed] bg-white px-4 py-3 text-sm text-[#4f6877]">
+              {action.kind === "convert_to_source"
+                ? "Creates source records from the selected customer accounts and soft-removes those accounts from the active Customers workspace."
+                : "Queues or removes the current filtered selection for route generation."}
+            </div>
           )}
 
           <button

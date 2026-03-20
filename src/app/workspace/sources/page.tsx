@@ -1,3 +1,4 @@
+import Link from "next/link";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import SourceWorkspaceIndex from "@/components/workspace/SourceWorkspaceIndex";
 import { requireStaff } from "@/lib/requireStaff";
@@ -19,6 +20,14 @@ export default async function WorkspaceSourcesPage({
       <AdminPageHeader
         title="Sources"
         description="Procurement workspace for suppliers, inbound leads, sourcing follow-up, and buyer coordination."
+        action={
+          <Link
+            href="/workspace/sources/quick-add"
+            className="inline-flex rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95"
+          >
+            Quick Add Source
+          </Link>
+        }
       />
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">

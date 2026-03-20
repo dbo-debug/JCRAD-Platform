@@ -164,6 +164,11 @@ type WorkspaceSummaryBuildArgs = {
   profileById: Map<string, GenericRow>;
 };
 
+function isCustomerWorkspaceRecord(customer: GenericRow) {
+  const recordKind = normalizeText(customer.record_kind);
+  return !recordKind || recordKind === "customer";
+}
+
 function normalizeText(value: unknown): string {
   return String(value || "").trim().toLowerCase();
 }
@@ -412,13 +417,19 @@ async function loadWorkspaceData(): Promise<WorkspaceData> {
 }
 
 function buildWorkspaceMetrics(data: WorkspaceData): CustomerWorkspaceMetrics {
+  const customerIds = new Set(
+    data.customers
+      .map((row) => String(row.id || "").trim())
+      .filter(Boolean)
+  );
+  const activeContacts = data.customerContacts.filter((row) => customerIds.has(String(row.customer_id || "").trim()));
   const customersWithContacts = new Set(
-    data.customerContacts
+    activeContacts
       .map((row) => String(row.customer_id || "").trim())
       .filter(Boolean)
   );
   const customersWithPrimaryContact = new Set(
-    data.customerContacts
+    activeContacts
       .filter((row) => row.is_primary === true)
       .map((row) => String(row.customer_id || "").trim())
       .filter(Boolean)
@@ -426,7 +437,7 @@ function buildWorkspaceMetrics(data: WorkspaceData): CustomerWorkspaceMetrics {
 
   return {
     totalCustomers: data.customers.length,
-    totalContacts: data.customerContacts.length,
+    totalContacts: activeContacts.length,
     customersWithContacts: customersWithContacts.size,
     missingPrimaryContact: data.customers.filter((customer) => !customersWithPrimaryContact.has(String(customer.id || "").trim())).length,
     customersWithoutContacts: data.customers.filter((customer) => !customersWithContacts.has(String(customer.id || "").trim())).length,
@@ -468,10 +479,11 @@ export async function loadCustomerWorkspaceIndex(): Promise<CustomerWorkspaceInd
   const data = await loadWorkspaceData();
   const profileById = getProfileMap(data.profiles);
   const authUserById = getAuthUserMap(data.authUsers);
+  const customers = data.customers.filter(isCustomerWorkspaceRecord);
 
   return {
-    customers: data.customers.map((customer) => buildCustomerSummary({ customer, data, profileById, authUserById })),
-    metrics: buildWorkspaceMetrics(data),
+    customers: customers.map((customer) => buildCustomerSummary({ customer, data, profileById, authUserById })),
+    metrics: buildWorkspaceMetrics({ ...data, customers }),
   };
 }
 
@@ -479,7 +491,7 @@ export async function loadCustomerWorkspaceDetail(customerId: string): Promise<C
   const data = await loadWorkspaceData();
   const profileById = getProfileMap(data.profiles);
   const authUserById = getAuthUserMap(data.authUsers);
-  const customer = data.customers.find((row) => String(row.id || "").trim() === customerId);
+  const customer = data.customers.find((row) => String(row.id || "").trim() === customerId && isCustomerWorkspaceRecord(row));
   if (!customer) return null;
 
   const contacts = data.customerContacts.filter((row) => String(row.customer_id || "").trim() === customerId);
