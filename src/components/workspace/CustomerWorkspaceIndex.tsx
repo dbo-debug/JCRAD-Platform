@@ -287,13 +287,29 @@ export default function CustomerWorkspaceIndex({
   const [pendingStops, setPendingStops] = useState<PendingRouteStop[]>(initialPendingStops);
   const [visibleGeocodeBusy, setVisibleGeocodeBusy] = useState(false);
   const [visibleGeocodeStatus, setVisibleGeocodeStatus] = useState<string | null>(null);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(
+    Boolean(
+      initialFilters.territory ||
+        initialFilters.owner ||
+        initialFilters.status ||
+        initialFilters.stage ||
+        (initialFilters.routeReadiness && initialFilters.routeReadiness !== "all") ||
+        (initialFilters.orderState && initialFilters.orderState !== "all")
+    )
+  );
 
   const statuses = Array.from(new Set(customers.map((customer) => customer.status).filter(Boolean))).sort((a, b) => a.localeCompare(b));
   const stages = Array.from(new Set(customers.map((customer) => customer.stage).filter((value): value is string => Boolean(value)))).sort((a, b) => a.localeCompare(b));
   const owners = Array.from(new Set(customers.map((customer) => customer.assignedSalesName).filter((value): value is string => Boolean(value)))).sort((a, b) => a.localeCompare(b));
   const sources = Array.from(new Set(customers.map((customer) => customer.source).filter((value): value is string => Boolean(value)))).sort((a, b) => a.localeCompare(b));
-  const importSources = Array.from(new Set(customers.map((customer) => customer.importSource).filter((value): value is string => Boolean(value)))).sort((a, b) => a.localeCompare(b));
   const territoryLabelMap = new Map(territoryOptions.map((option) => [option.value, option.label]));
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setSearchQuery(draftSearch.trim());
+    }, 180);
+    return () => window.clearTimeout(timeout);
+  }, [draftSearch]);
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -406,6 +422,14 @@ export default function CustomerWorkspaceIndex({
     noTask: customers.filter((customer) => !customer.hasOpenTask).length,
     overdue: customers.filter((customer) => customer.overdueTaskCount > 0).length,
   };
+  const advancedFilterCount = [
+    territoryFilter !== "all",
+    ownerFilter !== "all",
+    statusFilter !== "all",
+    stageFilter !== "all",
+    routeReadiness !== "all",
+    orderState !== "all",
+  ].filter(Boolean).length;
   const territoryStats = buildTerritoryStats(visibleCustomers, referenceNow);
 
   const sections =
@@ -559,11 +583,6 @@ export default function CustomerWorkspaceIndex({
   function clearSelection() {
     setSelectedCustomerIds([]);
     setBulkStatusMessage(null);
-  }
-
-  function handleSearchSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    startTransition(() => setSearchQuery(draftSearch.trim()));
   }
 
   function handleClearSearch() {
@@ -730,9 +749,9 @@ export default function CustomerWorkspaceIndex({
   }
 
   return (
-    <div className="mx-auto grid max-w-[1440px] gap-5 xl:grid-cols-[240px_minmax(0,1fr)]">
-      <aside className="xl:sticky xl:top-4 xl:self-start">
-        <section className="rounded-[24px] border border-[#d8e6ee] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbfd_100%)] p-4 shadow-[0_16px_38px_rgba(16,42,67,0.08)]">
+    <div className="mx-auto grid max-w-[1440px] gap-4 xl:grid-cols-[220px_minmax(0,1fr)]">
+      <aside>
+        <section className="rounded-[24px] border border-[#d8e6ee] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbfd_100%)] p-4 shadow-[0_12px_28px_rgba(16,42,67,0.07)]">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6c8797]">Customer Views</p>
           <div className="mt-3 space-y-2">
             {[
@@ -781,8 +800,8 @@ export default function CustomerWorkspaceIndex({
         </section>
       </aside>
 
-      <div className="space-y-4">
-        <section className="rounded-[24px] border border-[#d8e6ee] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbfd_100%)] p-4 shadow-[0_16px_38px_rgba(16,42,67,0.08)]">
+      <div className="space-y-3">
+        <section className="rounded-[24px] border border-[#d8e6ee] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbfd_100%)] p-4 shadow-[0_12px_28px_rgba(16,42,67,0.07)]">
           <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-[760px]">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6c8797]">Customer Workspace</p>
@@ -799,50 +818,23 @@ export default function CustomerWorkspaceIndex({
           </div>
         </section>
 
-        <section className="sticky top-4 z-20 rounded-[24px] border border-[#dbe8ef] bg-white/95 p-4 shadow-[0_16px_34px_rgba(16,42,67,0.10)] backdrop-blur">
-          <form onSubmit={handleSearchSubmit} className="grid gap-3 xl:grid-cols-[minmax(280px,1.4fr)_120px_120px]">
+        <section className="sticky top-4 z-20 rounded-[24px] border border-[#dbe8ef] bg-white/95 p-3 shadow-[0_14px_30px_rgba(16,42,67,0.10)] backdrop-blur">
+        <div className="grid gap-2 xl:grid-cols-[minmax(260px,1.5fr)_180px_160px_180px_auto_auto] xl:items-end">
           <label className="grid gap-1 text-sm text-[#4b6676]">
-            <span className="font-medium">Search accounts</span>
+            <span className="font-medium">Search</span>
             <input
               value={draftSearch}
               onChange={(event) => setDraftSearch(event.target.value)}
-              placeholder="Search account, contact, city, source, territory, route day, phone, website"
+              placeholder="Search account, contact, city, phone, website"
               className="h-10 rounded-2xl border border-[#cedde6] bg-[#fbfdfe] px-4 text-sm text-[#173543] outline-none transition focus:border-[#14b8a6] focus:bg-white"
             />
           </label>
-
-          <button type="submit" className={`${denseButtonClass("primary")} mt-auto`}>
-            Search
-          </button>
-          <button
-            type="button"
-            onClick={handleClearSearch}
-            className={`${denseButtonClass()} mt-auto`}
-          >
-            Clear
-          </button>
-        </form>
-
-        <div className="mt-3 grid gap-3 xl:grid-cols-[repeat(6,minmax(0,1fr))]">
           <FilterSelect
             label="Source"
             value={sourceFilter}
             onChange={setSourceFilter}
             options={sources.map((source) => ({ value: source, label: formatSourceLabel(source) }))}
           />
-          <FilterSelect
-            label="Import Source"
-            value={importSourceFilter}
-            onChange={setImportSourceFilter}
-            options={importSources.map((source) => ({ value: source, label: formatSourceLabel(source) }))}
-          />
-          <FilterSelect label="Territory" value={territoryFilter} onChange={setTerritoryFilter} options={territoryOptions.map((option) => ({ value: option.value, label: option.label }))} />
-          <FilterSelect label="Owner" value={ownerFilter} onChange={setOwnerFilter} options={owners.map((owner) => ({ value: owner, label: owner }))} />
-          <FilterSelect label="Status" value={statusFilter} onChange={setStatusFilter} options={statuses.map((status) => ({ value: status, label: titleCase(status) }))} />
-          <FilterSelect label="Stage" value={stageFilter} onChange={setStageFilter} options={stages.map((stage) => ({ value: stage, label: titleCase(stage) }))} />
-        </div>
-
-        <div className="mt-3 grid gap-3 xl:grid-cols-[repeat(6,minmax(0,1fr))]">
           <FilterSelect
             label="Hot Lead"
             value={hotLeadFilter}
@@ -862,38 +854,55 @@ export default function CustomerWorkspaceIndex({
               { value: "overdue_task", label: "Overdue Task" },
             ]}
           />
-          <FilterSelect
-            label="Contact Coverage"
-            value={contactCoverage}
-            onChange={(value) => setContactCoverage(value as ContactCoverageFilter)}
-            options={[
-              { value: "has_contacts", label: "Has Contacts" },
-              { value: "missing_primary", label: "Missing Primary" },
-              { value: "no_contacts", label: "No Contacts" },
-            ]}
-          />
-          <FilterSelect
-            label="Route Readiness"
-            value={routeReadiness}
-            onChange={(value) => setRouteReadiness(value as RouteReadinessFilter)}
-            options={[
-              { value: "route_ready", label: "Route Ready" },
-              { value: "no_territory", label: "No Territory" },
-              { value: "no_route_day", label: "No Route Day" },
-              { value: "no_route_rep", label: "No Route Rep" },
-              { value: "no_coords", label: "No Coordinates" },
-              { value: "address_ready", label: "Address Ready, No Coords" },
-            ]}
-          />
-          <FilterSelect
-            label="Has Orders"
-            value={orderState}
-            onChange={(value) => setOrderState(value as OrderStateFilter)}
-            options={[
-              { value: "has_orders", label: "Has Orders" },
-              { value: "no_orders", label: "No Orders" },
-            ]}
-          />
+          <button
+            type="button"
+            onClick={() => setShowAdvancedFilters((current) => !current)}
+            className={denseButtonClass()}
+          >
+            + Filters{advancedFilterCount > 0 ? ` (${advancedFilterCount})` : ""}
+          </button>
+          <button type="button" onClick={handleClearSearch} className={denseButtonClass()}>
+            Clear
+          </button>
+        </div>
+
+        {showAdvancedFilters ? (
+          <div className="mt-3 grid gap-3 rounded-2xl border border-[#dbe8ef] bg-[#f8fbfc] p-3 xl:grid-cols-[repeat(6,minmax(0,1fr))]">
+            <FilterSelect
+              label="Territory"
+              value={territoryFilter}
+              onChange={setTerritoryFilter}
+              options={territoryOptions.map((option) => ({ value: option.value, label: option.label }))}
+            />
+            <FilterSelect label="Owner" value={ownerFilter} onChange={setOwnerFilter} options={owners.map((owner) => ({ value: owner, label: owner }))} />
+            <FilterSelect label="Status" value={statusFilter} onChange={setStatusFilter} options={statuses.map((status) => ({ value: status, label: titleCase(status) }))} />
+            <FilterSelect label="Stage" value={stageFilter} onChange={setStageFilter} options={stages.map((stage) => ({ value: stage, label: titleCase(stage) }))} />
+            <FilterSelect
+              label="Route Readiness"
+              value={routeReadiness}
+              onChange={(value) => setRouteReadiness(value as RouteReadinessFilter)}
+              options={[
+                { value: "route_ready", label: "Route Ready" },
+                { value: "no_territory", label: "No Territory" },
+                { value: "no_route_day", label: "No Route Day" },
+                { value: "no_route_rep", label: "No Route Rep" },
+                { value: "no_coords", label: "No Coordinates" },
+                { value: "address_ready", label: "Address Ready, No Coords" },
+              ]}
+            />
+            <FilterSelect
+              label="Has Orders"
+              value={orderState}
+              onChange={(value) => setOrderState(value as OrderStateFilter)}
+              options={[
+                { value: "has_orders", label: "Has Orders" },
+                { value: "no_orders", label: "No Orders" },
+              ]}
+            />
+          </div>
+        ) : null}
+
+        <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,180px)_minmax(0,1fr)_auto]">
           <FilterSelect
             label="Organize By"
             value={organizeBy}
@@ -906,9 +915,6 @@ export default function CustomerWorkspaceIndex({
             ]}
             allowAllLabel="None"
           />
-        </div>
-
-        <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
           <FilterSelect
             label="Sort"
             value={sortKey}
@@ -922,7 +928,7 @@ export default function CustomerWorkspaceIndex({
             ]}
             allowAllLabel={null}
           />
-          <div className="flex flex-wrap items-end gap-2">
+          <div className="flex flex-wrap items-end justify-end gap-2">
             <button
               type="button"
               onClick={selectAllVisible}
@@ -950,7 +956,7 @@ export default function CustomerWorkspaceIndex({
           </div>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-2">
+        <div className="mt-2 flex flex-wrap items-center gap-2">
           <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4f6877]">
             Selected {selectedVisibleCustomerIds.length} of {visibleCustomers.length} filtered
           </span>
@@ -958,7 +964,7 @@ export default function CustomerWorkspaceIndex({
             Pending Stops {pendingStops.length}
           </span>
           <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4f6877]">
-            Search mode: explicit apply
+            Search updates automatically
           </span>
           <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4f6877]">
             Organize by {organizeBy === "none" ? "none" : titleCase(organizeBy)}
@@ -1230,7 +1236,7 @@ function BulkActionBar({
           : null;
 
   return (
-    <section className="sticky top-4 z-10 rounded-[24px] border border-[#bfe8e2] bg-[linear-gradient(180deg,#f5fffd_0%,#ffffff_100%)] p-4 shadow-[0_18px_40px_rgba(16,42,67,0.08)]">
+    <section className="rounded-[24px] border border-[#bfe8e2] bg-[linear-gradient(180deg,#f5fffd_0%,#ffffff_100%)] p-4 shadow-[0_14px_30px_rgba(16,42,67,0.08)]">
       <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#0f766e]">Bulk Actions</p>
@@ -1331,7 +1337,7 @@ function FilterSelect({
       <select
         value={value}
         onChange={(event) => startTransition(() => onChange(event.target.value))}
-        className="rounded-2xl border border-[#cedde6] bg-[#fbfdfe] px-4 py-3 text-sm text-[#173543] outline-none transition focus:border-[#14b8a6] focus:bg-white"
+        className="h-10 rounded-2xl border border-[#cedde6] bg-[#fbfdfe] px-4 text-sm text-[#173543] outline-none transition focus:border-[#14b8a6] focus:bg-white"
       >
         {allowAllLabel !== null ? <option value="all">{allowAllLabel}</option> : null}
         {options.map((option) => (
@@ -1356,7 +1362,7 @@ function MetricLine({ label, value }: { label: string; value: string }) {
 function QuickAction({ href, label, external = false }: { href: string | null; label: string; external?: boolean }) {
   if (!href) {
     return (
-      <span className="inline-flex items-center justify-center rounded-full border border-[#d9e5eb] bg-[#f7fbfd] px-4 py-2.5 text-sm text-[#89a0ad]">
+      <span className="inline-flex h-9 items-center justify-center rounded-full border border-[#d9e5eb] bg-[#f7fbfd] px-3.5 text-sm text-[#89a0ad]">
         {label}
       </span>
     );
