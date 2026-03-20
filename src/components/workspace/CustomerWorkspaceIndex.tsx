@@ -189,6 +189,10 @@ function denseButtonClass(tone: "primary" | "secondary" = "secondary") {
     : "inline-flex h-9 items-center justify-center rounded-full border border-[#d0dde5] bg-white px-3.5 text-sm font-medium text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543]";
 }
 
+function toolbarSelectClass() {
+  return "h-9 min-w-0 rounded-full border border-[#cedde6] bg-[#fbfdfe] px-3 text-sm text-[#173543] outline-none transition focus:border-[#14b8a6] focus:bg-white";
+}
+
 function getRouteReadiness(customer: CustomerSummary): Exclude<RouteReadinessFilter, "all"> | "other" {
   if (customer.territoryCode && customer.routeDay && customer.assignedRouteRepUserId && isRouteEligibleCustomer(customer)) return "route_ready";
   if (!customer.territoryCode) return "no_territory";
@@ -818,56 +822,49 @@ export default function CustomerWorkspaceIndex({
           </div>
         </section>
 
-        <section className="sticky top-4 z-20 rounded-[24px] border border-[#dbe8ef] bg-white/95 p-3 shadow-[0_14px_30px_rgba(16,42,67,0.10)] backdrop-blur">
-        <div className="grid gap-2 xl:grid-cols-[minmax(260px,1.5fr)_180px_160px_180px_auto_auto] xl:items-end">
-          <label className="grid gap-1 text-sm text-[#4b6676]">
-            <span className="font-medium">Search</span>
+        <section className="sticky top-3 z-20 rounded-[18px] border border-[#dbe8ef] bg-white/95 p-2.5 shadow-[0_10px_22px_rgba(16,42,67,0.10)] backdrop-blur">
+          <div className="grid gap-2 lg:grid-cols-[minmax(220px,1.8fr)_150px_140px_150px_150px_auto] lg:items-center">
             <input
               value={draftSearch}
               onChange={(event) => setDraftSearch(event.target.value)}
-              placeholder="Search account, contact, city, phone, website"
-              className="h-10 rounded-2xl border border-[#cedde6] bg-[#fbfdfe] px-4 text-sm text-[#173543] outline-none transition focus:border-[#14b8a6] focus:bg-white"
+              aria-label="Search accounts"
+              placeholder="Search accounts, contacts, city, phone"
+              className="h-9 rounded-full border border-[#cedde6] bg-[#fbfdfe] px-4 text-sm text-[#173543] outline-none transition focus:border-[#14b8a6] focus:bg-white"
             />
-          </label>
-          <FilterSelect
-            label="Source"
-            value={sourceFilter}
-            onChange={setSourceFilter}
-            options={sources.map((source) => ({ value: source, label: formatSourceLabel(source) }))}
-          />
-          <FilterSelect
-            label="Hot Lead"
-            value={hotLeadFilter}
-            onChange={(value) => setHotLeadFilter(value as HotLeadFilter)}
-            options={[
-              { value: "hot", label: "Hot Lead" },
-              { value: "not_hot", label: "Not Hot Lead" },
-            ]}
-          />
-          <FilterSelect
-            label="Follow-Up"
-            value={taskStateFilter}
-            onChange={(value) => setTaskStateFilter(value as TaskStateFilter)}
-            options={[
-              { value: "has_open_task", label: "Has Open Task" },
-              { value: "no_open_task", label: "No Open Task" },
-              { value: "overdue_task", label: "Overdue Task" },
-            ]}
-          />
-          <button
-            type="button"
-            onClick={() => setShowAdvancedFilters((current) => !current)}
-            className={denseButtonClass()}
-          >
-            + Filters{advancedFilterCount > 0 ? ` (${advancedFilterCount})` : ""}
-          </button>
-          <button type="button" onClick={handleClearSearch} className={denseButtonClass()}>
-            Clear
-          </button>
+            <select value={sourceFilter} onChange={(event) => startTransition(() => setSourceFilter(event.target.value))} aria-label="Source" className={toolbarSelectClass()}>
+              <option value="all">All Sources</option>
+              {sources.map((source) => (
+                <option key={source} value={source}>
+                  {formatSourceLabel(source)}
+                </option>
+              ))}
+            </select>
+            <select value={hotLeadFilter} onChange={(event) => startTransition(() => setHotLeadFilter(event.target.value as HotLeadFilter))} aria-label="Hot lead" className={toolbarSelectClass()}>
+              <option value="all">All Leads</option>
+              <option value="hot">Hot Lead</option>
+              <option value="not_hot">Not Hot</option>
+            </select>
+            <select value={taskStateFilter} onChange={(event) => startTransition(() => setTaskStateFilter(event.target.value as TaskStateFilter))} aria-label="Follow-up" className={toolbarSelectClass()}>
+              <option value="all">All Follow-Up</option>
+              <option value="has_open_task">Has Task</option>
+              <option value="no_open_task">No Task</option>
+              <option value="overdue_task">Overdue</option>
+            </select>
+            <select value={sortKey} onChange={(event) => startTransition(() => setSortKey(event.target.value as SortKey))} aria-label="Sort" className={toolbarSelectClass()}>
+              <option value="activity_desc">Recent</option>
+              <option value="name_asc">Name A-Z</option>
+              <option value="name_desc">Name Z-A</option>
+              <option value="orders_desc">Most Orders</option>
+              <option value="owner_asc">Owner A-Z</option>
+            </select>
+            <button type="button" onClick={() => setShowAdvancedFilters((current) => !current)} className={denseButtonClass()}>
+              More Filters{advancedFilterCount > 0 ? ` (${advancedFilterCount})` : ""}
+            </button>
         </div>
 
         {showAdvancedFilters ? (
-          <div className="mt-3 grid gap-3 rounded-2xl border border-[#dbe8ef] bg-[#f8fbfc] p-3 xl:grid-cols-[repeat(6,minmax(0,1fr))]">
+          <section className="rounded-[20px] border border-[#dbe8ef] bg-[#f8fbfc] p-3 shadow-[0_8px_18px_rgba(16,42,67,0.05)]">
+          <div className="grid gap-3 xl:grid-cols-[repeat(6,minmax(0,1fr))]">
             <FilterSelect
               label="Territory"
               value={territoryFilter}
@@ -899,36 +896,36 @@ export default function CustomerWorkspaceIndex({
                 { value: "no_orders", label: "No Orders" },
               ]}
             />
+            <FilterSelect
+              label="Contact Coverage"
+              value={contactCoverage}
+              onChange={(value) => setContactCoverage(value as ContactCoverageFilter)}
+              options={[
+                { value: "has_contacts", label: "Has Contacts" },
+                { value: "missing_primary", label: "Missing Primary" },
+                { value: "no_contacts", label: "No Contacts" },
+              ]}
+            />
+            <FilterSelect
+              label="Organize By"
+              value={organizeBy}
+              onChange={(value) => setOrganizeBy(value as OrganizeBy)}
+              options={[
+                { value: "territory", label: "Territory" },
+                { value: "owner", label: "Owner" },
+                { value: "route_day", label: "Route Day" },
+                { value: "stage", label: "Stage" },
+              ]}
+              allowAllLabel="None"
+            />
           </div>
-        ) : null}
-
-        <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,180px)_minmax(0,1fr)_auto]">
-          <FilterSelect
-            label="Organize By"
-            value={organizeBy}
-            onChange={(value) => setOrganizeBy(value as OrganizeBy)}
-            options={[
-              { value: "territory", label: "Territory" },
-              { value: "owner", label: "Owner" },
-              { value: "route_day", label: "Route Day" },
-              { value: "stage", label: "Stage" },
-            ]}
-            allowAllLabel="None"
-          />
-          <FilterSelect
-            label="Sort"
-            value={sortKey}
-            onChange={(value) => setSortKey(value as SortKey)}
-            options={[
-              { value: "activity_desc", label: "Recent Activity" },
-              { value: "name_asc", label: "Account Name A-Z" },
-              { value: "name_desc", label: "Account Name Z-A" },
-              { value: "orders_desc", label: "Most Orders" },
-              { value: "owner_asc", label: "Owner A-Z" },
-            ]}
-            allowAllLabel={null}
-          />
-          <div className="flex flex-wrap items-end justify-end gap-2">
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button type="button" onClick={handleClearSearch} className={denseButtonClass()}>
+              Clear search
+            </button>
+            <button type="button" onClick={resetFilters} className={denseButtonClass()}>
+              Reset filters
+            </button>
             <button
               type="button"
               onClick={selectAllVisible}
@@ -937,11 +934,8 @@ export default function CustomerWorkspaceIndex({
             >
               {allVisibleSelected ? "All selected" : `Select ${visibleCustomers.length}`}
             </button>
-            <button type="button" onClick={clearSelection} disabled={selectedVisibleCustomerIds.length === 0} className={denseButtonClass()}>
-              Clear
-            </button>
-            <button type="button" onClick={resetFilters} className={denseButtonClass()}>
-              Reset filters
+            <button type="button" onClick={clearSelection} disabled={selectedCustomerIds.length === 0} className={denseButtonClass()}>
+              Clear selection
             </button>
             {staffRole === "admin" ? (
               <button
@@ -954,9 +948,10 @@ export default function CustomerWorkspaceIndex({
               </button>
             ) : null}
           </div>
-        </div>
+          </section>
+        ) : null}
 
-        <div className="mt-2 flex flex-wrap items-center gap-2">
+        <div className="mt-1 flex flex-wrap items-center gap-2">
           <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4f6877]">
             Selected {selectedVisibleCustomerIds.length} of {visibleCustomers.length} filtered
           </span>
@@ -967,7 +962,7 @@ export default function CustomerWorkspaceIndex({
             Search updates automatically
           </span>
           <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4f6877]">
-            Organize by {organizeBy === "none" ? "none" : titleCase(organizeBy)}
+            Sort {titleCase(sortKey.replace("_", " "))}
           </span>
           {visibleGeocodeStatus ? <span className="text-sm text-[#4f6877]">{visibleGeocodeStatus}</span> : null}
         </div>
