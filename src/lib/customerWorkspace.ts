@@ -8,6 +8,7 @@ const WORKSPACE_BATCH_SIZE = 500;
 export type CustomerSummary = {
   id: string;
   name: string;
+  archivedAt: string | null;
   status: string;
   stage: string | null;
   source: string | null;
@@ -167,6 +168,10 @@ type WorkspaceSummaryBuildArgs = {
 function isCustomerWorkspaceRecord(customer: GenericRow) {
   const recordKind = normalizeText(customer.record_kind);
   return !recordKind || recordKind === "customer";
+}
+
+function isArchivedCustomerRecord(customer: GenericRow) {
+  return Boolean(firstText(customer.archived_at));
 }
 
 function normalizeText(value: unknown): string {
@@ -475,15 +480,17 @@ function buildLinkedRecords(
     });
 }
 
-export async function loadCustomerWorkspaceIndex(): Promise<CustomerWorkspaceIndexData> {
+export async function loadCustomerWorkspaceIndex(args?: { includeArchived?: boolean }): Promise<CustomerWorkspaceIndexData> {
   const data = await loadWorkspaceData();
   const profileById = getProfileMap(data.profiles);
   const authUserById = getAuthUserMap(data.authUsers);
-  const customers = data.customers.filter(isCustomerWorkspaceRecord);
+  const customerWorkspaceRows = data.customers.filter(isCustomerWorkspaceRecord);
+  const activeCustomers = customerWorkspaceRows.filter((customer) => !isArchivedCustomerRecord(customer));
+  const customers = args?.includeArchived ? customerWorkspaceRows : activeCustomers;
 
   return {
     customers: customers.map((customer) => buildCustomerSummary({ customer, data, profileById, authUserById })),
-    metrics: buildWorkspaceMetrics({ ...data, customers }),
+    metrics: buildWorkspaceMetrics({ ...data, customers: activeCustomers }),
   };
 }
 
@@ -739,6 +746,7 @@ function buildCustomerSummary({
   return {
     id: customerId,
     name: getCustomerName(customer),
+    archivedAt: firstText(customer.archived_at),
     status: getCustomerStatus(customer),
     stage: firstText(customer.stage),
     source,

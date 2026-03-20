@@ -41,13 +41,21 @@ type CustomerWorkspaceIndexProps = {
   };
 };
 
-type BulkActionKind = "assign_sales_rep" | "assign_territory" | "assign_route_day" | "add_to_pending_stops" | "remove_from_pending_stops" | "convert_to_source";
+type BulkActionKind =
+  | "assign_sales_rep"
+  | "assign_territory"
+  | "assign_route_day"
+  | "add_to_pending_stops"
+  | "remove_from_pending_stops"
+  | "convert_to_source"
+  | "archive_customers"
+  | "restore_customers";
 type BulkActionState = {
   kind: BulkActionKind;
   value: string;
 };
 
-type SavedViewKey = "all" | "pipeline" | "unassigned" | "missing_primary" | "with_orders" | "hall_of_flowers";
+type SavedViewKey = "all" | "pipeline" | "unassigned" | "missing_primary" | "with_orders" | "hall_of_flowers" | "archived";
 type SortKey = "activity_desc" | "name_asc" | "name_desc" | "orders_desc" | "owner_asc";
 type ContactCoverageFilter = "all" | "has_contacts" | "missing_primary" | "no_contacts";
 type RouteReadinessFilter = "all" | "route_ready" | "no_territory" | "no_route_day" | "no_route_rep" | "no_coords" | "address_ready";
@@ -65,6 +73,8 @@ const BULK_ACTIONS: Array<{ key: BulkActionKind; label: string }> = [
   { key: "add_to_pending_stops", label: "Add to Pending Stops" },
   { key: "remove_from_pending_stops", label: "Remove from Pending Stops" },
   { key: "convert_to_source", label: "Convert to Source" },
+  { key: "archive_customers", label: "Archive Customers" },
+  { key: "restore_customers", label: "Restore Customers" },
 ];
 
 function sameIds(left: string[], right: string[]) {
@@ -183,7 +193,7 @@ function followUpChipClass(customer: CustomerSummary) {
   return "border-[#bde8e4] bg-[#e9fbf9] text-[#0f766e]";
 }
 
-type WorkspacePresetKey = "all" | "hall_of_flowers" | "hot_leads" | "no_task" | "overdue";
+type WorkspacePresetKey = "all" | "hall_of_flowers" | "hot_leads" | "no_task" | "overdue" | "archived";
 
 function denseButtonClass(tone: "primary" | "secondary" = "secondary") {
   return tone === "primary"
@@ -229,9 +239,10 @@ export default function CustomerWorkspaceIndex({
   const [savedView, setSavedView] = useState<SavedViewKey>(
     initialFilters.savedView === "pipeline" ||
       initialFilters.savedView === "unassigned" ||
-      initialFilters.savedView === "missing_primary" ||
+    initialFilters.savedView === "missing_primary" ||
       initialFilters.savedView === "with_orders" ||
-      initialFilters.savedView === "hall_of_flowers"
+      initialFilters.savedView === "hall_of_flowers" ||
+      initialFilters.savedView === "archived"
       ? initialFilters.savedView
       : "all"
   );
@@ -304,6 +315,8 @@ export default function CustomerWorkspaceIndex({
     )
   );
 
+  const activeCustomers = customers.filter((customer) => !customer.archivedAt);
+  const archivedCustomers = customers.filter((customer) => Boolean(customer.archivedAt));
   const statuses = Array.from(new Set(customers.map((customer) => customer.status).filter(Boolean))).sort((a, b) => a.localeCompare(b));
   const stages = Array.from(new Set(customers.map((customer) => customer.stage).filter((value): value is string => Boolean(value)))).sort((a, b) => a.localeCompare(b));
   const owners = Array.from(new Set(customers.map((customer) => customer.assignedSalesName).filter((value): value is string => Boolean(value)))).sort((a, b) => a.localeCompare(b));
@@ -359,6 +372,12 @@ export default function CustomerWorkspaceIndex({
   ]);
 
   let visibleCustomers = customers.filter((customer) => {
+    if (savedView === "archived") {
+      if (!customer.archivedAt) return false;
+    } else if (customer.archivedAt) {
+      return false;
+    }
+
     const query = normalizeText(searchQuery);
     if (query && !getCustomerSearchText(customer).includes(query)) return false;
     if (sourceFilter !== "all" && (customer.source || "") !== sourceFilter) return false;
@@ -422,11 +441,12 @@ export default function CustomerWorkspaceIndex({
   const routeReadyCount = visibleCustomers.filter((customer) => getRouteReadiness(customer) === "route_ready").length;
   const visibleWithOrders = visibleCustomers.filter((customer) => customer.counts.orders > 0).length;
   const navCounts = {
-    all: customers.length,
-    hallOfFlowers: customers.filter((customer) => customer.isHallOfFlowersLead).length,
-    hotLeads: customers.filter((customer) => customer.isHotLead).length,
-    noTask: customers.filter((customer) => !customer.hasOpenTask).length,
-    overdue: customers.filter((customer) => customer.overdueTaskCount > 0).length,
+    all: activeCustomers.length,
+    hallOfFlowers: activeCustomers.filter((customer) => customer.isHallOfFlowersLead).length,
+    hotLeads: activeCustomers.filter((customer) => customer.isHotLead).length,
+    noTask: activeCustomers.filter((customer) => !customer.hasOpenTask).length,
+    overdue: activeCustomers.filter((customer) => customer.overdueTaskCount > 0).length,
+    archived: archivedCustomers.length,
   };
   const advancedFilterCount = [
     territoryFilter !== "all",
@@ -630,6 +650,10 @@ export default function CustomerWorkspaceIndex({
       }
       if (preset === "overdue") {
         setTaskStateFilter("overdue_task");
+        return;
+      }
+      if (preset === "archived") {
+        setSavedView("archived");
       }
     });
   }
@@ -692,6 +716,8 @@ export default function CustomerWorkspaceIndex({
       bulkAction.kind !== "add_to_pending_stops" &&
       bulkAction.kind !== "remove_from_pending_stops" &&
       bulkAction.kind !== "convert_to_source" &&
+      bulkAction.kind !== "archive_customers" &&
+      bulkAction.kind !== "restore_customers" &&
       !bulkAction.value
     ) {
       setBulkStatusMessage("Choose a value before applying the bulk action.");
@@ -733,6 +759,28 @@ export default function CustomerWorkspaceIndex({
           throw new Error(String(json.error || `Conversion failed (${res.status})`));
         }
         setBulkStatusMessage(`Converted ${converted} selected account${converted === 1 ? "" : "s"} into Sources.`);
+        setSelectedCustomerIds([]);
+        router.refresh();
+        return;
+      }
+
+      if (bulkAction.kind === "archive_customers" || bulkAction.kind === "restore_customers") {
+        const res = await fetch("/api/workspace/customers/archive", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            customer_ids: selectedVisibleCustomers.map((customer) => customer.id),
+            archived: bulkAction.kind === "archive_customers",
+          }),
+        });
+        const json = await parseJsonSafe(res);
+        const updatedCount = Number(json.updated_customer_count || 0);
+        if (!res.ok || json.ok !== true || updatedCount <= 0) {
+          throw new Error(String(json.error || `Archive update failed (${res.status})`));
+        }
+        setBulkStatusMessage(
+          `${bulkAction.kind === "archive_customers" ? "Archived" : "Restored"} ${updatedCount} selected account${updatedCount === 1 ? "" : "s"}.`
+        );
         setSelectedCustomerIds([]);
         router.refresh();
         return;
@@ -783,6 +831,7 @@ export default function CustomerWorkspaceIndex({
     { key: "hot_leads" as const, label: "Hot Leads", count: navCounts.hotLeads },
     { key: "no_task" as const, label: "No Task", count: navCounts.noTask },
     { key: "overdue" as const, label: "Overdue", count: navCounts.overdue },
+    { key: "archived" as const, label: "Archived", count: navCounts.archived },
   ];
 
   return (
@@ -802,7 +851,8 @@ export default function CustomerWorkspaceIndex({
                 (item.key === "hall_of_flowers" && savedView === "hall_of_flowers" && sourceFilter === "hall_of_flowers") ||
                 (item.key === "hot_leads" && hotLeadFilter === "hot") ||
                 (item.key === "no_task" && taskStateFilter === "no_open_task") ||
-                (item.key === "overdue" && taskStateFilter === "overdue_task");
+                (item.key === "overdue" && taskStateFilter === "overdue_task") ||
+                (item.key === "archived" && savedView === "archived");
 
               return (
                 <button
@@ -1256,7 +1306,12 @@ function BulkActionBar({
   onClear: () => void;
 }) {
   const availableActions = BULK_ACTIONS.filter((item) =>
-    staffRole === "admin" ? true : item.key !== "assign_sales_rep" && item.key !== "convert_to_source"
+    staffRole === "admin"
+      ? true
+      : item.key !== "assign_sales_rep" &&
+          item.key !== "convert_to_source" &&
+          item.key !== "archive_customers" &&
+          item.key !== "restore_customers"
   );
   const valueLabel =
     action.kind === "assign_sales_rep"
@@ -1328,6 +1383,10 @@ function BulkActionBar({
             <div className="rounded-2xl border border-[#d7e6ed] bg-white px-4 py-3 text-sm text-[#4f6877]">
               {action.kind === "convert_to_source"
                 ? "Creates source records from the selected customer accounts and soft-removes those accounts from the active Customers workspace."
+                : action.kind === "archive_customers"
+                  ? "Hides the selected customers from the active Customers workspace without deleting their history."
+                  : action.kind === "restore_customers"
+                    ? "Restores archived customers back into the active Customers workspace."
                 : "Queues or removes the current filtered selection for route generation."}
             </div>
           )}

@@ -18,7 +18,7 @@ export default async function WorkspaceCustomersPage({
 }) {
   const [staff, { customers, metrics }, { territoryOptions, routeRepOptions }, params] = await Promise.all([
     requireStaff(),
-    loadCustomerWorkspaceIndex(),
+    loadCustomerWorkspaceIndex({ includeArchived: true }),
     loadRouteReferenceData(),
     searchParams,
   ]);
