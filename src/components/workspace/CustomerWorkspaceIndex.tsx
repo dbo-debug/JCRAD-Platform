@@ -753,11 +753,11 @@ export default function CustomerWorkspaceIndex({
   }
 
   return (
-    <div className="mx-auto grid max-w-[1440px] gap-4 xl:grid-cols-[220px_minmax(0,1fr)]">
+    <div className="mx-auto grid max-w-[1440px] gap-4 xl:grid-cols-[200px_minmax(0,1fr)]">
       <aside>
-        <section className="rounded-[24px] border border-[#d8e6ee] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbfd_100%)] p-4 shadow-[0_12px_28px_rgba(16,42,67,0.07)]">
+        <section className="rounded-[20px] border border-[#d8e6ee] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbfd_100%)] p-3.5 shadow-[0_10px_22px_rgba(16,42,67,0.06)]">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6c8797]">Customer Views</p>
-          <div className="mt-3 space-y-2">
+          <div className="mt-2.5 space-y-1.5">
             {[
               { key: "all" as const, label: "All Accounts", count: navCounts.all },
               { key: "hall_of_flowers" as const, label: "Hall of Flowers", count: navCounts.hallOfFlowers },
@@ -783,7 +783,7 @@ export default function CustomerWorkspaceIndex({
                   type="button"
                   onClick={() => applyWorkspacePreset(item.key)}
                   className={[
-                    "flex w-full items-center justify-between rounded-2xl border px-3 py-3 text-left text-sm transition",
+                    "flex w-full items-center justify-between rounded-2xl border px-3 py-2.5 text-left text-sm transition",
                     active ? "border-[#14b8a6] bg-[#effcf9] text-[#0f766e]" : "border-[#dbe8ef] bg-white text-[#35505d] hover:border-[#97c7c1] hover:bg-[#f4fbfa]",
                   ].join(" ")}
                 >
@@ -794,7 +794,7 @@ export default function CustomerWorkspaceIndex({
             })}
           </div>
 
-          <div className="mt-4 grid gap-2 rounded-2xl border border-[#dbe8ef] bg-white/80 p-3">
+          <div className="mt-3 grid gap-1.5 rounded-2xl border border-[#dbe8ef] bg-white/80 p-3">
             <MetricLine label="Visible" value={String(visibleCustomers.length)} />
             <MetricLine label="Assigned" value={String(visibleWithOwners)} />
             <MetricLine label="Contacts" value={String(visibleWithContacts)} />
@@ -822,7 +822,7 @@ export default function CustomerWorkspaceIndex({
           </div>
         </section>
 
-        <section className="sticky top-3 z-20 rounded-[18px] border border-[#dbe8ef] bg-white/95 p-2.5 shadow-[0_10px_22px_rgba(16,42,67,0.10)] backdrop-blur">
+        <section className="sticky top-0 z-20 rounded-[16px] border border-[#dbe8ef] bg-white/95 p-2 shadow-[0_8px_18px_rgba(16,42,67,0.08)] backdrop-blur">
           <div className="grid gap-2 lg:grid-cols-[minmax(220px,1.8fr)_150px_140px_150px_150px_auto] lg:items-center">
             <input
               value={draftSearch}
@@ -1018,7 +1018,8 @@ export default function CustomerWorkspaceIndex({
               </div>
             ) : null}
 
-            <div className="space-y-4">
+            <div className="space-y-2">
+              <ResultsColumnHeader />
               {section.customers.map((customer) => (
                 <CustomerCard
                   key={customer.id}
@@ -1069,22 +1070,31 @@ function CustomerCard({
   return (
     <article
       className={[
-        "rounded-[20px] border bg-white px-3 py-2.5 shadow-[0_8px_18px_rgba(16,42,67,0.05)] transition hover:border-[#b9d5df] hover:shadow-[0_12px_24px_rgba(16,42,67,0.07)]",
+        "rounded-[18px] border bg-white px-3 py-2.5 shadow-[0_6px_14px_rgba(16,42,67,0.04)] transition hover:border-[#b9d5df] hover:shadow-[0_10px_20px_rgba(16,42,67,0.06)]",
         selected || pendingSelected ? "border-[#14b8a6] ring-2 ring-[#b8efe7]" : "border-[#d9e7ee]",
       ].join(" ")}
     >
-      <div className="flex flex-col gap-3 xl:grid xl:min-h-[86px] xl:grid-cols-[minmax(0,28px)_minmax(0,1.6fr)_minmax(240px,0.85fr)_minmax(230px,0.8fr)_auto] xl:items-center">
-        <div className="flex items-center">
+      <div className="grid gap-3 lg:min-h-[88px] lg:grid-cols-[28px_minmax(0,2fr)_minmax(220px,1.15fr)_minmax(220px,1fr)_auto] lg:items-center">
+        <div className="flex items-center self-start pt-1 lg:self-center lg:pt-0">
           <input type="checkbox" checked={selected} onChange={() => onToggleSelected(customer.id)} className="h-4 w-4 accent-[#14b8a6]" />
         </div>
 
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <Link href={`/workspace/customers/${customer.id}`} className="truncate text-sm font-semibold text-[#173543] transition hover:text-[#0f766e]">
+        <div className="min-w-0 space-y-1.5">
+          <div className="flex min-w-0 items-center gap-2">
+            <Link href={`/workspace/customers/${customer.id}`} className="truncate text-sm font-semibold text-[#173543] transition hover:text-[#0f766e] lg:text-[15px]">
               {customer.name}
             </Link>
-            <span className={["rounded-full border px-2 py-0.5 text-[11px] font-semibold", statusChipClass(customer.status)].join(" ")}>{titleCase(customer.status)}</span>
-            <span className={["rounded-full border px-2 py-0.5 text-[11px] font-semibold", stageChipClass(customer.stage)].join(" ")}>{titleCase(customer.stage, "No Stage")}</span>
+            <span className={["hidden rounded-full border px-2 py-0.5 text-[11px] font-semibold xl:inline-flex", statusChipClass(customer.status)].join(" ")}>
+              {titleCase(customer.status)}
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className={["rounded-full border px-2 py-0.5 text-[11px] font-semibold xl:hidden", statusChipClass(customer.status)].join(" ")}>
+              {titleCase(customer.status)}
+            </span>
+            <span className={["rounded-full border px-2 py-0.5 text-[11px] font-semibold", stageChipClass(customer.stage)].join(" ")}>
+              {titleCase(customer.stage, "No Stage")}
+            </span>
             {customer.isHallOfFlowersLead ? (
               <span className="rounded-full border border-[#f1ddad] bg-[#fff9eb] px-2 py-0.5 text-[11px] font-semibold text-[#8a5b00]">Hall of Flowers</span>
             ) : null}
@@ -1094,52 +1104,69 @@ function CustomerCard({
             <span className={["rounded-full border px-2 py-0.5 text-[11px] font-semibold", followUpChipClass(customer)].join(" ")}>{followUpState}</span>
             {pendingSelected ? <span className="rounded-full border border-[#bfe8e2] bg-[#f5fffd] px-2 py-0.5 text-[11px] font-semibold text-[#0f766e]">Pending Stop</span> : null}
           </div>
-          <p className="mt-1 truncate text-sm text-[#5a7483]">
-            {primaryContact?.name || "No primary contact"}
-            {primaryContact?.phone || customer.mainPhone ? ` • ${primaryContact?.phone || customer.mainPhone}` : ""}
+          <p className="truncate text-sm text-[#5a7483]">
+            {customer.city || "No city"}
+            {primaryContact?.name ? ` • ${primaryContact.name}` : ""}
+          </p>
+          <p className="truncate text-xs text-[#7a909d]">
+            {primaryContact?.phone || customer.mainPhone || "No phone"}
             {primaryContact?.email || customer.primaryContactEmail ? ` • ${primaryContact?.email || customer.primaryContactEmail}` : ""}
           </p>
         </div>
 
-        <div className="min-w-0 text-sm text-[#56717f]">
-          <p className="truncate">
-            Owner {customer.assignedSalesName || "Unassigned"}
-            {customer.city ? ` • ${customer.city}` : ""}
-          </p>
-          <p className="mt-1 truncate text-xs text-[#7a909d]">
+        <div className="min-w-0 space-y-1 text-sm text-[#56717f]">
+          <p className="truncate font-medium text-[#294653]">{customer.assignedSalesName || "Unassigned owner"}</p>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {customer.source ? (
+              <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-2 py-0.5 text-[11px] font-medium text-[#4f6877]">
+                {formatSourceLabel(customer.source)}
+              </span>
+            ) : null}
+            <RouteReadinessPill state={routeReadiness} />
+          </div>
+          <p className="truncate text-xs text-[#7a909d]">
             {customer.territoryCode ? `Territory ${customer.territoryCode}` : "Territory open"}
             {customer.routeDay ? ` • ${customer.routeDay}` : " • No route day"}
-            {customer.source ? ` • ${formatSourceLabel(customer.source)}` : ""}
+            {customer.assignedRouteRepName ? ` • ${customer.assignedRouteRepName}` : ""}
           </p>
         </div>
 
-        <div className="min-w-0 text-sm text-[#56717f]">
-          <div className="flex flex-wrap items-center gap-2 text-xs text-[#7a909d]">
-            <RouteReadinessPill state={routeReadiness} />
-            <span>{activityCount} linked</span>
-            <span>{customer.counts.orders} orders</span>
-            <span>{customer.contactCount} contacts</span>
+        <div className="min-w-0 space-y-1 text-sm text-[#56717f]">
+          <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-[#7a909d]">
+            <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-2 py-0.5">{activityCount} linked</span>
+            <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-2 py-0.5">{customer.counts.orders} orders</span>
+            <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-2 py-0.5">{customer.contactCount} contacts</span>
           </div>
-          <p className="mt-1 truncate text-xs text-[#7a909d]">
+          <p className="truncate text-sm text-[#294653]">{customer.hasOpenTask ? "Follow-up active" : "No open follow-up"}</p>
+          <p className="truncate text-xs text-[#7a909d]">
             {customer.nextVisitDueAt ? `Next visit ${formatDate(customer.nextVisitDueAt)}` : "No next visit"}
             {customer.updatedAt ? ` • Updated ${formatDate(customer.updatedAt)}` : ""}
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center justify-start gap-2 lg:justify-end">
           <RouteActionButton customer={customer} pendingSelected={pendingSelected} onTogglePendingSelected={onTogglePendingSelected} />
           <QuickAction href={phoneHref} label="Call" />
           <QuickAction href={primaryEmailHref} label="Email" />
-          <Link
-            href={`/workspace/customers/${customer.id}`}
-            className={denseButtonClass("primary")}
-          >
+          <Link href={`/workspace/customers/${customer.id}`} className={denseButtonClass("primary")}>
             Open
           </Link>
           <QuickAction href={websiteHref} label="Site" external />
         </div>
       </div>
     </article>
+  );
+}
+
+function ResultsColumnHeader() {
+  return (
+    <div className="hidden items-center gap-3 rounded-[16px] border border-[#dbe8ef] bg-[#f7fbfd] px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#76909f] lg:grid lg:grid-cols-[28px_minmax(0,2fr)_minmax(220px,1.15fr)_minmax(220px,1fr)_auto]">
+      <span />
+      <span>Account</span>
+      <span>Ownership / Source / Routing</span>
+      <span>Follow-Up / Activity</span>
+      <span className="text-right">Actions</span>
+    </div>
   );
 }
 
@@ -1153,20 +1180,16 @@ function RouteActionButton({
   onTogglePendingSelected: (customerId: string, nextSelected: boolean) => void;
 }) {
   const [busy, setBusy] = useState(false);
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const routeHref = pendingSelected
     ? `/workspace/routes?pending=1&customerId=${encodeURIComponent(customer.id)}`
     : null;
 
   async function handlePendingToggle() {
     setBusy(true);
-    setStatusMessage(null);
 
     try {
       await onTogglePendingSelected(customer.id, !pendingSelected);
-      setStatusMessage(pendingSelected ? "Removed from pending stops." : "Added to pending stops.");
-    } catch (error) {
-      setStatusMessage(error instanceof Error ? error.message : "Pending stop update failed");
+    } catch {
     } finally {
       setBusy(false);
     }
@@ -1179,7 +1202,7 @@ function RouteActionButton({
         onClick={() => void handlePendingToggle()}
         disabled={busy}
         className={[
-          "inline-flex h-9 items-center justify-center rounded-full px-3.5 text-sm font-semibold transition",
+          "inline-flex h-8 items-center justify-center rounded-full px-3 text-sm font-semibold transition",
           pendingSelected
             ? "border border-[#bfe8e2] bg-[#f5fffd] text-[#0f766e] hover:border-[#14b8a6]"
             : "border border-[#cddbe4] bg-white text-[#21424d] hover:border-[#14b8a6] hover:text-[#0f766e]",
@@ -1188,11 +1211,10 @@ function RouteActionButton({
         {busy ? "Saving..." : pendingSelected ? "Pending" : "Queue"}
       </button>
       {routeHref ? (
-        <Link href={routeHref} className="inline-flex h-9 items-center rounded-full border border-[#bfe8e2] px-3 text-sm font-medium text-[#0f766e] transition hover:text-[#0b5f58]">
+        <Link href={routeHref} className="inline-flex h-8 items-center rounded-full border border-[#bfe8e2] px-3 text-sm font-medium text-[#0f766e] transition hover:text-[#0b5f58]">
           Pending
         </Link>
       ) : null}
-      {statusMessage ? <p className="text-xs text-[#4f6877]">{statusMessage}</p> : null}
     </div>
   );
 }
@@ -1357,7 +1379,7 @@ function MetricLine({ label, value }: { label: string; value: string }) {
 function QuickAction({ href, label, external = false }: { href: string | null; label: string; external?: boolean }) {
   if (!href) {
     return (
-      <span className="inline-flex h-9 items-center justify-center rounded-full border border-[#d9e5eb] bg-[#f7fbfd] px-3.5 text-sm text-[#89a0ad]">
+      <span className="inline-flex h-8 items-center justify-center rounded-full border border-[#d9e5eb] bg-[#f7fbfd] px-3 text-sm text-[#89a0ad]">
         {label}
       </span>
     );
@@ -1368,7 +1390,7 @@ function QuickAction({ href, label, external = false }: { href: string | null; l
       href={href}
       target={external ? "_blank" : undefined}
       rel={external ? "noreferrer" : undefined}
-      className="inline-flex h-9 items-center justify-center rounded-full border border-[#cddbe4] bg-white px-3.5 text-sm font-medium text-[#21424d] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
+      className="inline-flex h-8 items-center justify-center rounded-full border border-[#cddbe4] bg-white px-3 text-sm font-medium text-[#21424d] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
     >
       {label}
     </a>
