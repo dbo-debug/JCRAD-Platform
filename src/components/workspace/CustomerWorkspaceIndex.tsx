@@ -727,11 +727,11 @@ export default function CustomerWorkspaceIndex({
           body: JSON.stringify({ customer_ids: selectedVisibleCustomers.map((customer) => customer.id) }),
         });
         const json = await parseJsonSafe(res);
-        if (!res.ok) {
+        const converted = Number(json.converted || 0);
+        const insertedSourceCount = Number(json.inserted_source_count || 0);
+        if (!res.ok || json.ok !== true || converted <= 0 || insertedSourceCount <= 0) {
           throw new Error(String(json.error || `Conversion failed (${res.status})`));
         }
-
-        const converted = Number(json.converted || selectedVisibleCustomers.length);
         setBulkStatusMessage(`Converted ${converted} selected account${converted === 1 ? "" : "s"} into Sources.`);
         setSelectedCustomerIds([]);
         router.refresh();
