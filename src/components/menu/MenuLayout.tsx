@@ -11,6 +11,7 @@ type MenuLayoutProps = {
   branding: ReactNode;
   valueStrip?: ReactNode;
   headerActions?: ReactNode;
+  mobileHeaderActions?: ReactNode;
   searchValue: string;
   onSearchChange: (value: string) => void;
   mode: MenuMode;
@@ -30,6 +31,7 @@ export default function MenuLayout({
   branding,
   valueStrip,
   headerActions,
+  mobileHeaderActions,
   searchValue,
   onSearchChange,
   mode,
@@ -85,13 +87,16 @@ export default function MenuLayout({
               </button>
             </div>
             {headerActions ? <div className="hidden md:block md:ml-auto">{headerActions}</div> : null}
-            <button
-              type="button"
-              onClick={onOpenCart}
-              className="rounded-full border border-[#d3dde4] bg-[#f7fafb] px-3 py-2 text-sm font-semibold text-[#1f2937] transition hover:border-[#14b8a6] lg:hidden"
-            >
-              Estimate Cart ({cartCount})
-            </button>
+            <div className="ml-auto flex items-center gap-2 md:hidden">
+              {mobileHeaderActions}
+              <button
+                type="button"
+                onClick={onOpenCart}
+                className="rounded-full border border-[#d3dde4] bg-[#f7fafb] px-3 py-2 text-sm font-semibold text-[#1f2937] transition hover:border-[#14b8a6]"
+              >
+                Estimate Cart ({cartCount})
+              </button>
+            </div>
           </div>
           {valueStrip ? (
             <div className="mt-3 rounded-full border border-[#d4e3e3] bg-[#eef7f6] px-4 py-1.5 text-center text-xs font-medium tracking-[0.08em] text-[#0f766e]">

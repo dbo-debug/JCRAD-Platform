@@ -1040,6 +1040,7 @@ export default function MenuClient({
 
   const cartLines = estimateSummary.lines;
   const cartTotal = estimateSummary.total;
+  const estimateHref = "/estimate";
   const hasCustomerPackagingInCart = useMemo(
     () => cartLines.some((line) => String(line.packagingMode || "").toLowerCase() === "customer"),
     [cartLines],
@@ -1094,6 +1095,7 @@ export default function MenuClient({
       };
     });
   }, [cartLines, offerById, initialInfusionSettings, yieldSettings]);
+  const menuEstimateCtaLabel = displayCartLines.length > 0 ? "View Estimate" : "Estimate Cart";
 
   async function addLineToEstimate(offer: Offer) {
     const cardState = cardStateForOffer(offer);
@@ -1347,6 +1349,7 @@ export default function MenuClient({
     <EstimateCartPanel
       lines={displayCartLines}
       total={cartTotal}
+      estimateHref={estimateHref}
       onRemoveLine={removeEstimateLine}
       removingLineId={removingLineId}
       onSendEstimatePdf={onSendEstimatePdf}
@@ -1382,12 +1385,20 @@ export default function MenuClient({
             Request Samples / Book Call
           </Link>
           <Link
-            href="/estimate"
+            href={estimateHref}
             className="inline-flex rounded-full bg-[#14b8a6] px-3 py-2 text-xs font-semibold text-white transition hover:opacity-95"
           >
-            Estimate Cart ({displayCartLines.length})
+            {menuEstimateCtaLabel} ({displayCartLines.length})
           </Link>
         </div>
+      }
+      mobileHeaderActions={
+        <Link
+          href={estimateHref}
+          className="inline-flex rounded-full bg-[#14b8a6] px-3 py-2 text-sm font-semibold text-white transition hover:opacity-95"
+        >
+          View Estimate
+        </Link>
       }
       searchValue={search}
       onSearchChange={setSearch}
@@ -1406,6 +1417,11 @@ export default function MenuClient({
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-[#dce6eb] bg-white p-3 text-sm text-[#5a7282] shadow-[0_14px_24px_-24px_rgba(16,24,40,0.55)]">
             <div className="flex items-center gap-3">
               <span>{offerCards.length} products</span>
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#d4e3e3] bg-[#eef7f6] px-3 py-1 text-xs font-medium text-[#0f766e]">
+                <span>{displayCartLines.length} in estimate</span>
+                <span aria-hidden="true" className="text-[#7aa7a3]">•</span>
+                <span>{asMoney(cartTotal)}</span>
+              </div>
               {canShowDraft ? (
                 <label className="inline-flex items-center gap-2 text-xs font-medium text-[#4f6877]">
                   <input
@@ -1422,8 +1438,8 @@ export default function MenuClient({
               <Link href={requestSamplesHref} className="text-[#0f766e] underline">
                 Request Samples
               </Link>
-              <Link href="/estimate" className="text-[#0f766e] underline">
-                Open Estimate Cart
+              <Link href={estimateHref} className="font-semibold text-[#0f766e] underline underline-offset-2">
+                Open Estimate
               </Link>
             </div>
           </div>

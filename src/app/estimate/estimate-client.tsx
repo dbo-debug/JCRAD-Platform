@@ -62,6 +62,7 @@ export default function EstimateClient() {
     }
     return "";
   }, [lines]);
+  const backToMenuHref = "/menu";
 
   function buildLineKey(line: EstimateLine, index: number): string {
     return String(line?.id || `line-${index}`);
@@ -144,7 +145,7 @@ export default function EstimateClient() {
       <div className="estimate-page mx-auto max-w-6xl space-y-3 rounded-2xl border border-[#dbe5ec] bg-white p-4 shadow-[0_20px_32px_-28px_rgba(16,24,40,0.55)]">
         <h1 className="text-2xl font-semibold tracking-tight text-[#1a3240]">JC RAD Estimate</h1>
         <p className="text-sm text-[#607988]">No active estimate found. Add a line from the menu first.</p>
-        <Link href="/menu" className="inline-flex rounded-full border border-[#d2dfe7] px-3 py-1.5 text-xs font-semibold text-[#274555]">
+        <Link href={backToMenuHref} className="inline-flex rounded-full border border-[#d2dfe7] px-3 py-1.5 text-xs font-semibold text-[#274555]">
           Go to Menu
         </Link>
         <EstimatePrintStyles />
@@ -167,7 +168,7 @@ export default function EstimateClient() {
           >
             Print / Save as PDF
           </Link>
-          <Link href="/menu" className="rounded-full border border-[#d2dfe7] px-3 py-1.5 text-xs font-semibold text-[#274555]">
+          <Link href={backToMenuHref} className="rounded-full border border-[#d2dfe7] px-3 py-1.5 text-xs font-semibold text-[#274555]">
             Back to Menu
           </Link>
         </div>
@@ -178,6 +179,16 @@ export default function EstimateClient() {
 
   return (
     <div className="estimate-page mx-auto max-w-6xl space-y-3 rounded-2xl border border-[#dbe5ec] bg-white p-3.5 shadow-[0_20px_32px_-28px_rgba(16,24,40,0.55)] md:p-4">
+      <div className="no-print flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-[#dce6eb] bg-[#fbfdfe] px-3 py-2 shadow-[0_14px_24px_-24px_rgba(16,24,40,0.4)]">
+        <div className="text-xs font-medium tracking-[0.08em] text-[#607988]">Need to add or adjust products?</div>
+        <Link
+          href={backToMenuHref}
+          className="inline-flex rounded-full border border-[#cfe0e7] px-3 py-1.5 text-xs font-semibold text-[#2a4655] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
+        >
+          Back to Menu
+        </Link>
+      </div>
+
       <header className="rounded-2xl border border-[#dce7ee] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbfc_100%)] p-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -192,6 +203,12 @@ export default function EstimateClient() {
             </div>
           </div>
           <div className="no-print flex flex-wrap gap-2">
+            <Link
+              href={backToMenuHref}
+              className="rounded-full border border-[#d2dfe7] px-3 py-1.5 text-xs font-semibold text-[#274555] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
+            >
+              Back to Menu
+            </Link>
             <Link
               href={`/estimate/${encodeURIComponent(safeEstimateId)}/print`}
               className="rounded-full bg-[#14b8a6] px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-95"
@@ -276,8 +293,11 @@ export default function EstimateClient() {
           >
             {busy ? "Working..." : "Request Order"}
           </button>
-          <Link href="/menu" className="rounded-full border border-[#d2dfe7] px-3 py-1.5 text-xs font-semibold text-[#274555]">
-            Menu
+          <Link
+            href={backToMenuHref}
+            className="rounded-full border border-[#d2dfe7] px-3 py-1.5 text-xs font-semibold text-[#274555] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
+          >
+            Back to Menu
           </Link>
         </div>
       </footer>
