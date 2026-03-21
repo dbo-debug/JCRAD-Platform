@@ -4,7 +4,11 @@ import {
   normalizePackagingCompatibilityContexts,
   type PackagingCompatibilityContext,
 } from "@/lib/packaging/compatibility";
-import { derivePackagingEstimatorSlots, normalizePackagingEstimatorSlots } from "@/lib/packaging/slots";
+import {
+  derivePackagingEstimatorSlots,
+  normalizePackagingEstimatorSlots,
+  packagingTypeRequiresPrimaryCapacity,
+} from "@/lib/packaging/slots";
 import { requireAdmin } from "@/lib/requireAdmin";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -227,6 +231,9 @@ export async function POST(req: Request) {
 
   if (applies_to === "concentrate") {
     packaging_type = "concentrate_jar";
+    if (size_grams == null || size_grams <= 0) {
+      return NextResponse.json({ error: "size_grams must be provided for concentrate vessels" }, { status: 400 });
+    }
   }
 
   if (applies_to === "flower") {
@@ -264,6 +271,10 @@ export async function POST(req: Request) {
       },
       { status: 400 }
     );
+  }
+
+  if (packagingTypeRequiresPrimaryCapacity(packaging_type) && applies_to !== "vape" && (size_grams == null || size_grams <= 0)) {
+    return NextResponse.json({ error: "size_grams must be provided for fill-capacity packaging" }, { status: 400 });
   }
 
   if (applies_to !== "vape") {

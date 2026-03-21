@@ -11,7 +11,12 @@ import {
   selectPackagingTier,
 } from "@/lib/pricing";
 import { skuSupportsPackagingCompatibilityContext } from "@/lib/packaging/compatibility";
-import { primaryPackagingSlotForEstimate, secondaryPackagingSlotForEstimate, skuSupportsPackagingEstimatorSlot } from "@/lib/packaging/slots";
+import {
+  primaryPackagingSlotForEstimate,
+  secondaryPackagingSlotForEstimate,
+  skuMatchesEstimatePrimaryCapacity,
+  skuSupportsPackagingEstimatorSlot,
+} from "@/lib/packaging/slots";
 import { getEstimatePackagingReviewState } from "@/lib/packaging/reviewStatus";
 
 type SupabaseClient = ReturnType<typeof createAdminClient>;
@@ -1464,6 +1469,13 @@ export async function POST(req: Request) {
         const requiredPrimarySlot = primaryPackagingSlot(productCategory, isPreRoll, pre_roll_pack_qty);
         if (!skuSupportsPackagingEstimatorSlot(sku as Record<string, unknown>, requiredPrimarySlot)) {
           return respond({ error: "Selected packaging SKU does not match the estimator packaging slot" }, { status: 400 });
+        }
+        if (!skuMatchesEstimatePrimaryCapacity(sku as Record<string, unknown>, {
+          category: productCategory === "concentrate" || productCategory === "vape" ? productCategory : "flower",
+          isPreRoll,
+          unitSizeGrams: gramsFromUnitSize(unit_size),
+        })) {
+          return respond({ error: "Selected packaging SKU does not match the required fill size" }, { status: 400 });
         }
         if (isPreRoll) {
           if (skuCategory && skuCategory !== "pre_roll") {

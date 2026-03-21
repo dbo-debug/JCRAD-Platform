@@ -7,6 +7,7 @@ import {
   packagingCompatibilityLabel,
   type PackagingCompatibilityContext,
 } from "@/lib/packaging/compatibility";
+import { packagingTypeRequiresPrimaryCapacity } from "@/lib/packaging/slots";
 
 type AppliesTo = PackagingCompatibilityContext;
 type PackagingType =
@@ -291,6 +292,7 @@ export default function PackagingSkuForm({
     const packagingType =
       allowedPackagingTypes.find((x) => x === form.packaging_type) ||
       getDefaultPackagingType(form.applies_to, Math.max(1, Number(packQty || 1)));
+    const requiresPrimaryCapacity = packagingTypeRequiresPrimaryCapacity(packagingType);
 
     const vapeFillGrams =
       form.applies_to === "vape" ? (form.vape_fill_grams === "0.5" ? 0.5 : form.vape_fill_grams === "1" ? 1 : null) : null;
@@ -327,6 +329,11 @@ export default function PackagingSkuForm({
     }
     if (form.applies_to === "vape" && vapeFillGrams == null) {
       setError("Vape fill grams must be 0.5 or 1.0.");
+      setBusy(false);
+      return;
+    }
+    if (form.applies_to !== "vape" && requiresPrimaryCapacity && (sizeGrams == null || sizeGrams <= 0)) {
+      setError("Size grams is required for fill-capacity packaging.");
       setBusy(false);
       return;
     }
@@ -462,7 +469,9 @@ export default function PackagingSkuForm({
 
         {form.applies_to !== "vape" ? (
           <label className="grid gap-1">
-            <span className="text-sm text-[#4f6877]">Size Grams (optional)</span>
+            <span className="text-sm text-[#4f6877]">
+              {packagingTypeRequiresPrimaryCapacity(form.packaging_type) ? "Size Grams" : "Size Grams (optional)"}
+            </span>
             <input
               type="number"
               min={0}
@@ -470,6 +479,7 @@ export default function PackagingSkuForm({
               className="rounded border border-[#cfdde5] bg-white px-3 py-2 text-sm text-[#173543]"
               value={form.size_grams}
               onChange={(e) => setForm((prev) => ({ ...prev, size_grams: e.target.value }))}
+              required={packagingTypeRequiresPrimaryCapacity(form.packaging_type)}
             />
           </label>
         ) : null}
@@ -534,11 +544,12 @@ export default function PackagingSkuForm({
                 className="rounded border border-[#cfdde5] bg-white px-3 py-2 text-sm text-[#173543]"
                 value={form.vape_fill_grams}
                 onChange={(e) => setForm((prev) => ({ ...prev, vape_fill_grams: e.target.value }))}
+                required
               >
                 <option value="0.5">0.5</option>
                 <option value="1">1.0</option>
               </select>
-              <span className="text-xs text-[#5b7382]">Only shown for Vape.</span>
+              <span className="text-xs text-[#5b7382]">Required for vape hardware capacity matching.</span>
             </label>
           </>
         ) : null}

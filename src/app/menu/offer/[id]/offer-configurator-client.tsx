@@ -3,7 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { CATEGORY_UNIT_SIZES, GRAMS_PER_LB, PRE_ROLL_UNIT_SIZES, gramsFromLiters, litersFromGrams } from "@/lib/pricing";
 import { type PackagingCategory } from "@/lib/packaging/category";
-import { primaryPackagingSlotForEstimate, secondaryPackagingSlotForEstimate, skuSupportsPackagingEstimatorSlot } from "@/lib/packaging/slots";
+import {
+  primaryPackagingSlotForEstimate,
+  secondaryPackagingSlotForEstimate,
+  skuMatchesEstimatePrimaryCapacity,
+  skuSupportsPackagingEstimatorSlot,
+} from "@/lib/packaging/slots";
 
 const ESTIMATE_KEY = "jc_estimate_id";
 
@@ -85,10 +90,17 @@ export default function OfferConfiguratorClient({
         preRollPackQty,
       });
       if (!skuSupportsPackagingEstimatorSlot(s, primarySlot)) return false;
+      const unitSizeNumber = Number(unitSize.replace("g", ""));
+      if (!skuMatchesEstimatePrimaryCapacity(s, {
+        category: estimatorCategory,
+        isPreRoll: isPreRollMode,
+        unitSizeGrams: unitSizeNumber,
+      })) {
+        return false;
+      }
       if (isPreRollMode) {
         const skuSize = Number(s.size_grams || 0);
         const skuQty = Number(s.pack_qty || 0);
-        const unitSizeNumber = Number(unitSize.replace("g", ""));
         if (skuSize > 0 && Math.abs(skuSize - unitSizeNumber) > 1e-9) return false;
         if (skuQty > 0 && skuQty !== preRollPackQty) return false;
         return true;

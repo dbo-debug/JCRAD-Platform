@@ -69,6 +69,7 @@ type SlotSource = {
   applies_to_contexts?: unknown;
   packaging_type?: unknown;
   size_grams?: unknown;
+  vape_fill_grams?: unknown;
   pack_qty?: unknown;
   estimator_slots?: unknown;
 };
@@ -80,6 +81,22 @@ function normalizedPackagingType(value: unknown): string {
 function toPositiveNumber(value: unknown): number | null {
   const n = Number(value);
   return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+export function packagingTypeRequiresPrimaryCapacity(value: unknown): boolean {
+  const packagingType = normalizedPackagingType(value);
+  return packagingType === "concentrate_jar" || packagingType === "vape_510_cart" || packagingType === "vape_all_in_one";
+}
+
+function primaryPackagingCapacityGrams(row: SlotSource): number | null {
+  const packagingType = normalizedPackagingType(row.packaging_type);
+  if (packagingType === "concentrate_jar") {
+    return toPositiveNumber(row.size_grams);
+  }
+  if (packagingType === "vape_510_cart" || packagingType === "vape_all_in_one") {
+    return toPositiveNumber(row.vape_fill_grams) ?? toPositiveNumber(row.size_grams);
+  }
+  return null;
 }
 
 function hasContext(contexts: PackagingCompatibilityContext[], target: PackagingCompatibilityContext): boolean {
@@ -135,6 +152,7 @@ export function skuSupportsPackagingEstimatorSlot(row: SlotSource, target: Packa
     applies_to_contexts: row.applies_to_contexts,
     packaging_type: row.packaging_type,
     size_grams: row.size_grams,
+    vape_fill_grams: row.vape_fill_grams,
     pack_qty: row.pack_qty,
   });
   if (derived.length > 0) return derived.includes(target);
@@ -181,4 +199,23 @@ export function secondaryPackagingSlotForEstimate(args: {
   if (args.category === "concentrate") return "concentrate_secondary_bag";
   if (args.category === "vape") return "vape_secondary_bag";
   return null;
+}
+
+export function skuMatchesEstimatePrimaryCapacity(
+  row: SlotSource,
+  args: {
+    category: "flower" | "concentrate" | "vape";
+    isPreRoll: boolean;
+    unitSizeGrams: number;
+  }
+): boolean {
+  if (args.isPreRoll) return true;
+  if (args.category !== "concentrate" && args.category !== "vape") return true;
+
+  const packagingType = normalizedPackagingType(row.packaging_type);
+  if (!packagingTypeRequiresPrimaryCapacity(packagingType)) return true;
+
+  const capacityGrams = primaryPackagingCapacityGrams(row);
+  if (capacityGrams == null) return false;
+  return Math.abs(capacityGrams - args.unitSizeGrams) < 1e-9;
 }

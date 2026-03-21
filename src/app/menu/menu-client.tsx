@@ -12,6 +12,7 @@ import { type PackagingCategory } from "@/lib/packaging/category";
 import {
   primaryPackagingSlotForEstimate,
   secondaryPackagingSlotForEstimate,
+  skuMatchesEstimatePrimaryCapacity,
   skuSupportsPackagingEstimatorSlot,
 } from "@/lib/packaging/slots";
 import {
@@ -859,10 +860,17 @@ export default function MenuClient({
             preRollPackQty: cardState.preRollPackQty,
           });
           if (!skuSupportsPackagingEstimatorSlot(sku, primarySlot)) return false;
+          const requestSize = Number(String(cardState.unitSize).replace("g", ""));
+          if (!skuMatchesEstimatePrimaryCapacity(sku, {
+            category: estimatorCategory,
+            isPreRoll,
+            unitSizeGrams: requestSize,
+          })) {
+            return false;
+          }
           if (isPreRoll) {
             const skuSize = Number(sku.size_grams || 0);
             const skuQty = Number(sku.pack_qty || 0);
-            const requestSize = Number(String(cardState.unitSize).replace("g", ""));
             if (skuSize > 0 && Math.abs(skuSize - requestSize) > 1e-9) return false;
             if (skuQty > 0 && skuQty !== cardState.preRollPackQty) return false;
             return true;
