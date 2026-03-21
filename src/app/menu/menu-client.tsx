@@ -9,6 +9,7 @@ import MenuLayout from "@/components/menu/MenuLayout";
 import ProductGrid from "@/components/menu/ProductGrid";
 import { LIQUID_INFUSION_MEDIA } from "@/lib/infusion-config";
 import { type PackagingCategory } from "@/lib/packaging/category";
+import { skuSupportsPackagingCompatibilityContext } from "@/lib/packaging/compatibility";
 import {
   CATEGORY_UNIT_SIZES,
   GRAMS_PER_LB,
@@ -57,6 +58,7 @@ type PackagingSku = {
   name: string;
   category?: string | null;
   applies_to?: string | null;
+  applies_to_contexts?: string[] | null;
   packaging_type?: string | null;
   size_grams?: number | null;
   pack_qty?: number | null;
@@ -133,22 +135,6 @@ function normalizeCategory(value: unknown): MenuCategory | "" {
   const raw = String(value || "").trim().toLowerCase();
   if (raw === "pre-roll" || raw === "preroll") return "pre_roll";
   if (raw === "flower" || raw === "concentrate" || raw === "vape" || raw === "pre_roll") return raw;
-  return "";
-}
-
-function normalizePackagingType(value: unknown): string {
-  return String(value || "").trim().toLowerCase().replace(/-/g, "_");
-}
-
-function packagingCategoryForSku(sku: PackagingSku): MenuCategory | "" {
-  const explicit = normalizeCategory(sku.applies_to || sku.category);
-  if (explicit) return explicit;
-
-  const packagingType = normalizePackagingType(sku.packaging_type);
-  if (packagingType === "pre_roll_tube" || packagingType === "pre_roll_jar" || packagingType === "pre_roll_pack") {
-    return "pre_roll";
-  }
-
   return "";
 }
 
@@ -861,9 +847,8 @@ export default function MenuClient({
             ? CATEGORY_UNIT_SIZES[category]
             : ["3.5g"];
         const filteredSkus = packagingSkus.filter((sku) => {
-          const skuCategory = packagingCategoryForSku(sku);
           if (isPreRoll) {
-            if (skuCategory && skuCategory !== "pre_roll") return false;
+            if (!skuSupportsPackagingCompatibilityContext(sku, "pre_roll")) return false;
             const skuSize = Number(sku.size_grams || 0);
             const skuQty = Number(sku.pack_qty || 0);
             const requestSize = Number(String(cardState.unitSize).replace("g", ""));
@@ -871,7 +856,7 @@ export default function MenuClient({
             if (skuQty > 0 && skuQty !== cardState.preRollPackQty) return false;
             return true;
           }
-          if (skuCategory && skuCategory !== category) return false;
+          if (!skuSupportsPackagingCompatibilityContext(sku, category)) return false;
           return true;
         });
         const vapeVesselOptions = category === "vape"
@@ -887,8 +872,7 @@ export default function MenuClient({
           const contexts = Array.isArray(sku.workflow_contexts)
             ? sku.workflow_contexts.map((v) => normalizedLower(v))
             : [];
-          const appliesTo = normalizedLower(sku.applies_to || sku.category || "");
-          return contexts.includes("concentrate") || appliesTo === "concentrate";
+          return contexts.includes("concentrate") || skuSupportsPackagingCompatibilityContext(sku, "concentrate");
         });
         const vapeMylarBagOptions = packagingSkus.filter((sku) => isMylar35Sku(sku));
         const selectedVapePackagingSku = category === "vape"

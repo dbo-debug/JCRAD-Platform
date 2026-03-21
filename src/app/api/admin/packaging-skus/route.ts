@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
+import {
+  normalizePackagingCompatibilityContext,
+  normalizePackagingCompatibilityContexts,
+  type PackagingCompatibilityContext,
+} from "@/lib/packaging/compatibility";
 import { requireAdmin } from "@/lib/requireAdmin";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-type AppliesTo = "flower" | "concentrate" | "vape" | "pre_roll";
+type AppliesTo = PackagingCompatibilityContext;
 type PackagingType =
   | "flower_in_bag"
   | "flower_in_jar"
@@ -37,10 +42,7 @@ function parseRequiredNumber(value: unknown): number | null {
 }
 
 function normalizeAppliesTo(value: unknown): AppliesTo | null {
-  const raw = String(value || "").trim().toLowerCase();
-  if (raw === "pre-roll" || raw === "preroll") return "pre_roll";
-  if (raw === "flower" || raw === "concentrate" || raw === "vape" || raw === "pre_roll") return raw;
-  return null;
+  return normalizePackagingCompatibilityContext(value) || null;
 }
 
 function normalizePackagingType(value: unknown): PackagingType | null {
@@ -54,9 +56,18 @@ function isMissingColumnError(error: any): boolean {
   return code === "42703" || code === "PGRST204" || (message.includes("column") && message.includes("does not exist"));
 }
 
-function normalizeReturnedSku(row: any): any {
+function removeOptionalPayloadKey(payload: Record<string, unknown>, key: string) {
+  delete payload[key];
+}
+
+function rowId(value: unknown): string {
+  return String((value && typeof value === "object" && "id" in value ? (value as { id?: unknown }).id : value) || "");
+}
+
+function normalizeReturnedSku(row: Record<string, unknown>): Record<string, unknown> {
   return {
     ...row,
+    applies_to_contexts: normalizePackagingCompatibilityContexts(row?.applies_to_contexts),
     applies_to: row?.applies_to ?? row?.category ?? null,
   };
 }
@@ -65,7 +76,7 @@ async function selectSkusWithFallback(supabase: ReturnType<typeof createAdminCli
   const withApplies = await supabase
     .from("packaging_skus")
     .select(
-      "id, name, category, applies_to, packaging_type, size_grams, pack_qty, vape_device, vape_fill_grams, unit_cost, inventory_qty, active, thumbnail_url"
+      "id, name, category, applies_to, applies_to_contexts, packaging_type, size_grams, pack_qty, vape_device, vape_fill_grams, unit_cost, inventory_qty, active, thumbnail_url"
     )
     .order("name", { ascending: true });
 
@@ -94,9 +105,10 @@ async function saveSkuWithAppliesFallback(
   payloadWithApplies: Record<string, unknown>
 ) {
   const payloadWithoutApplies = { ...payloadWithApplies };
-  delete (payloadWithoutApplies as any).applies_to;
-  delete (payloadWithoutApplies as any).thumbnail_bucket;
-  delete (payloadWithoutApplies as any).thumbnail_object_path;
+  removeOptionalPayloadKey(payloadWithoutApplies, "applies_to");
+  removeOptionalPayloadKey(payloadWithoutApplies, "applies_to_contexts");
+  removeOptionalPayloadKey(payloadWithoutApplies, "thumbnail_bucket");
+  removeOptionalPayloadKey(payloadWithoutApplies, "thumbnail_object_path");
 
   let savedId = id;
 
@@ -106,9 +118,9 @@ async function saveSkuWithAppliesFallback(
       if (!isMissingColumnError(firstUpdate.error)) return { data: null, error: firstUpdate.error };
       const retryUpdate = await supabase.from("packaging_skus").update(payloadWithoutApplies).eq("id", id).select("id").single();
       if (retryUpdate.error) return { data: null, error: retryUpdate.error };
-      savedId = String((retryUpdate.data as any)?.id || id);
+      savedId = rowId(retryUpdate.data) || id;
     } else {
-      savedId = String((firstUpdate.data as any)?.id || id);
+      savedId = rowId(firstUpdate.data) || id;
     }
   } else {
     const firstInsert = await supabase.from("packaging_skus").insert(payloadWithApplies).select("id").single();
@@ -116,9 +128,9 @@ async function saveSkuWithAppliesFallback(
       if (!isMissingColumnError(firstInsert.error)) return { data: null, error: firstInsert.error };
       const retryInsert = await supabase.from("packaging_skus").insert(payloadWithoutApplies).select("id").single();
       if (retryInsert.error) return { data: null, error: retryInsert.error };
-      savedId = String((retryInsert.data as any)?.id || "");
+      savedId = rowId(retryInsert.data);
     } else {
-      savedId = String((firstInsert.data as any)?.id || "");
+      savedId = rowId(firstInsert.data);
     }
   }
 
@@ -127,7 +139,7 @@ async function saveSkuWithAppliesFallback(
   const selectWithApplies = await supabase
     .from("packaging_skus")
     .select(
-      "id, name, category, applies_to, packaging_type, size_grams, pack_qty, vape_device, vape_fill_grams, unit_cost, inventory_qty, active, thumbnail_url"
+      "id, name, category, applies_to, applies_to_contexts, packaging_type, size_grams, pack_qty, vape_device, vape_fill_grams, unit_cost, inventory_qty, active, thumbnail_url"
     )
     .eq("id", savedId)
     .single();
@@ -164,6 +176,7 @@ export async function POST(req: Request) {
   const id = body?.id ? String(body.id) : null;
   const name = String(body?.name || "").trim();
   const applies_to = normalizeAppliesTo(body?.applies_to);
+  const applies_to_contexts = normalizePackagingCompatibilityContexts(body?.applies_to_contexts);
   const category = applies_to;
   let packaging_type = normalizePackagingType(body?.packaging_type);
   const size_grams = parseOptionalNumber(body?.size_grams);
@@ -184,6 +197,12 @@ export async function POST(req: Request) {
   if (!name) return NextResponse.json({ error: "name required" }, { status: 400 });
   if (!applies_to || !category) {
     return NextResponse.json({ error: "applies_to must be flower, concentrate, vape, or pre_roll" }, { status: 400 });
+  }
+  if (applies_to_contexts.length === 0) {
+    return NextResponse.json({ error: "applies_to_contexts must include at least one compatibility context" }, { status: 400 });
+  }
+  if (!applies_to_contexts.includes(applies_to)) {
+    return NextResponse.json({ error: "Primary applies_to must also be included in applies_to_contexts" }, { status: 400 });
   }
   if (unit_cost == null || unit_cost < 0) {
     return NextResponse.json({ error: "unit_cost must be >= 0" }, { status: 400 });
@@ -253,6 +272,7 @@ export async function POST(req: Request) {
     name,
     category,
     applies_to,
+    applies_to_contexts,
     packaging_type,
     size_grams,
     pack_qty,

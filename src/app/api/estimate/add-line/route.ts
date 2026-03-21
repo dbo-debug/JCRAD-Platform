@@ -10,6 +10,7 @@ import {
   money,
   selectPackagingTier,
 } from "@/lib/pricing";
+import { skuSupportsPackagingCompatibilityContext } from "@/lib/packaging/compatibility";
 import { getEstimatePackagingReviewState } from "@/lib/packaging/reviewStatus";
 
 type SupabaseClient = ReturnType<typeof createAdminClient>;
@@ -137,25 +138,17 @@ function isWholePositiveInteger(n: number): boolean {
   return Number.isFinite(n) && n > 0 && Math.abs(n - Math.round(n)) < 1e-9;
 }
 
-function normalizePackagingCategory(value: unknown): "flower" | "concentrate" | "vape" | "pre_roll" | "" {
-  const raw = String(value || "").trim().toLowerCase().replace(/-/g, "_");
-  if (raw === "flower" || raw === "concentrate" || raw === "vape" || raw === "pre_roll") return raw;
-  return "";
-}
-
 function normalizePackagingType(value: unknown): string {
   return String(value || "").trim().toLowerCase().replace(/-/g, "_");
 }
 
 function packagingCategoryForSku(row: { category?: unknown; applies_to?: unknown; packaging_type?: unknown }) {
-  const explicit = normalizePackagingCategory(row.applies_to || row.category);
-  if (explicit) return explicit;
-
+  if (skuSupportsPackagingCompatibilityContext(row, "pre_roll")) return "pre_roll" as const;
+  if (skuSupportsPackagingCompatibilityContext(row, "flower")) return "flower" as const;
+  if (skuSupportsPackagingCompatibilityContext(row, "concentrate")) return "concentrate" as const;
+  if (skuSupportsPackagingCompatibilityContext(row, "vape")) return "vape" as const;
   const packagingType = normalizePackagingType(row.packaging_type);
-  if (packagingType === "pre_roll_tube" || packagingType === "pre_roll_jar" || packagingType === "pre_roll_pack") {
-    return "pre_roll" as const;
-  }
-
+  if (packagingType === "pre_roll_tube" || packagingType === "pre_roll_jar" || packagingType === "pre_roll_pack") return "pre_roll" as const;
   return "";
 }
 
@@ -1458,7 +1451,7 @@ export async function POST(req: Request) {
 
         const { data: sku, error: skuErr } = await supabase
           .from("packaging_skus")
-          .select("id, name, packaging_type, category, size_grams, pack_qty, vape_device, vape_fill_grams, applies_to, unit_cost")
+          .select("id, name, packaging_type, category, size_grams, pack_qty, vape_device, vape_fill_grams, applies_to, applies_to_contexts, unit_cost")
           .eq("id", packaging_sku_id)
           .single();
         mark("after packaging_skus select");
@@ -1526,7 +1519,7 @@ export async function POST(req: Request) {
           const { data: secondarySku, error: secondaryErr } = await supabase
             .from("packaging_skus")
             .select(
-              "id, name, packaging_type, size_grams, active, applies_to, workflow_contexts, packaging_role, unit_cost"
+              "id, name, packaging_type, size_grams, active, applies_to, applies_to_contexts, workflow_contexts, packaging_role, unit_cost"
             )
             .eq("id", secondary_packaging_sku_id)
             .single();
@@ -1535,11 +1528,10 @@ export async function POST(req: Request) {
             return respond({ error: secondaryErr?.message || "Secondary packaging SKU not found" }, { status: 404 });
           }
 
-          const secondaryAppliesTo = String((secondarySku as any).applies_to || "").toLowerCase();
           const secondaryContextOk =
             productCategory === "vape"
               ? true
-              : hasWorkflowContext(secondarySku, "concentrate") || secondaryAppliesTo === "concentrate";
+              : hasWorkflowContext(secondarySku, "concentrate") || skuSupportsPackagingCompatibilityContext(secondarySku, "concentrate");
 
           if (
             !isMylar35SecondarySku(secondarySku) ||

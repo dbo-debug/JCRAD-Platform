@@ -5,6 +5,7 @@ const DEFAULT_VALUES: PackagingSkuFormValues = {
   id: null,
   name: "",
   applies_to: "flower",
+  applies_to_contexts: ["flower"],
   packaging_type: "",
   size_grams: null,
   pack_qty: 1,

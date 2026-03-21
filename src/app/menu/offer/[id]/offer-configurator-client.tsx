@@ -3,6 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { CATEGORY_UNIT_SIZES, GRAMS_PER_LB, PRE_ROLL_UNIT_SIZES, gramsFromLiters, litersFromGrams } from "@/lib/pricing";
 import { type PackagingCategory } from "@/lib/packaging/category";
+import {
+  skuSupportsPackagingCompatibilityContext,
+} from "@/lib/packaging/compatibility";
 
 const ESTIMATE_KEY = "jc_estimate_id";
 
@@ -21,28 +24,6 @@ function setEstimateId(id: string) {
 function inferPackagingCategoryFromContext(mode: Mode, category: string): PackagingCategory | "" {
   if (mode === "pre_roll") return "pre_roll";
   if (category === "flower" || category === "concentrate" || category === "vape") return category;
-  return "";
-}
-
-function normalizeSkuCategory(value: unknown): PackagingCategory | "" {
-  const raw = String(value || "").trim().toLowerCase().replace(/-/g, "_");
-  if (raw === "flower" || raw === "concentrate" || raw === "vape" || raw === "pre_roll") return raw;
-  return "";
-}
-
-function normalizePackagingType(value: unknown): string {
-  return String(value || "").trim().toLowerCase().replace(/-/g, "_");
-}
-
-function packagingCategoryForSku(row: { applies_to?: unknown; category?: unknown; packaging_type?: unknown }): PackagingCategory | "" {
-  const explicit = normalizeSkuCategory(row.applies_to || row.category);
-  if (explicit) return explicit;
-
-  const packagingType = normalizePackagingType(row.packaging_type);
-  if (packagingType === "pre_roll_tube" || packagingType === "pre_roll_jar" || packagingType === "pre_roll_pack") {
-    return "pre_roll";
-  }
-
   return "";
 }
 
@@ -99,10 +80,8 @@ export default function OfferConfiguratorClient({
 
   const filteredSkus = useMemo(() => {
     return packagingSkus.filter((s) => {
-      const skuCategory = packagingCategoryForSku(s);
-
       if (isPreRollMode) {
-        if (skuCategory && skuCategory !== "pre_roll") return false;
+        if (!skuSupportsPackagingCompatibilityContext(s, "pre_roll")) return false;
         const skuSize = Number(s.size_grams || 0);
         const skuQty = Number(s.pack_qty || 0);
         const unitSizeNumber = Number(unitSize.replace("g", ""));
@@ -111,7 +90,7 @@ export default function OfferConfiguratorClient({
         return true;
       }
 
-      if (skuCategory && skuCategory !== category) return false;
+      if (!skuSupportsPackagingCompatibilityContext(s, category)) return false;
       return true;
     });
   }, [packagingSkus, category, isPreRollMode, unitSize, preRollPackQty]);
@@ -131,8 +110,7 @@ export default function OfferConfiguratorClient({
       const contexts = Array.isArray((s as any).workflow_contexts)
         ? ((s as any).workflow_contexts as unknown[]).map((v) => String(v || "").toLowerCase())
         : [];
-      const appliesTo = String((s as any).applies_to || (s as any).category || "").toLowerCase();
-      return contexts.includes("concentrate") || appliesTo === "concentrate";
+      return contexts.includes("concentrate") || skuSupportsPackagingCompatibilityContext(s, "concentrate");
     });
   }, [packagingSkus]);
 

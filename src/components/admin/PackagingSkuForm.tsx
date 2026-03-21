@@ -2,8 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  PACKAGING_COMPATIBILITY_CONTEXTS,
+  packagingCompatibilityLabel,
+  type PackagingCompatibilityContext,
+} from "@/lib/packaging/compatibility";
 
-type AppliesTo = "flower" | "concentrate" | "vape" | "pre_roll";
+type AppliesTo = PackagingCompatibilityContext;
 type PackagingType =
   | "flower_in_bag"
   | "flower_in_jar"
@@ -19,6 +24,7 @@ export type PackagingSkuFormValues = {
   id?: string | null;
   name: string;
   applies_to: AppliesTo;
+  applies_to_contexts: AppliesTo[];
   packaging_type: string;
   size_grams: number | null;
   pack_qty: number;
@@ -35,6 +41,7 @@ export type PackagingSkuFormValues = {
 type FormState = {
   name: string;
   applies_to: AppliesTo;
+  applies_to_contexts: AppliesTo[];
   packaging_type: PackagingType;
   size_grams: string;
   pack_qty: string;
@@ -108,6 +115,9 @@ export default function PackagingSkuForm({
   const [form, setForm] = useState<FormState>({
     name: initialValues.name,
     applies_to: initialValues.applies_to,
+    applies_to_contexts: initialValues.applies_to_contexts.length > 0
+      ? initialValues.applies_to_contexts
+      : [initialValues.applies_to],
     packaging_type: initialPackagingType,
     size_grams: initialValues.size_grams == null ? "" : String(initialValues.size_grams),
     pack_qty: String(initialPackQty),
@@ -165,9 +175,30 @@ export default function PackagingSkuForm({
         changed = true;
       }
 
+      if (!next.applies_to_contexts.includes(next.applies_to)) {
+        next.applies_to_contexts = Array.from(new Set([...next.applies_to_contexts, next.applies_to]));
+        changed = true;
+      }
+
       return changed ? next : prev;
     });
   }, [form.applies_to, form.pack_qty]);
+
+  function toggleCompatibilityContext(context: AppliesTo) {
+    setForm((prev) => {
+      const hasContext = prev.applies_to_contexts.includes(context);
+      const nextContexts = hasContext
+        ? prev.applies_to_contexts.filter((value) => value !== context)
+        : [...prev.applies_to_contexts, context];
+      const deduped = Array.from(new Set(nextContexts));
+      return {
+        ...prev,
+        applies_to_contexts: deduped.includes(prev.applies_to)
+          ? deduped
+          : Array.from(new Set([...deduped, prev.applies_to])),
+      };
+    });
+  }
 
   async function onUploadThumbnail() {
     if (!initialValues.id) {
@@ -221,6 +252,7 @@ export default function PackagingSkuForm({
     setError("");
 
     const name = form.name.trim();
+    const appliesToContexts = Array.from(new Set(form.applies_to_contexts.filter(Boolean)));
     const unitCost = toRequiredNumber(form.unit_cost);
     const inventoryQty = toRequiredNumber(form.inventory_qty);
     const packQtyInput = toRequiredNumber(form.pack_qty);
@@ -235,6 +267,11 @@ export default function PackagingSkuForm({
 
     if (!name) {
       setError("Name is required.");
+      setBusy(false);
+      return;
+    }
+    if (appliesToContexts.length === 0) {
+      setError("Select at least one compatibility context.");
       setBusy(false);
       return;
     }
@@ -272,6 +309,7 @@ export default function PackagingSkuForm({
           id: initialValues.id || null,
           name,
           applies_to: form.applies_to,
+          applies_to_contexts: appliesToContexts,
           packaging_type: packagingType,
           size_grams: sizeGrams,
           pack_qty: form.applies_to === "pre_roll" ? packQty : 1,
@@ -315,7 +353,7 @@ export default function PackagingSkuForm({
         </label>
 
         <label className="grid gap-1">
-          <span className="text-sm text-[#4f6877]">Applies To</span>
+          <span className="text-sm text-[#4f6877]">Primary Family</span>
           <select
             className="rounded border border-[#cfdde5] bg-white px-3 py-2 text-sm text-[#173543]"
             value={form.applies_to}
@@ -327,6 +365,31 @@ export default function PackagingSkuForm({
             <option value="pre_roll">pre_roll</option>
           </select>
         </label>
+
+        <div className="grid gap-2 md:col-span-2">
+          <span className="text-sm text-[#4f6877]">Compatibility Contexts</span>
+          <div className="flex flex-wrap gap-3 rounded border border-[#dbe9ef] bg-[#f6fbfd] px-3 py-2 text-sm text-[#2f4a59]">
+            {PACKAGING_COMPATIBILITY_CONTEXTS.map((context) => {
+              const checked = form.applies_to_contexts.includes(context);
+              const disabled = context === form.applies_to;
+              return (
+                <label key={context} className="inline-flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    disabled={disabled}
+                    onChange={() => toggleCompatibilityContext(context)}
+                  />
+                  {packagingCompatibilityLabel(context)}
+                  {disabled ? " (primary)" : ""}
+                </label>
+              );
+            })}
+          </div>
+          <span className="text-xs text-[#5b7382]">
+            Primary family preserves current estimator packaging assumptions. Compatibility contexts extend where this SKU can be used.
+          </span>
+        </div>
 
         <label className="grid gap-1">
           <span className="text-sm text-[#4f6877]">Packaging Type</span>

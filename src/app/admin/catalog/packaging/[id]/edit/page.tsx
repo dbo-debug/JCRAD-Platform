@@ -1,27 +1,58 @@
 import { notFound } from "next/navigation";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import PackagingSkuForm, { type PackagingSkuFormValues } from "@/components/admin/PackagingSkuForm";
+import { normalizePackagingCompatibilityContexts } from "@/lib/packaging/compatibility";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 type PageProps = {
   params: Promise<{ id: string }>;
 };
 
+type PackagingSkuRecord = {
+  id?: unknown;
+  name?: unknown;
+  applies_to?: unknown;
+  applies_to_contexts?: unknown;
+  packaging_type?: unknown;
+  size_grams?: unknown;
+  pack_qty?: unknown;
+  vape_device?: unknown;
+  vape_fill_grams?: unknown;
+  unit_cost?: unknown;
+  inventory_qty?: unknown;
+  active?: unknown;
+  thumbnail_url?: unknown;
+  thumbnail_bucket?: unknown;
+  thumbnail_object_path?: unknown;
+};
+
 export default async function AdminCatalogPackagingEditPage({ params }: PageProps) {
   const { id } = await params;
   const supabase = createAdminClient();
 
-  const { data: sku, error } = await supabase
+  let sku: PackagingSkuRecord | null = null;
+  let error: { message?: string } | null = null;
+  ({ data: sku, error } = await supabase
     .from("packaging_skus")
     .select(
-      "id, name, applies_to, packaging_type, size_grams, pack_qty, vape_device, vape_fill_grams, unit_cost, inventory_qty, active, thumbnail_url"
+      "id, name, applies_to, applies_to_contexts, packaging_type, size_grams, pack_qty, vape_device, vape_fill_grams, unit_cost, inventory_qty, active, thumbnail_url"
     )
     .eq("id", id)
-    .single();
+    .single());
+
+  if (error && String(error?.message || "").toLowerCase().includes("applies_to_contexts")) {
+    ({ data: sku, error } = await supabase
+      .from("packaging_skus")
+      .select(
+        "id, name, applies_to, packaging_type, size_grams, pack_qty, vape_device, vape_fill_grams, unit_cost, inventory_qty, active, thumbnail_url"
+      )
+      .eq("id", id)
+      .single());
+  }
 
   if (error || !sku) notFound();
 
-  const appliesToRaw = String((sku as any).applies_to || "").toLowerCase();
+  const appliesToRaw = String(sku.applies_to || "").toLowerCase();
   const applies_to =
     appliesToRaw === "pre-roll" || appliesToRaw === "preroll"
       ? "pre_roll"
@@ -30,20 +61,23 @@ export default async function AdminCatalogPackagingEditPage({ params }: PageProp
         : "flower";
 
   const initialValues: PackagingSkuFormValues = {
-    id: String((sku as any).id),
-    name: String((sku as any).name || ""),
+    id: String(sku.id),
+    name: String(sku.name || ""),
     applies_to,
-    packaging_type: String((sku as any).packaging_type || ""),
-    size_grams: (sku as any).size_grams == null ? null : Number((sku as any).size_grams),
-    pack_qty: Math.max(1, Number((sku as any).pack_qty || 1)),
-    vape_device: (sku as any).vape_device ? String((sku as any).vape_device) : null,
-    vape_fill_grams: (sku as any).vape_fill_grams == null ? null : Number((sku as any).vape_fill_grams),
-    unit_cost: Number((sku as any).unit_cost || 0),
-    inventory_qty: Number((sku as any).inventory_qty || 0),
-    active: (sku as any).active == null ? true : !!(sku as any).active,
-    thumbnail_url: (sku as any).thumbnail_url ? String((sku as any).thumbnail_url) : null,
-    thumbnail_bucket: (sku as any).thumbnail_bucket ? String((sku as any).thumbnail_bucket) : null,
-    thumbnail_object_path: (sku as any).thumbnail_object_path ? String((sku as any).thumbnail_object_path) : null,
+    applies_to_contexts: normalizePackagingCompatibilityContexts(sku.applies_to_contexts).length > 0
+      ? normalizePackagingCompatibilityContexts(sku.applies_to_contexts)
+      : [applies_to],
+    packaging_type: String(sku.packaging_type || ""),
+    size_grams: sku.size_grams == null ? null : Number(sku.size_grams),
+    pack_qty: Math.max(1, Number(sku.pack_qty || 1)),
+    vape_device: sku.vape_device ? String(sku.vape_device) : null,
+    vape_fill_grams: sku.vape_fill_grams == null ? null : Number(sku.vape_fill_grams),
+    unit_cost: Number(sku.unit_cost || 0),
+    inventory_qty: Number(sku.inventory_qty || 0),
+    active: sku.active == null ? true : !!sku.active,
+    thumbnail_url: sku.thumbnail_url ? String(sku.thumbnail_url) : null,
+    thumbnail_bucket: sku.thumbnail_bucket ? String(sku.thumbnail_bucket) : null,
+    thumbnail_object_path: sku.thumbnail_object_path ? String(sku.thumbnail_object_path) : null,
   };
 
   return (

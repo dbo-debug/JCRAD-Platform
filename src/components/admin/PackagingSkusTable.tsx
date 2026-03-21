@@ -3,6 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
+import {
+  normalizePackagingCompatibilityContexts,
+  packagingCompatibilityLabel,
+  skuSupportsPackagingCompatibilityContext,
+} from "@/lib/packaging/compatibility";
 
 type PackagingFilter = "All" | "Flower" | "Concentrate" | "Vape" | "Pre-Roll";
 type AppliesTo = "flower" | "concentrate" | "vape" | "pre_roll";
@@ -11,6 +16,7 @@ type PackagingSkuRow = {
   id: string;
   name: string | null;
   applies_to: string | null;
+  applies_to_contexts?: string[] | null;
   packaging_type: string | null;
   size_grams: number | null;
   pack_qty: number | null;
@@ -25,14 +31,6 @@ type ActionType = "deactivate" | "restore";
 
 const FILTER_TABS: PackagingFilter[] = ["All", "Flower", "Concentrate", "Vape", "Pre-Roll"];
 
-function normalizeAppliesTo(value: string | null): AppliesTo | "" {
-  const raw = String(value || "").trim().toLowerCase();
-  if (!raw) return "";
-  if (raw === "pre-roll" || raw === "preroll") return "pre_roll";
-  if (raw === "flower" || raw === "concentrate" || raw === "vape" || raw === "pre_roll") return raw;
-  return "";
-}
-
 function filterToAppliesTo(tab: PackagingFilter): AppliesTo | null {
   if (tab === "All") return null;
   if (tab === "Pre-Roll") return "pre_roll";
@@ -40,10 +38,15 @@ function filterToAppliesTo(tab: PackagingFilter): AppliesTo | null {
 }
 
 function formatAppliesTo(value: string | null): string {
-  const normalized = normalizeAppliesTo(value);
-  if (!normalized) return "-";
-  if (normalized === "pre_roll") return "Pre-Roll";
-  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+  const normalized = normalizePackagingCompatibilityContexts(value);
+  if (normalized.length === 0) return "-";
+  return normalized.map(packagingCompatibilityLabel).join(", ");
+}
+
+function formatContexts(row: PackagingSkuRow): string {
+  const contexts = normalizePackagingCompatibilityContexts(row.applies_to_contexts);
+  if (contexts.length > 0) return contexts.map(packagingCompatibilityLabel).join(", ");
+  return formatAppliesTo(row.applies_to);
 }
 
 function formatSize(row: PackagingSkuRow): string {
@@ -134,7 +137,7 @@ export default function PackagingSkusTable() {
   const filteredRows = useMemo(() => {
     const filterValue = filterToAppliesTo(selectedFilter);
     if (!filterValue) return rows;
-    return rows.filter((row) => normalizeAppliesTo(row.applies_to) === filterValue);
+    return rows.filter((row) => skuSupportsPackagingCompatibilityContext(row, filterValue));
   }, [rows, selectedFilter]);
 
   const hasRows = filteredRows.length > 0;
@@ -215,7 +218,7 @@ export default function PackagingSkusTable() {
                       />
                     </td>
                     <td className="px-4 py-3">{row.name || "Untitled"}</td>
-                    <td className="px-4 py-3 text-[#4f6877]">{formatAppliesTo(row.applies_to)}</td>
+                    <td className="px-4 py-3 text-[#4f6877]">{formatContexts(row)}</td>
                     <td className="px-4 py-3 text-[#4f6877]">{row.packaging_type || "-"}</td>
                     <td className="px-4 py-3 text-[#4f6877]">{formatSize(row)}</td>
                     <td className="px-4 py-3 text-[#4f6877]">{formatQty(row.pack_qty)}</td>
