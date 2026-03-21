@@ -7,7 +7,7 @@ export async function GET() {
   const { data: skus, error } = await supabase
     .from("packaging_skus")
     .select(
-      "id, name, category, applies_to, applies_to_contexts, packaging_type, size_grams, pack_qty, vape_fill_grams, compliance_status, active, workflow_contexts, packaging_role"
+      "id, name, category, applies_to, applies_to_contexts, estimator_slots, packaging_type, size_grams, pack_qty, vape_fill_grams, compliance_status, active, workflow_contexts, packaging_role"
     )
     .eq("compliance_status", "approved")
     .order("name", { ascending: true });

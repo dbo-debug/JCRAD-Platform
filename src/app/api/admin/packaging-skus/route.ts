@@ -4,6 +4,7 @@ import {
   normalizePackagingCompatibilityContexts,
   type PackagingCompatibilityContext,
 } from "@/lib/packaging/compatibility";
+import { derivePackagingEstimatorSlots, normalizePackagingEstimatorSlots } from "@/lib/packaging/slots";
 import { requireAdmin } from "@/lib/requireAdmin";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -68,6 +69,7 @@ function normalizeReturnedSku(row: Record<string, unknown>): Record<string, unkn
   return {
     ...row,
     applies_to_contexts: normalizePackagingCompatibilityContexts(row?.applies_to_contexts),
+    estimator_slots: normalizePackagingEstimatorSlots(row?.estimator_slots),
     applies_to: row?.applies_to ?? row?.category ?? null,
   };
 }
@@ -76,7 +78,7 @@ async function selectSkusWithFallback(supabase: ReturnType<typeof createAdminCli
   const withApplies = await supabase
     .from("packaging_skus")
     .select(
-      "id, name, category, applies_to, applies_to_contexts, packaging_type, size_grams, pack_qty, vape_device, vape_fill_grams, unit_cost, inventory_qty, active, thumbnail_url"
+      "id, name, category, applies_to, applies_to_contexts, estimator_slots, packaging_type, size_grams, pack_qty, vape_device, vape_fill_grams, unit_cost, inventory_qty, active, thumbnail_url"
     )
     .order("name", { ascending: true });
 
@@ -107,6 +109,7 @@ async function saveSkuWithAppliesFallback(
   const payloadWithoutApplies = { ...payloadWithApplies };
   removeOptionalPayloadKey(payloadWithoutApplies, "applies_to");
   removeOptionalPayloadKey(payloadWithoutApplies, "applies_to_contexts");
+  removeOptionalPayloadKey(payloadWithoutApplies, "estimator_slots");
   removeOptionalPayloadKey(payloadWithoutApplies, "thumbnail_bucket");
   removeOptionalPayloadKey(payloadWithoutApplies, "thumbnail_object_path");
 
@@ -139,7 +142,7 @@ async function saveSkuWithAppliesFallback(
   const selectWithApplies = await supabase
     .from("packaging_skus")
     .select(
-      "id, name, category, applies_to, applies_to_contexts, packaging_type, size_grams, pack_qty, vape_device, vape_fill_grams, unit_cost, inventory_qty, active, thumbnail_url"
+      "id, name, category, applies_to, applies_to_contexts, estimator_slots, packaging_type, size_grams, pack_qty, vape_device, vape_fill_grams, unit_cost, inventory_qty, active, thumbnail_url"
     )
     .eq("id", savedId)
     .single();
@@ -268,11 +271,20 @@ export async function POST(req: Request) {
     pack_qty = 1;
   }
 
+  const estimator_slots = derivePackagingEstimatorSlots({
+    applies_to,
+    applies_to_contexts,
+    packaging_type,
+    size_grams,
+    pack_qty,
+  });
+
   const payload: Record<string, unknown> = {
     name,
     category,
     applies_to,
     applies_to_contexts,
+    estimator_slots,
     packaging_type,
     size_grams,
     pack_qty,

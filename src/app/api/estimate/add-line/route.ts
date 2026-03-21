@@ -11,6 +11,7 @@ import {
   selectPackagingTier,
 } from "@/lib/pricing";
 import { skuSupportsPackagingCompatibilityContext } from "@/lib/packaging/compatibility";
+import { primaryPackagingSlotForEstimate, secondaryPackagingSlotForEstimate, skuSupportsPackagingEstimatorSlot } from "@/lib/packaging/slots";
 import { getEstimatePackagingReviewState } from "@/lib/packaging/reviewStatus";
 
 type SupabaseClient = ReturnType<typeof createAdminClient>;
@@ -150,6 +151,22 @@ function packagingCategoryForSku(row: { category?: unknown; applies_to?: unknown
   const packagingType = normalizePackagingType(row.packaging_type);
   if (packagingType === "pre_roll_tube" || packagingType === "pre_roll_jar" || packagingType === "pre_roll_pack") return "pre_roll" as const;
   return "";
+}
+
+function primaryPackagingSlot(category: string, isPreRoll: boolean, preRollPackQty: number) {
+  return primaryPackagingSlotForEstimate({
+    category: (category === "concentrate" || category === "vape" ? category : "flower") as "flower" | "concentrate" | "vape",
+    isPreRoll,
+    preRollPackQty,
+  });
+}
+
+function secondaryPackagingSlot(category: string, isPreRoll: boolean, preRollPackQty: number) {
+  return secondaryPackagingSlotForEstimate({
+    category: (category === "concentrate" || category === "vape" ? category : "flower") as "flower" | "concentrate" | "vape",
+    isPreRoll,
+    preRollPackQty,
+  });
 }
 
 type InfusionType = "none" | "internal" | "external";
@@ -1451,7 +1468,7 @@ export async function POST(req: Request) {
 
         const { data: sku, error: skuErr } = await supabase
           .from("packaging_skus")
-          .select("id, name, packaging_type, category, size_grams, pack_qty, vape_device, vape_fill_grams, applies_to, applies_to_contexts, unit_cost")
+          .select("id, name, packaging_type, category, size_grams, pack_qty, vape_device, vape_fill_grams, applies_to, applies_to_contexts, estimator_slots, unit_cost")
           .eq("id", packaging_sku_id)
           .single();
         mark("after packaging_skus select");
@@ -1463,6 +1480,10 @@ export async function POST(req: Request) {
         const skuCategory = packagingCategoryForSku(
           sku as { category?: unknown; applies_to?: unknown; packaging_type?: unknown }
         );
+        const requiredPrimarySlot = primaryPackagingSlot(productCategory, isPreRoll, pre_roll_pack_qty);
+        if (!skuSupportsPackagingEstimatorSlot(sku as Record<string, unknown>, requiredPrimarySlot)) {
+          return respond({ error: "Selected packaging SKU does not match the estimator packaging slot" }, { status: 400 });
+        }
         if (isPreRoll) {
           if (skuCategory && skuCategory !== "pre_roll") {
             return respond({ error: "Pre-roll lines require pre_roll packaging SKUs" }, { status: 400 });
@@ -1519,7 +1540,7 @@ export async function POST(req: Request) {
           const { data: secondarySku, error: secondaryErr } = await supabase
             .from("packaging_skus")
             .select(
-              "id, name, packaging_type, size_grams, active, applies_to, applies_to_contexts, workflow_contexts, packaging_role, unit_cost"
+              "id, name, packaging_type, size_grams, active, applies_to, applies_to_contexts, estimator_slots, workflow_contexts, packaging_role, unit_cost"
             )
             .eq("id", secondary_packaging_sku_id)
             .single();
@@ -1528,10 +1549,10 @@ export async function POST(req: Request) {
             return respond({ error: secondaryErr?.message || "Secondary packaging SKU not found" }, { status: 404 });
           }
 
+          const requiredSecondarySlot = secondaryPackagingSlot(productCategory, false, pre_roll_pack_qty);
           const secondaryContextOk =
-            productCategory === "vape"
-              ? true
-              : hasWorkflowContext(secondarySku, "concentrate") || skuSupportsPackagingCompatibilityContext(secondarySku, "concentrate");
+            requiredSecondarySlot != null
+              && skuSupportsPackagingEstimatorSlot(secondarySku as Record<string, unknown>, requiredSecondarySlot);
 
           if (
             !isMylar35SecondarySku(secondarySku) ||

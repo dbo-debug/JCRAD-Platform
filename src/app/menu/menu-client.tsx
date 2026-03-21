@@ -9,7 +9,11 @@ import MenuLayout from "@/components/menu/MenuLayout";
 import ProductGrid from "@/components/menu/ProductGrid";
 import { LIQUID_INFUSION_MEDIA } from "@/lib/infusion-config";
 import { type PackagingCategory } from "@/lib/packaging/category";
-import { skuSupportsPackagingCompatibilityContext } from "@/lib/packaging/compatibility";
+import {
+  primaryPackagingSlotForEstimate,
+  secondaryPackagingSlotForEstimate,
+  skuSupportsPackagingEstimatorSlot,
+} from "@/lib/packaging/slots";
 import {
   CATEGORY_UNIT_SIZES,
   GRAMS_PER_LB,
@@ -59,6 +63,7 @@ type PackagingSku = {
   category?: string | null;
   applies_to?: string | null;
   applies_to_contexts?: string[] | null;
+  estimator_slots?: string[] | null;
   packaging_type?: string | null;
   size_grams?: number | null;
   pack_qty?: number | null;
@@ -841,14 +846,20 @@ export default function MenuClient({
         const apiMode = cardMode === "pre_roll" ? "copack" : cardMode;
         const addAllowed = apiMode === "bulk" ? !!offer.allow_bulk : !!offer.allow_copack;
         const isPreRoll = cardMode === "pre_roll";
+        const estimatorCategory = (category === "concentrate" || category === "vape" ? category : "flower") as "flower" | "concentrate" | "vape";
         const unitSizeOptions = isPreRoll
           ? [...PRE_ROLL_UNIT_SIZES]
           : CATEGORY_UNIT_SIZES[category] && CATEGORY_UNIT_SIZES[category].length > 0
             ? CATEGORY_UNIT_SIZES[category]
             : ["3.5g"];
         const filteredSkus = packagingSkus.filter((sku) => {
+          const primarySlot = primaryPackagingSlotForEstimate({
+            category: estimatorCategory,
+            isPreRoll,
+            preRollPackQty: cardState.preRollPackQty,
+          });
+          if (!skuSupportsPackagingEstimatorSlot(sku, primarySlot)) return false;
           if (isPreRoll) {
-            if (!skuSupportsPackagingCompatibilityContext(sku, "pre_roll")) return false;
             const skuSize = Number(sku.size_grams || 0);
             const skuQty = Number(sku.pack_qty || 0);
             const requestSize = Number(String(cardState.unitSize).replace("g", ""));
@@ -856,25 +867,21 @@ export default function MenuClient({
             if (skuQty > 0 && skuQty !== cardState.preRollPackQty) return false;
             return true;
           }
-          if (!skuSupportsPackagingCompatibilityContext(sku, category)) return false;
           return true;
         });
         const vapeVesselOptions = category === "vape"
           ? filteredSkus.filter((sku) => isVapeVesselSku(sku))
           : [];
         const secondaryBagOptions = packagingSkus.filter((sku) => {
-          const packagingType = normalizedLower(sku.packaging_type);
-          const sizeGrams = Number(sku.size_grams || 0);
-          const active = sku.active === true;
-          if (!active || packagingType !== "flower_in_bag" || Math.abs(sizeGrams - 3.5) > 1e-9) return false;
-          const role = normalizedLower(sku.packaging_role || "");
-          if (role && role !== "secondary") return false;
-          const contexts = Array.isArray(sku.workflow_contexts)
-            ? sku.workflow_contexts.map((v) => normalizedLower(v))
-            : [];
-          return contexts.includes("concentrate") || skuSupportsPackagingCompatibilityContext(sku, "concentrate");
+          const secondarySlot = secondaryPackagingSlotForEstimate({
+            category: estimatorCategory,
+            isPreRoll,
+            preRollPackQty: cardState.preRollPackQty,
+          });
+          if (!secondarySlot) return false;
+          return sku.active === true && skuSupportsPackagingEstimatorSlot(sku, secondarySlot);
         });
-        const vapeMylarBagOptions = packagingSkus.filter((sku) => isMylar35Sku(sku));
+        const vapeMylarBagOptions = packagingSkus.filter((sku) => sku.active === true && skuSupportsPackagingEstimatorSlot(sku, "vape_secondary_bag"));
         const selectedVapePackagingSku = category === "vape"
           ? packagingSkus.find((sku) => String(sku.id) === String(cardState.packagingSkuId))
           : null;

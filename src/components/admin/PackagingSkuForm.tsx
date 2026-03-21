@@ -136,6 +136,7 @@ export default function PackagingSkuForm({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [localPreviewUrl, setLocalPreviewUrl] = useState<string>("");
 
   const packQtyNumber = Math.max(1, Number(form.pack_qty || 1));
 
@@ -184,6 +185,16 @@ export default function PackagingSkuForm({
     });
   }, [form.applies_to, form.pack_qty]);
 
+  useEffect(() => {
+    if (!selectedFile) {
+      setLocalPreviewUrl("");
+      return;
+    }
+    const objectUrl = URL.createObjectURL(selectedFile);
+    setLocalPreviewUrl(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [selectedFile]);
+
   function toggleCompatibilityContext(context: AppliesTo) {
     setForm((prev) => {
       const hasContext = prev.applies_to_contexts.includes(context);
@@ -201,11 +212,25 @@ export default function PackagingSkuForm({
   }
 
   async function onUploadThumbnail() {
-    if (!initialValues.id) {
+    const skuId = initialValues.id || null;
+    if (!skuId) {
       setUploadError("Save this SKU first to enable uploads.");
       return;
     }
     if (!selectedFile) {
+      setUploadError("Select an image file first.");
+      return;
+    }
+
+    await uploadThumbnailForSkuId(skuId, selectedFile);
+  }
+
+  async function uploadThumbnailForSkuId(skuId: string, file: File) {
+    if (!skuId) {
+      setUploadError("Save this SKU first to enable uploads.");
+      return;
+    }
+    if (!file) {
       setUploadError("Select an image file first.");
       return;
     }
@@ -216,9 +241,9 @@ export default function PackagingSkuForm({
 
     try {
       const formData = new FormData();
-      formData.append("file", selectedFile);
+      formData.append("file", file);
 
-      const response = await fetch(`/api/admin/packaging-skus/${encodeURIComponent(initialValues.id)}/upload-thumbnail`, {
+      const response = await fetch(`/api/admin/packaging-skus/${encodeURIComponent(skuId)}/upload-thumbnail`, {
         method: "POST",
         body: formData,
       });
@@ -241,6 +266,7 @@ export default function PackagingSkuForm({
       setUploadSuccess("Saved thumbnail.");
     } catch (err: any) {
       setUploadError(err?.message || "Upload failed");
+      throw err;
     } finally {
       setUploading(false);
     }
@@ -329,6 +355,20 @@ export default function PackagingSkuForm({
         throw new Error(String(json?.error || `Save failed (${response.status})`));
       }
 
+      const savedSkuId = String(json?.sku?.id || initialValues.id || "").trim();
+      if (selectedFile && savedSkuId) {
+        try {
+          await uploadThumbnailForSkuId(savedSkuId, selectedFile);
+        } catch (uploadErr: any) {
+          if (mode === "new") {
+            setError(`Packaging SKU created, but thumbnail upload failed: ${String(uploadErr?.message || "Upload failed")}`);
+            setBusy(false);
+            return;
+          }
+          throw uploadErr;
+        }
+      }
+
       router.push("/admin/catalog/packaging");
     } catch (err: any) {
       setError(err?.message || "Save failed");
@@ -337,7 +377,7 @@ export default function PackagingSkuForm({
     }
   }
 
-  const thumbnailPreview = String(form.thumbnail_url || "").trim() || "/brand/PRIMARY.png";
+  const thumbnailPreview = localPreviewUrl || String(form.thumbnail_url || "").trim() || "/brand/PRIMARY.png";
 
   return (
     <form onSubmit={onSubmit} className="space-y-5 rounded-xl border border-[var(--surface-border)] bg-white p-5 shadow-sm">
@@ -531,24 +571,28 @@ export default function PackagingSkuForm({
         </label>
       </div>
 
-      {initialValues.id ? (
-        <div className="space-y-4 rounded-lg border border-[#dbe9ef] bg-[#f9fcfd] p-4">
-          <div>
-            <h3 className="text-sm font-semibold text-[#173543]">Thumbnail</h3>
-            <p className="mt-1 text-xs text-[#5b7382]">Upload a thumbnail. It will persist on Save Changes.</p>
-          </div>
-          <img
-            src={thumbnailPreview}
-            alt={`${form.name || "Packaging SKU"} thumbnail`}
-            className="h-40 w-40 rounded-md border border-[#dbe9ef] object-cover"
+      <div className="space-y-4 rounded-lg border border-[#dbe9ef] bg-[#f9fcfd] p-4">
+        <div>
+          <h3 className="text-sm font-semibold text-[#173543]">Thumbnail</h3>
+          <p className="mt-1 text-xs text-[#5b7382]">
+            {initialValues.id
+              ? "Upload a thumbnail now. It will persist on Save Changes."
+              : "Choose a thumbnail now. It will upload automatically after the packaging SKU is created."}
+          </p>
+        </div>
+        <img
+          src={thumbnailPreview}
+          alt={`${form.name || "Packaging SKU"} thumbnail`}
+          className="h-40 w-40 rounded-md border border-[#dbe9ef] object-cover"
+        />
+        <div className="grid gap-2">
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+            className="rounded border border-[#cfdde5] bg-white px-3 py-2 text-sm text-[#173543]"
           />
-          <div className="grid gap-2">
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-              className="rounded border border-[#cfdde5] bg-white px-3 py-2 text-sm text-[#173543]"
-            />
+          {initialValues.id ? (
             <button
               type="button"
               onClick={onUploadThumbnail}
@@ -557,11 +601,11 @@ export default function PackagingSkuForm({
             >
               {uploading ? "Uploading..." : "Upload Thumbnail"}
             </button>
-            {uploadError ? <p className="text-sm text-[#991b1b]">{uploadError}</p> : null}
-            {uploadSuccess ? <p className="text-sm text-[#0f766e]">{uploadSuccess}</p> : null}
-          </div>
+          ) : null}
+          {uploadError ? <p className="text-sm text-[#991b1b]">{uploadError}</p> : null}
+          {uploadSuccess ? <p className="text-sm text-[#0f766e]">{uploadSuccess}</p> : null}
         </div>
-      ) : null}
+      </div>
 
       {error ? <p className="text-sm text-[#991b1b]">{error}</p> : null}
 

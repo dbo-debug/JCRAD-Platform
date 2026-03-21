@@ -3,9 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { CATEGORY_UNIT_SIZES, GRAMS_PER_LB, PRE_ROLL_UNIT_SIZES, gramsFromLiters, litersFromGrams } from "@/lib/pricing";
 import { type PackagingCategory } from "@/lib/packaging/category";
-import {
-  skuSupportsPackagingCompatibilityContext,
-} from "@/lib/packaging/compatibility";
+import { primaryPackagingSlotForEstimate, secondaryPackagingSlotForEstimate, skuSupportsPackagingEstimatorSlot } from "@/lib/packaging/slots";
 
 const ESTIMATE_KEY = "jc_estimate_id";
 
@@ -41,6 +39,7 @@ export default function OfferConfiguratorClient({
   isPreRollView: boolean;
 }) {
   const category = String(offer?.products?.category || "").toLowerCase();
+  const estimatorCategory = (category === "concentrate" || category === "vape" ? category : "flower") as "flower" | "concentrate" | "vape";
   const initialMode: Mode = isPreRollView && category === "flower" ? "pre_roll" : offer.allow_bulk ? "bulk" : "copack";
 
   const [mode, setMode] = useState<Mode>(initialMode);
@@ -80,8 +79,13 @@ export default function OfferConfiguratorClient({
 
   const filteredSkus = useMemo(() => {
     return packagingSkus.filter((s) => {
+      const primarySlot = primaryPackagingSlotForEstimate({
+        category: estimatorCategory,
+        isPreRoll: isPreRollMode,
+        preRollPackQty,
+      });
+      if (!skuSupportsPackagingEstimatorSlot(s, primarySlot)) return false;
       if (isPreRollMode) {
-        if (!skuSupportsPackagingCompatibilityContext(s, "pre_roll")) return false;
         const skuSize = Number(s.size_grams || 0);
         const skuQty = Number(s.pack_qty || 0);
         const unitSizeNumber = Number(unitSize.replace("g", ""));
@@ -89,30 +93,21 @@ export default function OfferConfiguratorClient({
         if (skuQty > 0 && skuQty !== preRollPackQty) return false;
         return true;
       }
-
-      if (!skuSupportsPackagingCompatibilityContext(s, category)) return false;
       return true;
     });
-  }, [packagingSkus, category, isPreRollMode, unitSize, preRollPackQty]);
+  }, [packagingSkus, estimatorCategory, isPreRollMode, unitSize, preRollPackQty]);
 
   const secondaryBagOptions = useMemo(() => {
     return packagingSkus.filter((s) => {
-      const packagingType = String((s as any).packaging_type || "").toLowerCase();
-      const sizeGrams = Number((s as any).size_grams || 0);
-      const active = (s as any).active === true;
-      if (!active) return false;
-      if (packagingType !== "flower_in_bag") return false;
-      if (Math.abs(sizeGrams - 3.5) > 1e-9) return false;
-
-      const role = String((s as any).packaging_role || "").toLowerCase();
-      if (role && role !== "secondary") return false;
-
-      const contexts = Array.isArray((s as any).workflow_contexts)
-        ? ((s as any).workflow_contexts as unknown[]).map((v) => String(v || "").toLowerCase())
-        : [];
-      return contexts.includes("concentrate") || skuSupportsPackagingCompatibilityContext(s, "concentrate");
+      const secondarySlot = secondaryPackagingSlotForEstimate({
+        category: estimatorCategory,
+        isPreRoll: false,
+        preRollPackQty,
+      });
+      if (!secondarySlot) return false;
+      return (s as any).active === true && skuSupportsPackagingEstimatorSlot(s, secondarySlot);
     });
-  }, [packagingSkus]);
+  }, [packagingSkus, estimatorCategory, preRollPackQty]);
 
   useEffect(() => {
     if (!unitSizeOptions.includes(unitSize)) {
