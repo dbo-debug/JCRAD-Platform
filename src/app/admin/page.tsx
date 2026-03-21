@@ -40,7 +40,6 @@ type PackagingSubmissionRow = {
   created_at: string | null;
 };
 
-type ProfileRow = Record<string, unknown>;
 type PlatformEventRow = {
   id: string;
   event_type: string | null;
@@ -57,8 +56,6 @@ type CustomerTaskRow = {
   status: string | null;
 };
 
-const APPROVED_VERIFICATION_STATUSES = new Set(["approved", "verified"]);
-const FOLLOW_UP_VERIFICATION_STATUSES = new Set(["rejected", "needs_review", "follow_up", "failed"]);
 const CLOSED_ORDER_STATUSES = new Set(["fulfilled", "completed", "cancelled", "rejected", "closed"]);
 const CLOSED_TASK_STATUSES = new Set(["completed", "closed", "cancelled"]);
 
@@ -129,18 +126,6 @@ function formatMoney(value: number | null): string {
   });
 }
 
-function getProfileVerificationStatus(row: ProfileRow): string {
-  const explicit = normalizeStatus(row.verification_status);
-  if (explicit) return explicit;
-  if (row.verified === true || row.is_verified === true) return "verified";
-  return "unverified";
-}
-
-function getProfileRole(row: ProfileRow): string {
-  const role = normalizeStatus(row.role);
-  return role || "customer";
-}
-
 function getPendingOrderCount(rows: OrderRow[]): number {
   return rows.reduce((count, row) => {
     const status = normalizeStatus(row.status) || "pending";
@@ -172,11 +157,28 @@ function metadataSummary(metadata: Record<string, unknown> | null): string {
   return parts.join(" • ");
 }
 
+function countApprovalStatuses(rows: Array<{ approvalStatus: string }>) {
+  return rows.reduce(
+    (counts, row) => {
+      const status = normalizeStatus(row.approvalStatus);
+      if (status === "approved" || status === "verified") {
+        counts.approved += 1;
+      } else if (status === "rejected" || status === "needs_review" || status === "follow_up" || status === "failed") {
+        counts.followUp += 1;
+      } else {
+        counts.pending += 1;
+      }
+      return counts;
+    },
+    { pending: 0, approved: 0, followUp: 0 },
+  );
+}
+
 export default async function AdminDashboardPage() {
   const supabase = createAdminClient();
   const referenceNow = Date.parse(new Date().toISOString());
 
-  const [estimateRes, orderRes, submissionRes, profileRes, eventRes, routeStopQueueRes, taskRes, customerIndex, savedRoutes, approvalQueue] = await Promise.all([
+  const [estimateRes, orderRes, submissionRes, eventRes, routeStopQueueRes, taskRes, customerIndex, savedRoutes, approvalQueue] = await Promise.all([
     supabase
       .from("estimates")
       .select("id, status, total, customer_name, customer_email, packaging_review_pending, created_at, updated_at")
@@ -192,7 +194,6 @@ export default async function AdminDashboardPage() {
       .select("id, estimate_id, category, status, customer_name, customer_email, created_at")
       .order("created_at", { ascending: false })
       .limit(2000),
-    supabase.from("profiles").select("*").limit(2000),
     supabase
       .from("platform_events")
       .select("id, event_type, user_email, metadata, created_at")
@@ -212,7 +213,6 @@ export default async function AdminDashboardPage() {
   const estimates = (estimateRes.data || []) as EstimateRow[];
   const orders = (orderRes.data || []) as OrderRow[];
   const submissions = (submissionRes.data || []) as PackagingSubmissionRow[];
-  const profiles = (profileRes.data || []) as ProfileRow[];
   const platformEvents = (eventRes.data || []) as PlatformEventRow[];
   const customerTasks = (taskRes.data || []) as CustomerTaskRow[];
   const customers = customerIndex.customers;
@@ -235,17 +235,7 @@ export default async function AdminDashboardPage() {
   const recentEstimates = estimates.slice(0, 6);
 
   const pendingOrdersCount = getPendingOrderCount(orders);
-
-  const customerProfiles = profiles.filter((row) => {
-    const role = getProfileRole(row);
-    return role === "customer" || !role;
-  });
-  const approvedCustomers = customerProfiles.filter((row) =>
-    APPROVED_VERIFICATION_STATUSES.has(getProfileVerificationStatus(row))
-  );
-  const followUpCustomers = customerProfiles.filter((row) =>
-    FOLLOW_UP_VERIFICATION_STATUSES.has(getProfileVerificationStatus(row))
-  );
+  const approvalStatusCounts = countApprovalStatuses(approvalQueue);
   const packagingPending = submissions.filter((row) => {
     const status = normalizeStatus(row.status);
     return !status || status === "pending";
@@ -306,7 +296,6 @@ export default async function AdminDashboardPage() {
   const hasEstimateError = Boolean(estimateRes.error);
   const hasOrderError = Boolean(orderRes.error);
   const hasSubmissionError = Boolean(submissionRes.error);
-  const hasProfileError = Boolean(profileRes.error);
   const hasEventError = Boolean(eventRes.error);
   const hasTaskError = Boolean(taskRes.error);
   const hasRouteQueueError = Boolean(routeStopQueueRes.error);
@@ -365,7 +354,7 @@ export default async function AdminDashboardPage() {
           label="Pending Customer Approvals"
           value={approvalQueue.length}
           href="/workspace/customers/approvals"
-          helper={`${approvedCustomers.length} approved`}
+          helper={`${approvalStatusCounts.approved} approved`}
         />
         <MetricCard
           label="Packaging Review Queue"
@@ -375,7 +364,7 @@ export default async function AdminDashboardPage() {
         />
       </section>
 
-      {(hasEstimateError || hasOrderError || hasSubmissionError || hasProfileError || hasEventError || hasTaskError || hasRouteQueueError) ? (
+      {(hasEstimateError || hasOrderError || hasSubmissionError || hasEventError || hasTaskError || hasRouteQueueError) ? (
         <div className="rounded-xl border border-[#f3d2d2] bg-[#fff4f4] px-4 py-3 text-sm text-[#991b1b]">
           Some dashboard data is unavailable right now. Refresh after backend sync.
         </div>
@@ -547,14 +536,14 @@ export default async function AdminDashboardPage() {
 
           <Panel
             title="Customer Approval Visibility"
-            description="Onboarding/compliance status using current profile verification model."
+            description="Onboarding/compliance status using production-safe customer/profile linkage."
             href="/workspace/customers/approvals"
             hrefLabel="Open approvals"
           >
             <div className="grid grid-cols-3 gap-2">
-              <StatusPill label="Pending" value={approvalQueue.length} tone="warn" />
-              <StatusPill label="Approved" value={approvedCustomers.length} tone="ok" />
-              <StatusPill label="Follow-up" value={followUpCustomers.length} tone="bad" />
+              <StatusPill label="Pending" value={approvalStatusCounts.pending} tone="warn" />
+              <StatusPill label="Approved" value={approvalStatusCounts.approved} tone="ok" />
+              <StatusPill label="Follow-up" value={approvalStatusCounts.followUp} tone="bad" />
             </div>
             <div className="mt-3 space-y-2">
               {approvalQueue.slice(0, 4).map((item) => (

@@ -35,8 +35,6 @@ export type CustomerApprovalQueueItem = {
   accountHref: string;
 };
 
-const APPROVED_VERIFICATION_STATUSES = new Set(["approved", "verified"]);
-
 function normalizeStatus(value: unknown): string {
   return String(value || "").trim().toLowerCase();
 }
@@ -49,11 +47,10 @@ function firstText(...values: Array<unknown>): string | null {
   return null;
 }
 
-function deriveVerificationStatus(profile: GenericRow): string {
-  const explicit = normalizeStatus(profile.verification_status);
-  if (explicit) return explicit;
-  if (profile.verified === true || profile.is_verified === true) return "verified";
-  return "unverified";
+function deriveVerificationStatus(): string {
+  // Production profiles cannot safely be assumed to carry verification columns.
+  // Keep approval queue rendering alive by degrading to a generic pending state.
+  return "pending";
 }
 
 function profileDisplayName(profile: ApprovalCandidateProfile): string | null {
@@ -69,14 +66,12 @@ function statusPriority(status: string): number {
   if (status === "needs_review" || status === "follow_up") return 1;
   if (status === "pending" || status === "submitted") return 2;
   if (status === "unverified") return 3;
-  if (APPROVED_VERIFICATION_STATUSES.has(status)) return 9;
+  if (status === "approved" || status === "verified") return 9;
   return 4;
 }
 
 function choosePrimaryPendingProfile(profiles: ApprovalCandidateProfile[]): ApprovalCandidateProfile | null {
-  const pending = profiles.filter((profile) => !APPROVED_VERIFICATION_STATUSES.has(profile.verificationStatus));
-  if (pending.length === 0) return null;
-  return [...pending].sort((left, right) => {
+  return [...profiles].sort((left, right) => {
     const priorityDelta = statusPriority(left.verificationStatus) - statusPriority(right.verificationStatus);
     if (priorityDelta !== 0) return priorityDelta;
 
@@ -112,7 +107,7 @@ export async function loadCustomerApprovalQueue(): Promise<CustomerApprovalQueue
   const [{ customers }, authUsers, profilesRes] = await Promise.all([
     loadCustomerWorkspaceIndex(),
     listAuthUsers(supabase),
-    supabase.from("profiles").select("id, role, company_name, verification_status, verified, is_verified, created_at, updated_at").limit(5000),
+    supabase.from("profiles").select("id, role, company_name, created_at, updated_at").limit(5000),
   ]);
 
   if (profilesRes.error) throw new Error(profilesRes.error.message);
@@ -124,7 +119,7 @@ export async function loadCustomerApprovalQueue(): Promise<CustomerApprovalQueue
       email: firstText(authEmailById.get(String(profile.id || "").trim())),
       companyName: firstText(profile.company_name),
       role: normalizeStatus(profile.role),
-      verificationStatus: deriveVerificationStatus(profile),
+      verificationStatus: deriveVerificationStatus(),
       createdAt: firstText(profile.created_at),
       updatedAt: firstText(profile.updated_at),
     }))
