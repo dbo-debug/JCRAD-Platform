@@ -12,6 +12,7 @@ const DEFAULT_VALUES: PackagingSkuFormValues = {
   vape_device: null,
   vape_fill_grams: null,
   unit_cost: 0,
+  sell_price: null,
   inventory_qty: 0,
   active: true,
   thumbnail_url: null,

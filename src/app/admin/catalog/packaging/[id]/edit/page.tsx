@@ -19,6 +19,7 @@ type PackagingSkuRecord = {
   vape_device?: unknown;
   vape_fill_grams?: unknown;
   unit_cost?: unknown;
+  sell_price?: unknown;
   inventory_qty?: unknown;
   active?: unknown;
   thumbnail_url?: unknown;
@@ -34,9 +35,9 @@ export default async function AdminCatalogPackagingEditPage({ params }: PageProp
   let error: { message?: string } | null = null;
   ({ data: sku, error } = await supabase
     .from("packaging_skus")
-    .select(
-      "id, name, applies_to, applies_to_contexts, packaging_type, size_grams, pack_qty, vape_device, vape_fill_grams, unit_cost, inventory_qty, active, thumbnail_url"
-    )
+      .select(
+        "id, name, applies_to, applies_to_contexts, packaging_type, size_grams, pack_qty, vape_device, vape_fill_grams, unit_cost, sell_price, inventory_qty, active, thumbnail_url"
+      )
     .eq("id", id)
     .single());
 
@@ -44,7 +45,7 @@ export default async function AdminCatalogPackagingEditPage({ params }: PageProp
     ({ data: sku, error } = await supabase
       .from("packaging_skus")
       .select(
-        "id, name, applies_to, packaging_type, size_grams, pack_qty, vape_device, vape_fill_grams, unit_cost, inventory_qty, active, thumbnail_url"
+        "id, name, applies_to, packaging_type, size_grams, pack_qty, vape_device, vape_fill_grams, unit_cost, sell_price, inventory_qty, active, thumbnail_url"
       )
       .eq("id", id)
       .single());
@@ -73,6 +74,7 @@ export default async function AdminCatalogPackagingEditPage({ params }: PageProp
     vape_device: sku.vape_device ? String(sku.vape_device) : null,
     vape_fill_grams: sku.vape_fill_grams == null ? null : Number(sku.vape_fill_grams),
     unit_cost: Number(sku.unit_cost || 0),
+    sell_price: sku.sell_price == null ? null : Number(sku.sell_price),
     inventory_qty: Number(sku.inventory_qty || 0),
     active: sku.active == null ? true : !!sku.active,
     thumbnail_url: sku.thumbnail_url ? String(sku.thumbnail_url) : null,

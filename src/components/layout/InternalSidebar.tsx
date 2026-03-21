@@ -45,7 +45,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { label: "Orders", href: "/admin/orders", adminOnly: true },
       { label: "Menu", href: "/menu" },
-      { label: "Packaging", href: "/admin/packaging", adminOnly: true },
+      { label: "Packaging", href: "/admin/catalog/packaging", adminOnly: true },
       { label: "Packaging Reviews", href: "/admin/packaging/submissions", adminOnly: true },
       { label: "Catalog", href: "/admin/catalog", adminOnly: true },
       { label: "Settings", href: "/admin/settings", adminOnly: true },

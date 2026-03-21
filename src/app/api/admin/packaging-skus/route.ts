@@ -78,7 +78,7 @@ async function selectSkusWithFallback(supabase: ReturnType<typeof createAdminCli
   const withApplies = await supabase
     .from("packaging_skus")
     .select(
-      "id, name, category, applies_to, applies_to_contexts, estimator_slots, packaging_type, size_grams, pack_qty, vape_device, vape_fill_grams, unit_cost, inventory_qty, active, thumbnail_url"
+      "id, name, category, applies_to, applies_to_contexts, estimator_slots, packaging_type, size_grams, pack_qty, vape_device, vape_fill_grams, unit_cost, sell_price, inventory_qty, active, thumbnail_url"
     )
     .order("name", { ascending: true });
 
@@ -93,7 +93,7 @@ async function selectSkusWithFallback(supabase: ReturnType<typeof createAdminCli
   const fallback = await supabase
     .from("packaging_skus")
     .select(
-      "id, name, category, packaging_type, size_grams, pack_qty, vape_device, vape_fill_grams, unit_cost, inventory_qty, active, thumbnail_url"
+      "id, name, category, packaging_type, size_grams, pack_qty, vape_device, vape_fill_grams, unit_cost, sell_price, inventory_qty, active, thumbnail_url"
     )
     .order("name", { ascending: true });
 
@@ -142,7 +142,7 @@ async function saveSkuWithAppliesFallback(
   const selectWithApplies = await supabase
     .from("packaging_skus")
     .select(
-      "id, name, category, applies_to, applies_to_contexts, estimator_slots, packaging_type, size_grams, pack_qty, vape_device, vape_fill_grams, unit_cost, inventory_qty, active, thumbnail_url"
+      "id, name, category, applies_to, applies_to_contexts, estimator_slots, packaging_type, size_grams, pack_qty, vape_device, vape_fill_grams, unit_cost, sell_price, inventory_qty, active, thumbnail_url"
     )
     .eq("id", savedId)
     .single();
@@ -153,7 +153,7 @@ async function saveSkuWithAppliesFallback(
   const selectFallback = await supabase
     .from("packaging_skus")
     .select(
-      "id, name, category, packaging_type, size_grams, pack_qty, vape_device, vape_fill_grams, unit_cost, inventory_qty, active, thumbnail_url"
+      "id, name, category, packaging_type, size_grams, pack_qty, vape_device, vape_fill_grams, unit_cost, sell_price, inventory_qty, active, thumbnail_url"
     )
     .eq("id", savedId)
     .single();
@@ -187,6 +187,7 @@ export async function POST(req: Request) {
   let vape_device = body?.vape_device == null ? null : String(body.vape_device).trim() || null;
   let vape_fill_grams = parseOptionalNumber(body?.vape_fill_grams);
   const unit_cost = parseRequiredNumber(body?.unit_cost);
+  const sell_price = parseOptionalNumber(body?.sell_price);
   const inventory_qty = parseRequiredNumber(body?.inventory_qty);
   const active = typeof body?.active === "boolean" ? body.active : true;
   const hasThumbnailUrl = Object.prototype.hasOwnProperty.call(body, "thumbnail_url");
@@ -209,6 +210,9 @@ export async function POST(req: Request) {
   }
   if (unit_cost == null || unit_cost < 0) {
     return NextResponse.json({ error: "unit_cost must be >= 0" }, { status: 400 });
+  }
+  if (sell_price != null && sell_price < 0) {
+    return NextResponse.json({ error: "sell_price must be blank or >= 0" }, { status: 400 });
   }
   if (inventory_qty == null || inventory_qty < 0) {
     return NextResponse.json({ error: "inventory_qty must be >= 0" }, { status: 400 });
@@ -291,6 +295,7 @@ export async function POST(req: Request) {
     vape_device,
     vape_fill_grams,
     unit_cost,
+    sell_price,
     inventory_qty,
     active,
   };

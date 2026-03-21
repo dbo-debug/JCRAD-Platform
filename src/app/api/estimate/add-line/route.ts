@@ -1468,7 +1468,7 @@ export async function POST(req: Request) {
 
         const { data: sku, error: skuErr } = await supabase
           .from("packaging_skus")
-          .select("id, name, packaging_type, category, size_grams, pack_qty, vape_device, vape_fill_grams, applies_to, applies_to_contexts, estimator_slots, unit_cost")
+          .select("id, name, packaging_type, category, size_grams, pack_qty, vape_device, vape_fill_grams, applies_to, applies_to_contexts, estimator_slots, unit_cost, sell_price")
           .eq("id", packaging_sku_id)
           .single();
         mark("after packaging_skus select");
@@ -1518,6 +1518,10 @@ export async function POST(req: Request) {
         packagingType = String((sku as any).packaging_type || "flower_in_bag");
         void selectedTier;
         let packagingUnitCostInternal = money(Number((sku as any).unit_cost || 0));
+        let packagingPrimarySellPerUnit = Number((sku as any).sell_price);
+        if (!Number.isFinite(packagingPrimarySellPerUnit) || packagingPrimarySellPerUnit < 0) {
+          packagingPrimarySellPerUnit = money(packagingUnitCostInternal * markupMultiplier);
+        }
         packaging_primary_cost_total = packagingUnitCostInternal;
         const isVapeHardwarePackaging =
           productCategory === "vape" && (packagingType === "vape_510_cart" || packagingType === "vape_all_in_one");
@@ -1540,7 +1544,7 @@ export async function POST(req: Request) {
           const { data: secondarySku, error: secondaryErr } = await supabase
             .from("packaging_skus")
             .select(
-              "id, name, packaging_type, size_grams, active, applies_to, applies_to_contexts, estimator_slots, workflow_contexts, packaging_role, unit_cost"
+              "id, name, packaging_type, size_grams, active, applies_to, applies_to_contexts, estimator_slots, workflow_contexts, packaging_role, unit_cost, sell_price"
             )
             .eq("id", secondary_packaging_sku_id)
             .single();
@@ -1569,15 +1573,22 @@ export async function POST(req: Request) {
           }
 
           packaging_secondary_cost_total = money(Number((secondarySku as any).unit_cost || 0));
+          let packagingSecondarySellPerUnit = Number((secondarySku as any).sell_price);
+          if (!Number.isFinite(packagingSecondarySellPerUnit) || packagingSecondarySellPerUnit < 0) {
+            packagingSecondarySellPerUnit = money(packaging_secondary_cost_total * markupMultiplier);
+          }
           if (isVapeHardwarePackaging) {
             packaging_secondary_label = String((secondarySku as any).name || "3.5g mylar bag");
           }
           packagingUnitCostInternal = money(packagingUnitCostInternal + packaging_secondary_cost_total);
+          packaging_secondary_sell_total = money(packagingSecondarySellPerUnit * units);
         }
 
         packaging_base_cost_total = money(packagingUnitCostInternal * units);
-        packaging_primary_sell_total = money(packaging_primary_cost_total * units * markupMultiplier);
-        packaging_secondary_sell_total = money(packaging_secondary_cost_total * units * markupMultiplier);
+        packaging_primary_sell_total = money(packagingPrimarySellPerUnit * units);
+        if (packaging_secondary_cost_total <= 0) {
+          packaging_secondary_sell_total = 0;
+        }
         packaging_cost_total = packaging_base_cost_total;
         if (isPreRoll) {
           const heatShrinkQty = Math.max(
@@ -1632,7 +1643,7 @@ export async function POST(req: Request) {
     const coneQty = !excludeJcRadPackagingCosts && isPreRoll ? quotedUnitsHigh : 0;
     cone_cost_total = money(coneQty * Math.max(0, coneUnitCostUsd));
     packaging_cost_total = money(packaging_cost_total + sticker_cost_total + cone_cost_total);
-    packaging_base_sell_total = money(packaging_base_cost_total * markupMultiplier);
+    packaging_base_sell_total = money(packaging_primary_sell_total + packaging_secondary_sell_total);
     sticker_sell_total = sticker_cost_total;
     heat_shrink_sell_total = heat_shrink_cost_total;
     cone_sell_total = cone_cost_total;

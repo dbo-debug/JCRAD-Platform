@@ -31,6 +31,7 @@ export type PackagingSkuFormValues = {
   vape_device: string | null;
   vape_fill_grams: number | null;
   unit_cost: number;
+  sell_price: number | null;
   inventory_qty: number;
   active: boolean;
   thumbnail_url?: string | null;
@@ -48,6 +49,7 @@ type FormState = {
   vape_device: string;
   vape_fill_grams: string;
   unit_cost: string;
+  sell_price: string;
   inventory_qty: string;
   active: boolean;
   thumbnail_url: string;
@@ -124,6 +126,7 @@ export default function PackagingSkuForm({
     vape_device: initialValues.vape_device || "",
     vape_fill_grams: initialValues.vape_fill_grams == null ? "" : String(initialValues.vape_fill_grams),
     unit_cost: String(initialValues.unit_cost),
+    sell_price: initialValues.sell_price == null ? "" : String(initialValues.sell_price),
     inventory_qty: String(initialValues.inventory_qty),
     active: initialValues.active,
     thumbnail_url: String(initialValues.thumbnail_url || ""),
@@ -280,6 +283,7 @@ export default function PackagingSkuForm({
     const name = form.name.trim();
     const appliesToContexts = Array.from(new Set(form.applies_to_contexts.filter(Boolean)));
     const unitCost = toRequiredNumber(form.unit_cost);
+    const sellPrice = toOptionalNumber(form.sell_price);
     const inventoryQty = toRequiredNumber(form.inventory_qty);
     const packQtyInput = toRequiredNumber(form.pack_qty);
     const packQty = form.applies_to === "pre_roll" ? packQtyInput : 1;
@@ -303,6 +307,11 @@ export default function PackagingSkuForm({
     }
     if (unitCost == null || unitCost < 0) {
       setError("Unit cost must be a number >= 0.");
+      setBusy(false);
+      return;
+    }
+    if (sellPrice != null && sellPrice < 0) {
+      setError("Sell price must be blank or a number >= 0.");
       setBusy(false);
       return;
     }
@@ -342,6 +351,7 @@ export default function PackagingSkuForm({
           vape_device: form.applies_to === "vape" ? form.vape_device.trim() || null : null,
           vape_fill_grams: form.applies_to === "vape" ? vapeFillGrams : null,
           unit_cost: unitCost,
+          sell_price: sellPrice,
           inventory_qty: inventoryQty,
           active: form.active,
           thumbnail_url: form.thumbnail_url.trim() || null,
@@ -544,6 +554,19 @@ export default function PackagingSkuForm({
             onChange={(e) => setForm((prev) => ({ ...prev, unit_cost: e.target.value }))}
             required
           />
+        </label>
+
+        <label className="grid gap-1">
+          <span className="text-sm text-[#4f6877]">Sell Price Override (optional)</span>
+          <input
+            type="number"
+            min={0}
+            step="0.01"
+            className="rounded border border-[#cfdde5] bg-white px-3 py-2 text-sm text-[#173543]"
+            value={form.sell_price}
+            onChange={(e) => setForm((prev) => ({ ...prev, sell_price: e.target.value }))}
+          />
+          <span className="text-xs text-[#5b7382]">If set, estimator uses this sell price instead of cost plus default markup.</span>
         </label>
 
         <label className="grid gap-1">
