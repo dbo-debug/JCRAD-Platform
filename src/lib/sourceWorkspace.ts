@@ -99,7 +99,7 @@ function firstNumber(...values: Array<unknown>): number | null {
 }
 
 function formatProfileName(profile: GenericRow | null | undefined): string | null {
-  return firstText(profile?.full_name, profile?.company_name, profile?.email);
+  return firstText(profile?.company_name, profile?.email);
 }
 
 function getProfileMap(profiles: GenericRow[]) {

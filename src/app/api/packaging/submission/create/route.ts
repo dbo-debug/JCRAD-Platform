@@ -29,11 +29,16 @@ export async function POST(req: Request) {
   }
 
   const supabase = createAdminClient();
+  const requesterProfileRes = await supabase.from("profiles").select("id, company_name").eq("id", user.id).maybeSingle();
+  if (requesterProfileRes.error) {
+    return NextResponse.json({ error: requesterProfileRes.error.message }, { status: 500 });
+  }
+  const requesterProfile = (requesterProfileRes.data || null) as { company_name?: string | null } | null;
   const form = await req.formData();
 
   const estimate_id = form.get("estimate_id")?.toString() || null;
   const category = normalizePackagingCategory(form.get("category")?.toString() || "");
-  const customer_name = form.get("customer_name")?.toString() || user.user_metadata?.full_name || "";
+  const customer_name = form.get("customer_name")?.toString() || requesterProfile?.company_name || user.email || "";
   const customer_email = String(user.email || "").trim().toLowerCase();
   const customer_phone = form.get("customer_phone")?.toString() || "";
   const notes = form.get("notes")?.toString() || "";
@@ -91,7 +96,8 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ submission: data });
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message || "Upload failed" }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Upload failed";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

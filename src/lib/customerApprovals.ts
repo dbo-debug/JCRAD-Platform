@@ -10,7 +10,6 @@ type AuthUser = {
 type ApprovalCandidateProfile = {
   id: string;
   email: string | null;
-  fullName: string | null;
   companyName: string | null;
   role: string;
   verificationStatus: string;
@@ -58,7 +57,7 @@ function deriveVerificationStatus(profile: GenericRow): string {
 }
 
 function profileDisplayName(profile: ApprovalCandidateProfile): string | null {
-  return firstText(profile.fullName, profile.companyName, profile.email);
+  return firstText(profile.companyName, profile.email);
 }
 
 function isCustomerProfile(profile: ApprovalCandidateProfile): boolean {
@@ -113,7 +112,7 @@ export async function loadCustomerApprovalQueue(): Promise<CustomerApprovalQueue
   const [{ customers }, authUsers, profilesRes] = await Promise.all([
     loadCustomerWorkspaceIndex(),
     listAuthUsers(supabase),
-    supabase.from("profiles").select("id, role, company_name, full_name, verification_status, verified, is_verified, created_at, updated_at").limit(5000),
+    supabase.from("profiles").select("id, role, company_name, verification_status, verified, is_verified, created_at, updated_at").limit(5000),
   ]);
 
   if (profilesRes.error) throw new Error(profilesRes.error.message);
@@ -123,7 +122,6 @@ export async function loadCustomerApprovalQueue(): Promise<CustomerApprovalQueue
     .map((profile): ApprovalCandidateProfile => ({
       id: String(profile.id || "").trim(),
       email: firstText(authEmailById.get(String(profile.id || "").trim())),
-      fullName: firstText(profile.full_name),
       companyName: firstText(profile.company_name),
       role: normalizeStatus(profile.role),
       verificationStatus: deriveVerificationStatus(profile),

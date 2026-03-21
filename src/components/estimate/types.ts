@@ -1,3 +1,21 @@
+export type EstimateAttachedCustomer = {
+  id: string;
+  company_name?: string | null;
+  contact_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  logo_url?: string | null;
+};
+
+export type EstimateCustomerOption = {
+  id: string;
+  company_name: string;
+  contact_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  logo_url?: string | null;
+};
+
 export type EstimateLineOfferProduct = {
   id?: string | null;
   name?: string | null;
@@ -31,11 +49,13 @@ export type EstimatePayload = {
   subtotal?: number;
   adjustments?: number;
   total?: number;
+  customer_account_id?: string | null;
   customer_name?: string | null;
   customer_email?: string | null;
   customer_phone?: string | null;
   created_at?: string | null;
   packaging_review_pending?: boolean;
+  attached_customer?: EstimateAttachedCustomer | null;
 };
 
 export type BreakdownRow = {

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { logPlatformEvent } from "@/lib/events/logPlatformEvent";
+import { loadEstimateAttachedCustomer } from "@/lib/estimate/customer";
+import { getStaffContext } from "@/lib/getStaffContext";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -9,10 +11,18 @@ export async function POST(req: Request) {
   const user = authData?.user ?? null;
 
   const supabase = createAdminClient();
+  const requesterProfileRes = user
+    ? await supabase.from("profiles").select("id, company_name").eq("id", user.id).maybeSingle()
+    : { data: null, error: null };
+  if (requesterProfileRes.error) {
+    return NextResponse.json({ error: requesterProfileRes.error.message }, { status: 500 });
+  }
+  const requesterProfile = (requesterProfileRes.data || null) as { company_name?: string | null } | null;
   const body = await req.json().catch(() => ({}));
   const isDev = process.env.NODE_ENV !== "production";
   if (isDev) {
     console.log("[estimate/create] request", {
+      customer_account_id_present: Boolean(body?.customer_account_id),
       customer_name_present: Boolean(body?.customer_name),
       customer_email_present: Boolean(body?.customer_email),
       customer_phone_present: Boolean(body?.customer_phone),
@@ -26,18 +36,29 @@ export async function POST(req: Request) {
     return NextResponse.json(payload, init);
   };
 
-  const customer_name = body?.customer_name
-    ? String(body.customer_name)
-    : String(user?.user_metadata?.full_name || "");
-  const customer_email = body?.customer_email
-    ? String(body.customer_email).trim().toLowerCase()
-    : String(user?.email || "").trim().toLowerCase();
-  const customer_phone = body?.customer_phone ? String(body.customer_phone) : "";
+  const staff = await getStaffContext();
+  const requestedCustomerAccountId = staff ? String(body?.customer_account_id || "").trim() : "";
+  const attachedCustomer = requestedCustomerAccountId ? await loadEstimateAttachedCustomer(supabase, requestedCustomerAccountId) : null;
+  if (requestedCustomerAccountId && !attachedCustomer) {
+    return respond({ error: "Customer not found" }, { status: 404 });
+  }
+  const customer_name = attachedCustomer
+    ? attachedCustomer.contact_name || attachedCustomer.company_name || ""
+    : body?.customer_name
+      ? String(body.customer_name)
+      : String(requesterProfile?.company_name || user?.email || "");
+  const customer_email = attachedCustomer
+    ? String(attachedCustomer.email || "").trim().toLowerCase()
+    : body?.customer_email
+      ? String(body.customer_email).trim().toLowerCase()
+      : String(user?.email || "").trim().toLowerCase();
+  const customer_phone = attachedCustomer ? String(attachedCustomer.phone || "") : body?.customer_phone ? String(body.customer_phone) : "";
   const notes = body?.notes ? String(body.notes) : "";
 
   const { data, error } = await supabase
     .from("estimates")
     .insert({
+      customer_account_id: attachedCustomer?.id || null,
       customer_name,
       customer_email,
       customer_phone,
@@ -48,7 +69,7 @@ export async function POST(req: Request) {
       total: 0,
       packaging_review_pending: false,
     })
-    .select("id, status, subtotal, adjustments, total, customer_name, customer_email, customer_phone, notes, packaging_review_pending, created_at")
+    .select("id, status, subtotal, adjustments, total, customer_account_id, customer_name, customer_email, customer_phone, notes, packaging_review_pending, created_at")
     .single();
 
   if (error) return respond({ error: error.message }, { status: 500 });
@@ -57,8 +78,13 @@ export async function POST(req: Request) {
     userId: user?.id || null,
     userEmail: customer_email || user?.email || null,
     metadata: {
-      estimate_id: (data as any)?.id || null,
+      estimate_id: (data as { id?: string | null } | null)?.id || null,
     },
   });
-  return respond({ estimate: data });
+  return respond({
+    estimate: {
+      ...data,
+      attached_customer: attachedCustomer,
+    },
+  });
 }

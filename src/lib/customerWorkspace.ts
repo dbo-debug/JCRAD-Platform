@@ -208,11 +208,16 @@ function hasHotLeadFlag(details: unknown): boolean {
 }
 
 function formatProfileName(profile: GenericRow | null | undefined): string | null {
-  return firstText(profile?.full_name, profile?.company_name, profile?.email);
+  return firstText(profile?.company_name, profile?.email);
 }
 
 function getCustomerName(customer: GenericRow): string {
-  return firstText(customer.name, customer.company_name, customer.display_name, customer.primary_contact_email) || "Unnamed customer";
+  return firstText(
+    customer.company_name,
+    customer.primary_contact_name,
+    customer.primary_contact_email,
+    customer.main_phone,
+  ) || "Unnamed customer";
 }
 
 function getCustomerStatus(customer: GenericRow): string {

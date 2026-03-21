@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import EstimateLineCard from "@/components/estimate/EstimateLineCard";
 import EstimatePrintStyles from "@/components/estimate/EstimatePrintStyles";
 import Money from "@/components/estimate/Money";
-import type { EstimateLine, EstimatePayload } from "@/components/estimate/types";
+import type { EstimateCustomerOption, EstimateLine, EstimatePayload } from "@/components/estimate/types";
 
 const ESTIMATE_KEY = "jc_estimate_id";
 
@@ -37,14 +37,32 @@ type ConfirmOrderResponse = {
   order_id?: string;
 };
 
-export default function EstimateClient() {
-  const [estimateId, setEstimateId] = useState("");
+type EstimateClientProps = {
+  staffRole: "admin" | "sales" | null;
+  customerOptions: EstimateCustomerOption[];
+};
+
+function buildCustomerSearchText(customer: EstimateCustomerOption): string {
+  return [
+    customer.company_name,
+    customer.contact_name,
+    customer.email,
+    customer.phone,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+export default function EstimateClient({ staffRole, customerOptions }: EstimateClientProps) {
+  const [estimateId] = useState(() => String(getEstimateId() || "").trim());
   const [estimate, setEstimate] = useState<EstimatePayload | null>(null);
   const [lines, setLines] = useState<EstimateLine[]>([]);
   const [expandedByLineKey, setExpandedByLineKey] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
+  const [customerQuery, setCustomerQuery] = useState("");
 
   const quoteDate = useMemo(() => {
     const source = estimate?.created_at || new Date().toISOString();
@@ -55,14 +73,23 @@ export default function EstimateClient() {
   const packagingReviewBlocked = Boolean(estimate?.packaging_review_pending);
   const preferredPackagingCategory = useMemo(() => {
     for (const line of lines) {
-      if (String((line as any)?.packaging_mode || "").toLowerCase() !== "customer") continue;
-      if (String((line as any)?.pre_roll_mode || "").trim()) return "pre_roll";
-      const category = normalizePackagingCategory((line as any)?.offers?.products?.category);
+      const row = line as Record<string, unknown>;
+      const offer = (row.offers as Record<string, unknown> | null) || null;
+      const product = (offer?.products as Record<string, unknown> | null) || null;
+      if (String(row.packaging_mode || "").toLowerCase() !== "customer") continue;
+      if (String(row.pre_roll_mode || "").trim()) return "pre_roll";
+      const category = normalizePackagingCategory(product?.category);
       if (category) return category;
     }
     return "";
   }, [lines]);
   const backToMenuHref = "/menu";
+  const attachedCustomer = estimate?.attached_customer || null;
+  const filteredCustomerOptions = useMemo(() => {
+    const query = customerQuery.trim().toLowerCase();
+    if (!query) return customerOptions.slice(0, 8);
+    return customerOptions.filter((customer) => buildCustomerSearchText(customer).includes(query)).slice(0, 8);
+  }, [customerOptions, customerQuery]);
 
   function buildLineKey(line: EstimateLine, index: number): string {
     return String(line?.id || `line-${index}`);
@@ -134,11 +161,35 @@ export default function EstimateClient() {
     setBusy(false);
   }
 
+  async function updateAttachedCustomer(customerId: string | null) {
+    if (!safeEstimateId || !staffRole) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/estimate/customer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ estimate_id: safeEstimateId, customer_id: customerId }),
+      });
+      const json = (await parseJsonSafe(res)) as EstimateGetResponse;
+      if (!res.ok) {
+        setError(json.error || `Customer update failed (${res.status})`);
+        setBusy(false);
+        return;
+      }
+      setCustomerQuery("");
+      await load(safeEstimateId);
+      setBusy(false);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Customer update failed");
+      setBusy(false);
+    }
+  }
+
   useEffect(() => {
-    const id = String(getEstimateId() || "").trim();
-    setEstimateId(id);
-    if (id) void load(id);
-  }, [load]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (safeEstimateId) void load(safeEstimateId);
+  }, [load, safeEstimateId]);
 
   if (!safeEstimateId) {
     return (
@@ -190,7 +241,7 @@ export default function EstimateClient() {
       </div>
 
       <header className="rounded-2xl border border-[#dce7ee] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbfc_100%)] p-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-center gap-3">
             <img src="/brand/BLACK.png" alt="JC RAD" className="h-16 w-16 rounded-xl border border-[#dbe6ed] bg-white p-2" />
             <div>
@@ -224,7 +275,76 @@ export default function EstimateClient() {
             </button>
           </div>
         </div>
+        {attachedCustomer ? (
+          <div className="mt-3 flex flex-wrap items-center gap-3 rounded-2xl border border-[#dce7ee] bg-[#fbfdfe] px-3 py-2.5">
+            {attachedCustomer.logo_url ? (
+              <img
+                src={attachedCustomer.logo_url}
+                alt={attachedCustomer.company_name || attachedCustomer.contact_name || "Customer logo"}
+                className="h-14 w-14 rounded-xl border border-[#dbe6ed] bg-white object-contain p-2"
+              />
+            ) : null}
+            <div className="space-y-0.5">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#5b7382]">Customer</div>
+              <div className="text-base font-semibold text-[#1a3240]">{attachedCustomer.company_name || "Attached customer"}</div>
+              {attachedCustomer.contact_name ? <div className="text-sm text-[#4e6777]">{attachedCustomer.contact_name}</div> : null}
+              <div className="text-xs text-[#607988]">
+                {[attachedCustomer.email, attachedCustomer.phone].filter(Boolean).join(" • ") || "Customer account attached"}
+              </div>
+            </div>
+          </div>
+        ) : null}
       </header>
+
+      {staffRole ? (
+        <section className="no-print rounded-2xl border border-[#dce7ee] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbfc_100%)] p-3 shadow-[0_14px_24px_-24px_rgba(16,24,40,0.4)]">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#5b7382]">Formal Estimate</div>
+              <h2 className="text-base font-semibold text-[#1a3240]">Choose Customer</h2>
+              <p className="text-xs text-[#607988]">Optional for sales/admin. Leave blank for the current fast estimate flow.</p>
+            </div>
+            {attachedCustomer ? (
+              <button
+                type="button"
+                onClick={() => void updateAttachedCustomer(null)}
+                disabled={busy}
+                className="rounded-full border border-[#d2dfe7] px-3 py-1.5 text-xs font-semibold text-[#274555] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Clear Customer
+              </button>
+            ) : null}
+          </div>
+          <div className="mt-3 space-y-2">
+            <input
+              value={customerQuery}
+              onChange={(e) => setCustomerQuery(e.target.value)}
+              placeholder="Search by company, contact, email, or phone"
+              className="w-full rounded-xl border border-[#d2dfe7] bg-white px-3 py-2 text-sm text-[#173543] outline-none transition focus:border-[#14b8a6]"
+            />
+            <div className="grid gap-2 md:grid-cols-2">
+              {filteredCustomerOptions.map((customer) => {
+                const selected = attachedCustomer?.id === customer.id;
+                return (
+                  <button
+                    key={customer.id}
+                    type="button"
+                    onClick={() => void updateAttachedCustomer(customer.id)}
+                    disabled={busy || selected}
+                    className="rounded-xl border border-[#dbe6ed] bg-white px-3 py-2 text-left shadow-[0_12px_24px_-24px_rgba(16,24,40,0.45)] transition hover:border-[#14b8a6] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <div className="text-sm font-semibold text-[#173543]">{customer.company_name}</div>
+                    <div className="text-xs text-[#607988]">
+                      {[customer.contact_name, customer.email, customer.phone].filter(Boolean).join(" • ") || "No contact details"}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            {filteredCustomerOptions.length === 0 ? <div className="text-xs text-[#607988]">No matching customers.</div> : null}
+          </div>
+        </section>
+      ) : null}
 
       <div className="rounded-2xl border border-[#e2ebf0] bg-[repeating-linear-gradient(135deg,#ffffff_0px,#ffffff_18px,#f6f9fb_18px,#f6f9fb_36px)] px-3 py-2 shadow-[0_14px_30px_-26px_rgba(16,24,40,0.4)]">
         <div className="rounded-full border border-[#d4e3e3] bg-[#eef7f6] px-3 py-1 text-center text-[10px] font-medium tracking-[0.08em] text-[#0f766e]">

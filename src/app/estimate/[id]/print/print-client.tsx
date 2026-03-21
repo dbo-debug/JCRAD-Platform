@@ -32,13 +32,18 @@ function normalizePackagingCategory(value: unknown): "vape" | "flower" | "pre_ro
 
 export default function EstimatePrintClient({ estimateId }: EstimatePrintClientProps) {
   const router = useRouter();
-  const [resolvedEstimateId, setResolvedEstimateId] = useState(String(estimateId || "").trim());
+  const [resolvedEstimateId] = useState(() => {
+    const fromParams = String(estimateId || "").trim();
+    if (fromParams) return fromParams;
+    if (typeof window === "undefined") return "";
+    return String(window.localStorage.getItem("jc_estimate_id") || "").trim();
+  });
   const [estimate, setEstimate] = useState<EstimatePayload | null>(null);
   const [lines, setLines] = useState<EstimateLine[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(true);
-  const [missingId, setMissingId] = useState(false);
+  const [busy, setBusy] = useState(() => Boolean(String(estimateId || "").trim() || (typeof window !== "undefined" && window.localStorage.getItem("jc_estimate_id"))));
   const [sendEmailMessage, setSendEmailMessage] = useState<string | null>(null);
+  const missingId = !resolvedEstimateId;
 
   const quoteDate = useMemo(() => {
     const source = estimate?.created_at || new Date().toISOString();
@@ -47,32 +52,23 @@ export default function EstimatePrintClient({ estimateId }: EstimatePrintClientP
   }, [estimate?.created_at]);
   const preferredPackagingCategory = useMemo(() => {
     for (const line of lines) {
-      if (String((line as any)?.packaging_mode || "").toLowerCase() !== "customer") continue;
-      if (String((line as any)?.pre_roll_mode || "").trim()) return "pre_roll";
-      const category = normalizePackagingCategory((line as any)?.offers?.products?.category);
+      const row = line as Record<string, unknown>;
+      const offer = (row.offers as Record<string, unknown> | null) || null;
+      const product = (offer?.products as Record<string, unknown> | null) || null;
+      if (String(row.packaging_mode || "").toLowerCase() !== "customer") continue;
+      if (String(row.pre_roll_mode || "").trim()) return "pre_roll";
+      const category = normalizePackagingCategory(product?.category);
       if (category) return category;
     }
     return "";
   }, [lines]);
+  const attachedCustomer = estimate?.attached_customer || null;
 
   useEffect(() => {
-    const idFromParams = String(estimateId || "").trim();
-    if (idFromParams) {
-      setResolvedEstimateId(idFromParams);
-      setMissingId(false);
-      return;
+    if (!String(estimateId || "").trim() && resolvedEstimateId) {
+      router.replace(`/estimate/${encodeURIComponent(resolvedEstimateId)}/print`);
     }
-    if (typeof window === "undefined") return;
-    const stored = String(window.localStorage.getItem("jc_estimate_id") || "").trim();
-    if (stored) {
-      setResolvedEstimateId(stored);
-      router.replace(`/estimate/${encodeURIComponent(stored)}/print`);
-      return;
-    }
-    setResolvedEstimateId("");
-    setMissingId(true);
-    setBusy(false);
-  }, [estimateId, router]);
+  }, [estimateId, resolvedEstimateId, router]);
 
   useEffect(() => {
     if (!resolvedEstimateId) return;
@@ -118,7 +114,7 @@ export default function EstimatePrintClient({ estimateId }: EstimatePrintClientP
   return (
     <div className="estimate-page mx-auto max-w-5xl space-y-3 bg-white p-3 md:p-4">
       <header className="estimate-break-avoid rounded-2xl border border-[#dbe6ed] bg-white p-4 shadow-[0_16px_24px_-24px_rgba(16,24,40,0.45)]">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-center gap-3">
             <img src="/brand/BLACK.png" alt="JC RAD" className="h-14 w-14 rounded-xl border border-[#dbe6ed] bg-white p-2" />
             <div className="space-y-0.5">
@@ -152,6 +148,25 @@ export default function EstimatePrintClient({ estimateId }: EstimatePrintClientP
             </Link>
           </div>
         </div>
+        {attachedCustomer ? (
+          <div className="mt-3 flex flex-wrap items-center gap-3 rounded-2xl border border-[#dce7ee] bg-[#fbfdfe] px-3 py-2.5">
+            {attachedCustomer.logo_url ? (
+              <img
+                src={attachedCustomer.logo_url}
+                alt={attachedCustomer.company_name || attachedCustomer.contact_name || "Customer logo"}
+                className="h-14 w-14 rounded-xl border border-[#dbe6ed] bg-white object-contain p-2"
+              />
+            ) : null}
+            <div className="space-y-0.5">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#5b7382]">Prepared For</div>
+              <div className="text-base font-semibold text-[#1a3240]">{attachedCustomer.company_name || "Attached customer"}</div>
+              {attachedCustomer.contact_name ? <div className="text-sm text-[#4e6777]">{attachedCustomer.contact_name}</div> : null}
+              <div className="text-xs text-[#607988]">
+                {[attachedCustomer.email, attachedCustomer.phone].filter(Boolean).join(" • ")}
+              </div>
+            </div>
+          </div>
+        ) : null}
         <p className="no-print mt-3 text-xs text-[#607988]">
           Download the estimate as a PDF from this screen, or use Send Email when the backend mail flow is available.
         </p>

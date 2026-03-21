@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/requireAdmin";
 import { logPlatformEvent } from "@/lib/events/logPlatformEvent";
@@ -104,7 +105,7 @@ export async function POST(req: Request) {
 
   const { data: estimate, error: estErr } = await supabase
     .from("estimates")
-    .select("id, status, subtotal, adjustments, total, customer_name, customer_email, customer_phone, notes, packaging_review_pending")
+    .select("id, status, subtotal, adjustments, total, customer_account_id, customer_name, customer_email, customer_phone, notes, packaging_review_pending")
     .eq("id", estimate_id)
     .single();
 
@@ -148,6 +149,7 @@ export async function POST(req: Request) {
     .from("orders")
     .insert({
       estimate_id,
+      customer_account_id: (estimate as any).customer_account_id || null,
       customer_name: (estimate as any).customer_name || "",
       customer_email: (estimate as any).customer_email || "",
       customer_phone: (estimate as any).customer_phone || "",

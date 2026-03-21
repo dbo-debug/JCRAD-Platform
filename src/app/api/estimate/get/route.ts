@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { loadEstimateAttachedCustomer } from "@/lib/estimate/customer";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function GET(req: Request) {
@@ -22,7 +23,7 @@ export async function GET(req: Request) {
 
   const { data: estimate, error: estErr } = await supabase
     .from("estimates")
-    .select("id, status, subtotal, adjustments, total, customer_name, customer_email, customer_phone, notes, packaging_review_pending, created_at, updated_at")
+    .select("id, status, subtotal, adjustments, total, customer_account_id, customer_name, customer_email, customer_phone, notes, packaging_review_pending, created_at, updated_at")
     .eq("id", id)
     .single();
 
@@ -35,7 +36,7 @@ export async function GET(req: Request) {
     .order("created_at", { ascending: true });
 
   if (linesErr) return respond({ error: linesErr.message }, { status: 500 });
-  const lineRows = (lines ?? []) as Array<Record<string, any>>;
+  const lineRows = (lines ?? []) as Array<Record<string, unknown>>;
   const infusionProductIds = new Set<string>();
   const packagingSkuIds = new Set<string>();
   for (const line of lineRows) {
@@ -68,9 +69,9 @@ export async function GET(req: Request) {
       .select("id, name")
       .in("id", Array.from(infusionProductIds));
     for (const row of infusionProducts || []) {
-      const rid = String((row as any)?.id || "").trim();
+      const rid = String((row as { id?: string | null })?.id || "").trim();
       if (!rid) continue;
-      infusionNameById.set(rid, String((row as any)?.name || "").trim());
+      infusionNameById.set(rid, String((row as { name?: string | null })?.name || "").trim());
     }
   }
 
@@ -81,9 +82,9 @@ export async function GET(req: Request) {
       .select("id, name")
       .in("id", Array.from(packagingSkuIds));
     for (const row of packagingSkus || []) {
-      const rid = String((row as any)?.id || "").trim();
+      const rid = String((row as { id?: string | null })?.id || "").trim();
       if (!rid) continue;
-      packagingLabelById.set(rid, String((row as any)?.name || "").trim());
+      packagingLabelById.set(rid, String((row as { name?: string | null })?.name || "").trim());
     }
   }
 
@@ -179,5 +180,16 @@ export async function GET(req: Request) {
     };
   });
 
-  return respond({ estimate, lines: enrichedLines });
+  const attachedCustomerId = String((estimate as { customer_account_id?: string | null })?.customer_account_id || "").trim();
+  const attachedCustomer = attachedCustomerId
+    ? await loadEstimateAttachedCustomer(supabase, attachedCustomerId).catch(() => null)
+    : null;
+
+  return respond({
+    estimate: {
+      ...estimate,
+      attached_customer: attachedCustomer,
+    },
+    lines: enrichedLines,
+  });
 }
