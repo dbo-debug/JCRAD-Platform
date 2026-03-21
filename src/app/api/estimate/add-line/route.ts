@@ -1855,9 +1855,7 @@ export async function POST(req: Request) {
       unit_size,
       packaging_mode,
       packaging_sku_id,
-      secondary_packaging_sku_id: packaging_mode === "jcrad" && productCategory === "concentrate"
-        ? secondary_packaging_sku_id
-        : null,
+      secondary_packaging_sku_id: packaging_mode === "jcrad" ? secondary_packaging_sku_id : null,
       packaging_submission_id,
       extra_touch_points: packaging_mode === "customer" ? Math.max(0, extra_touch_points) : 0,
       pre_roll_mode,
