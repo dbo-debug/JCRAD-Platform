@@ -101,6 +101,53 @@ function pickNumber(group: Record<string, unknown>, key: string, fallback = 0): 
   return raw;
 }
 
+function formatCommercialQty(value: number, unit: string): string {
+  if (!Number.isFinite(value) || value <= 0) return "";
+  if (unit === "lb") return `${value.toFixed(3)} lb`;
+  if (unit === "g") return `${value.toFixed(3)} g`;
+  return `${value.toFixed(3)} ${unit}`;
+}
+
+function formatRate(rate: number, unit: string): string {
+  if (!Number.isFinite(rate) || rate <= 0) return "";
+  return `${fmtUsd(rate)}/${unit}`;
+}
+
+function detailFromQtyRate(quantity: number, unit: string, total: number, explicitRate?: number): string {
+  const qtyText = formatCommercialQty(quantity, unit);
+  if (!qtyText) return "";
+  const derivedRate = quantity > 0 ? money(total / quantity) : 0;
+  const rate = explicitRate != null && Number.isFinite(explicitRate) && explicitRate > 0 ? explicitRate : derivedRate;
+  const rateText = formatRate(rate, unit);
+  return rateText ? `${qtyText} @ ${rateText}` : qtyText;
+}
+
+function baseMaterialLabel(line: EstimateLine): string {
+  const category = String(line?.offers?.products?.category || "").trim().toLowerCase();
+  const productName = String(line?.offers?.products?.name || "").trim();
+  if (category === "flower") return "Flower";
+  if (productName) return productName;
+  if (category === "vape") return "Vape Material";
+  if (category === "concentrate") return "Concentrate Material";
+  return "Materials";
+}
+
+function baseMaterialDetail(line: EstimateLine, total: number): string {
+  const category = String(line?.offers?.products?.category || "").trim().toLowerCase();
+  if (category === "flower") {
+    const qty = Number(line?.quantity ?? line?.quantity_lbs ?? 0);
+    return detailFromQtyRate(qty, "lb", total);
+  }
+  const qty = Number(line?.quantity ?? 0);
+  return detailFromQtyRate(qty, "g", total);
+}
+
+function packagingUnitDetail(total: number, line: EstimateLine): string {
+  const units = quotedUnitsHigh(line);
+  if (units <= 0 || money(total) <= 0) return "";
+  return `${fmtUsd(ceilDisplayCent(total / units))}/unit`;
+}
+
 export function buildBreakdownGroups(line: EstimateLine): BreakdownGroupData[] {
   const infusionInputs = asRecord(line?.infusion_inputs);
   const costBreakdown = asRecord(infusionInputs.cost_breakdown);
@@ -109,18 +156,48 @@ export function buildBreakdownGroups(line: EstimateLine): BreakdownGroupData[] {
   const labor = asRecord(costBreakdown.labor);
   const coa = asRecord(costBreakdown.coa);
   const materialSplit = resolveMaterialSellSplit(line);
-  const materialCategory = String(line?.offers?.products?.category || "").trim().toLowerCase();
-  const baseMaterialLabel = materialCategory === "vape" ? "Distillate" : "Flower";
+  const baseLabel = baseMaterialLabel(line);
+  const baseMaterialTotal = money(pickNumber(material, "flower_sell_total", materialSplit.flower));
 
   const materialsRows = positiveRows([
-    { id: "flower", label: baseMaterialLabel, total: money(pickNumber(material, "flower_sell_total", materialSplit.flower)) },
-    { id: "internal", label: "Internal Infusion", total: money(pickNumber(material, "internal_infusion_sell_total")) },
+    {
+      id: "flower",
+      label: baseLabel,
+      detail: baseMaterialDetail(line, baseMaterialTotal),
+      total: baseMaterialTotal,
+    },
+    {
+      id: "internal",
+      label: "Internal Infusion",
+      detail: detailFromQtyRate(
+        pickNumber(material, "internal_infusion_grams"),
+        "g",
+        pickNumber(material, "internal_infusion_sell_total")
+      ),
+      total: money(pickNumber(material, "internal_infusion_sell_total")),
+    },
     {
       id: "ext-dist",
       label: "External Distillate",
+      detail: detailFromQtyRate(
+        pickNumber(material, "external_distillate_grams_base"),
+        "g",
+        pickNumber(material, "external_distillate_sell_total"),
+        pickNumber(material, "external_distillate_sell_per_g")
+      ),
       total: money(pickNumber(material, "external_distillate_sell_total")),
     },
-    { id: "ext-dry", label: "External Dry", total: money(pickNumber(material, "external_dry_sell_total")) },
+    {
+      id: "ext-dry",
+      label: "External Dry",
+      detail: detailFromQtyRate(
+        pickNumber(material, "external_dry_grams_base"),
+        "g",
+        pickNumber(material, "external_dry_sell_total"),
+        pickNumber(material, "external_dry_sell_per_g")
+      ),
+      total: money(pickNumber(material, "external_dry_sell_total")),
+    },
   ]);
 
   const packagingBaseFallback = money(line?.packaging_total)
@@ -135,23 +212,41 @@ export function buildBreakdownGroups(line: EstimateLine): BreakdownGroupData[] {
       ? {
         id: "pack-primary",
         label: packagingPrimaryLabel,
+        detail: packagingUnitDetail(money(pickNumber(packaging, "primary_sell_total")), line),
         total: money(pickNumber(packaging, "primary_sell_total")),
       }
       : {
         id: "pack",
         label: "Packaging",
+        detail: packagingUnitDetail(money(pickNumber(packaging, "base_sell_total", packagingBaseFallback)), line),
         total: money(pickNumber(packaging, "base_sell_total", packagingBaseFallback)),
       },
     packagingSecondaryLabel
       ? {
         id: "pack-secondary",
         label: packagingSecondaryLabel,
+        detail: packagingUnitDetail(money(pickNumber(packaging, "secondary_sell_total")), line),
         total: money(pickNumber(packaging, "secondary_sell_total")),
       }
       : { id: "pack-secondary", label: "", total: 0 },
-    { id: "stickers", label: "Stickers", total: money(pickNumber(packaging, "stickers_sell_total")) },
-    { id: "heat", label: "Heat Shrink", total: money(pickNumber(packaging, "heat_shrink_sell_total")) },
-    { id: "cones", label: "Cones", total: money(pickNumber(packaging, "cone_sell_total")) },
+    {
+      id: "stickers",
+      label: "Stickers",
+      detail: packagingUnitDetail(money(pickNumber(packaging, "stickers_sell_total")), line),
+      total: money(pickNumber(packaging, "stickers_sell_total")),
+    },
+    {
+      id: "heat",
+      label: "Heat Shrink",
+      detail: packagingUnitDetail(money(pickNumber(packaging, "heat_shrink_sell_total")), line),
+      total: money(pickNumber(packaging, "heat_shrink_sell_total")),
+    },
+    {
+      id: "cones",
+      label: "Cones",
+      detail: packagingUnitDetail(money(pickNumber(packaging, "cone_sell_total")), line),
+      total: money(pickNumber(packaging, "cone_sell_total")),
+    },
   ]);
 
   const productionRows = positiveRows([

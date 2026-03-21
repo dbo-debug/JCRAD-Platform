@@ -24,7 +24,10 @@ export default function BreakdownColumn({ title, line, unitLabel, group }: Break
               index % 2 === 1 ? "bg-[#f8fbfd]" : "bg-transparent",
             ].join(" ")}
           >
-            <span>{row.label}</span>
+            <div className="min-w-0">
+              <div>{row.label}</div>
+              {row.detail ? <div className="text-[10px] text-[#6b8494]">{row.detail}</div> : null}
+            </div>
             <span className="text-right [font-variant-numeric:tabular-nums]">
               <Money value={row.total} className="font-medium text-[#19384a]" />
               <span className="ml-1 text-[10px] text-[#6b8494]">

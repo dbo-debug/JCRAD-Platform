@@ -16,7 +16,10 @@ export default function BreakdownGroup({ title, line, unitLabel, group }: Breakd
       <div className="space-y-2">
         {group.rows.map((row) => (
           <div key={row.id} className="flex items-start justify-between gap-3 text-sm text-[#324a59]">
-            <span>{row.label}</span>
+            <div className="min-w-0">
+              <div>{row.label}</div>
+              {row.detail ? <div className="text-xs text-[#6c8494]">{row.detail}</div> : null}
+            </div>
             <span className="text-right">
               <Money value={row.total} className="font-semibold text-[#1f3746]" />
               <span className="ml-1 text-xs text-[#6c8494]">

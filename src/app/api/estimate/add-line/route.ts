@@ -1516,6 +1516,7 @@ export async function POST(req: Request) {
           packagingPrimarySellPerUnit = money(packagingUnitCostInternal * markupMultiplier);
         }
         packaging_primary_cost_total = packagingUnitCostInternal;
+        packaging_primary_label = String((sku as any).name || "").trim() || packaging_primary_label;
         const isVapeHardwarePackaging =
           productCategory === "vape" && (packagingType === "vape_510_cart" || packagingType === "vape_all_in_one");
         if (isVapeHardwarePackaging) {
@@ -1567,6 +1568,7 @@ export async function POST(req: Request) {
           if (!Number.isFinite(packagingSecondarySellPerUnit) || packagingSecondarySellPerUnit < 0) {
             packagingSecondarySellPerUnit = money(packaging_secondary_cost_total * markupMultiplier);
           }
+          packaging_secondary_label = String((secondarySku as any).name || "").trim() || packaging_secondary_label;
           if (isVapeHardwarePackaging) {
             packaging_secondary_label = String((secondarySku as any).name || "3.5g mylar bag");
           }

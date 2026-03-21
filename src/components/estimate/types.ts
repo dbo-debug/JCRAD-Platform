@@ -41,6 +41,7 @@ export type EstimatePayload = {
 export type BreakdownRow = {
   id: string;
   label: string;
+  detail?: string;
   total: number;
 };
 

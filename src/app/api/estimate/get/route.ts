@@ -37,6 +37,7 @@ export async function GET(req: Request) {
   if (linesErr) return respond({ error: linesErr.message }, { status: 500 });
   const lineRows = (lines ?? []) as Array<Record<string, any>>;
   const infusionProductIds = new Set<string>();
+  const packagingSkuIds = new Set<string>();
   for (const line of lineRows) {
     const infusionInputs =
       line?.infusion_inputs && typeof line.infusion_inputs === "object"
@@ -54,6 +55,10 @@ export async function GET(req: Request) {
     if (internalId) infusionProductIds.add(internalId);
     if (liquidId) infusionProductIds.add(liquidId);
     if (dryId) infusionProductIds.add(dryId);
+    const primaryPackagingSkuId = String(line?.packaging_sku_id || "").trim();
+    const secondaryPackagingSkuId = String(line?.secondary_packaging_sku_id || "").trim();
+    if (primaryPackagingSkuId) packagingSkuIds.add(primaryPackagingSkuId);
+    if (secondaryPackagingSkuId) packagingSkuIds.add(secondaryPackagingSkuId);
   }
 
   const infusionNameById = new Map<string, string>();
@@ -66,6 +71,19 @@ export async function GET(req: Request) {
       const rid = String((row as any)?.id || "").trim();
       if (!rid) continue;
       infusionNameById.set(rid, String((row as any)?.name || "").trim());
+    }
+  }
+
+  const packagingLabelById = new Map<string, string>();
+  if (packagingSkuIds.size > 0) {
+    const { data: packagingSkus } = await supabase
+      .from("packaging_skus")
+      .select("id, name")
+      .in("id", Array.from(packagingSkuIds));
+    for (const row of packagingSkus || []) {
+      const rid = String((row as any)?.id || "").trim();
+      if (!rid) continue;
+      packagingLabelById.set(rid, String((row as any)?.name || "").trim());
     }
   }
 
@@ -84,13 +102,27 @@ export async function GET(req: Request) {
       infusionInputs?.material_breakdown && typeof infusionInputs.material_breakdown === "object"
         ? (infusionInputs.material_breakdown as Record<string, unknown>)
         : null;
+    const costBreakdown =
+      infusionInputs?.cost_breakdown && typeof infusionInputs.cost_breakdown === "object"
+        ? ({ ...(infusionInputs.cost_breakdown as Record<string, unknown>) } as Record<string, unknown>)
+        : null;
+    const packagingBreakdown =
+      costBreakdown?.packaging && typeof costBreakdown.packaging === "object"
+        ? ({ ...(costBreakdown.packaging as Record<string, unknown>) } as Record<string, unknown>)
+        : null;
 
     const internalId = String(internal?.product_id || "").trim();
     const liquidId = String(external?.liquid_product_id || "").trim();
     const dryId = String(external?.dry_product_id || "").trim();
+    const primaryPackagingSkuId = String(line?.packaging_sku_id || "").trim();
+    const secondaryPackagingSkuId = String(line?.secondary_packaging_sku_id || "").trim();
     const internalName = String(internal?.product_name || "").trim() || infusionNameById.get(internalId) || null;
     const liquidName = String(external?.liquid_product_name || "").trim() || infusionNameById.get(liquidId) || null;
     const dryName = String(external?.dry_product_name || "").trim() || infusionNameById.get(dryId) || null;
+    const primaryPackagingLabel =
+      String(packagingBreakdown?.primary_label || "").trim() || packagingLabelById.get(primaryPackagingSkuId) || null;
+    const secondaryPackagingLabel =
+      String(packagingBreakdown?.secondary_label || "").trim() || packagingLabelById.get(secondaryPackagingSkuId) || null;
 
     const flowerCostTotal = Number(
       line?.material_flower_cost_total
@@ -119,6 +151,18 @@ export async function GET(req: Request) {
       infusion_inputs: infusionInputs
         ? {
           ...infusionInputs,
+          cost_breakdown: costBreakdown
+            ? {
+              ...costBreakdown,
+              packaging: packagingBreakdown
+                ? {
+                  ...packagingBreakdown,
+                  primary_label: primaryPackagingLabel,
+                  secondary_label: secondaryPackagingLabel,
+                }
+                : null,
+            }
+            : null,
           internal: internal ? { ...internal, product_name: internalName } : null,
           external: external
             ? { ...external, liquid_product_name: liquidName, dry_product_name: dryName }
