@@ -315,21 +315,23 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
           </div>
         </Panel>
 
-        <Panel title="Customer Documents">
-          <div className="space-y-2.5">
-            {detail.documents.map((doc) => (
-              <div key={doc.id} className="rounded-xl border border-[#dbe9ef] bg-[#f9fcfd] px-3 py-2.5">
-                <p className="font-semibold text-[#173543]">
-                  {String(doc.title || doc.file_name || doc.name || `Document ${doc.id.slice(0, 8)}`)}
-                </p>
-                <p className="mt-1 text-sm text-[#4a6575]">
-                  {String(doc.document_type || doc.kind || "Document")} • {formatDate(String(doc.updatedAt || doc.createdAt || ""))}
-                </p>
-              </div>
-            ))}
-            {detail.documents.length === 0 ? <EmptyState label="No customer documents linked yet." /> : null}
-          </div>
-        </Panel>
+        <div id="customer-documents" className="scroll-mt-24">
+          <Panel title="Customer Documents">
+            <div className="space-y-2.5">
+              {detail.documents.map((doc) => (
+                <div key={doc.id} className="rounded-xl border border-[#dbe9ef] bg-[#f9fcfd] px-3 py-2.5">
+                  <p className="font-semibold text-[#173543]">
+                    {String(doc.title || doc.file_name || doc.name || `Document ${doc.id.slice(0, 8)}`)}
+                  </p>
+                  <p className="mt-1 text-sm text-[#4a6575]">
+                    {String(doc.document_type || doc.kind || "Document")} • {formatDate(String(doc.updatedAt || doc.createdAt || ""))}
+                  </p>
+                </div>
+              ))}
+              {detail.documents.length === 0 ? <EmptyState label="No customer documents linked yet." /> : null}
+            </div>
+          </Panel>
+        </div>
 
         <Panel title="Internal Notes">
           <div className="space-y-2.5">

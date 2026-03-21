@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
+import { loadCustomerApprovalQueue } from "@/lib/customerApprovals";
 import { loadCustomerWorkspaceIndex } from "@/lib/customerWorkspace";
 import { getRouteEligibilityReason, isRouteEligibleCustomer } from "@/lib/routeEligibility";
 import { loadSavedRoutes } from "@/lib/routeWorkspace";
@@ -140,13 +141,6 @@ function getProfileRole(row: ProfileRow): string {
   return role || "customer";
 }
 
-function getProfileDisplayName(row: ProfileRow): string {
-  const company = String(row.company_name || "").trim();
-  const fullName = String(row.full_name || "").trim();
-  const email = String(row.email || "").trim();
-  return company || fullName || email || "Unnamed customer";
-}
-
 function getPendingOrderCount(rows: OrderRow[]): number {
   return rows.reduce((count, row) => {
     const status = normalizeStatus(row.status) || "pending";
@@ -182,7 +176,7 @@ export default async function AdminDashboardPage() {
   const supabase = createAdminClient();
   const referenceNow = Date.parse(new Date().toISOString());
 
-  const [estimateRes, orderRes, submissionRes, profileRes, eventRes, routeStopQueueRes, taskRes, customerIndex, savedRoutes] = await Promise.all([
+  const [estimateRes, orderRes, submissionRes, profileRes, eventRes, routeStopQueueRes, taskRes, customerIndex, savedRoutes, approvalQueue] = await Promise.all([
     supabase
       .from("estimates")
       .select("id, status, total, customer_name, customer_email, packaging_review_pending, created_at, updated_at")
@@ -212,6 +206,7 @@ export default async function AdminDashboardPage() {
       .limit(2000),
     loadCustomerWorkspaceIndex(),
     loadSavedRoutes(),
+    loadCustomerApprovalQueue(),
   ]);
 
   const estimates = (estimateRes.data || []) as EstimateRow[];
@@ -251,11 +246,6 @@ export default async function AdminDashboardPage() {
   const followUpCustomers = customerProfiles.filter((row) =>
     FOLLOW_UP_VERIFICATION_STATUSES.has(getProfileVerificationStatus(row))
   );
-  const pendingCustomers = customerProfiles.filter((row) => {
-    const status = getProfileVerificationStatus(row);
-    return !APPROVED_VERIFICATION_STATUSES.has(status);
-  });
-
   const packagingPending = submissions.filter((row) => {
     const status = normalizeStatus(row.status);
     return !status || status === "pending";
@@ -294,9 +284,9 @@ export default async function AdminDashboardPage() {
       tone: "warn",
     },
     {
-      label: "Customers pending onboarding/compliance",
-      count: pendingCustomers.length,
-      href: "/admin/customers",
+      label: "Pending customer approvals",
+      count: approvalQueue.length,
+      href: "/workspace/customers/approvals",
       tone: "warn",
     },
     {
@@ -372,9 +362,9 @@ export default async function AdminDashboardPage() {
           helper="Open order progression"
         />
         <MetricCard
-          label="Pending Customers / Onboarding"
-          value={pendingCustomers.length}
-          href="/admin/customers"
+          label="Pending Customer Approvals"
+          value={approvalQueue.length}
+          href="/workspace/customers/approvals"
           helper={`${approvedCustomers.length} approved`}
         />
         <MetricCard
@@ -558,22 +548,28 @@ export default async function AdminDashboardPage() {
           <Panel
             title="Customer Approval Visibility"
             description="Onboarding/compliance status using current profile verification model."
-            href="/admin/customers"
-            hrefLabel="Open customers"
+            href="/workspace/customers/approvals"
+            hrefLabel="Open approvals"
           >
             <div className="grid grid-cols-3 gap-2">
-              <StatusPill label="Pending" value={pendingCustomers.length} tone="warn" />
+              <StatusPill label="Pending" value={approvalQueue.length} tone="warn" />
               <StatusPill label="Approved" value={approvedCustomers.length} tone="ok" />
               <StatusPill label="Follow-up" value={followUpCustomers.length} tone="bad" />
             </div>
             <div className="mt-3 space-y-2">
-              {pendingCustomers.slice(0, 4).map((row, idx) => (
-                <div key={`${String(row.id || idx)}`} className="rounded-lg border border-[#dbe9ef] bg-white px-3 py-2 text-sm">
-                  <p className="font-semibold text-[#173543]">{getProfileDisplayName(row)}</p>
-                  <p className="text-xs text-[#5b7382]">Status: {getProfileVerificationStatus(row)}</p>
-                </div>
+              {approvalQueue.slice(0, 4).map((item) => (
+                <Link
+                  key={item.customerId}
+                  href={item.reviewHref}
+                  className="block rounded-lg border border-[#dbe9ef] bg-white px-3 py-2 text-sm transition hover:border-[#14b8a6] hover:bg-[#f6fbfd]"
+                >
+                  <p className="font-semibold text-[#173543]">{item.companyName}</p>
+                  <p className="text-xs text-[#5b7382]">
+                    {item.contactName || item.contactEmail || "No contact mapped"} • {item.approvalStatus}
+                  </p>
+                </Link>
               ))}
-              {pendingCustomers.length === 0 ? (
+              {approvalQueue.length === 0 ? (
                 <p className="text-sm text-[#5b7382]">No pending customer approvals.</p>
               ) : null}
             </div>
