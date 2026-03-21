@@ -317,7 +317,7 @@ async function loadStaffUsers() {
         userId: String(user.id || ""),
         role: String(profile.role || ""),
         email: asText(user.email),
-        fullName: asText((user.user_metadata as Record<string, unknown> | undefined)?.full_name || (user.user_metadata as Record<string, unknown> | undefined)?.name),
+        fullName: asText(profile.company_name) || asText(user.email),
         companyName: asText(profile.company_name),
       });
     }
