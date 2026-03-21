@@ -189,25 +189,6 @@ function isUnknownColumnError(error: any, columnName: string): boolean {
   return false;
 }
 
-function hasWorkflowContext(row: any, value: string): boolean {
-  const target = String(value || "").toLowerCase();
-  const contexts = Array.isArray(row?.workflow_contexts) ? row.workflow_contexts : [];
-  return contexts.map((v: unknown) => String(v || "").toLowerCase()).includes(target);
-}
-
-function isMylar35SecondarySku(row: any): boolean {
-  const secondaryType = String(row?.packaging_type || "").toLowerCase();
-  const secondarySize = Number(row?.size_grams || 0);
-  const secondaryActive = row?.active === true;
-  const secondaryRole = String(row?.packaging_role || "").toLowerCase();
-  return (
-    secondaryActive &&
-    secondaryType === "flower_in_bag" &&
-    Math.abs(secondarySize - 3.5) < 1e-9 &&
-    (!secondaryRole || secondaryRole === "secondary")
-  );
-}
-
 type OfferPricingRow = {
   id: string;
   product_id: string;
@@ -1558,10 +1539,7 @@ export async function POST(req: Request) {
             requiredSecondarySlot != null
               && skuSupportsPackagingEstimatorSlot(secondarySku as Record<string, unknown>, requiredSecondarySlot);
 
-          if (
-            !isMylar35SecondarySku(secondarySku) ||
-            !secondaryContextOk
-          ) {
+          if (!secondaryContextOk) {
             return respond(
               {
                 error: productCategory === "vape"
