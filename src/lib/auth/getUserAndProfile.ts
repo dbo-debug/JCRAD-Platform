@@ -53,14 +53,14 @@ async function loadCustomerApprovalStatus(userId: string, email: string | null):
 
   const { data, error } = await admin
     .from("customers")
-    .select("id, approval_status, archived_at, record_kind")
+    .select("id, approval_status, record_kind")
     .in("id", customerIds);
 
   if (error) throw new Error(error.message);
 
   const customers = ((data || []) as Array<Record<string, unknown>>).filter((row) => {
     const recordKind = String(row.record_kind || "customer").trim().toLowerCase();
-    return (!recordKind || recordKind === "customer") && !row.archived_at;
+    return !recordKind || recordKind === "customer";
   });
   if (customers.length === 0) return "pending";
 

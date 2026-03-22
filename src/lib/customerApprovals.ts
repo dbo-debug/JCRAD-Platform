@@ -1,5 +1,5 @@
 import { loadCustomerWorkspaceIndex, type CustomerSummary } from "@/lib/customerWorkspace";
-import { isApprovedCustomerApprovalStatus, isFollowUpCustomerApprovalStatus } from "@/lib/customerApproval";
+import { isApprovedCustomerApprovalStatus, isFollowUpCustomerApprovalStatus, normalizeCustomerApprovalStatus } from "@/lib/customerApproval";
 
 export type CustomerApprovalQueueItem = {
   customerId: string;
@@ -17,6 +17,15 @@ export type CustomerApprovalQueueItem = {
   documentCount: number;
   reviewHref: string;
   accountHref: string;
+};
+
+export type CustomerApprovalQueueStats = {
+  totalCustomers: number;
+  rawPending: number;
+  rawApproved: number;
+  rawFollowUp: number;
+  candidateCount: number;
+  queueCount: number;
 };
 
 function firstText(...values: Array<unknown>): string | null {
@@ -60,20 +69,33 @@ function buildApprovalQueueItem(customer: CustomerSummary): CustomerApprovalQueu
 }
 
 export function isCustomerApprovalCandidate(customer: CustomerSummary): boolean {
-  if (customer.archivedAt) return false;
-  if (customer.counts.documents > 0) return true;
-  if (customer.counts.orders > 0) return true;
-  if (customer.memberUsers.length > 0) return true;
-  if (isApprovedCustomerApprovalStatus(customer.approvalStatus)) return true;
-  if (isFollowUpCustomerApprovalStatus(customer.approvalStatus)) return true;
-  return false;
+  // Keep the queue source-of-truth aligned to explicit customer approval state.
+  // Non-approved active customers remain review candidates unless business rules later narrow this intentionally.
+  return !customer.archivedAt;
+}
+
+export function summarizeCustomerApprovalQueue(rows: Array<{ approvalStatus: string }>) {
+  return rows.reduce(
+    (counts, row) => {
+      const status = normalizeCustomerApprovalStatus(row.approvalStatus);
+      if (isFollowUpCustomerApprovalStatus(status)) {
+        counts.followUp += 1;
+      } else {
+        counts.pending += 1;
+      }
+      return counts;
+    },
+    { pending: 0, followUp: 0 },
+  );
 }
 
 export async function loadCustomerApprovalQueue(): Promise<CustomerApprovalQueueItem[]> {
   const { customers } = await loadCustomerWorkspaceIndex();
-
-  return customers
-    .filter(isCustomerApprovalCandidate)
+  const rawPending = customers.filter((customer) => normalizeCustomerApprovalStatus(customer.approvalStatus) === "pending").length;
+  const rawApproved = customers.filter((customer) => isApprovedCustomerApprovalStatus(customer.approvalStatus)).length;
+  const rawFollowUp = customers.filter((customer) => isFollowUpCustomerApprovalStatus(customer.approvalStatus)).length;
+  const approvalCandidates = customers.filter(isCustomerApprovalCandidate);
+  const queue = approvalCandidates
     .filter((customer) => !isApprovedCustomerApprovalStatus(customer.approvalStatus))
     .map(buildApprovalQueueItem)
     .sort((left, right) => {
@@ -81,4 +103,15 @@ export async function loadCustomerApprovalQueue(): Promise<CustomerApprovalQueue
       const rightTime = Date.parse(String(right.submittedAt || ""));
       return (Number.isFinite(rightTime) ? rightTime : 0) - (Number.isFinite(leftTime) ? leftTime : 0);
     });
+
+  console.log("[customerApprovals] queue_metrics", {
+    total_customers_loaded: customers.length,
+    raw_pending_by_approval_status: rawPending,
+    raw_approved_by_approval_status: rawApproved,
+    raw_follow_up_by_approval_status: rawFollowUp,
+    approval_candidates_after_filter: approvalCandidates.length,
+    queue_items_returned: queue.length,
+  } satisfies Record<string, number>);
+
+  return queue;
 }

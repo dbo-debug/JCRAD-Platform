@@ -107,7 +107,7 @@ async function loadCustomerContext(admin: AdminClient, customerIds: string[]) {
   const [customersRes, contactsRes, membershipsRes] = await Promise.all([
     admin
       .from("customers")
-      .select("id, company_name, primary_contact_name, primary_contact_email, primary_contact_phone, main_phone, record_kind, archived_at")
+      .select("id, company_name, primary_contact_name, primary_contact_email, primary_contact_phone, main_phone, record_kind")
       .in("id", customerIds),
     admin
       .from("customer_contacts")
@@ -134,7 +134,7 @@ async function loadCustomerContext(admin: AdminClient, customerIds: string[]) {
   return {
     customers: ((customersRes.data || []) as GenericRow[]).filter((row) => {
       const recordKind = String(row.record_kind || "customer").trim().toLowerCase();
-      return (!recordKind || recordKind === "customer") && !row.archived_at;
+      return !recordKind || recordKind === "customer";
     }),
     contacts: (contactsRes.data || []) as GenericRow[],
     memberships,
@@ -162,7 +162,6 @@ export async function loadEstimateCustomerOptions(admin: AdminClient): Promise<E
   const { data: customerRows, error } = await admin
     .from("customers")
     .select("id")
-    .is("archived_at", null)
     .or("record_kind.is.null,record_kind.eq.customer")
     .order("updated_at", { ascending: false })
     .limit(500);

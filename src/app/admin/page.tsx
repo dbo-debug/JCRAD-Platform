@@ -1,8 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
-import { isCustomerApprovalCandidate, loadCustomerApprovalQueue } from "@/lib/customerApprovals";
-import { isApprovedCustomerApprovalStatus, isFollowUpCustomerApprovalStatus, normalizeCustomerApprovalStatus } from "@/lib/customerApproval";
+import { loadCustomerApprovalQueue, summarizeCustomerApprovalQueue } from "@/lib/customerApprovals";
 import { loadCustomerWorkspaceIndex } from "@/lib/customerWorkspace";
 import { getRouteEligibilityReason, isRouteEligibleCustomer } from "@/lib/routeEligibility";
 import { loadSavedRoutes } from "@/lib/routeWorkspace";
@@ -158,23 +157,6 @@ function metadataSummary(metadata: Record<string, unknown> | null): string {
   return parts.join(" • ");
 }
 
-function countApprovalStatuses(rows: Array<{ approvalStatus: string }>) {
-  return rows.reduce(
-    (counts, row) => {
-      const status = normalizeCustomerApprovalStatus(row.approvalStatus);
-      if (isApprovedCustomerApprovalStatus(status)) {
-        counts.approved += 1;
-      } else if (isFollowUpCustomerApprovalStatus(status)) {
-        counts.followUp += 1;
-      } else {
-        counts.pending += 1;
-      }
-      return counts;
-    },
-    { pending: 0, approved: 0, followUp: 0 },
-  );
-}
-
 export default async function AdminDashboardPage() {
   const supabase = createAdminClient();
   const referenceNow = Date.parse(new Date().toISOString());
@@ -236,8 +218,8 @@ export default async function AdminDashboardPage() {
   const recentEstimates = estimates.slice(0, 6);
 
   const pendingOrdersCount = getPendingOrderCount(orders);
-  const approvalCandidates = customers.filter(isCustomerApprovalCandidate);
-  const approvalStatusCounts = countApprovalStatuses(approvalCandidates);
+  const approvalStatusCounts = summarizeCustomerApprovalQueue(approvalQueue);
+  const approvalDocsLinkedCount = approvalQueue.filter((item) => item.readyState === "docs_linked").length;
   const packagingPending = submissions.filter((row) => {
     const status = normalizeStatus(row.status);
     return !status || status === "pending";
@@ -266,7 +248,7 @@ export default async function AdminDashboardPage() {
     {
       label: "Accounts blocked by geocode",
       count: blockedByGeocode.length,
-      href: "/workspace/customers",
+      href: "/workspace/routes?coordStatus=needs_coords&territoryFocus=cleanup",
       tone: "warn",
     },
     {
@@ -319,7 +301,7 @@ export default async function AdminDashboardPage() {
         <MetricCard
           label="Blocked By Geocode"
           value={blockedByGeocode.length}
-          href="/workspace/customers"
+          href="/workspace/routes?coordStatus=needs_coords&territoryFocus=cleanup"
           helper="Address, coord, or geocode issue"
         />
         <MetricCard
@@ -356,7 +338,7 @@ export default async function AdminDashboardPage() {
           label="Pending Customer Approvals"
           value={approvalQueue.length}
           href="/workspace/customers/approvals"
-          helper={`${approvalStatusCounts.approved} approved`}
+          helper={`${approvalDocsLinkedCount} with docs`}
         />
         <MetricCard
           label="Packaging Review Queue"
@@ -544,7 +526,7 @@ export default async function AdminDashboardPage() {
           >
             <div className="grid grid-cols-3 gap-2">
               <StatusPill label="Pending" value={approvalStatusCounts.pending} tone="warn" />
-              <StatusPill label="Approved" value={approvalStatusCounts.approved} tone="ok" />
+              <StatusPill label="With Docs" value={approvalDocsLinkedCount} tone="ok" />
               <StatusPill label="Follow-up" value={approvalStatusCounts.followUp} tone="bad" />
             </div>
             <div className="mt-3 space-y-2">

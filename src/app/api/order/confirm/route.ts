@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from "next/server";
+import { isApprovedCustomerApprovalStatus, normalizeCustomerApprovalStatus } from "@/lib/customerApproval";
 import { requireAdmin } from "@/lib/requireAdmin";
 import { logPlatformEvent } from "@/lib/events/logPlatformEvent";
 import { appendOrderRowToSheet } from "@/lib/googleSheets";
@@ -21,6 +22,83 @@ type OfferProductInventory = {
 function toLb(value: number, unit: string | null | undefined): number {
   if (String(unit || "lb").toLowerCase() === "g") return value / 453.592;
   return value;
+}
+
+function isActiveCustomerRow(row: Record<string, unknown>) {
+  const recordKind = String(row.record_kind || "customer").trim().toLowerCase();
+  return !recordKind || recordKind === "customer";
+}
+
+async function loadApprovalCandidatesByEmail(
+  supabase: ReturnType<typeof createAdminClient>,
+  customerEmail: string,
+) {
+  const normalizedEmail = String(customerEmail || "").trim().toLowerCase();
+  if (!normalizedEmail) return [] as Array<Record<string, unknown>>;
+
+  const [customerRes, contactRes] = await Promise.all([
+    supabase.from("customers").select("id").ilike("primary_contact_email", normalizedEmail),
+    supabase.from("customer_contacts").select("customer_id").ilike("email", normalizedEmail),
+  ]);
+
+  if (customerRes.error) throw new Error(customerRes.error.message);
+  if (contactRes.error) throw new Error(contactRes.error.message);
+
+  const customerIds = Array.from(
+    new Set([
+      ...(customerRes.data || []).map((row: Record<string, unknown>) => String(row.id || "").trim()),
+      ...(contactRes.data || []).map((row: Record<string, unknown>) => String(row.customer_id || "").trim()),
+    ].filter(Boolean)),
+  );
+
+  if (customerIds.length === 0) return [] as Array<Record<string, unknown>>;
+
+  const { data, error } = await supabase
+    .from("customers")
+    .select("id, approval_status, record_kind")
+    .in("id", customerIds);
+
+  if (error) throw new Error(error.message);
+
+  return ((data || []) as Array<Record<string, unknown>>).filter(isActiveCustomerRow);
+}
+
+async function getOrderSubmissionApprovalState(
+  supabase: ReturnType<typeof createAdminClient>,
+  estimate: {
+    customer_account_id?: string | null;
+    customer_email?: string | null;
+  },
+) {
+  const attachedCustomerId = String(estimate.customer_account_id || "").trim();
+  const customerEmail = String(estimate.customer_email || "").trim().toLowerCase();
+
+  let customers: Array<Record<string, unknown>> = [];
+
+  if (attachedCustomerId) {
+    const { data, error } = await supabase
+      .from("customers")
+      .select("id, approval_status, record_kind")
+      .eq("id", attachedCustomerId)
+      .maybeSingle();
+
+    if (error) throw new Error(error.message);
+
+    customers = data ? [data as Record<string, unknown>].filter(isActiveCustomerRow) : [];
+  } else {
+    customers = await loadApprovalCandidatesByEmail(supabase, customerEmail);
+  }
+
+  const approvedCustomer = customers.find((row) => isApprovedCustomerApprovalStatus(row.approval_status));
+  const matchedCustomer = approvedCustomer || customers[0] || null;
+  const approvalStatus = normalizeCustomerApprovalStatus(matchedCustomer?.approval_status);
+
+  return {
+    approved: Boolean(approvedCustomer),
+    matchedCustomerId: String(matchedCustomer?.id || "").trim() || null,
+    approvalStatus,
+    hasAttachedCustomer: Boolean(attachedCustomerId),
+  };
 }
 
 async function validateAndConsumeInventory(supabase: ReturnType<typeof createAdminClient>, lines: any[]) {
@@ -126,6 +204,17 @@ export async function POST(req: Request) {
   if (linesErr) return NextResponse.json({ error: linesErr.message }, { status: 500 });
   if (!lines || lines.length === 0) {
     return NextResponse.json({ error: "Estimate has no lines" }, { status: 400 });
+  }
+
+  const approvalState = await getOrderSubmissionApprovalState(supabase, estimate as {
+    customer_account_id?: string | null;
+    customer_email?: string | null;
+  });
+  if (!approvalState.approved) {
+    const onboardingMessage = approvalState.matchedCustomerId
+      ? `Customer onboarding approval is required before submitting an order. Current approval status: ${approvalState.approvalStatus}.`
+      : "Customer onboarding approval is required before submitting an order. Attach an approved customer account or use a contact email linked to an approved account.";
+    return NextResponse.json({ error: onboardingMessage }, { status: 400 });
   }
 
   const packagingState = await getEstimatePackagingReviewState(supabase, estimate_id);
