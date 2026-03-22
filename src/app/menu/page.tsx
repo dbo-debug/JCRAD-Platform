@@ -1,6 +1,8 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { INFUSION_ELIGIBILITY, LIQUID_INFUSION_MEDIA } from "@/lib/infusion-config";
+import { defaultPrerollBaseUnitsPerLb, unitSizeSettingToken } from "@/lib/estimate/expectedUnits";
+import { CATEGORY_UNIT_SIZES, PRE_ROLL_UNIT_SIZES } from "@/lib/pricing";
 import Header from "@/components/layout/Header";
 import MenuClient from "./menu-client";
 
@@ -39,12 +41,19 @@ type YieldSettings = {
   concentrateYieldPct: number;
   prerollYieldPct: number;
   vapeFillYieldPct: number;
+  flowerYieldPctBySize: Record<string, number>;
+  prerollYieldPctBySize: Record<string, number>;
+  prerollBaseUnitsPerLbBySize: Record<string, number>;
 };
 
 type InfusionSettings = {
   internalGPerLb: number;
+  internalLossPct: number;
+  internalThcaLossPct: number;
   externalDistillatePer1g: number;
+  externalDistillateLossPct: number;
   externalKiefPer1g: number;
+  externalKiefLossPct: number;
 };
 
 type InfusionProductOption = {
@@ -66,6 +75,13 @@ function parseYieldPct(valueJson: unknown, fallback: number): number {
   return raw;
 }
 
+function parseLossPct(valueJson: unknown, fallbackLossPct: number): number {
+  const obj = (valueJson && typeof valueJson === "object" ? valueJson : {}) as Record<string, unknown>;
+  const raw = Number(obj.pct);
+  if (!Number.isFinite(raw) || raw < 0 || raw > 1) return fallbackLossPct;
+  return raw;
+}
+
 function parseNumberSetting(valueJson: unknown, fallback: number): number {
   const obj = (valueJson && typeof valueJson === "object" ? valueJson : {}) as Record<string, unknown>;
   const candidates = [obj.value, obj.usd, obj.g_per_lb, obj.g_per_unit_1g, obj.grams, obj.number];
@@ -74,6 +90,26 @@ function parseNumberSetting(valueJson: unknown, fallback: number): number {
     if (Number.isFinite(n) && n >= 0) return n;
   }
   return fallback;
+}
+
+function yieldPctFromSettings(args: {
+  byKey: Map<string, unknown>;
+  unitSize: string;
+  genericYieldKey: string;
+  sizeYieldPrefix: string;
+  sizeLossPrefix: string;
+  fallbackYieldPct: number;
+}): number {
+  const token = unitSizeSettingToken(args.unitSize);
+  const sizeLossKey = `${args.sizeLossPrefix}_${token}`;
+  if (args.byKey.has(sizeLossKey)) {
+    return Math.max(0, 1 - parseLossPct(args.byKey.get(sizeLossKey), 1 - args.fallbackYieldPct));
+  }
+  const sizeYieldKey = `${args.sizeYieldPrefix}_${token}`;
+  if (args.byKey.has(sizeYieldKey)) {
+    return parseYieldPct(args.byKey.get(sizeYieldKey), args.fallbackYieldPct);
+  }
+  return parseYieldPct(args.byKey.get(args.genericYieldKey), args.fallbackYieldPct);
 }
 
 function isHttpUrl(value: string): boolean {
@@ -225,9 +261,33 @@ export default async function MenuPage() {
       "concentrate_yield_pct",
       "preroll_yield_pct",
       "vape_fill_yield_pct",
+      "infusion_internal_loss_pct",
+      "internal_infusion_loss_pct",
+      "infusion_internal_thca_loss_pct",
+      "internal_thca_loss_pct",
       "internal_infusion_g_per_lb",
+      "infusion_external_dist_loss_pct",
+      "infusion_external_dry_loss_pct",
       "external_infusion_distillate_g_per_unit_1g",
       "external_infusion_kief_g_per_unit_1g",
+      ...PRE_ROLL_UNIT_SIZES.flatMap((size) => {
+        const token = unitSizeSettingToken(size);
+        return [
+          `preroll_base_units_per_lb_${token}`,
+          `preroll_units_per_lb_${token}`,
+          `preroll_yield_pct_${token}`,
+          `preroll_finished_goods_loss_pct_${token}`,
+          `preroll_loss_pct_${token}`,
+        ];
+      }),
+      ...CATEGORY_UNIT_SIZES.flower.flatMap((size) => {
+        const token = unitSizeSettingToken(size);
+        return [
+          `flower_yield_pct_${token}`,
+          `flower_finished_goods_loss_pct_${token}`,
+          `flower_loss_pct_${token}`,
+        ];
+      }),
     ]);
   const yieldsByKey = new Map<string, unknown>();
   for (const row of (yieldRows || []) as Array<{ key: string | null; value_json: unknown }>) {
@@ -238,11 +298,63 @@ export default async function MenuPage() {
     concentrateYieldPct: parseYieldPct(yieldsByKey.get("concentrate_yield_pct"), 0.95),
     prerollYieldPct: parseYieldPct(yieldsByKey.get("preroll_yield_pct"), 0.92),
     vapeFillYieldPct: parseYieldPct(yieldsByKey.get("vape_fill_yield_pct"), 0.97),
+    flowerYieldPctBySize: Object.fromEntries(
+      CATEGORY_UNIT_SIZES.flower.map((size) => [
+        size,
+        yieldPctFromSettings({
+          byKey: yieldsByKey,
+          unitSize: size,
+          genericYieldKey: "flower_yield_pct",
+          sizeYieldPrefix: "flower_yield_pct",
+          sizeLossPrefix: "flower_finished_goods_loss_pct",
+          fallbackYieldPct: 0.92,
+        }),
+      ]),
+    ),
+    prerollYieldPctBySize: Object.fromEntries(
+      PRE_ROLL_UNIT_SIZES.map((size) => [
+        size,
+        yieldPctFromSettings({
+          byKey: yieldsByKey,
+          unitSize: size,
+          genericYieldKey: "preroll_yield_pct",
+          sizeYieldPrefix: "preroll_yield_pct",
+          sizeLossPrefix: "preroll_finished_goods_loss_pct",
+          fallbackYieldPct: 0.92,
+        }),
+      ]),
+    ),
+    prerollBaseUnitsPerLbBySize: Object.fromEntries(
+      PRE_ROLL_UNIT_SIZES.map((size) => {
+        const token = unitSizeSettingToken(size);
+        return [
+          size,
+          parseNumberSetting(
+            yieldsByKey.get(`preroll_base_units_per_lb_${token}`)
+            ?? yieldsByKey.get(`preroll_units_per_lb_${token}`),
+            defaultPrerollBaseUnitsPerLb(size),
+          ),
+        ];
+      }),
+    ),
   };
   const initialInfusionSettings: InfusionSettings = {
     internalGPerLb: parseNumberSetting(yieldsByKey.get("internal_infusion_g_per_lb"), 80),
+    internalLossPct: parseLossPct(
+      yieldsByKey.get("infusion_internal_loss_pct") ?? yieldsByKey.get("internal_infusion_loss_pct"),
+      0,
+    ),
+    internalThcaLossPct: parseLossPct(
+      yieldsByKey.get("infusion_internal_thca_loss_pct") ?? yieldsByKey.get("internal_thca_loss_pct"),
+      parseLossPct(
+        yieldsByKey.get("infusion_internal_loss_pct") ?? yieldsByKey.get("internal_infusion_loss_pct"),
+        0,
+      ),
+    ),
     externalDistillatePer1g: parseNumberSetting(yieldsByKey.get("external_infusion_distillate_g_per_unit_1g"), 0.1),
+    externalDistillateLossPct: parseLossPct(yieldsByKey.get("infusion_external_dist_loss_pct"), 0),
     externalKiefPer1g: parseNumberSetting(yieldsByKey.get("external_infusion_kief_g_per_unit_1g"), 0.15),
+    externalKiefLossPct: parseLossPct(yieldsByKey.get("infusion_external_dry_loss_pct"), 0),
   };
   const internalEligibleNames = Object.entries(INFUSION_ELIGIBILITY)
     .filter(([, flags]) => flags.internal)

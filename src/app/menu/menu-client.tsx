@@ -8,6 +8,7 @@ import FilterChipBar from "@/components/menu/FilterChipBar";
 import MenuLayout from "@/components/menu/MenuLayout";
 import ProductGrid from "@/components/menu/ProductGrid";
 import { LIQUID_INFUSION_MEDIA } from "@/lib/infusion-config";
+import { calculateInfusedPreRollExpectedUnits } from "@/lib/estimate/expectedUnits";
 import { type PackagingCategory } from "@/lib/packaging/category";
 import {
   primaryPackagingSlotForEstimate,
@@ -56,7 +57,6 @@ const CONCENTRATE_TYPE_OPTIONS = [
 ];
 const VAPE_MEDIUM_OPTIONS = [...LIQUID_INFUSION_MEDIA];
 const PRE_ROLL_MATERIAL_OPTIONS = ["Flower", "Smalls", "Shake"];
-const INFUSION_GRAMS_PER_LB = 454;
 
 type PackagingSku = {
   id: string;
@@ -100,12 +100,19 @@ type YieldSettings = {
   concentrateYieldPct: number;
   prerollYieldPct: number;
   vapeFillYieldPct: number;
+  flowerYieldPctBySize: Record<string, number>;
+  prerollYieldPctBySize: Record<string, number>;
+  prerollBaseUnitsPerLbBySize: Record<string, number>;
 };
 
 type InfusionSettings = {
   internalGPerLb: number;
+  internalLossPct: number;
+  internalThcaLossPct: number;
   externalDistillatePer1g: number;
+  externalDistillateLossPct: number;
   externalKiefPer1g: number;
+  externalKiefLossPct: number;
 };
 
 const PRE_ROLL_MODES = [
@@ -323,6 +330,7 @@ function deriveExpectedRange(args: {
   preRollPackQty: number;
   hasInternalInfusion: boolean;
   hasExternalInfusion: boolean;
+  internalInfusionProductName?: string | null;
   infusionSettings: InfusionSettings;
   yields: YieldSettings;
 }): {
@@ -346,60 +354,53 @@ function deriveExpectedRange(args: {
     preRollPackQty,
     hasInternalInfusion,
     hasExternalInfusion,
+    internalInfusionProductName,
     infusionSettings,
     yields,
   } = args;
   const gramsPerUnit = gramsFromUnitSize(unitSize) * (mode === "pre_roll" ? Math.max(1, preRollPackQty) : 1);
-  const internalSummary = hasInternalInfusion ? "Internal infusion selected" : undefined;
-  const externalSummary = hasExternalInfusion ? "External infusion selected" : undefined;
   if (category === "flower") {
     if (mode === "pre_roll" && (hasInternalInfusion || hasExternalInfusion)) {
-      const startFlowerG = Math.max(0, startingWeightLbs) * INFUSION_GRAMS_PER_LB;
-      const gPerLb = Math.max(0, Number(infusionSettings.internalGPerLb || 80));
-      const internalAddedG = hasInternalInfusion ? Math.max(0, startingWeightLbs) * gPerLb : 0;
-      const flowerBlendTotalG = startFlowerG + internalAddedG;
       const jointG = gramsFromUnitSize(unitSize);
       const packQty = Math.max(1, preRollPackQty);
-      const distPerJoint = hasExternalInfusion
-        ? Math.max(0, Number(infusionSettings.externalDistillatePer1g || 0.1)) * jointG
-        : 0;
-      const kiefPerJoint = hasExternalInfusion
-        ? Math.max(0, Number(infusionSettings.externalKiefPer1g || 0.15)) * jointG
-        : 0;
-      const flowerBlendPerJoint = jointG - distPerJoint - kiefPerJoint;
-      if (hasExternalInfusion && flowerBlendPerJoint <= 0) {
-        return {
-          low: 0,
-          high: 0,
-          label: "Expected units: 0-0",
-          internalSummary,
-          externalSummary,
-          internalInfusionGPerLb: gPerLb,
-          externalDistillatePerUnit: distPerJoint * packQty,
-          externalKiefPerUnit: kiefPerJoint * packQty,
-          externalFlowerPerUnit: 0,
-        };
-      }
-      const flowerBlendPerPack = Math.max(1e-9, flowerBlendPerJoint * packQty);
-      const unitsHigh = Math.max(0, Math.floor(flowerBlendTotalG / flowerBlendPerPack));
-      const pct = clampYieldPct(yields.prerollYieldPct);
-      const unitsLow = Math.max(0, Math.floor(unitsHigh * pct));
+      const gPerLb = Math.max(0, Number(infusionSettings.internalGPerLb || 80));
+      const expected = calculateInfusedPreRollExpectedUnits({
+        startingWeightLbs,
+        unitSize,
+        preRollPackQty: packQty,
+        baseUnitsPerLb: Number(yields.prerollBaseUnitsPerLbBySize[unitSize] || 0),
+        finishedGoodsYieldPct: clampYieldPct(yields.prerollYieldPctBySize[unitSize] ?? yields.prerollYieldPct),
+        hasInternalInfusion,
+        internalTargetGPerLb: gPerLb,
+        internalLossPct: clampYieldPct(infusionSettings.internalLossPct),
+        internalThcaLossPct: clampYieldPct(infusionSettings.internalThcaLossPct),
+        useThcaInternalLoss: /\bthca\b/i.test(String(internalInfusionProductName || "")),
+        hasExternalInfusion,
+        externalLiquidTargetGPerUnit1g: Math.max(0, Number(infusionSettings.externalDistillatePer1g || 0.1)),
+        externalLiquidLossPct: clampYieldPct(infusionSettings.externalDistillateLossPct),
+        externalDryTargetGPerUnit1g: Math.max(0, Number(infusionSettings.externalKiefPer1g || 0.15)),
+        externalDryLossPct: clampYieldPct(infusionSettings.externalKiefLossPct),
+      });
       return {
-        low: unitsLow,
-        high: unitsHigh,
-        label: `Expected units: ${unitsLow.toLocaleString()}-${unitsHigh.toLocaleString()}`,
-        internalSummary,
-        externalSummary,
+        low: expected.lowUnits,
+        high: expected.highUnits,
+        label: `Expected units: ${expected.lowUnits.toLocaleString()}-${expected.highUnits.toLocaleString()}`,
         internalInfusionGPerLb: gPerLb,
-        externalDistillatePerUnit: distPerJoint * packQty,
-        externalKiefPerUnit: kiefPerJoint * packQty,
-        externalFlowerPerUnit: flowerBlendPerPack,
+        externalDistillatePerUnit: Math.max(0, Number(infusionSettings.externalDistillatePer1g || 0.1)) * jointG * packQty,
+        externalKiefPerUnit: Math.max(0, Number(infusionSettings.externalKiefPer1g || 0.15)) * jointG * packQty,
+        externalFlowerPerUnit: expected.highUnits > 0
+          ? Math.floor((expected.baseFlowerGrams / expected.highUnits) * 100) / 100
+          : 0,
       };
     }
     const startG = Math.max(0, startingWeightLbs) * GRAMS_PER_LB;
     const high = Math.max(0, Math.floor(startG / Math.max(1e-9, gramsPerUnit)));
-    const pct = clampYieldPct(mode === "pre_roll" ? yields.prerollYieldPct : yields.flowerYieldPct);
-    const low = Math.max(0, Math.floor((startG * pct) / Math.max(1e-9, gramsPerUnit)));
+    const pct = clampYieldPct(
+      mode === "pre_roll"
+        ? (yields.prerollYieldPctBySize[unitSize] ?? yields.prerollYieldPct)
+        : (yields.flowerYieldPctBySize[unitSize] ?? yields.flowerYieldPct),
+    );
+    const low = Math.max(0, Math.floor(high * pct));
     return { low, high, label: `Expected units: ${low.toLocaleString()}-${high.toLocaleString()}` };
   }
   if (category === "concentrate") {
@@ -909,6 +910,8 @@ export default function MenuClient({
           preRollPackQty: cardState.preRollPackQty,
           hasInternalInfusion: Boolean(cardState.internalInfusionProductId),
           hasExternalInfusion: Boolean(cardState.externalLiquidProductId || cardState.externalDryProductId),
+          internalInfusionProductName:
+            internalInfusionProducts.find((product) => product.id === cardState.internalInfusionProductId)?.name || null,
           infusionSettings: initialInfusionSettings,
           yields: yieldSettings,
         });
@@ -1076,6 +1079,7 @@ export default function MenuClient({
         preRollPackQty,
         hasInternalInfusion: false,
         hasExternalInfusion: false,
+        internalInfusionProductName: null,
         infusionSettings: initialInfusionSettings,
         yields: yieldSettings,
       });
@@ -1113,6 +1117,8 @@ export default function MenuClient({
       preRollPackQty: cardState.preRollPackQty,
       hasInternalInfusion: Boolean(cardState.internalInfusionProductId),
       hasExternalInfusion: Boolean(cardState.externalLiquidProductId || cardState.externalDryProductId),
+      internalInfusionProductName:
+        internalInfusionProducts.find((product) => product.id === cardState.internalInfusionProductId)?.name || null,
       infusionSettings: initialInfusionSettings,
       yields: yieldSettings,
     });

@@ -25,12 +25,6 @@ export default function ProductCard({ item, onAdd }: ProductCardProps) {
       && item.copackConfig.mode === "pre_roll"
       && (Boolean(item.copackConfig.externalLiquidProductId) !== Boolean(item.copackConfig.externalDryProductId))
   );
-  const hasBothExternalSelections = Boolean(
-    item.copackConfig
-      && item.copackConfig.mode === "pre_roll"
-      && Boolean(item.copackConfig.externalLiquidProductId)
-      && Boolean(item.copackConfig.externalDryProductId)
-  );
   const showInternalInfusionSection = Boolean(
     item.copackConfig
       && (item.copackConfig.mode === "copack" || item.copackConfig.mode === "pre_roll")
@@ -262,11 +256,6 @@ export default function ProductCard({ item, onAdd }: ProductCardProps) {
                               <option key={option.id} value={option.id}>{option.name}</option>
                             ))}
                           </select>
-                          {item.copackConfig.internalInfusionProductId ? (
-                            <div className="rounded-md border border-[#dbe6ed] bg-[#f9fcfe] px-2 py-1.5 text-[11px] text-[#355060]">
-                              {item.copackConfig.internalSummary}
-                            </div>
-                          ) : null}
                         </div>
 
                         {showExternalInfusionSection ? (
@@ -294,11 +283,6 @@ export default function ProductCard({ item, onAdd }: ProductCardProps) {
                                 ))}
                               </select>
                             </div>
-                            {hasBothExternalSelections && item.copackConfig.externalSummary ? (
-                              <div className="rounded-md border border-[#dbe6ed] bg-[#f9fcfe] px-2 py-1.5 text-[11px] text-[#355060]">
-                                <div>{item.copackConfig.externalSummary}</div>
-                              </div>
-                            ) : null}
                             {hasOnlyOneExternalSelection ? (
                               <div className="text-[11px] text-[#be3a2d]">
                                 Select both liquid + dry to enable external infusion.

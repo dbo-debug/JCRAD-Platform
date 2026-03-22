@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { calculateInfusedPreRollExpectedUnits, defaultPrerollBaseUnitsPerLb, unitSizeSettingToken } from "@/lib/estimate/expectedUnits";
 import { logPlatformEvent } from "@/lib/events/logPlatformEvent";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
@@ -53,8 +54,8 @@ const DEFAULT_STICKERS_PER_UNIT = 3;
 const DEFAULT_EXTRA_TOUCH_POINT_COST_USD = 0.1;
 const DEFAULT_TARGET_MARKUP_PCT = 0.2;
 const DEFAULT_INTERNAL_INFUSION_G_PER_LB = 80;
-const DEFAULT_EXTERNAL_DISTILLATE_PER_UNIT_1G = 0.15;
-const DEFAULT_EXTERNAL_KIEF_PER_UNIT_1G = 0.1;
+const DEFAULT_EXTERNAL_DISTILLATE_PER_UNIT_1G = 0.1;
+const DEFAULT_EXTERNAL_KIEF_PER_UNIT_1G = 0.15;
 const DEFAULT_EXTERNAL_INFUSION_LOSS_PCT = 0;
 const DEFAULT_YIELD_PCTS = {
   flower: 0.92,
@@ -115,6 +116,13 @@ function parsePct(valueJson: unknown, fallback: number): number {
   return raw;
 }
 
+function parseLossPct(valueJson: unknown, fallback: number): number {
+  const obj = (valueJson && typeof valueJson === "object" ? valueJson : {}) as Record<string, unknown>;
+  const raw = Number(obj.pct);
+  if (!Number.isFinite(raw) || raw < 0 || raw > 1) return fallback;
+  return raw;
+}
+
 function parseNonNegativeNumber(value: unknown, fallback: number): number {
   const n = Number(value);
   if (!Number.isFinite(n) || n < 0) return fallback;
@@ -138,6 +146,26 @@ function parseSettingNumber(valueJson: unknown, fallback: number): number {
     if (Number.isFinite(n) && n >= 0) return n;
   }
   return fallback;
+}
+
+function yieldPctFromSettings(args: {
+  settings: Map<string, unknown>;
+  unitSize: string;
+  genericYieldKey: string;
+  sizeYieldPrefix: string;
+  sizeLossPrefix: string;
+  fallbackYieldPct: number;
+}): number {
+  const token = unitSizeSettingToken(args.unitSize);
+  const sizeLossKey = `${args.sizeLossPrefix}_${token}`;
+  if (args.settings.has(sizeLossKey)) {
+    return Math.max(0, 1 - parseLossPct(args.settings.get(sizeLossKey), 1 - args.fallbackYieldPct));
+  }
+  const sizeYieldKey = `${args.sizeYieldPrefix}_${token}`;
+  if (args.settings.has(sizeYieldKey)) {
+    return parsePct(args.settings.get(sizeYieldKey), args.fallbackYieldPct);
+  }
+  return parsePct(args.settings.get(args.genericYieldKey), args.fallbackYieldPct);
 }
 
 function isWholePositiveInteger(n: number): boolean {
@@ -814,9 +842,21 @@ export async function POST(req: Request) {
         "concentrate_yield_pct",
         "preroll_yield_pct",
         "vape_fill_yield_pct",
+        `flower_yield_pct_${unitSizeSettingToken(unit_size)}`,
+        `flower_finished_goods_loss_pct_${unitSizeSettingToken(unit_size)}`,
+        `flower_loss_pct_${unitSizeSettingToken(unit_size)}`,
+        `preroll_base_units_per_lb_${unitSizeSettingToken(unit_size)}`,
+        `preroll_units_per_lb_${unitSizeSettingToken(unit_size)}`,
+        `preroll_yield_pct_${unitSizeSettingToken(unit_size)}`,
+        `preroll_finished_goods_loss_pct_${unitSizeSettingToken(unit_size)}`,
+        `preroll_loss_pct_${unitSizeSettingToken(unit_size)}`,
         "infusion_internal_dry_g_per_lb",
         "internal_infusion_g_per_lb",
         "internal_thca_g_per_lb",
+        "infusion_internal_loss_pct",
+        "internal_infusion_loss_pct",
+        "infusion_internal_thca_loss_pct",
+        "internal_thca_loss_pct",
         "infusion_external_dist_g_per_unit_1g",
         "infusion_external_dry_g_per_unit_1g",
         "infusion_external_dist_g_per_1g_unit",
@@ -909,12 +949,34 @@ export async function POST(req: Request) {
       pricingByKey.get("infusion_external_dry_loss_pct"),
       DEFAULT_EXTERNAL_INFUSION_LOSS_PCT
     );
+    const internalLossPct = parseLossPct(
+      pricingByKey.get("infusion_internal_loss_pct") ?? pricingByKey.get("internal_infusion_loss_pct"),
+      0,
+    );
+    const internalThcaLossPct = parseLossPct(
+      pricingByKey.get("infusion_internal_thca_loss_pct") ?? pricingByKey.get("internal_thca_loss_pct"),
+      internalLossPct,
+    );
 
     const isPreRoll = isPreRollLine(mode, productCategory, pre_roll_mode);
     const yieldPct = isPreRoll
-      ? parsePct(pricingByKey.get("preroll_yield_pct"), DEFAULT_YIELD_PCTS.preroll)
+      ? yieldPctFromSettings({
+        settings: pricingByKey,
+        unitSize: unit_size,
+        genericYieldKey: "preroll_yield_pct",
+        sizeYieldPrefix: "preroll_yield_pct",
+        sizeLossPrefix: "preroll_finished_goods_loss_pct",
+        fallbackYieldPct: DEFAULT_YIELD_PCTS.preroll,
+      })
       : productCategory === "flower"
-        ? parsePct(pricingByKey.get("flower_yield_pct"), DEFAULT_YIELD_PCTS.flower)
+        ? yieldPctFromSettings({
+          settings: pricingByKey,
+          unitSize: unit_size,
+          genericYieldKey: "flower_yield_pct",
+          sizeYieldPrefix: "flower_yield_pct",
+          sizeLossPrefix: "flower_finished_goods_loss_pct",
+          fallbackYieldPct: DEFAULT_YIELD_PCTS.flower,
+        })
         : productCategory === "concentrate"
           ? parsePct(pricingByKey.get("concentrate_yield_pct"), DEFAULT_YIELD_PCTS.concentrate)
           : parsePct(pricingByKey.get("vape_fill_yield_pct"), DEFAULT_YIELD_PCTS.vape);
@@ -1190,28 +1252,47 @@ export async function POST(req: Request) {
 
         const startFlowerG = startingWeightLbForCalc * INFUSION_LB_TO_G;
         const gPerLb = internalInfusionDryGPerLb;
+        const selectedInternalName = String(internalInput?.product_name || "").trim();
+        const useThcaInternalLoss = /\bthca\b/i.test(selectedInternalName);
         const internalAddedG = hasInternalInfusion ? flowerStartingLbsForBilling * gPerLb : 0;
         internalAddedGComputed = internalAddedG;
+        const internalUsableG = hasInternalInfusion
+          ? Math.floor(internalAddedG * (1 - (useThcaInternalLoss ? internalThcaLossPct : internalLossPct)))
+          : 0;
         const flowerBlendTotalG = startFlowerG + internalAddedG;
 
         if (isPreRoll) {
           const packQty = Math.max(1, pre_roll_pack_qty);
           const jointG = targetUnitG;
-          const distPer1g = externalDistillatePerUnit1g;
-          const dryPer1g = externalDryPerUnit1g;
-          const distPerJoint = hasExternalInfusion ? distPer1g * jointG : 0;
-          const dryPerJoint = hasExternalInfusion ? dryPer1g * jointG : 0;
-          const flowerBlendPerJoint = jointG - distPerJoint - dryPerJoint;
-          if (hasExternalInfusion && (!Number.isFinite(flowerBlendPerJoint) || flowerBlendPerJoint <= 0)) {
-            return respond({ error: "Invalid external infusion ratios for selected unit size." }, { status: 400 });
-          }
-          const flowerBlendPerPack = flowerBlendPerJoint * packQty;
-          const packsHigh = Math.max(0, Math.floor(flowerBlendTotalG / Math.max(1e-9, flowerBlendPerPack)));
-          const packsLow = Math.max(0, Math.floor(packsHigh * yieldPct));
-          const distBaseG = packsHigh * distPer1g;
-          const dryBaseG = packsHigh * dryPer1g;
-          const distPullG = distBaseG * (1 + externalDistLossPct);
-          const dryPullG = dryBaseG * (1 + externalDryLossPct);
+          const expected = calculateInfusedPreRollExpectedUnits({
+            startingWeightLbs: startingWeightLbForCalc,
+            unitSize: unit_size,
+            preRollPackQty: packQty,
+            baseUnitsPerLb: parseSettingNumber(
+              pricingByKey.get(`preroll_base_units_per_lb_${unitSizeSettingToken(unit_size)}`)
+              ?? pricingByKey.get(`preroll_units_per_lb_${unitSizeSettingToken(unit_size)}`),
+              defaultPrerollBaseUnitsPerLb(unit_size),
+            ),
+            finishedGoodsYieldPct: yieldPct,
+            hasInternalInfusion,
+            internalTargetGPerLb: gPerLb,
+            internalLossPct,
+            internalThcaLossPct,
+            useThcaInternalLoss,
+            hasExternalInfusion,
+            externalLiquidTargetGPerUnit1g: externalDistillatePerUnit1g,
+            externalLiquidLossPct: externalDistLossPct,
+            externalDryTargetGPerUnit1g: externalDryPerUnit1g,
+            externalDryLossPct: externalDryLossPct,
+          });
+          const distPerJoint = hasExternalInfusion ? externalDistillatePerUnit1g * jointG : 0;
+          const dryPerJoint = hasExternalInfusion ? externalDryPerUnit1g * jointG : 0;
+          const packsHigh = expected.highUnits;
+          const packsLow = expected.lowUnits;
+          const distBaseG = expected.externalLiquidTargetGrams;
+          const dryBaseG = expected.externalDryTargetGrams;
+          const distPullG = expected.externalLiquidUsableGrams;
+          const dryPullG = expected.externalDryUsableGrams;
           distTotalGComputed = distPullG;
           dryTotalGComputed = dryPullG;
           computedHighUnits = packsHigh;
@@ -1224,32 +1305,35 @@ export async function POST(req: Request) {
                 ...internalInput,
                 g_per_lb: gPerLb,
                 added_g: money(internalAddedG),
+                usable_g: money(internalUsableG),
               }
               : null,
             external: hasExternalInfusion
               ? {
                 ...externalInput,
-                dist_per_1g: distPer1g,
-                dry_per_1g: dryPer1g,
+                dist_per_1g: externalDistillatePerUnit1g,
+                dry_per_1g: externalDryPerUnit1g,
                 joint_g: jointG,
                 joints_per_pack: packQty,
                 dist_per_joint: distPerJoint,
                 dry_per_joint: dryPerJoint,
-                flower_blend_per_joint: flowerBlendPerJoint,
-                flower_blend_per_pack: flowerBlendPerPack,
+                flower_blend_per_joint: packsHigh > 0 ? money(startFlowerG / (packsHigh * packQty)) : 0,
+                flower_blend_per_pack: packsHigh > 0 ? money(startFlowerG / packsHigh) : 0,
                 dist_base_g: money(distBaseG),
                 dry_base_g: money(dryBaseG),
                 dist_loss_pct: externalDistLossPct,
                 dry_loss_pct: externalDryLossPct,
-                dist_total_g: money(distPullG),
-                dry_total_g: money(dryPullG),
+                dist_total_g: money(distBaseG),
+                dry_total_g: money(dryBaseG),
+                dist_usable_g: money(distPullG),
+                dry_usable_g: money(dryPullG),
               }
               : null,
-            flower_blend_total_g: money(flowerBlendTotalG),
+            flower_blend_total_g: money(expected.totalUsableGrams),
           };
-          infusion_grams_total = money(internalAddedG + distPullG + dryPullG);
-          mix_grams_total = money(packsHigh * jointG * packQty);
-          flower_grams_per_unit = money(flowerBlendPerPack);
+          infusion_grams_total = money(internalAddedG + distBaseG + dryBaseG);
+          mix_grams_total = money(expected.totalUsableGrams);
+          flower_grams_per_unit = packsHigh > 0 ? money(startFlowerG / packsHigh) : 0;
         } else {
           const mixG = flowerBlendTotalG;
           computedHighUnits = Math.max(0, Math.floor(mixG / Math.max(1e-9, grams_per_unit)));
@@ -1261,6 +1345,7 @@ export async function POST(req: Request) {
               ...internalInput,
               g_per_lb: gPerLb,
               added_g: money(internalAddedG),
+              usable_g: money(internalUsableG),
             },
             external: null,
             flower_blend_total_g: money(flowerBlendTotalG),
@@ -1310,10 +1395,11 @@ export async function POST(req: Request) {
       }
 
       if (isPreRoll && hasExternalInfusionSelection) {
-        distBaseGComputed = money(units * externalDistillatePerUnit1g);
-        dryBaseGComputed = money(units * externalDryPerUnit1g);
-        distTotalGComputed = money(distBaseGComputed * (1 + externalDistLossPct));
-        dryTotalGComputed = money(dryBaseGComputed * (1 + externalDryLossPct));
+        const packQty = Math.max(1, pre_roll_pack_qty);
+        distBaseGComputed = money(units * externalDistillatePerUnit1g * targetUnitG * packQty);
+        dryBaseGComputed = money(units * externalDryPerUnit1g * targetUnitG * packQty);
+        distTotalGComputed = Math.floor(distBaseGComputed * (1 - externalDistLossPct));
+        dryTotalGComputed = Math.floor(dryBaseGComputed * (1 - externalDryLossPct));
         persistedInfusionInputs = {
           ...(persistedInfusionInputs || infusion_inputs || {}),
           external: hasExternalInfusionSelection
@@ -1325,8 +1411,10 @@ export async function POST(req: Request) {
               dry_base_g: dryBaseGComputed,
               dist_loss_pct: externalDistLossPct,
               dry_loss_pct: externalDryLossPct,
-              dist_total_g: distTotalGComputed,
-              dry_total_g: dryTotalGComputed,
+              dist_total_g: distBaseGComputed,
+              dry_total_g: dryBaseGComputed,
+              dist_usable_g: distTotalGComputed,
+              dry_usable_g: dryTotalGComputed,
             }
             : null,
         };
