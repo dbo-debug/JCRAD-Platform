@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -13,12 +14,17 @@ const NAV_LINKS = [
   { href: "/contact", label: "Contact" },
 ] as const;
 
+type MarketingHeaderProps = {
+  isAuthenticated: boolean;
+  dashboardHref?: string;
+};
+
 function isActive(pathname: string, href: string): boolean {
   if (href === "/") return pathname === "/";
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export default function MarketingHeader() {
+export default function MarketingHeader({ isAuthenticated, dashboardHref = "/dashboard" }: MarketingHeaderProps) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -27,7 +33,7 @@ export default function MarketingHeader() {
       <div className="mx-auto flex h-20 w-full max-w-7xl items-center justify-between px-4 md:px-6">
         <Link href="/" className="inline-flex items-center gap-3" onClick={() => setMobileOpen(false)}>
           <div className="rounded-xl border border-[#d7e6ed] bg-[#f7fbfd] p-1 shadow-sm">
-            <img src="/brand/BLACK.png" alt="JC RAD Inc." className="h-14 w-auto md:h-16" />
+            <Image src="/brand/BLACK.png" alt="JC RAD Inc." width={64} height={64} className="h-14 w-auto md:h-16" />
           </div>
           <div className="hidden sm:block">
             <div className="text-sm font-semibold tracking-[0.04em] text-[#173543]">JC RAD Inc.</div>
@@ -57,18 +63,39 @@ export default function MarketingHeader() {
           >
             View Menu
           </Link>
-          <Link
-            href="/signup"
-            className="hidden rounded-full border border-[#cfe0e7] bg-white px-4 py-2 text-sm font-semibold text-[#2b4756] transition hover:border-[#14b8a6] hover:text-[#0f766e] md:inline-flex"
-          >
-            Create Account
-          </Link>
-          <Link
-            href="/login"
-            className="hidden rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95 md:inline-flex"
-          >
-            Login
-          </Link>
+          {!isAuthenticated ? (
+            <>
+              <Link
+                href="/signup"
+                className="hidden rounded-full border border-[#cfe0e7] bg-white px-4 py-2 text-sm font-semibold text-[#2b4756] transition hover:border-[#14b8a6] hover:text-[#0f766e] md:inline-flex"
+              >
+                Create Account
+              </Link>
+              <Link
+                href="/login"
+                className="hidden rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95 md:inline-flex"
+              >
+                Login
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link
+                href={dashboardHref}
+                className="hidden rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95 md:inline-flex"
+              >
+                Dashboard
+              </Link>
+              <form action="/auth/logout" method="post" className="hidden md:block">
+                <button
+                  type="submit"
+                  className="rounded-full border border-[#cfe0e7] bg-white px-4 py-2 text-sm font-semibold text-[#2b4756] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
+                >
+                  Logout
+                </button>
+              </form>
+            </>
+          )}
           <button
             type="button"
             aria-label="Open navigation"
@@ -107,20 +134,42 @@ export default function MarketingHeader() {
             >
               View Menu
             </Link>
-            <Link
-              href="/signup"
-              onClick={() => setMobileOpen(false)}
-              className="mt-2 inline-flex justify-center rounded-full border border-[#cfe0e7] bg-white px-4 py-2 text-sm font-semibold text-[#2b4756]"
-            >
-              Create Account
-            </Link>
-            <Link
-              href="/login"
-              onClick={() => setMobileOpen(false)}
-              className="mt-2 inline-flex justify-center rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white"
-            >
-              Login
-            </Link>
+            {!isAuthenticated ? (
+              <>
+                <Link
+                  href="/signup"
+                  onClick={() => setMobileOpen(false)}
+                  className="mt-2 inline-flex justify-center rounded-full border border-[#cfe0e7] bg-white px-4 py-2 text-sm font-semibold text-[#2b4756]"
+                >
+                  Create Account
+                </Link>
+                <Link
+                  href="/login"
+                  onClick={() => setMobileOpen(false)}
+                  className="mt-2 inline-flex justify-center rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white"
+                >
+                  Login
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link
+                  href={dashboardHref}
+                  onClick={() => setMobileOpen(false)}
+                  className="mt-2 inline-flex justify-center rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white"
+                >
+                  Dashboard
+                </Link>
+                <form action="/auth/logout" method="post" className="mt-2">
+                  <button
+                    type="submit"
+                    className="w-full rounded-full border border-[#cfe0e7] bg-white px-4 py-2 text-sm font-semibold text-[#2b4756]"
+                  >
+                    Logout
+                  </button>
+                </form>
+              </>
+            )}
           </nav>
         </div>
       ) : null}

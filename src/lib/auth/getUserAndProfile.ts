@@ -1,6 +1,9 @@
+import { normalizeCustomerApprovalStatus } from "@/lib/customerApproval";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 type GenericProfile = Record<string, unknown> | null;
+type GenericRow = Record<string, unknown>;
 
 export type UserProfileResult = {
   user: Awaited<ReturnType<Awaited<ReturnType<typeof createClient>>["auth"]["getUser"]>>["data"]["user"] | null;
@@ -9,18 +12,60 @@ export type UserProfileResult = {
 };
 
 function deriveVerificationStatus(profile: GenericProfile): string {
-  if (!profile) return "unverified";
+  return normalizeCustomerApprovalStatus(profile?.approval_status);
+}
 
-  const fromStatus = profile.verification_status;
-  if (typeof fromStatus === "string" && fromStatus.trim()) {
-    return fromStatus.trim().toLowerCase();
+async function loadCustomerApprovalStatus(userId: string, email: string | null): Promise<string> {
+  const admin = createAdminClient();
+  const membershipRes = await admin
+    .from("customer_users")
+    .select("customer_id, is_primary")
+    .eq("user_id", userId);
+
+  if (membershipRes.error) {
+    throw new Error(membershipRes.error.message);
   }
 
-  if (profile.verified === true || profile.is_verified === true) {
-    return "verified";
+  const membershipIds = (membershipRes.data || [])
+    .map((row: GenericRow) => String(row.customer_id || "").trim())
+    .filter(Boolean);
+
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  let fallbackIds: string[] = [];
+
+  if (normalizedEmail) {
+    const [customerRes, contactRes] = await Promise.all([
+      admin.from("customers").select("id").ilike("primary_contact_email", normalizedEmail),
+      admin.from("customer_contacts").select("customer_id").ilike("email", normalizedEmail),
+    ]);
+
+    if (customerRes.error) throw new Error(customerRes.error.message);
+    if (contactRes.error) throw new Error(contactRes.error.message);
+
+    fallbackIds = [
+      ...(customerRes.data || []).map((row: GenericRow) => String(row.id || "").trim()),
+      ...(contactRes.data || []).map((row: GenericRow) => String(row.customer_id || "").trim()),
+    ].filter(Boolean);
   }
 
-  return "unverified";
+  const customerIds = Array.from(new Set([...membershipIds, ...fallbackIds]));
+  if (customerIds.length === 0) return "pending";
+
+  const { data, error } = await admin
+    .from("customers")
+    .select("id, approval_status, archived_at, record_kind")
+    .in("id", customerIds);
+
+  if (error) throw new Error(error.message);
+
+  const customers = ((data || []) as Array<Record<string, unknown>>).filter((row) => {
+    const recordKind = String(row.record_kind || "customer").trim().toLowerCase();
+    return (!recordKind || recordKind === "customer") && !row.archived_at;
+  });
+  if (customers.length === 0) return "pending";
+
+  const membershipCustomer = customers.find((row) => membershipIds.includes(String(row.id || "").trim()));
+  return normalizeCustomerApprovalStatus((membershipCustomer || customers[0])?.approval_status);
 }
 
 export async function getUserAndProfile(): Promise<UserProfileResult> {
@@ -38,9 +83,19 @@ export async function getUserAndProfile(): Promise<UserProfileResult> {
     .eq("id", user.id)
     .maybeSingle();
 
+  let approvalStatus = "pending";
+  try {
+    approvalStatus = await loadCustomerApprovalStatus(user.id, user.email || null);
+  } catch {
+    approvalStatus = "pending";
+  }
+
   return {
     user,
     profile: (profile as GenericProfile) ?? null,
-    verificationStatus: deriveVerificationStatus((profile as GenericProfile) ?? null),
+    verificationStatus: deriveVerificationStatus({
+      ...(profile as GenericProfile || {}),
+      approval_status: approvalStatus,
+    }),
   };
 }

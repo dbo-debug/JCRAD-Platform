@@ -1,21 +1,5 @@
 import { loadCustomerWorkspaceIndex, type CustomerSummary } from "@/lib/customerWorkspace";
-import { createAdminClient } from "@/lib/supabase/admin";
-
-type GenericRow = Record<string, unknown>;
-type AuthUser = {
-  id: string;
-  email: string | null;
-};
-
-type ApprovalCandidateProfile = {
-  id: string;
-  email: string | null;
-  companyName: string | null;
-  role: string;
-  verificationStatus: string;
-  createdAt: string | null;
-  updatedAt: string | null;
-};
+import { isApprovedCustomerApprovalStatus } from "@/lib/customerApproval";
 
 export type CustomerApprovalQueueItem = {
   customerId: string;
@@ -35,10 +19,6 @@ export type CustomerApprovalQueueItem = {
   accountHref: string;
 };
 
-function normalizeStatus(value: unknown): string {
-  return String(value || "").trim().toLowerCase();
-}
-
 function firstText(...values: Array<unknown>): string | null {
   for (const value of values) {
     const text = String(value || "").trim();
@@ -47,154 +27,7 @@ function firstText(...values: Array<unknown>): string | null {
   return null;
 }
 
-function deriveVerificationStatus(): string {
-  // Production profiles cannot safely be assumed to carry verification columns.
-  // Keep approval queue rendering alive by degrading to a generic pending state.
-  return "pending";
-}
-
-function profileDisplayName(profile: ApprovalCandidateProfile): string | null {
-  return firstText(profile.companyName, profile.email);
-}
-
-function isCustomerProfile(profile: ApprovalCandidateProfile): boolean {
-  return !profile.role || profile.role === "customer";
-}
-
-function statusPriority(status: string): number {
-  if (status === "rejected" || status === "failed") return 0;
-  if (status === "needs_review" || status === "follow_up") return 1;
-  if (status === "pending" || status === "submitted") return 2;
-  if (status === "unverified") return 3;
-  if (status === "approved" || status === "verified") return 9;
-  return 4;
-}
-
-function choosePrimaryPendingProfile(profiles: ApprovalCandidateProfile[]): ApprovalCandidateProfile | null {
-  return [...profiles].sort((left, right) => {
-    const priorityDelta = statusPriority(left.verificationStatus) - statusPriority(right.verificationStatus);
-    if (priorityDelta !== 0) return priorityDelta;
-
-    const leftUpdated = Date.parse(String(left.updatedAt || left.createdAt || ""));
-    const rightUpdated = Date.parse(String(right.updatedAt || right.createdAt || ""));
-    return (Number.isFinite(rightUpdated) ? rightUpdated : 0) - (Number.isFinite(leftUpdated) ? leftUpdated : 0);
-  })[0] || null;
-}
-
-async function listAuthUsers(supabase: ReturnType<typeof createAdminClient>): Promise<AuthUser[]> {
-  const users: AuthUser[] = [];
-  let page = 1;
-  const perPage = 1000;
-
-  while (true) {
-    const { data, error } = await supabase.auth.admin.listUsers({ page, perPage });
-    if (error) throw new Error(error.message);
-
-    const chunk = (data?.users || []).map((user: { id?: string; email?: string | null }) => ({
-      id: String(user.id || ""),
-      email: firstText(user.email),
-    }));
-    users.push(...chunk);
-    if (chunk.length < perPage) break;
-    page += 1;
-  }
-
-  return users;
-}
-
-export async function loadCustomerApprovalQueue(): Promise<CustomerApprovalQueueItem[]> {
-  const supabase = createAdminClient();
-  const [{ customers }, authUsers, profilesRes] = await Promise.all([
-    loadCustomerWorkspaceIndex(),
-    listAuthUsers(supabase),
-    supabase.from("profiles").select("id, role, company_name, created_at, updated_at").limit(5000),
-  ]);
-
-  if (profilesRes.error) throw new Error(profilesRes.error.message);
-
-  const authEmailById = new Map(authUsers.map((user) => [user.id, normalizeStatus(user.email)] as const));
-  const profiles = ((profilesRes.data || []) as GenericRow[])
-    .map((profile): ApprovalCandidateProfile => ({
-      id: String(profile.id || "").trim(),
-      email: firstText(authEmailById.get(String(profile.id || "").trim())),
-      companyName: firstText(profile.company_name),
-      role: normalizeStatus(profile.role),
-      verificationStatus: deriveVerificationStatus(),
-      createdAt: firstText(profile.created_at),
-      updatedAt: firstText(profile.updated_at),
-    }))
-    .filter((profile) => Boolean(profile.id))
-    .filter(isCustomerProfile);
-
-  const profilesById = new Map(profiles.map((profile) => [profile.id, profile] as const));
-  const profilesByEmail = new Map<string, ApprovalCandidateProfile[]>();
-  for (const profile of profiles) {
-    const email = normalizeStatus(profile.email);
-    if (!email) continue;
-    const existing = profilesByEmail.get(email) || [];
-    existing.push(profile);
-    profilesByEmail.set(email, existing);
-  }
-
-  const queue = customers
-    .filter((customer) => !customer.archivedAt)
-    .map((customer) => buildApprovalQueueItem(customer, profilesById, profilesByEmail))
-    .filter((item): item is CustomerApprovalQueueItem => item !== null)
-    .sort((left, right) => {
-      const leftTime = Date.parse(String(left.submittedAt || ""));
-      const rightTime = Date.parse(String(right.submittedAt || ""));
-      return (Number.isFinite(rightTime) ? rightTime : 0) - (Number.isFinite(leftTime) ? leftTime : 0);
-    });
-
-  return queue;
-}
-
-function buildApprovalQueueItem(
-  customer: CustomerSummary,
-  profilesById: Map<string, ApprovalCandidateProfile>,
-  profilesByEmail: Map<string, ApprovalCandidateProfile[]>,
-): CustomerApprovalQueueItem | null {
-  const candidateProfiles = new Map<string, ApprovalCandidateProfile>();
-
-  for (const member of customer.memberUsers) {
-    const profile = profilesById.get(member.userId);
-    if (profile) candidateProfiles.set(profile.id, profile);
-  }
-
-  const candidateEmails = [
-    customer.primaryContactEmail,
-    ...customer.primaryContacts.map((contact) => contact.email),
-    ...customer.memberUsers.map((member) => member.email),
-  ];
-
-  for (const email of candidateEmails) {
-    const matches = profilesByEmail.get(normalizeStatus(email)) || [];
-    for (const profile of matches) candidateProfiles.set(profile.id, profile);
-  }
-
-  const matchedProfiles = Array.from(candidateProfiles.values());
-  const primaryPendingProfile = choosePrimaryPendingProfile(matchedProfiles);
-  if (!primaryPendingProfile) return null;
-
-  const contactName =
-    firstText(
-      customer.primaryContacts[0]?.name,
-      profileDisplayName(primaryPendingProfile),
-      customer.memberUsers[0]?.fullName,
-    );
-  const contactEmail =
-    firstText(
-      customer.primaryContacts[0]?.email,
-      primaryPendingProfile.email,
-      customer.memberUsers[0]?.email,
-      customer.primaryContactEmail,
-    );
-  const submittedAt = firstText(
-    primaryPendingProfile.updatedAt,
-    primaryPendingProfile.createdAt,
-    customer.updatedAt,
-    customer.createdAt,
-  );
+function buildApprovalQueueItem(customer: CustomerSummary): CustomerApprovalQueueItem {
   const documentCount = customer.counts.documents;
   const readyState = documentCount > 0 ? "docs_linked" : "missing_docs";
   const readyLabel = documentCount > 0 ? `${documentCount} linked doc${documentCount === 1 ? "" : "s"}` : "No linked docs yet";
@@ -203,10 +36,17 @@ function buildApprovalQueueItem(
   return {
     customerId: customer.id,
     companyName: customer.name,
-    contactName,
-    contactEmail,
-    approvalStatus: primaryPendingProfile.verificationStatus,
-    submittedAt,
+    contactName: firstText(
+      customer.primaryContacts[0]?.name,
+      customer.memberUsers[0]?.fullName,
+    ),
+    contactEmail: firstText(
+      customer.primaryContacts[0]?.email,
+      customer.memberUsers[0]?.email,
+      customer.primaryContactEmail,
+    ),
+    approvalStatus: customer.approvalStatus,
+    submittedAt: firstText(customer.updatedAt, customer.createdAt),
     ownerName: customer.assignedSalesName,
     ownerEmail: customer.assignedSalesEmail,
     assignedRepName: customer.assignedRouteRepName,
@@ -217,4 +57,18 @@ function buildApprovalQueueItem(
     reviewHref: `${accountHref}#customer-documents`,
     accountHref,
   };
+}
+
+export async function loadCustomerApprovalQueue(): Promise<CustomerApprovalQueueItem[]> {
+  const { customers } = await loadCustomerWorkspaceIndex();
+
+  return customers
+    .filter((customer) => !customer.archivedAt)
+    .filter((customer) => !isApprovedCustomerApprovalStatus(customer.approvalStatus))
+    .map(buildApprovalQueueItem)
+    .sort((left, right) => {
+      const leftTime = Date.parse(String(left.submittedAt || ""));
+      const rightTime = Date.parse(String(right.submittedAt || ""));
+      return (Number.isFinite(rightTime) ? rightTime : 0) - (Number.isFinite(leftTime) ? leftTime : 0);
+    });
 }

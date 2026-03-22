@@ -1,6 +1,8 @@
 import Link from "next/link";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
+import CustomerApprovalActions from "@/components/workspace/CustomerApprovalActions";
 import { loadCustomerApprovalQueue, type CustomerApprovalQueueItem } from "@/lib/customerApprovals";
+import { isFollowUpCustomerApprovalStatus, normalizeCustomerApprovalStatus } from "@/lib/customerApproval";
 import { requireStaff } from "@/lib/requireStaff";
 
 function formatDate(value: string | null): string {
@@ -21,9 +23,8 @@ function formatStatusLabel(value: string): string {
 }
 
 function statusTone(value: string): "warn" | "bad" | "neutral" {
-  const status = String(value || "").trim().toLowerCase();
-  if (status === "rejected" || status === "failed") return "bad";
-  if (status === "needs_review" || status === "follow_up") return "bad";
+  const status = normalizeCustomerApprovalStatus(value);
+  if (status === "rejected" || status === "needs_review" || status === "follow_up") return "bad";
   return "warn";
 }
 
@@ -73,6 +74,7 @@ function ApprovalCard({ item }: { item: CustomerApprovalQueueItem }) {
         </div>
 
         <div className="flex flex-wrap gap-2">
+          <CustomerApprovalActions customerId={item.customerId} approvalStatus={item.approvalStatus} />
           <Link
             href={item.reviewHref}
             className="inline-flex rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95"
@@ -112,16 +114,13 @@ export default async function WorkspaceCustomerApprovalsPage() {
   await requireStaff();
   const queue = await loadCustomerApprovalQueue();
   const docsLinkedCount = queue.filter((item) => item.readyState === "docs_linked").length;
-  const followUpCount = queue.filter((item) => {
-    const status = item.approvalStatus.toLowerCase();
-    return status === "needs_review" || status === "follow_up" || status === "rejected" || status === "failed";
-  }).length;
+  const followUpCount = queue.filter((item) => isFollowUpCustomerApprovalStatus(item.approvalStatus)).length;
 
   return (
     <div className="mx-auto w-full max-w-[1520px] space-y-6">
       <AdminPageHeader
         title="Customer Approvals"
-        description="Dedicated onboarding approval queue using the current customer profile verification model and linked account documents."
+        description="Dedicated onboarding approval queue using customer approval status and linked account documents."
         action={
           <Link
             href="/admin"

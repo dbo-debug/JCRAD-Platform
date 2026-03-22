@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { geocodeCustomerRow, getCustomerNormalizedAddress } from "@/lib/customerGeocode";
+import { normalizeCustomerApprovalStatus } from "@/lib/customerApproval";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStaffContext } from "@/lib/getStaffContext";
 
@@ -47,6 +48,11 @@ function isAllowedVisitStatus(value: string | null): boolean {
   return new Set(["due", "scheduled", "visited", "overdue", "skipped", "needs_follow_up", "met_buyer", "no_answer", "unavailable", "sample_drop", "interested", "revisit_needed"]).has(value);
 }
 
+function isAllowedApprovalStatus(value: string | null): boolean {
+  if (!value) return true;
+  return normalizeCustomerApprovalStatus(value) === value;
+}
+
 export async function PATCH(req: Request, context: { params: Promise<{ id: string }> }) {
   const staff = await getStaffContext();
   if (!staff) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -59,6 +65,7 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
   const primaryContactEmail = asText(body.primary_contact_email);
   const status = asText(body.status);
   const stage = asText(body.stage);
+  const approvalStatus = asText(body.approval_status);
   const address1 = asText(body.address_1);
   const address2 = asText(body.address_2);
   const city = asText(body.city);
@@ -81,6 +88,9 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
   }
   if (!isAllowedStage(stage)) {
     return NextResponse.json({ error: "Invalid stage" }, { status: 400 });
+  }
+  if (!isAllowedApprovalStatus(approvalStatus)) {
+    return NextResponse.json({ error: "Invalid approval_status" }, { status: 400 });
   }
   if ("route_day" in body && body.route_day && !routeDay) {
     return NextResponse.json({ error: "Invalid route_day" }, { status: 400 });
@@ -137,12 +147,13 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
 
   if (staff.role === "admin") {
     if ("company_name" in body) payload.company_name = companyName;
+    if ("approval_status" in body) payload.approval_status = approvalStatus;
     if ("assigned_sales_user_id" in body) payload.assigned_sales_user_id = assignedSalesUserId;
     if ("assigned_route_rep_user_id" in body) payload.assigned_route_rep_user_id = assignedRouteRepUserId;
   } else {
     const isOwnRouteAssignment = applyRoute && "assigned_route_rep_user_id" in body && assignedRouteRepUserId === staff.userId;
-    if ("company_name" in body || "assigned_sales_user_id" in body || ("assigned_route_rep_user_id" in body && !isOwnRouteAssignment)) {
-      return NextResponse.json({ error: "Only admins can update company or assignment fields" }, { status: 403 });
+    if ("company_name" in body || "approval_status" in body || "assigned_sales_user_id" in body || ("assigned_route_rep_user_id" in body && !isOwnRouteAssignment)) {
+      return NextResponse.json({ error: "Only admins can update company, approval, or assignment fields" }, { status: 403 });
     }
     if (isOwnRouteAssignment) {
       payload.assigned_route_rep_user_id = assignedRouteRepUserId;

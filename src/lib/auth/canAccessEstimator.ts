@@ -1,3 +1,5 @@
+import { normalizeCustomerApprovalStatus } from "@/lib/customerApproval";
+
 type GenericProfile = Record<string, unknown> | null;
 
 export type EstimatorAccess = {
@@ -7,11 +9,7 @@ export type EstimatorAccess = {
 };
 
 function normalizeStatus(profile: GenericProfile): string {
-  const raw = profile?.verification_status;
-  if (typeof raw === "string" && raw.trim()) {
-    return raw.trim().toLowerCase();
-  }
-  return "unverified";
+  return normalizeCustomerApprovalStatus(profile?.approval_status);
 }
 
 export function getEstimatorAccess(profile: GenericProfile): EstimatorAccess {
@@ -20,12 +18,8 @@ export function getEstimatorAccess(profile: GenericProfile): EstimatorAccess {
   }
 
   const verificationStatus = normalizeStatus(profile);
-  if (verificationStatus === "verified" || verificationStatus === "approved") {
+  if (verificationStatus === "approved") {
     return { canAccess: true, profileStatus: verificationStatus, reason: "Profile verification status is allowed." };
-  }
-
-  if (profile.verified === true || profile.is_verified === true) {
-    return { canAccess: true, profileStatus: "verified", reason: "Legacy verified flag is true." };
   }
 
   return { canAccess: false, profileStatus: verificationStatus, reason: "Verification status is not eligible." };

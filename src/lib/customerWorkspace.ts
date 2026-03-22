@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { normalizeCustomerApprovalStatus } from "@/lib/customerApproval";
 
 type GenericRow = Record<string, unknown>;
 type AuthUser = { id: string; email: string | null };
@@ -8,6 +9,7 @@ const WORKSPACE_BATCH_SIZE = 500;
 export type CustomerSummary = {
   id: string;
   name: string;
+  approvalStatus: string;
   archivedAt: string | null;
   status: string;
   stage: string | null;
@@ -222,6 +224,10 @@ function getCustomerName(customer: GenericRow): string {
 
 function getCustomerStatus(customer: GenericRow): string {
   return firstText(customer.status, customer.account_status) || "active";
+}
+
+function getCustomerApprovalStatus(customer: GenericRow): string {
+  return normalizeCustomerApprovalStatus(customer.approval_status);
 }
 
 function getProfileMap(profiles: GenericRow[]) {
@@ -751,6 +757,7 @@ function buildCustomerSummary({
   return {
     id: customerId,
     name: getCustomerName(customer),
+    approvalStatus: getCustomerApprovalStatus(customer),
     archivedAt: firstText(customer.archived_at),
     status: getCustomerStatus(customer),
     stage: firstText(customer.stage),

@@ -12,8 +12,8 @@ export default async function PortalPage() {
     redirect("/login?returnTo=/portal");
   }
 
-  const isVerified = verificationStatus === "verified";
-  const badgeClass = isVerified
+  const isApproved = verificationStatus === "approved";
+  const badgeClass = isApproved
     ? "border-[#14b8a6]/35 bg-[#14b8a6]/10 text-[#0f766e]"
     : "border-amber-300/45 bg-amber-100 text-amber-700";
 
@@ -22,7 +22,7 @@ export default async function PortalPage() {
       <div className="space-y-6">
         <section className="space-y-2">
           <h1 className="text-3xl font-semibold text-[#13303f]">Customer Portal</h1>
-          <p className="text-[#4a6575]">Manage verification status before saving and submitting orders.</p>
+          <p className="text-[#4a6575]">Manage onboarding approval status before saving and submitting orders.</p>
         </section>
 
         <Card className="border border-[var(--surface-border)] bg-white p-6 text-[var(--text)] shadow-sm">
@@ -37,7 +37,7 @@ export default async function PortalPage() {
           </div>
         </Card>
 
-        {!isVerified ? (
+        {!isApproved ? (
           <Card className="border border-[var(--surface-border)] bg-white p-6 text-[var(--text)] shadow-sm">
             <p className="text-[#173543]">
               Upload license &amp; seller&apos;s permit to enable saving orders

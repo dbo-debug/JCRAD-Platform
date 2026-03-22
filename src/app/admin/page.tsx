@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import { loadCustomerApprovalQueue } from "@/lib/customerApprovals";
+import { isApprovedCustomerApprovalStatus, isFollowUpCustomerApprovalStatus, normalizeCustomerApprovalStatus } from "@/lib/customerApproval";
 import { loadCustomerWorkspaceIndex } from "@/lib/customerWorkspace";
 import { getRouteEligibilityReason, isRouteEligibleCustomer } from "@/lib/routeEligibility";
 import { loadSavedRoutes } from "@/lib/routeWorkspace";
@@ -160,10 +161,10 @@ function metadataSummary(metadata: Record<string, unknown> | null): string {
 function countApprovalStatuses(rows: Array<{ approvalStatus: string }>) {
   return rows.reduce(
     (counts, row) => {
-      const status = normalizeStatus(row.approvalStatus);
-      if (status === "approved" || status === "verified") {
+      const status = normalizeCustomerApprovalStatus(row.approvalStatus);
+      if (isApprovedCustomerApprovalStatus(status)) {
         counts.approved += 1;
-      } else if (status === "rejected" || status === "needs_review" || status === "follow_up" || status === "failed") {
+      } else if (isFollowUpCustomerApprovalStatus(status)) {
         counts.followUp += 1;
       } else {
         counts.pending += 1;
@@ -235,7 +236,7 @@ export default async function AdminDashboardPage() {
   const recentEstimates = estimates.slice(0, 6);
 
   const pendingOrdersCount = getPendingOrderCount(orders);
-  const approvalStatusCounts = countApprovalStatuses(approvalQueue);
+  const approvalStatusCounts = countApprovalStatuses(customers);
   const packagingPending = submissions.filter((row) => {
     const status = normalizeStatus(row.status);
     return !status || status === "pending";
