@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
-import { loadCustomerApprovalQueue } from "@/lib/customerApprovals";
+import { isCustomerApprovalCandidate, loadCustomerApprovalQueue } from "@/lib/customerApprovals";
 import { isApprovedCustomerApprovalStatus, isFollowUpCustomerApprovalStatus, normalizeCustomerApprovalStatus } from "@/lib/customerApproval";
 import { loadCustomerWorkspaceIndex } from "@/lib/customerWorkspace";
 import { getRouteEligibilityReason, isRouteEligibleCustomer } from "@/lib/routeEligibility";
@@ -236,7 +236,8 @@ export default async function AdminDashboardPage() {
   const recentEstimates = estimates.slice(0, 6);
 
   const pendingOrdersCount = getPendingOrderCount(orders);
-  const approvalStatusCounts = countApprovalStatuses(customers);
+  const approvalCandidates = customers.filter(isCustomerApprovalCandidate);
+  const approvalStatusCounts = countApprovalStatuses(approvalCandidates);
   const packagingPending = submissions.filter((row) => {
     const status = normalizeStatus(row.status);
     return !status || status === "pending";

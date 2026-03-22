@@ -491,6 +491,31 @@ function buildLinkedRecords(
     });
 }
 
+function buildLinkedCustomerDocuments(rows: GenericRow[], args: { accountId: string; userIds: Set<string> }): LinkedRecord[] {
+  return rows
+    .map((row): LinkedRecord | null => {
+      const accountId = String(row.customer_account_id || "").trim();
+      const userId = String(row.user_id || "").trim();
+      const matchesAccount = accountId && accountId === args.accountId;
+      const matchesUser = !matchesAccount && userId && args.userIds.has(userId);
+      if (!matchesAccount && !matchesUser) return null;
+
+      return {
+        ...row,
+        id: String(row.id || ""),
+        matchType: "account" as const,
+        createdAt: firstText(row.created_at) || null,
+        updatedAt: firstText(row.updated_at) || null,
+      };
+    })
+    .filter(isLinkedRecord)
+    .sort((a, b) => {
+      const aTime = Date.parse(String(a.updatedAt || a.createdAt || ""));
+      const bTime = Date.parse(String(b.updatedAt || b.createdAt || ""));
+      return (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0);
+    });
+}
+
 export async function loadCustomerWorkspaceIndex(args?: { includeArchived?: boolean }): Promise<CustomerWorkspaceIndexData> {
   const data = await loadWorkspaceData();
   const profileById = getProfileMap(data.profiles);
@@ -520,6 +545,7 @@ export async function loadCustomerWorkspaceDetail(customerId: string): Promise<C
     customerUsers: memberships,
     authUserById,
   });
+  const membershipUserIds = new Set(memberships.map((row) => String(row.user_id || "").trim()).filter(Boolean));
 
   const estimates = buildLinkedRecords(data.estimates, identifiers);
   const orders = data.orders
@@ -532,20 +558,10 @@ export async function loadCustomerWorkspaceDetail(customerId: string): Promise<C
       updatedAt: firstText(row.updated_at) || null,
     }));
   const packagingSubmissions = buildLinkedRecords(data.packagingSubmissions, identifiers);
-  const documents = data.customerDocuments
-    .filter((row) => String(row.customer_account_id || "").trim() === customerId)
-    .map((row) => ({
-      ...row,
-      id: String(row.id || ""),
-      matchType: "account" as const,
-      createdAt: firstText(row.created_at) || null,
-      updatedAt: firstText(row.updated_at) || null,
-    }))
-    .sort((a, b) => {
-      const aTime = Date.parse(String(a.updatedAt || a.createdAt || ""));
-      const bTime = Date.parse(String(b.updatedAt || b.createdAt || ""));
-      return (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0);
-    });
+  const documents = buildLinkedCustomerDocuments(data.customerDocuments, {
+    accountId: customerId,
+    userIds: membershipUserIds,
+  });
 
   const notes = sortByRecent(
     data.customerNotes
@@ -666,6 +682,7 @@ function buildCustomerSummary({
     customerUsers: memberships,
     authUserById,
   });
+  const membershipUserIds = new Set(memberships.map((row) => String(row.user_id || "").trim()).filter(Boolean));
 
   const linkedEstimates = buildLinkedRecords(data.estimates, identifiers);
   const linkedOrders = data.orders
@@ -678,15 +695,10 @@ function buildCustomerSummary({
       updatedAt: firstText(row.updated_at) || null,
     }));
   const linkedPackaging = buildLinkedRecords(data.packagingSubmissions, identifiers);
-  const linkedDocuments = data.customerDocuments
-    .filter((row) => String(row.customer_account_id || "").trim() === identifiers.accountId)
-    .map((row) => ({
-      ...row,
-      id: String(row.id || ""),
-      matchType: "account" as const,
-      createdAt: firstText(row.created_at) || null,
-      updatedAt: firstText(row.updated_at) || null,
-    }));
+  const linkedDocuments = buildLinkedCustomerDocuments(data.customerDocuments, {
+    accountId: identifiers.accountId,
+    userIds: membershipUserIds,
+  });
 
   const assignedSalesUserId = firstText(customer.assigned_sales_user_id, customer.owner_user_id);
   const assignedSalesProfile = assignedSalesUserId ? profileById.get(assignedSalesUserId) : null;

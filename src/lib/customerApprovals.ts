@@ -1,5 +1,5 @@
 import { loadCustomerWorkspaceIndex, type CustomerSummary } from "@/lib/customerWorkspace";
-import { isApprovedCustomerApprovalStatus } from "@/lib/customerApproval";
+import { isApprovedCustomerApprovalStatus, isFollowUpCustomerApprovalStatus } from "@/lib/customerApproval";
 
 export type CustomerApprovalQueueItem = {
   customerId: string;
@@ -54,16 +54,26 @@ function buildApprovalQueueItem(customer: CustomerSummary): CustomerApprovalQueu
     readyState,
     readyLabel,
     documentCount,
-    reviewHref: `${accountHref}#customer-documents`,
+    reviewHref: documentCount > 0 ? `${accountHref}#customer-documents` : accountHref,
     accountHref,
   };
+}
+
+export function isCustomerApprovalCandidate(customer: CustomerSummary): boolean {
+  if (customer.archivedAt) return false;
+  if (customer.counts.documents > 0) return true;
+  if (customer.counts.orders > 0) return true;
+  if (customer.memberUsers.length > 0) return true;
+  if (isApprovedCustomerApprovalStatus(customer.approvalStatus)) return true;
+  if (isFollowUpCustomerApprovalStatus(customer.approvalStatus)) return true;
+  return false;
 }
 
 export async function loadCustomerApprovalQueue(): Promise<CustomerApprovalQueueItem[]> {
   const { customers } = await loadCustomerWorkspaceIndex();
 
   return customers
-    .filter((customer) => !customer.archivedAt)
+    .filter(isCustomerApprovalCandidate)
     .filter((customer) => !isApprovedCustomerApprovalStatus(customer.approvalStatus))
     .map(buildApprovalQueueItem)
     .sort((left, right) => {
