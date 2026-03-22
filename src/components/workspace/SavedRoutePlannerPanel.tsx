@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { startTransition, useState } from "react";
 import type { CustomerSummary } from "@/lib/customerWorkspace";
+import type { SegmentBuilderSettings } from "@/lib/segmentBuilderSettings";
 import type { PendingRouteStop } from "@/lib/routeStopQueue";
 import type { RouteRepOption, SavedRouteSummary, TerritoryOption } from "@/lib/routeWorkspace";
 import RouteStopsMap from "@/components/workspace/RouteStopsMap";
@@ -18,6 +19,7 @@ type SavedRoutePlannerPanelProps = {
   routeRepOptions: RouteRepOption[];
   territoryOptions: TerritoryOption[];
   savedRoutes: SavedRouteSummary[];
+  plannerDefaults: SegmentBuilderSettings;
 };
 
 type DraftStop = {
@@ -170,14 +172,15 @@ export default function SavedRoutePlannerPanel({
   routeRepOptions,
   territoryOptions,
   savedRoutes,
+  plannerDefaults,
 }: SavedRoutePlannerPanelProps) {
   const router = useRouter();
   const [pendingStops, setPendingStops] = useState(initialPendingStops);
   const [territoryCode, setTerritoryCode] = useState("");
   const [assignedUserId, setAssignedUserId] = useState(currentUserId);
   const [routeDate, setRouteDate] = useState(new Date().toISOString().slice(0, 10));
-  const [startTime, setStartTime] = useState("09:00");
-  const [maxStops, setMaxStops] = useState("12");
+  const [startTime, setStartTime] = useState(plannerDefaults.route_planner_default_start_time || "09:00");
+  const [maxStops, setMaxStops] = useState(String(plannerDefaults.route_planner_default_max_stops || 12));
   const [notes, setNotes] = useState("");
   const [draftStops, setDraftStops] = useState<DraftStop[]>([]);
   const [draftSource, setDraftSource] = useState<"pending" | "territory" | null>(null);

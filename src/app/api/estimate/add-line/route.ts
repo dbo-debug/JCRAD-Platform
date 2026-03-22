@@ -838,6 +838,8 @@ export async function POST(req: Request) {
         "sticker_unit_cost",
         "stickers_per_unit",
         "target_markup_pct",
+        "farmers_pound_grams",
+        "flower_whole_pounds_only",
         "flower_yield_pct",
         "concentrate_yield_pct",
         "preroll_yield_pct",
@@ -915,6 +917,17 @@ export async function POST(req: Request) {
       ? Math.min(5, Math.max(0, targetMarkupRaw))
       : DEFAULT_TARGET_MARKUP_PCT;
     const markupMultiplier = 1 + targetMarkupPct;
+    const farmersPoundGrams = parseSettingNumber(
+      pricingByKey.get("farmers_pound_grams"),
+      INFUSION_LB_TO_G,
+    );
+    const flowerWholePoundsOnly = (() => {
+      const raw = pricingByKey.get("flower_whole_pounds_only");
+      const obj = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+      if (typeof obj.enabled === "boolean") return obj.enabled;
+      if (typeof obj.value === "boolean") return obj.value;
+      return true;
+    })();
     const internalInfusionDryGPerLb = parseSettingNumber(
       pricingByKey.get("infusion_internal_dry_g_per_lb")
       ?? pricingByKey.get("internal_infusion_g_per_lb")
@@ -1192,10 +1205,10 @@ export async function POST(req: Request) {
             : providedQuantityUnit === "g" && Number.isFinite(providedQuantity) && providedQuantity > 0
               ? providedQuantity / LB_TO_G
               : derivedStartingWeightLb;
-        if (!isWholePositiveInteger(startingWeightLb)) {
+        if (flowerWholePoundsOnly && !isWholePositiveInteger(startingWeightLb)) {
           return respond({ error: "Flower must be ordered in whole pounds." }, { status: 400 });
         }
-        flowerStartingLbsForBilling = Math.round(startingWeightLb);
+        flowerStartingLbsForBilling = flowerWholePoundsOnly ? Math.round(startingWeightLb) : startingWeightLb;
         startingWeightGForCalc = flowerStartingLbsForBilling * LB_TO_G;
         startingWeightLbForCalc = flowerStartingLbsForBilling;
         quantity = flowerStartingLbsForBilling;
@@ -1250,7 +1263,7 @@ export async function POST(req: Request) {
           return respond({ error: "External infusion is currently only supported for pre-roll lines." }, { status: 400 });
         }
 
-        const startFlowerG = startingWeightLbForCalc * INFUSION_LB_TO_G;
+        const startFlowerG = startingWeightLbForCalc * farmersPoundGrams;
         const gPerLb = internalInfusionDryGPerLb;
         const selectedInternalName = String(internalInput?.product_name || "").trim();
         const useThcaInternalLoss = /\bthca\b/i.test(selectedInternalName);
@@ -1266,6 +1279,7 @@ export async function POST(req: Request) {
           const jointG = targetUnitG;
           const expected = calculateInfusedPreRollExpectedUnits({
             startingWeightLbs: startingWeightLbForCalc,
+            farmersPoundGrams,
             unitSize: unit_size,
             preRollPackQty: packQty,
             baseUnitsPerLb: parseSettingNumber(

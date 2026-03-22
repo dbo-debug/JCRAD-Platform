@@ -3,6 +3,7 @@ import RoutePlannerIndex from "@/components/workspace/RoutePlannerIndex";
 import SavedRoutePlannerPanel from "@/components/workspace/SavedRoutePlannerPanel";
 import { requireStaff } from "@/lib/requireStaff";
 import { loadRouteWorkspaceData } from "@/lib/routeWorkspace";
+import { loadSegmentBuilderSettings } from "@/lib/segmentBuilderSettings";
 
 function asQueryValue(value: string | string[] | undefined): string {
   return Array.isArray(value) ? String(value[0] || "") : String(value || "");
@@ -14,9 +15,10 @@ export default async function WorkspaceRoutesPage({
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const staff = await requireStaff();
-  const [params, { customers, routeRepOptions, territoryOptions, savedRoutes, pendingStops }] = await Promise.all([
+  const [params, { customers, routeRepOptions, territoryOptions, savedRoutes, pendingStops }, plannerDefaults] = await Promise.all([
     searchParams,
     loadRouteWorkspaceData(staff.userId),
+    loadSegmentBuilderSettings(),
   ]);
 
   return (
@@ -32,6 +34,7 @@ export default async function WorkspaceRoutesPage({
         routeRepOptions={routeRepOptions}
         territoryOptions={territoryOptions}
         savedRoutes={savedRoutes}
+        plannerDefaults={plannerDefaults}
       />
       <RoutePlannerIndex
         customers={customers}

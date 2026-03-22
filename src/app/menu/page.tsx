@@ -47,6 +47,7 @@ type YieldSettings = {
 };
 
 type InfusionSettings = {
+  farmersPoundGrams: number;
   internalGPerLb: number;
   internalLossPct: number;
   internalThcaLossPct: number;
@@ -261,6 +262,9 @@ export default async function MenuPage() {
       "concentrate_yield_pct",
       "preroll_yield_pct",
       "vape_fill_yield_pct",
+      "farmers_pound_grams",
+      "flower_whole_pounds_only",
+      "infusion_internal_dry_g_per_lb",
       "infusion_internal_loss_pct",
       "internal_infusion_loss_pct",
       "infusion_internal_thca_loss_pct",
@@ -339,7 +343,11 @@ export default async function MenuPage() {
     ),
   };
   const initialInfusionSettings: InfusionSettings = {
-    internalGPerLb: parseNumberSetting(yieldsByKey.get("internal_infusion_g_per_lb"), 80),
+    farmersPoundGrams: parseNumberSetting(yieldsByKey.get("farmers_pound_grams"), 454),
+    internalGPerLb: parseNumberSetting(
+      yieldsByKey.get("infusion_internal_dry_g_per_lb") ?? yieldsByKey.get("internal_infusion_g_per_lb"),
+      80,
+    ),
     internalLossPct: parseLossPct(
       yieldsByKey.get("infusion_internal_loss_pct") ?? yieldsByKey.get("internal_infusion_loss_pct"),
       0,
@@ -351,9 +359,15 @@ export default async function MenuPage() {
         0,
       ),
     ),
-    externalDistillatePer1g: parseNumberSetting(yieldsByKey.get("external_infusion_distillate_g_per_unit_1g"), 0.1),
+    externalDistillatePer1g: parseNumberSetting(
+      yieldsByKey.get("infusion_external_dist_g_per_unit_1g") ?? yieldsByKey.get("external_infusion_distillate_g_per_unit_1g"),
+      0.1,
+    ),
     externalDistillateLossPct: parseLossPct(yieldsByKey.get("infusion_external_dist_loss_pct"), 0),
-    externalKiefPer1g: parseNumberSetting(yieldsByKey.get("external_infusion_kief_g_per_unit_1g"), 0.15),
+    externalKiefPer1g: parseNumberSetting(
+      yieldsByKey.get("infusion_external_dry_g_per_unit_1g") ?? yieldsByKey.get("external_infusion_kief_g_per_unit_1g"),
+      0.15,
+    ),
     externalKiefLossPct: parseLossPct(yieldsByKey.get("infusion_external_dry_loss_pct"), 0),
   };
   const internalEligibleNames = Object.entries(INFUSION_ELIGIBILITY)

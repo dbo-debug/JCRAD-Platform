@@ -32,6 +32,7 @@ export function defaultPrerollBaseUnitsPerLb(unitSize: string): number {
 
 export type InfusedPreRollExpectedUnitsArgs = {
   startingWeightLbs: number;
+  farmersPoundGrams?: number;
   unitSize: string;
   preRollPackQty: number;
   baseUnitsPerLb: number;
@@ -66,6 +67,7 @@ export type InfusedPreRollExpectedUnitsResult = {
 
 export function calculateInfusedPreRollExpectedUnits(args: InfusedPreRollExpectedUnitsArgs): InfusedPreRollExpectedUnitsResult {
   const startingWeightLbs = Math.max(0, Number(args.startingWeightLbs || 0));
+  const farmersPoundGrams = Math.max(1, Number(args.farmersPoundGrams || FARMERS_POUND_GRAMS));
   const packQty = Math.max(1, Math.floor(Number(args.preRollPackQty || 1)));
   const unitSize = String(args.unitSize || "1g").trim() || "1g";
   const unitSizeGrams = Math.max(0, gramsFromUnitSize(unitSize));
@@ -74,7 +76,7 @@ export function calculateInfusedPreRollExpectedUnits(args: InfusedPreRollExpecte
     floorNonNegative(Number(args.baseUnitsPerLb || 0)) || defaultPrerollBaseUnitsPerLb(unitSize),
   );
   const packsPerLbHigh = Math.max(1, Math.floor(baseUnitsPerLb / packQty));
-  const gramsPerPackHigh = FARMERS_POUND_GRAMS / packsPerLbHigh;
+  const gramsPerPackHigh = farmersPoundGrams / packsPerLbHigh;
   const finishedGoodsYieldPct = clampPct(Number(args.finishedGoodsYieldPct), 1);
   const internalLossPct = clampPct(
     Number(args.useThcaInternalLoss ? (args.internalThcaLossPct ?? args.internalLossPct) : args.internalLossPct),
@@ -82,7 +84,7 @@ export function calculateInfusedPreRollExpectedUnits(args: InfusedPreRollExpecte
   const externalLiquidLossPct = clampPct(Number(args.externalLiquidLossPct));
   const externalDryLossPct = clampPct(Number(args.externalDryLossPct));
 
-  const baseFlowerGrams = floorNonNegative(startingWeightLbs * FARMERS_POUND_GRAMS);
+  const baseFlowerGrams = floorNonNegative(startingWeightLbs * farmersPoundGrams);
   const internalTargetGrams = args.hasInternalInfusion
     ? Math.max(0, Number(args.internalTargetGPerLb || 0)) * startingWeightLbs
     : 0;

@@ -5,6 +5,7 @@ import {
   optimizeStopOrderWithGoogle,
 } from "@/lib/googleRouteServices";
 import { getBusinessTimeParts, parseBusinessDateTime } from "@/lib/businessTime";
+import { loadSegmentBuilderSettings } from "@/lib/segmentBuilderSettings";
 
 export const JC_RAD_HQ = {
   name: "JC RAD HQ",
@@ -94,8 +95,9 @@ function haversineMiles(args: { leftLat: number; leftLng: number; rightLat: numb
   return 2 * earthRadiusMiles * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-function estimateDriveMinutes(miles: number) {
-  return Math.max(5, Math.round((miles / 22) * 60));
+function estimateDriveMinutes(miles: number, averageMph: number) {
+  const safeAverageMph = Math.max(1, averageMph);
+  return Math.max(5, Math.round((miles / safeAverageMph) * 60));
 }
 
 function parseStartDateTime(args: { routeDate: string; startTime: string }) {
@@ -270,7 +272,8 @@ function estimateMinutesToOrigin(stop: RoutePlanStopInput) {
       leftLng: stop.longitude,
       rightLat: JC_RAD_HQ.latitude,
       rightLng: JC_RAD_HQ.longitude,
-    })
+    }),
+    22,
   );
 }
 
@@ -454,10 +457,21 @@ export async function buildPlannedRoute(args: {
   visitMinutes?: number | null;
   lunchMinutes?: number | null;
 }): Promise<PlannedRoute> {
-  const startTime = parseTimeText(args.startTime, DEFAULT_SHIFT_START_TIME);
-  const requiredReturnByTime = parseTimeText(args.requiredReturnByTime, DEFAULT_REQUIRED_RETURN_TIME);
-  const visitMinutes = Math.max(0, Math.round(args.visitMinutes || DEFAULT_VISIT_MINUTES)) || DEFAULT_VISIT_MINUTES;
-  const lunchMinutes = Math.max(0, Math.round(args.lunchMinutes ?? DEFAULT_LUNCH_MINUTES));
+  const settings = await loadSegmentBuilderSettings();
+  const startTime = parseTimeText(args.startTime, settings.route_planner_default_start_time || DEFAULT_SHIFT_START_TIME);
+  const requiredReturnByTime = parseTimeText(
+    args.requiredReturnByTime,
+    settings.route_planner_default_required_return_time || DEFAULT_REQUIRED_RETURN_TIME,
+  );
+  const visitMinutes = Math.max(
+    0,
+    Math.round(args.visitMinutes ?? settings.route_planner_default_visit_minutes ?? DEFAULT_VISIT_MINUTES),
+  ) || DEFAULT_VISIT_MINUTES;
+  const lunchMinutes = Math.max(
+    0,
+    Math.round(args.lunchMinutes ?? settings.route_planner_default_lunch_minutes ?? DEFAULT_LUNCH_MINUTES),
+  );
+  const fallbackDriveMph = Math.max(1, Math.round(settings.route_planner_fallback_drive_mph || 22));
   const trimmedStops = args.stops;
   if (trimmedStops.length === 0) {
     return {
@@ -552,7 +566,8 @@ export async function buildPlannedRoute(args: {
           leftLng: JC_RAD_HQ.longitude,
           rightLat: stop.latitude,
           rightLng: stop.longitude,
-        })
+        }),
+        fallbackDriveMph,
       );
     }
     const previous = fallbackOrderedStops[index - 1];
@@ -562,7 +577,8 @@ export async function buildPlannedRoute(args: {
         leftLng: previous.longitude,
         rightLat: stop.latitude,
         rightLng: stop.longitude,
-      })
+      }),
+      fallbackDriveMph,
     );
   });
   const returnDriveMinutes = estimateDriveMinutes(
@@ -571,7 +587,8 @@ export async function buildPlannedRoute(args: {
       leftLng: fallbackOrderedStops[fallbackOrderedStops.length - 1].longitude,
       rightLat: JC_RAD_HQ.latitude,
       rightLng: JC_RAD_HQ.longitude,
-    })
+    }),
+    fallbackDriveMph,
   );
 
   return buildScheduledPlan({

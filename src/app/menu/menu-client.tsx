@@ -106,6 +106,7 @@ type YieldSettings = {
 };
 
 type InfusionSettings = {
+  farmersPoundGrams: number;
   internalGPerLb: number;
   internalLossPct: number;
   internalThcaLossPct: number;
@@ -366,6 +367,7 @@ function deriveExpectedRange(args: {
       const gPerLb = Math.max(0, Number(infusionSettings.internalGPerLb || 80));
       const expected = calculateInfusedPreRollExpectedUnits({
         startingWeightLbs,
+        farmersPoundGrams: Number(infusionSettings.farmersPoundGrams || 454),
         unitSize,
         preRollPackQty: packQty,
         baseUnitsPerLb: Number(yields.prerollBaseUnitsPerLbBySize[unitSize] || 0),
