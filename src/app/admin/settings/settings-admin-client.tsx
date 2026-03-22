@@ -83,6 +83,22 @@ const ESTIMATOR_GROUPS = [
       "infusion_external_dry_loss_pct",
     ],
   },
+  {
+    title: "Estimator / Labor",
+    description: "Predetermined labor sell rates used by estimate creation and finalization. Customer packaging add-ons still use the separate extra touch point pricing default.",
+    fields: [
+      "labor_flower_in_bag_per_unit",
+      "labor_concentrate_per_unit",
+      "labor_vape_per_unit",
+      "labor_preroll_no_infusion_per_unit",
+      "labor_preroll_internal_infusion_per_unit",
+      "labor_preroll_external_infusion_per_unit",
+      "labor_preroll_internal_and_external_infusion_per_unit",
+      "labor_preroll_5pk_no_infusion_per_pack",
+      "labor_preroll_5pk_internal_dry_infusion_per_pack",
+      "labor_preroll_5pk_external_infusion_per_pack",
+    ],
+  },
 ] as const;
 
 function numericValue(value: unknown, fallback: number): number {

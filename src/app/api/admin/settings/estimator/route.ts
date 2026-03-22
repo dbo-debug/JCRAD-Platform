@@ -16,7 +16,10 @@ export async function GET() {
   const { data, error } = await supabase
     .from("app_settings")
     .select("key, value_json")
-    .in("key", ESTIMATOR_SETTINGS_FIELDS.map((field) => field.key));
+    .in(
+      "key",
+      Array.from(new Set(ESTIMATOR_SETTINGS_FIELDS.flatMap((field) => [field.key, ...(field.aliases || [])]))),
+    );
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 

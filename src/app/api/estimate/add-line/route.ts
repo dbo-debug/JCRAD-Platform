@@ -4,12 +4,14 @@ import { logPlatformEvent } from "@/lib/events/logPlatformEvent";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   CATEGORY_UNIT_SIZES,
+  DEFAULT_LABOR_SETTINGS,
   PRE_ROLL_UNIT_SIZES,
   gramsFromUnitSize,
   laborUnitCost,
   lbsFromEstimateLine,
   money,
   selectPackagingTier,
+  type LaborSettings,
 } from "@/lib/pricing";
 import { skuSupportsPackagingCompatibilityContext } from "@/lib/packaging/compatibility";
 import {
@@ -63,6 +65,51 @@ const DEFAULT_YIELD_PCTS = {
   preroll: 0.92,
   vape: 0.97,
 } as const;
+
+function readLaborSettings(settings: Map<string, unknown>): LaborSettings {
+  return {
+    flowerInBagPerUnit: parseSettingNumber(
+      settings.get("labor_flower_in_bag_per_unit"),
+      DEFAULT_LABOR_SETTINGS.flowerInBagPerUnit,
+    ),
+    concentratePerUnit: parseSettingNumber(
+      settings.get("labor_concentrate_per_unit"),
+      DEFAULT_LABOR_SETTINGS.concentratePerUnit,
+    ),
+    vapePerUnit: parseSettingNumber(
+      settings.get("labor_vape_per_unit"),
+      DEFAULT_LABOR_SETTINGS.vapePerUnit,
+    ),
+    prerollNoInfusionPerUnit: parseSettingNumber(
+      settings.get("labor_preroll_no_infusion_per_unit"),
+      DEFAULT_LABOR_SETTINGS.prerollNoInfusionPerUnit,
+    ),
+    prerollInternalInfusionPerUnit: parseSettingNumber(
+      settings.get("labor_preroll_internal_infusion_per_unit"),
+      DEFAULT_LABOR_SETTINGS.prerollInternalInfusionPerUnit,
+    ),
+    prerollExternalInfusionPerUnit: parseSettingNumber(
+      settings.get("labor_preroll_external_infusion_per_unit"),
+      DEFAULT_LABOR_SETTINGS.prerollExternalInfusionPerUnit,
+    ),
+    prerollInternalAndExternalInfusionPerUnit: parseSettingNumber(
+      settings.get("labor_preroll_internal_and_external_infusion_per_unit"),
+      DEFAULT_LABOR_SETTINGS.prerollInternalAndExternalInfusionPerUnit,
+    ),
+    preroll5PackNoInfusionPerUnit: parseSettingNumber(
+      settings.get("labor_preroll_5pk_no_infusion_per_pack"),
+      DEFAULT_LABOR_SETTINGS.preroll5PackNoInfusionPerUnit,
+    ),
+    preroll5PackInternalDryInfusionPerUnit: parseSettingNumber(
+      settings.get("labor_preroll_5pk_internal_dry_infusion_per_pack"),
+      DEFAULT_LABOR_SETTINGS.preroll5PackInternalDryInfusionPerUnit,
+    ),
+    preroll5PackExternalInfusionPerUnit: parseSettingNumber(
+      settings.get("labor_preroll_5pk_external_infusion_per_pack"),
+      DEFAULT_LABOR_SETTINGS.preroll5PackExternalInfusionPerUnit,
+    ),
+  };
+}
 
 function toLb(value: number, unit: string | null | undefined): number {
   const normalized = String(unit || "lb").toLowerCase();
@@ -869,6 +916,16 @@ export async function POST(req: Request) {
         "external_distillate_g_per_unit_1g",
         "external_infusion_kief_g_per_unit_1g",
         "external_kief_g_per_unit_1g",
+        "labor_flower_in_bag_per_unit",
+        "labor_concentrate_per_unit",
+        "labor_vape_per_unit",
+        "labor_preroll_no_infusion_per_unit",
+        "labor_preroll_internal_infusion_per_unit",
+        "labor_preroll_external_infusion_per_unit",
+        "labor_preroll_internal_and_external_infusion_per_unit",
+        "labor_preroll_5pk_no_infusion_per_pack",
+        "labor_preroll_5pk_internal_dry_infusion_per_pack",
+        "labor_preroll_5pk_external_infusion_per_pack",
       ]);
     mark("after app_settings select");
     if (pricingErr) return respond({ error: pricingErr.message }, { status: 500 });
@@ -970,6 +1027,7 @@ export async function POST(req: Request) {
       pricingByKey.get("infusion_internal_thca_loss_pct") ?? pricingByKey.get("internal_thca_loss_pct"),
       internalLossPct,
     );
+    const laborSettings = readLaborSettings(pricingByKey);
 
     const isPreRoll = isPreRollLine(mode, productCategory, pre_roll_mode);
     const yieldPct = isPreRoll
@@ -1106,10 +1164,12 @@ export async function POST(req: Request) {
       quantity_unit = selectedBulkUnit;
       quantity_lbs = quantity_unit === "g" ? quantity / LB_TO_G : quantity;
       if (productCategory === "flower") {
-        if (!isWholePositiveInteger(quantity_lbs)) {
+        if (flowerWholePoundsOnly && !isWholePositiveInteger(quantity_lbs)) {
           return respond({ error: "Flower must be ordered in whole pounds." }, { status: 400 });
         }
-        quantity_lbs = Math.round(quantity_lbs);
+        if (flowerWholePoundsOnly) {
+          quantity_lbs = Math.round(quantity_lbs);
+        }
         flowerStartingLbsForBilling = quantity_lbs;
         quantity = quantity_lbs;
         quantity_unit = "lb";
@@ -1705,21 +1765,20 @@ export async function POST(req: Request) {
         }
       }
 
-      let laborUnitCostRaw = money(
+      const laborUnitCostRaw = money(
         laborUnitCost({
           category: offer?.products?.category,
           packagingType,
           preRollMode: pre_roll_mode,
           isPreRoll,
+          hasInternalInfusion: hasInternalInfusionSelection,
+          hasExternalInfusion: hasExternalInfusionSelection,
           customerPackaging: packaging_mode === "customer",
           extraTouchPoints: packaging_mode === "customer" ? extra_touch_points : 0,
           extraTouchPointCostUsd: extra_touch_point_cost_usd,
+          laborSettings,
         })
       );
-      if (isPreRoll && hasInternalInfusionSelection && hasExternalInfusionSelection) {
-        // Combined internal+external pre-roll labor override (sell/pass-through rate).
-        laborUnitCostRaw = 1.43;
-      }
       labor_cost_total = money(laborUnitCostRaw * units);
       labor_sell_total = labor_cost_total;
       labor_unit_cost_value = units > 0 ? money(labor_sell_total / units) : 0;

@@ -2,6 +2,7 @@ export type AppSettingKind = "percent" | "number" | "boolean" | "time";
 
 export type AppSettingField = {
   key: string;
+  aliases?: string[];
   label: string;
   description: string;
   kind: AppSettingKind;
@@ -45,6 +46,7 @@ export const ESTIMATOR_SETTINGS_FIELDS: AppSettingField[] = [
   },
   {
     key: "flower_finished_goods_loss_pct_3_5g",
+    aliases: ["flower_loss_pct_3_5g"],
     label: "Flower 3.5g loss %",
     description: "Finished-goods loss for 3.5g flower runs.",
     kind: "percent",
@@ -55,6 +57,7 @@ export const ESTIMATOR_SETTINGS_FIELDS: AppSettingField[] = [
   },
   {
     key: "flower_finished_goods_loss_pct_5g",
+    aliases: ["flower_loss_pct_5g"],
     label: "Flower 5g loss %",
     description: "Finished-goods loss for 5g flower runs.",
     kind: "percent",
@@ -65,6 +68,7 @@ export const ESTIMATOR_SETTINGS_FIELDS: AppSettingField[] = [
   },
   {
     key: "flower_finished_goods_loss_pct_7g",
+    aliases: ["flower_loss_pct_7g"],
     label: "Flower 7g loss %",
     description: "Finished-goods loss for 7g flower runs.",
     kind: "percent",
@@ -75,6 +79,7 @@ export const ESTIMATOR_SETTINGS_FIELDS: AppSettingField[] = [
   },
   {
     key: "flower_finished_goods_loss_pct_14g",
+    aliases: ["flower_loss_pct_14g"],
     label: "Flower 14g loss %",
     description: "Finished-goods loss for 14g flower runs.",
     kind: "percent",
@@ -85,6 +90,7 @@ export const ESTIMATOR_SETTINGS_FIELDS: AppSettingField[] = [
   },
   {
     key: "flower_finished_goods_loss_pct_28g",
+    aliases: ["flower_loss_pct_28g"],
     label: "Flower 28g loss %",
     description: "Finished-goods loss for 28g flower runs.",
     kind: "percent",
@@ -105,6 +111,7 @@ export const ESTIMATOR_SETTINGS_FIELDS: AppSettingField[] = [
   },
   {
     key: "preroll_base_units_per_lb_0_5g",
+    aliases: ["preroll_units_per_lb_0_5g"],
     label: "Pre-roll 0.5g base units/lb",
     description: "Top-end base output used for 0.5g pre-roll runs.",
     kind: "number",
@@ -114,6 +121,7 @@ export const ESTIMATOR_SETTINGS_FIELDS: AppSettingField[] = [
   },
   {
     key: "preroll_base_units_per_lb_0_75g",
+    aliases: ["preroll_units_per_lb_0_75g"],
     label: "Pre-roll 0.75g base units/lb",
     description: "Top-end base output used for 0.75g pre-roll runs.",
     kind: "number",
@@ -123,6 +131,7 @@ export const ESTIMATOR_SETTINGS_FIELDS: AppSettingField[] = [
   },
   {
     key: "preroll_base_units_per_lb_1g",
+    aliases: ["preroll_units_per_lb_1g"],
     label: "Pre-roll 1g base units/lb",
     description: "Top-end base output used for 1g pre-roll runs.",
     kind: "number",
@@ -132,6 +141,7 @@ export const ESTIMATOR_SETTINGS_FIELDS: AppSettingField[] = [
   },
   {
     key: "preroll_finished_goods_loss_pct_0_5g",
+    aliases: ["preroll_loss_pct_0_5g"],
     label: "Pre-roll 0.5g loss %",
     description: "Displayed low-side loss for 0.5g pre-roll runs.",
     kind: "percent",
@@ -142,6 +152,7 @@ export const ESTIMATOR_SETTINGS_FIELDS: AppSettingField[] = [
   },
   {
     key: "preroll_finished_goods_loss_pct_0_75g",
+    aliases: ["preroll_loss_pct_0_75g"],
     label: "Pre-roll 0.75g loss %",
     description: "Displayed low-side loss for 0.75g pre-roll runs.",
     kind: "percent",
@@ -152,6 +163,7 @@ export const ESTIMATOR_SETTINGS_FIELDS: AppSettingField[] = [
   },
   {
     key: "preroll_finished_goods_loss_pct_1g",
+    aliases: ["preroll_loss_pct_1g"],
     label: "Pre-roll 1g loss %",
     description: "Displayed low-side loss for 1g pre-roll runs.",
     kind: "percent",
@@ -182,6 +194,7 @@ export const ESTIMATOR_SETTINGS_FIELDS: AppSettingField[] = [
   },
   {
     key: "internal_infusion_g_per_lb",
+    aliases: ["infusion_internal_dry_g_per_lb"],
     label: "Internal infusion grams/lb",
     description: "Base dry internal infusion target per starting pound of flower.",
     kind: "number",
@@ -211,6 +224,11 @@ export const ESTIMATOR_SETTINGS_FIELDS: AppSettingField[] = [
   },
   {
     key: "external_infusion_distillate_g_per_unit_1g",
+    aliases: [
+      "infusion_external_dist_g_per_unit_1g",
+      "infusion_external_dist_g_per_1g_unit",
+      "external_distillate_g_per_unit_1g",
+    ],
     label: "External distillate g per 1g unit",
     description: "External liquid infusion ratio for a 1g unit before process loss.",
     kind: "number",
@@ -230,6 +248,11 @@ export const ESTIMATOR_SETTINGS_FIELDS: AppSettingField[] = [
   },
   {
     key: "external_infusion_kief_g_per_unit_1g",
+    aliases: [
+      "infusion_external_dry_g_per_unit_1g",
+      "infusion_external_kief_g_per_1g_unit",
+      "external_kief_g_per_unit_1g",
+    ],
     label: "External dry g per 1g unit",
     description: "External dry infusion ratio for a 1g unit before process loss.",
     kind: "number",
@@ -246,6 +269,96 @@ export const ESTIMATOR_SETTINGS_FIELDS: AppSettingField[] = [
     min: 0,
     max: 100,
     step: 0.1,
+  },
+  {
+    key: "labor_flower_in_bag_per_unit",
+    label: "Labor flower bag per unit",
+    description: "Base per-unit labor sell rate for non-pre-roll flower bag copack runs.",
+    kind: "number",
+    defaultValue: 1.08,
+    min: 0,
+    step: 0.01,
+  },
+  {
+    key: "labor_concentrate_per_unit",
+    label: "Labor concentrate per unit",
+    description: "Base per-unit labor sell rate for concentrate copack runs.",
+    kind: "number",
+    defaultValue: 1.28,
+    min: 0,
+    step: 0.01,
+  },
+  {
+    key: "labor_vape_per_unit",
+    label: "Labor vape per unit",
+    description: "Base per-unit labor sell rate for vape copack runs.",
+    kind: "number",
+    defaultValue: 1.13,
+    min: 0,
+    step: 0.01,
+  },
+  {
+    key: "labor_preroll_no_infusion_per_unit",
+    label: "Labor pre-roll no infusion per unit",
+    description: "Per-unit labor sell rate for single pre-roll runs without infusion.",
+    kind: "number",
+    defaultValue: 0.88,
+    min: 0,
+    step: 0.01,
+  },
+  {
+    key: "labor_preroll_internal_infusion_per_unit",
+    label: "Labor pre-roll internal infusion per unit",
+    description: "Per-unit labor sell rate for single pre-roll runs with internal infusion.",
+    kind: "number",
+    defaultValue: 0.93,
+    min: 0,
+    step: 0.01,
+  },
+  {
+    key: "labor_preroll_external_infusion_per_unit",
+    label: "Labor pre-roll external infusion per unit",
+    description: "Per-unit labor sell rate for single pre-roll runs with external infusion.",
+    kind: "number",
+    defaultValue: 1.38,
+    min: 0,
+    step: 0.01,
+  },
+  {
+    key: "labor_preroll_internal_and_external_infusion_per_unit",
+    label: "Labor pre-roll internal + external per unit",
+    description: "Per-unit labor sell rate for single pre-roll runs using both internal and external infusion.",
+    kind: "number",
+    defaultValue: 1.43,
+    min: 0,
+    step: 0.01,
+  },
+  {
+    key: "labor_preroll_5pk_no_infusion_per_pack",
+    label: "Labor 5-pack no infusion per pack",
+    description: "Per-pack labor sell rate for 5-pack pre-roll runs without infusion.",
+    kind: "number",
+    defaultValue: 2.33,
+    min: 0,
+    step: 0.01,
+  },
+  {
+    key: "labor_preroll_5pk_internal_dry_infusion_per_pack",
+    label: "Labor 5-pack internal infusion per pack",
+    description: "Per-pack labor sell rate for 5-pack pre-roll runs with internal dry infusion.",
+    kind: "number",
+    defaultValue: 2.55,
+    min: 0,
+    step: 0.01,
+  },
+  {
+    key: "labor_preroll_5pk_external_infusion_per_pack",
+    label: "Labor 5-pack external infusion per pack",
+    description: "Per-pack labor sell rate for 5-pack pre-roll runs with external infusion.",
+    kind: "number",
+    defaultValue: 4.83,
+    min: 0,
+    step: 0.01,
   },
 ];
 
@@ -373,7 +486,12 @@ export function valuesFromRows(
     byKey.set(String(row.key || ""), row.value_json);
   }
 
-  return Object.fromEntries(fields.map((field) => [field.key, readSettingValue(field, byKey.get(field.key))]));
+  return Object.fromEntries(
+    fields.map((field) => {
+      const resolvedKey = [field.key, ...(field.aliases || [])].find((key) => byKey.has(key)) || field.key;
+      return [field.key, readSettingValue(field, byKey.get(resolvedKey))];
+    }),
+  );
 }
 
 export function validateSettingValue(field: AppSettingField, value: unknown): string | null {

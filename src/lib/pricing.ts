@@ -4,6 +4,7 @@ export type PreRollLaborMode =
   | "preroll_no_infusion_any_size"
   | "internal_infusion"
   | "external_infusion"
+  | "internal_and_external_infusion"
   | "5pk_no_infusion"
   | "5pk_internal_dry_infusion"
   | "5pk_external_infusion";
@@ -18,10 +19,41 @@ export const PRE_ROLL_LABOR_PER_UNIT: Record<PreRollLaborMode, number> = {
   preroll_no_infusion_any_size: 0.88,
   internal_infusion: 0.93,
   external_infusion: 1.38,
+  internal_and_external_infusion: 1.43,
   "5pk_no_infusion": 2.33,
   "5pk_internal_dry_infusion": 2.55,
   "5pk_external_infusion": 4.83,
 };
+
+export type LaborSettings = {
+  flowerInBagPerUnit: number;
+  concentratePerUnit: number;
+  vapePerUnit: number;
+  prerollNoInfusionPerUnit: number;
+  prerollInternalInfusionPerUnit: number;
+  prerollExternalInfusionPerUnit: number;
+  prerollInternalAndExternalInfusionPerUnit: number;
+  preroll5PackNoInfusionPerUnit: number;
+  preroll5PackInternalDryInfusionPerUnit: number;
+  preroll5PackExternalInfusionPerUnit: number;
+};
+
+export const DEFAULT_LABOR_SETTINGS: LaborSettings = {
+  flowerInBagPerUnit: JC_RAD_PACKAGING_LABOR_PER_UNIT.flower_in_bag,
+  concentratePerUnit: JC_RAD_PACKAGING_LABOR_PER_UNIT.concentrate,
+  vapePerUnit: JC_RAD_PACKAGING_LABOR_PER_UNIT.vape,
+  prerollNoInfusionPerUnit: PRE_ROLL_LABOR_PER_UNIT.preroll_no_infusion_any_size,
+  prerollInternalInfusionPerUnit: PRE_ROLL_LABOR_PER_UNIT.internal_infusion,
+  prerollExternalInfusionPerUnit: PRE_ROLL_LABOR_PER_UNIT.external_infusion,
+  prerollInternalAndExternalInfusionPerUnit: PRE_ROLL_LABOR_PER_UNIT.internal_and_external_infusion,
+  preroll5PackNoInfusionPerUnit: PRE_ROLL_LABOR_PER_UNIT["5pk_no_infusion"],
+  preroll5PackInternalDryInfusionPerUnit: PRE_ROLL_LABOR_PER_UNIT["5pk_internal_dry_infusion"],
+  preroll5PackExternalInfusionPerUnit: PRE_ROLL_LABOR_PER_UNIT["5pk_external_infusion"],
+};
+
+function resolveLaborSettings(overrides?: Partial<LaborSettings>): LaborSettings {
+  return { ...DEFAULT_LABOR_SETTINGS, ...(overrides || {}) };
+}
 
 export type PackagingTier = {
   moq: number;
@@ -114,21 +146,40 @@ export function laborUnitCost(args: {
   packagingType?: string | null;
   preRollMode?: string | null;
   isPreRoll?: boolean;
+  hasInternalInfusion?: boolean;
+  hasExternalInfusion?: boolean;
   customerPackaging?: boolean;
   extraTouchPoints?: number;
   extraTouchPointCostUsd?: number;
+  laborSettings?: Partial<LaborSettings>;
 }) {
   const customerPackaging = !!args.customerPackaging;
   const extraTouchPoints = Number.isFinite(args.extraTouchPoints) ? Number(args.extraTouchPoints) : 0;
   const extraTouchPointCostUsd = Number.isFinite(args.extraTouchPointCostUsd) ? Number(args.extraTouchPointCostUsd) : 0.1;
+  const laborSettings = resolveLaborSettings(args.laborSettings);
 
   if (args.isPreRoll) {
-    const mode = (args.preRollMode || "preroll_no_infusion_any_size") as PreRollLaborMode;
-    return PRE_ROLL_LABOR_PER_UNIT[mode] ?? PRE_ROLL_LABOR_PER_UNIT.preroll_no_infusion_any_size;
+    const hasInternalInfusion = !!args.hasInternalInfusion;
+    const hasExternalInfusion = !!args.hasExternalInfusion;
+    const preRollMode = String(args.preRollMode || "");
+    if (hasInternalInfusion && hasExternalInfusion) {
+      return laborSettings.prerollInternalAndExternalInfusionPerUnit;
+    }
+    if (preRollMode === "5pk_no_infusion") return laborSettings.preroll5PackNoInfusionPerUnit;
+    if (preRollMode === "5pk_internal_dry_infusion") return laborSettings.preroll5PackInternalDryInfusionPerUnit;
+    if (preRollMode === "5pk_external_infusion") return laborSettings.preroll5PackExternalInfusionPerUnit;
+    if (preRollMode === "internal_infusion") return laborSettings.prerollInternalInfusionPerUnit;
+    if (preRollMode === "external_infusion") return laborSettings.prerollExternalInfusionPerUnit;
+    return laborSettings.prerollNoInfusionPerUnit;
   }
 
   const packagingType = (args.packagingType || "flower_in_bag") as CopackPackagingType;
-  const base = JC_RAD_PACKAGING_LABOR_PER_UNIT[packagingType] ?? JC_RAD_PACKAGING_LABOR_PER_UNIT.flower_in_bag;
+  const base =
+    packagingType === "concentrate"
+      ? laborSettings.concentratePerUnit
+      : packagingType === "vape"
+        ? laborSettings.vapePerUnit
+        : laborSettings.flowerInBagPerUnit;
 
   if (!customerPackaging) return base;
   return base + Math.max(0, extraTouchPoints) * Math.max(0, extraTouchPointCostUsd);

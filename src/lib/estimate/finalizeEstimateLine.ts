@@ -1,4 +1,4 @@
-import { laborUnitCost, money } from "@/lib/pricing";
+import { DEFAULT_LABOR_SETTINGS, laborUnitCost, money, type LaborSettings } from "@/lib/pricing";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 type SupabaseClient = ReturnType<typeof createAdminClient>;
@@ -32,6 +32,16 @@ function parseUsd(valueJson: unknown, fallback: number): number {
   const raw = Number(obj.usd);
   if (!Number.isFinite(raw) || raw < 0) return fallback;
   return raw;
+}
+
+function parseNumber(valueJson: unknown, fallback: number): number {
+  const obj = valueJson && typeof valueJson === "object" ? (valueJson as Record<string, unknown>) : {};
+  const candidates = [obj.value, obj.number, obj.usd];
+  for (const candidate of candidates) {
+    const raw = Number(candidate);
+    if (Number.isFinite(raw) && raw >= 0) return raw;
+  }
+  return fallback;
 }
 
 function parseMarginPct(valueJson: unknown): number {
@@ -69,7 +79,21 @@ async function loadPricingSettings(supabase: SupabaseClient) {
   const { data, error } = await supabase
     .from("app_settings")
     .select("key, value_json")
-    .in("key", ["default_margin_pct", "coa_base_cost", "extra_touch_point_cost"]);
+    .in("key", [
+      "default_margin_pct",
+      "coa_base_cost",
+      "extra_touch_point_cost",
+      "labor_flower_in_bag_per_unit",
+      "labor_concentrate_per_unit",
+      "labor_vape_per_unit",
+      "labor_preroll_no_infusion_per_unit",
+      "labor_preroll_internal_infusion_per_unit",
+      "labor_preroll_external_infusion_per_unit",
+      "labor_preroll_internal_and_external_infusion_per_unit",
+      "labor_preroll_5pk_no_infusion_per_pack",
+      "labor_preroll_5pk_internal_dry_infusion_per_pack",
+      "labor_preroll_5pk_external_infusion_per_pack",
+    ]);
 
   if (error) throw new Error(error.message);
 
@@ -82,6 +106,45 @@ async function loadPricingSettings(supabase: SupabaseClient) {
     defaultMarginPctDecimal: parseMarginPct(byKey.get("default_margin_pct")),
     coaBaseCostUsd: parseUsd(byKey.get("coa_base_cost"), DEFAULT_COA_BASE_COST_USD),
     extraTouchPointCostUsd: parseUsd(byKey.get("extra_touch_point_cost"), DEFAULT_EXTRA_TOUCH_POINT_COST_USD),
+    laborSettings: {
+      flowerInBagPerUnit: parseNumber(
+        byKey.get("labor_flower_in_bag_per_unit"),
+        DEFAULT_LABOR_SETTINGS.flowerInBagPerUnit,
+      ),
+      concentratePerUnit: parseNumber(
+        byKey.get("labor_concentrate_per_unit"),
+        DEFAULT_LABOR_SETTINGS.concentratePerUnit,
+      ),
+      vapePerUnit: parseNumber(byKey.get("labor_vape_per_unit"), DEFAULT_LABOR_SETTINGS.vapePerUnit),
+      prerollNoInfusionPerUnit: parseNumber(
+        byKey.get("labor_preroll_no_infusion_per_unit"),
+        DEFAULT_LABOR_SETTINGS.prerollNoInfusionPerUnit,
+      ),
+      prerollInternalInfusionPerUnit: parseNumber(
+        byKey.get("labor_preroll_internal_infusion_per_unit"),
+        DEFAULT_LABOR_SETTINGS.prerollInternalInfusionPerUnit,
+      ),
+      prerollExternalInfusionPerUnit: parseNumber(
+        byKey.get("labor_preroll_external_infusion_per_unit"),
+        DEFAULT_LABOR_SETTINGS.prerollExternalInfusionPerUnit,
+      ),
+      prerollInternalAndExternalInfusionPerUnit: parseNumber(
+        byKey.get("labor_preroll_internal_and_external_infusion_per_unit"),
+        DEFAULT_LABOR_SETTINGS.prerollInternalAndExternalInfusionPerUnit,
+      ),
+      preroll5PackNoInfusionPerUnit: parseNumber(
+        byKey.get("labor_preroll_5pk_no_infusion_per_pack"),
+        DEFAULT_LABOR_SETTINGS.preroll5PackNoInfusionPerUnit,
+      ),
+      preroll5PackInternalDryInfusionPerUnit: parseNumber(
+        byKey.get("labor_preroll_5pk_internal_dry_infusion_per_pack"),
+        DEFAULT_LABOR_SETTINGS.preroll5PackInternalDryInfusionPerUnit,
+      ),
+      preroll5PackExternalInfusionPerUnit: parseNumber(
+        byKey.get("labor_preroll_5pk_external_infusion_per_pack"),
+        DEFAULT_LABOR_SETTINGS.preroll5PackExternalInfusionPerUnit,
+      ),
+    } satisfies LaborSettings,
   };
 }
 
@@ -153,7 +216,7 @@ export async function finalizeEstimateLine(args: {
     throw new Error("Estimate line is missing offer_id");
   }
 
-  const [{ defaultMarginPctDecimal, coaBaseCostUsd, extraTouchPointCostUsd }, offerResult] = await Promise.all([
+  const [{ defaultMarginPctDecimal, coaBaseCostUsd, extraTouchPointCostUsd, laborSettings }, offerResult] = await Promise.all([
     loadPricingSettings(supabase),
     supabase
       .from("offers")
@@ -236,15 +299,40 @@ export async function finalizeEstimateLine(args: {
   }
 
   const isPreRoll = String(lineRow.mode || "").toLowerCase() === "copack" && category === "flower" && !!lineRow.pre_roll_mode;
+  const infusionType = String(lineRow.infusion_type || "").toLowerCase();
+  const infusionInputs =
+    lineRow.infusion_inputs && typeof lineRow.infusion_inputs === "object"
+      ? (lineRow.infusion_inputs as Record<string, unknown>)
+      : {};
+  const internalInfusion =
+    infusionInputs.internal && typeof infusionInputs.internal === "object"
+      ? (infusionInputs.internal as Record<string, unknown>)
+      : null;
+  const externalInfusion =
+    infusionInputs.external && typeof infusionInputs.external === "object"
+      ? (infusionInputs.external as Record<string, unknown>)
+      : null;
+  const hasInternalInfusion =
+    Boolean(String(lineRow.internal_infusion_product_id || "").trim())
+    || Boolean(String(internalInfusion?.product_id || "").trim());
+  const hasExternalInfusion =
+    Boolean(String(externalInfusion?.liquid_product_id || "").trim())
+    || Boolean(String(externalInfusion?.dry_product_id || "").trim())
+    || Boolean(String(externalInfusion?.liquid_product_name || "").trim())
+    || Boolean(String(externalInfusion?.dry_product_name || "").trim())
+    || infusionType === "external";
   const laborUnitCostValue = money(
     laborUnitCost({
       category,
       packagingType,
       preRollMode: String(lineRow.pre_roll_mode || ""),
       isPreRoll,
+      hasInternalInfusion,
+      hasExternalInfusion,
       customerPackaging: String(lineRow.packaging_mode || "").toLowerCase() === "customer",
       extraTouchPoints: Number(lineRow.extra_touch_points || 0),
       extraTouchPointCostUsd,
+      laborSettings,
     })
   );
 

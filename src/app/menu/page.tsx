@@ -270,6 +270,12 @@ export default async function MenuPage() {
       "infusion_internal_thca_loss_pct",
       "internal_thca_loss_pct",
       "internal_infusion_g_per_lb",
+      "infusion_external_dist_g_per_unit_1g",
+      "infusion_external_dry_g_per_unit_1g",
+      "infusion_external_dist_g_per_1g_unit",
+      "infusion_external_kief_g_per_1g_unit",
+      "external_distillate_g_per_unit_1g",
+      "external_kief_g_per_unit_1g",
       "infusion_external_dist_loss_pct",
       "infusion_external_dry_loss_pct",
       "external_infusion_distillate_g_per_unit_1g",
@@ -360,12 +366,18 @@ export default async function MenuPage() {
       ),
     ),
     externalDistillatePer1g: parseNumberSetting(
-      yieldsByKey.get("infusion_external_dist_g_per_unit_1g") ?? yieldsByKey.get("external_infusion_distillate_g_per_unit_1g"),
+      yieldsByKey.get("infusion_external_dist_g_per_unit_1g")
+      ?? yieldsByKey.get("infusion_external_dist_g_per_1g_unit")
+      ?? yieldsByKey.get("external_infusion_distillate_g_per_unit_1g")
+      ?? yieldsByKey.get("external_distillate_g_per_unit_1g"),
       0.1,
     ),
     externalDistillateLossPct: parseLossPct(yieldsByKey.get("infusion_external_dist_loss_pct"), 0),
     externalKiefPer1g: parseNumberSetting(
-      yieldsByKey.get("infusion_external_dry_g_per_unit_1g") ?? yieldsByKey.get("external_infusion_kief_g_per_unit_1g"),
+      yieldsByKey.get("infusion_external_dry_g_per_unit_1g")
+      ?? yieldsByKey.get("infusion_external_kief_g_per_1g_unit")
+      ?? yieldsByKey.get("external_infusion_kief_g_per_unit_1g")
+      ?? yieldsByKey.get("external_kief_g_per_unit_1g"),
       0.15,
     ),
     externalKiefLossPct: parseLossPct(yieldsByKey.get("infusion_external_dry_loss_pct"), 0),
