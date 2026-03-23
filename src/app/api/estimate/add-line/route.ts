@@ -1853,17 +1853,7 @@ export async function POST(req: Request) {
           cost: packagingUnitCostInternal,
           markupPct: targetMarkupPct,
         });
-        let packagingPrimarySellPerUnit = money(packagingPrimaryResolution.sellPrice ?? 0);
-        if (
-          productCategory === "concentrate"
-          && packagingType === "concentrate_jar"
-          && (packagingPrimaryResolution.sellPrice == null || (packagingPrimaryResolution.derivedFromCost && packagingPrimarySellPerUnit <= 0))
-          && selectedTier
-          && Number.isFinite(Number(selectedTier.unit_price))
-          && Number(selectedTier.unit_price) > 0
-        ) {
-          packagingPrimarySellPerUnit = money(Number(selectedTier.unit_price));
-        }
+        const packagingPrimarySellPerUnit = money(packagingPrimaryResolution.sellPrice ?? 0);
         if (productCategory === "concentrate" && isDev) {
           console.log(`[add-line:${requestId}] concentrate-primary-selection`, {
             required_primary_slot: requiredPrimarySlot,
@@ -1877,6 +1867,7 @@ export async function POST(req: Request) {
             selected_primary_jar_selected_tier_unit_price: selectedTier?.unit_price ?? null,
             selected_primary_jar_selected_tier_moq: selectedTier?.moq ?? null,
             selected_primary_jar_resolved_sell_per_unit: packagingPrimarySellPerUnit,
+            selected_primary_jar_derived_from_cost: packagingPrimaryResolution.derivedFromCost,
           });
         }
         packaging_primary_cost_total = packagingUnitCostInternal;

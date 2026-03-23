@@ -16,6 +16,7 @@ const LB_TO_G = 453.592;
 const DEFAULT_COA_BASE_COST_USD = 450;
 const DEFAULT_MARGIN_PCT_DECIMAL = 0.2;
 const DEFAULT_EXTRA_TOUCH_POINT_COST_USD = 0.1;
+const DEFAULT_TARGET_MARKUP_PCT = 0.2;
 
 type FinalizedFields = {
   estimate_line_id: string;
@@ -45,10 +46,10 @@ function parseNumber(valueJson: unknown, fallback: number): number {
   return fallback;
 }
 
-function parseMarginPct(valueJson: unknown): number {
+function parseMarginPct(valueJson: unknown, fallback = DEFAULT_MARGIN_PCT_DECIMAL): number {
   const obj = valueJson && typeof valueJson === "object" ? (valueJson as Record<string, unknown>) : {};
   const raw = Number(obj.pct);
-  if (!Number.isFinite(raw) || raw < 0) return DEFAULT_MARGIN_PCT_DECIMAL;
+  if (!Number.isFinite(raw) || raw < 0) return fallback;
   return raw;
 }
 
@@ -82,6 +83,7 @@ async function loadPricingSettings(supabase: SupabaseClient) {
     .select("key, value_json")
     .in("key", [
       "default_margin_pct",
+      "target_markup_pct",
       "coa_base_cost",
       "extra_touch_point_cost",
       "labor_flower_in_bag_per_unit",
@@ -105,6 +107,7 @@ async function loadPricingSettings(supabase: SupabaseClient) {
 
   return {
     defaultMarginPctDecimal: parseMarginPct(byKey.get("default_margin_pct")),
+    targetMarkupPctDecimal: parseMarginPct(byKey.get("target_markup_pct"), DEFAULT_TARGET_MARKUP_PCT),
     coaBaseCostUsd: parseUsd(byKey.get("coa_base_cost"), DEFAULT_COA_BASE_COST_USD),
     extraTouchPointCostUsd: parseUsd(byKey.get("extra_touch_point_cost"), DEFAULT_EXTRA_TOUCH_POINT_COST_USD),
     laborSettings: {
@@ -217,7 +220,7 @@ export async function finalizeEstimateLine(args: {
     throw new Error("Estimate line is missing offer_id");
   }
 
-  const [{ defaultMarginPctDecimal, coaBaseCostUsd, extraTouchPointCostUsd, laborSettings }, offerResult] = await Promise.all([
+  const [{ defaultMarginPctDecimal, targetMarkupPctDecimal, coaBaseCostUsd, extraTouchPointCostUsd, laborSettings }, offerResult] = await Promise.all([
     loadPricingSettings(supabase),
     supabase
       .from("offers")
@@ -318,7 +321,7 @@ export async function finalizeEstimateLine(args: {
           resolveUnitSellPrice({
             explicitSellPrice: skuRow.sell_price,
             cost: skuRow.unit_cost,
-            markupPct: marginPctDecimal,
+            markupPct: targetMarkupPctDecimal,
           }).sellPrice ?? 0
         );
     }
