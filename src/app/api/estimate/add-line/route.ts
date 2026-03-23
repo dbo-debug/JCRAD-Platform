@@ -284,6 +284,15 @@ function comparePackagingSkuPreference(a: PackagingSkuLookupRow, b: PackagingSku
   return String(a.id || "").localeCompare(String(b.id || ""));
 }
 
+function skuMatchesRequiredPrimaryPackagingType(
+  row: Pick<PackagingSkuLookupRow, "packaging_type">,
+  category: "concentrate" | "vape"
+) {
+  const packagingType = normalizePackagingType(row.packaging_type);
+  if (category === "concentrate") return packagingType === "concentrate_jar";
+  return packagingType === "vape_510_cart" || packagingType === "vape_all_in_one";
+}
+
 function resolveAutoPackagingSku(args: {
   rows: PackagingSkuLookupRow[];
   slot: ReturnType<typeof primaryPackagingSlotForEstimate> | NonNullable<ReturnType<typeof secondaryPackagingSlotForEstimate>>;
@@ -295,7 +304,7 @@ function resolveAutoPackagingSku(args: {
     if (!row.active) return false;
     if (!skuSupportsPackagingEstimatorSlot(row, args.slot)) return false;
     if (args.primary) {
-      if (packagingCategoryForSku(row) !== args.category) return false;
+      if (!skuMatchesRequiredPrimaryPackagingType(row, args.category)) return false;
       return skuMatchesEstimatePrimaryCapacity(row, {
         category: args.category,
         isPreRoll: false,
@@ -1696,15 +1705,30 @@ export async function POST(req: Request) {
         };
 
         let resolvedPackagingSkuId = packaging_sku_id;
-        if (!resolvedPackagingSkuId && autoResolveRequiredPackaging) {
-          const primarySku = resolveAutoPackagingSku({
-            rows: await loadActivePackagingSkus(),
-            slot: requiredPrimarySlot,
-            category: productCategory,
-            unitSizeGrams: requestedUnitSizeGrams,
-            primary: true,
-          });
-          resolvedPackagingSkuId = primarySku?.id || null;
+        if (autoResolveRequiredPackaging) {
+          const activeSkus = await loadActivePackagingSkus();
+          const providedPrimarySku = resolvedPackagingSkuId
+            ? activeSkus.find((row) => String(row.id) === String(resolvedPackagingSkuId)) || null
+            : null;
+          const providedPrimarySkuValid = providedPrimarySku
+            ? skuSupportsPackagingEstimatorSlot(providedPrimarySku, requiredPrimarySlot)
+              && skuMatchesRequiredPrimaryPackagingType(providedPrimarySku, productCategory)
+              && skuMatchesEstimatePrimaryCapacity(providedPrimarySku, {
+                category: productCategory,
+                isPreRoll: false,
+                unitSizeGrams: requestedUnitSizeGrams,
+              })
+            : false;
+          if (!providedPrimarySkuValid) {
+            const primarySku = resolveAutoPackagingSku({
+              rows: activeSkus,
+              slot: requiredPrimarySlot,
+              category: productCategory,
+              unitSizeGrams: requestedUnitSizeGrams,
+              primary: true,
+            });
+            resolvedPackagingSkuId = primarySku?.id || null;
+          }
         }
 
         if (!resolvedPackagingSkuId) {
