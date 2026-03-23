@@ -548,6 +548,12 @@ function parseCanonicalSettingNumber(args: {
   return fallback;
 }
 
+function hasExplicitResolvedPrice(value: unknown): boolean {
+  if (value == null || value === "") return false;
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0;
+}
+
 function runInfusedPrerollSeedReconciliation(requestId: string) {
   const billedLbs = 5;
   const unitsHigh = 3560;
@@ -1848,8 +1854,9 @@ export async function POST(req: Request) {
 
         packagingType = String((sku as any).packaging_type || "flower_in_bag");
         let packagingUnitCostInternal = money(Number((sku as any).unit_cost || 0));
+        const primaryExplicitSellPrice = (sku as any).sell_price;
         const packagingPrimaryResolution = resolveUnitSellPrice({
-          explicitSellPrice: (sku as any).sell_price,
+          explicitSellPrice: primaryExplicitSellPrice,
           cost: packagingUnitCostInternal,
           markupPct: targetMarkupPct,
         });
@@ -1863,7 +1870,7 @@ export async function POST(req: Request) {
             selected_primary_jar_estimator_slots: (sku as any).estimator_slots ?? null,
             selected_primary_jar_packaging_role: (sku as any).packaging_role ?? null,
             selected_primary_jar_unit_cost: (sku as any).unit_cost ?? null,
-            selected_primary_jar_sell_price: (sku as any).sell_price ?? null,
+            selected_primary_jar_sell_price: primaryExplicitSellPrice ?? null,
             selected_primary_jar_selected_tier_unit_price: selectedTier?.unit_price ?? null,
             selected_primary_jar_selected_tier_moq: selectedTier?.moq ?? null,
             selected_primary_jar_resolved_sell_per_unit: packagingPrimarySellPerUnit,
@@ -1882,6 +1889,7 @@ export async function POST(req: Request) {
           packaging_primary_label = String((sku as any).name || "Vape hardware");
         }
 
+        let secondaryExplicitSellPrice: unknown = null;
         if (productCategory === "concentrate" || isVapeHardwarePackaging) {
           const requiredSecondarySlot =
             productCategory === "concentrate"
@@ -1937,17 +1945,30 @@ export async function POST(req: Request) {
             );
           }
 
+          secondaryExplicitSellPrice = (secondarySku as any).sell_price;
           packaging_secondary_cost_total = money(Number((secondarySku as any).unit_cost || 0));
-          const packagingSecondarySellPerUnit = money(
-            resolveUnitSellPrice({
-              explicitSellPrice: (secondarySku as any).sell_price,
-              cost: packaging_secondary_cost_total,
-              markupPct: targetMarkupPct,
-            }).sellPrice ?? 0
-          );
+          const packagingSecondaryResolution = resolveUnitSellPrice({
+            explicitSellPrice: secondaryExplicitSellPrice,
+            cost: packaging_secondary_cost_total,
+            markupPct: targetMarkupPct,
+          });
+          const packagingSecondarySellPerUnit = money(packagingSecondaryResolution.sellPrice ?? 0);
           packaging_secondary_label = String((secondarySku as any).name || "").trim() || packaging_secondary_label;
           if (isVapeHardwarePackaging) {
             packaging_secondary_label = String((secondarySku as any).name || "3.5g mylar bag");
+          }
+          if (productCategory === "concentrate" && isDev) {
+            console.log(`[add-line:${requestId}] concentrate-secondary-selection`, {
+              selected_secondary_bag_sku_id: (secondarySku as any).id ?? null,
+              selected_secondary_bag_name: (secondarySku as any).name ?? null,
+              selected_secondary_bag_packaging_type: (secondarySku as any).packaging_type ?? null,
+              selected_secondary_bag_estimator_slots: (secondarySku as any).estimator_slots ?? null,
+              selected_secondary_bag_packaging_role: (secondarySku as any).packaging_role ?? null,
+              selected_secondary_bag_unit_cost: (secondarySku as any).unit_cost ?? null,
+              selected_secondary_bag_sell_price: secondaryExplicitSellPrice ?? null,
+              selected_secondary_bag_resolved_sell_per_unit: packagingSecondarySellPerUnit,
+              selected_secondary_bag_derived_from_cost: packagingSecondaryResolution.derivedFromCost,
+            });
           }
           packagingUnitCostInternal = money(packagingUnitCostInternal + packaging_secondary_cost_total);
           packaging_secondary_sell_total = money(packagingSecondarySellPerUnit * units);
@@ -1973,6 +1994,7 @@ export async function POST(req: Request) {
         if (
           productCategory === "concentrate"
           && packaging_primary_sell_total <= 0
+          && !hasExplicitResolvedPrice(primaryExplicitSellPrice)
           && packaging_primary_cost_total > 0
           && units > 0
         ) {
@@ -1985,8 +2007,20 @@ export async function POST(req: Request) {
           );
           packaging_primary_sell_total = money(primarySellFallbackPerUnit * units);
         }
-        if (packaging_secondary_cost_total <= 0) {
-          packaging_secondary_sell_total = 0;
+        if (
+          packaging_secondary_sell_total <= 0
+          && packaging_secondary_cost_total > 0
+          && units > 0
+          && !hasExplicitResolvedPrice(secondaryExplicitSellPrice)
+        ) {
+          const secondarySellFallbackPerUnit = money(
+            resolveUnitSellPrice({
+              explicitSellPrice: null,
+              cost: packaging_secondary_cost_total,
+              markupPct: targetMarkupPct,
+            }).sellPrice ?? 0
+          );
+          packaging_secondary_sell_total = money(secondarySellFallbackPerUnit * units);
         }
         packaging_cost_total = packaging_base_cost_total;
         if (isPreRoll) {
