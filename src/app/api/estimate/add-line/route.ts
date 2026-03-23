@@ -27,6 +27,7 @@ type SupabaseClient = ReturnType<typeof createAdminClient>;
 type PackagingSkuLookupRow = {
   id: string;
   name?: string | null;
+  compliance_status?: string | null;
   packaging_type?: string | null;
   category?: string | null;
   size_grams?: number | null;
@@ -1709,9 +1710,10 @@ export async function POST(req: Request) {
           const { data, error } = await supabase
             .from("packaging_skus")
             .select(
-              "id, name, packaging_type, category, size_grams, pack_qty, vape_device, vape_fill_grams, applies_to, applies_to_contexts, estimator_slots, workflow_contexts, packaging_role, unit_cost, sell_price, active"
+              "id, name, compliance_status, packaging_type, category, size_grams, pack_qty, vape_device, vape_fill_grams, applies_to, applies_to_contexts, estimator_slots, workflow_contexts, packaging_role, unit_cost, sell_price, active"
             )
-            .eq("active", true);
+            .eq("active", true)
+            .eq("compliance_status", "approved");
           if (error) throw new Error(error.message);
           activePackagingSkus = (data || []) as PackagingSkuLookupRow[];
           return activePackagingSkus;
@@ -1889,6 +1891,17 @@ export async function POST(req: Request) {
 
         packaging_sku_id = resolvedPackagingSkuId;
 
+        if (isDev && productCategory === "concentrate") {
+          console.log(`[add-line:${requestId}] concentrate-packaging-resolution`, {
+            requested_primary_packaging_sku_id: body?.packaging_sku_id ?? null,
+            resolved_primary_packaging_sku_id: packaging_sku_id,
+            resolved_secondary_packaging_sku_id: secondary_packaging_sku_id,
+            packaging_primary_label,
+            packaging_secondary_label,
+            units,
+          });
+        }
+
         packaging_base_cost_total = money(packagingUnitCostInternal * units);
         packaging_primary_sell_total = money(packagingPrimarySellPerUnit * units);
         if (packaging_secondary_cost_total <= 0) {
@@ -1956,6 +1969,21 @@ export async function POST(req: Request) {
     );
     packaging_unit_cost = quotedUnitsHigh > 0 ? money(packaging_sell_total / quotedUnitsHigh) : 0;
     packaging_total = packaging_sell_total;
+
+    if (isDev && productCategory === "concentrate") {
+      console.log(`[add-line:${requestId}] concentrate-packaging-assembly`, {
+        packaging_sku_id,
+        secondary_packaging_sku_id,
+        quoted_units_high: quotedUnitsHigh,
+        packaging: [
+          { kind: "primary", label: packaging_primary_label, sell_total: packaging_primary_sell_total },
+          { kind: "secondary", label: packaging_secondary_label, sell_total: packaging_secondary_sell_total },
+          { kind: "stickers", label: "Stickers", sell_total: sticker_sell_total },
+        ],
+        packaging_base_sell_total,
+        packaging_sell_total,
+      });
+    }
 
     if (quotedUnitsHigh > 0) {
       coa_cost_total = money(coa_run_cost_usd);
