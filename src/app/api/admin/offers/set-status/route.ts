@@ -14,6 +14,7 @@ type OfferRow = {
   material_cost_input: number | null;
   allow_bulk: boolean | null;
   allow_copack: boolean | null;
+  allow_pre_roll: boolean | null;
   created_at: string;
   updated_at: string;
 };
@@ -34,7 +35,7 @@ export async function POST(req: Request) {
   const { data: latestOfferData, error: latestOfferErr } = await supabase
     .from("offers")
     .select(
-      "id, product_id, status, min_order, bulk_cost_per_lb, bulk_sell_per_lb, material_cost_per_g, material_cost_basis, material_cost_input, allow_bulk, allow_copack, created_at, updated_at"
+      "id, product_id, status, min_order, bulk_cost_per_lb, bulk_sell_per_lb, material_cost_per_g, material_cost_basis, material_cost_input, allow_bulk, allow_copack, allow_pre_roll, created_at, updated_at"
     )
     .eq("product_id", product_id)
     .order("created_at", { ascending: false })
@@ -58,9 +59,10 @@ export async function POST(req: Request) {
         material_cost_input: null,
         allow_bulk: true,
         allow_copack: true,
+        allow_pre_roll: true,
       })
       .select(
-        "id, product_id, status, min_order, bulk_cost_per_lb, bulk_sell_per_lb, material_cost_per_g, material_cost_basis, material_cost_input, allow_bulk, allow_copack, created_at, updated_at"
+        "id, product_id, status, min_order, bulk_cost_per_lb, bulk_sell_per_lb, material_cost_per_g, material_cost_basis, material_cost_input, allow_bulk, allow_copack, allow_pre_roll, created_at, updated_at"
       )
       .single();
 
@@ -82,7 +84,7 @@ export async function POST(req: Request) {
     .update({ status })
     .eq("id", latestOffer.id)
     .select(
-      "id, product_id, status, min_order, bulk_cost_per_lb, bulk_sell_per_lb, material_cost_per_g, material_cost_basis, material_cost_input, allow_bulk, allow_copack, created_at, updated_at"
+      "id, product_id, status, min_order, bulk_cost_per_lb, bulk_sell_per_lb, material_cost_per_g, material_cost_basis, material_cost_input, allow_bulk, allow_copack, allow_pre_roll, created_at, updated_at"
     )
     .single();
 

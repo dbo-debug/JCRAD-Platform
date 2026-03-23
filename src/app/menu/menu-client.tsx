@@ -302,6 +302,21 @@ function modeFromLine(modeRaw: unknown, preRollModeRaw: unknown): MenuMode | "pr
   return String(preRollModeRaw || "").trim() ? "pre_roll" : "copack";
 }
 
+function lineUnitPrice(line: any, mode: MenuMode | "pre_roll"): number | null {
+  const lineTotalRaw = Number(line?.line_sell_total);
+  const fallbackTotalRaw = Number(line?.line_total);
+  const total = Number.isFinite(lineTotalRaw) ? lineTotalRaw : Number.isFinite(fallbackTotalRaw) ? fallbackTotalRaw : NaN;
+  if (!Number.isFinite(total) || total <= 0) return null;
+
+  if (mode === "bulk") {
+    const quantity = Number(line?.quantity ?? line?.quantity_lbs ?? 0);
+    return quantity > 0 ? total / quantity : null;
+  }
+
+  const units = Number(line?.units || 0);
+  return units > 0 ? total / units : null;
+}
+
 function lineQuantityLabel(line: any, mode: MenuMode | "pre_roll", category: MenuCategory | "" | null): string {
   const quantityLbs = Number(line?.quantity_lbs || 0);
   const quantity = Number(line?.quantity || 0);
@@ -461,13 +476,31 @@ function mapEstimateLine(line: any): EstimateCartLine {
     ? "pre_roll"
     : normalizeCategory(line?.offers?.products?.category) || null;
   const quantityLabel = lineQuantityLabel(line, mode, category);
+  const infusionInputs =
+    line?.infusion_inputs && typeof line.infusion_inputs === "object"
+      ? (line.infusion_inputs as Record<string, any>)
+      : null;
+  const internalInput =
+    infusionInputs?.internal && typeof infusionInputs.internal === "object"
+      ? (infusionInputs.internal as Record<string, any>)
+      : null;
+  const externalInput =
+    infusionInputs?.external && typeof infusionInputs.external === "object"
+      ? (infusionInputs.external as Record<string, any>)
+      : null;
+  const packagingBreakdown =
+    infusionInputs?.cost_breakdown?.packaging && typeof infusionInputs.cost_breakdown.packaging === "object"
+      ? (infusionInputs.cost_breakdown.packaging as Record<string, any>)
+      : null;
   const lineTotalRaw = Number(line?.line_sell_total);
   const fallbackTotalRaw = Number(line?.line_total);
+  const productTitle = normalizeWhitespace(String(line?.offers?.products?.name || line?.offers?.name || ""));
+  const fallbackTitle = normalizeWhitespace(String(line?.notes || "Estimate line"));
 
   return {
     id: String(line?.id || crypto.randomUUID()),
     offerId: String(line?.offer_id || ""),
-    title: String(line?.notes || "Estimate line"),
+    title: productTitle || fallbackTitle,
     category,
     mode,
     quantityLabel,
@@ -483,6 +516,21 @@ function mapEstimateLine(line: any): EstimateCartLine {
       : null,
     preRollPackQty: Number.isFinite(Number(line?.pre_roll_pack_qty)) ? Number(line.pre_roll_pack_qty) : null,
     preRollMode: line?.pre_roll_mode ? String(line.pre_roll_mode) : null,
+    packagingSkuId: line?.packaging_sku_id ? String(line.packaging_sku_id) : null,
+    secondaryPackagingSkuId: line?.secondary_packaging_sku_id ? String(line.secondary_packaging_sku_id) : null,
+    packagingPrimaryLabel: packagingBreakdown?.primary_label ? String(packagingBreakdown.primary_label) : null,
+    packagingSecondaryLabel: packagingBreakdown?.secondary_label ? String(packagingBreakdown.secondary_label) : null,
+    materialTotal: Number.isFinite(Number(line?.material_total)) ? Number(line.material_total) : null,
+    packagingTotal: Number.isFinite(Number(line?.packaging_total)) ? Number(line.packaging_total) : null,
+    laborTotal: Number.isFinite(Number(line?.labor_total)) ? Number(line.labor_total) : null,
+    coaTotal: Number.isFinite(Number(line?.coa_total)) ? Number(line.coa_total) : null,
+    unitPrice: lineUnitPrice(line, mode),
+    internalInfusionProductId: internalInput?.product_id ? String(internalInput.product_id) : null,
+    externalLiquidProductId: externalInput?.liquid_product_id ? String(externalInput.liquid_product_id) : null,
+    externalDryProductId: externalInput?.dry_product_id ? String(externalInput.dry_product_id) : null,
+    internalInfusionProductName: internalInput?.product_name ? String(internalInput.product_name) : null,
+    externalLiquidProductName: externalInput?.liquid_product_name ? String(externalInput.liquid_product_name) : null,
+    externalDryProductName: externalInput?.dry_product_name ? String(externalInput.dry_product_name) : null,
   };
 }
 
@@ -517,6 +565,7 @@ export default function MenuClient({
   const [busyByOfferId, setBusyByOfferId] = useState<Record<string, boolean>>({});
   const [errorByOfferId, setErrorByOfferId] = useState<Record<string, string>>({});
   const [removingLineId, setRemovingLineId] = useState<string | null>(null);
+  const [editingLineId, setEditingLineId] = useState<string | null>(null);
   const [estimateSummary, setEstimateSummary] = useState<EstimateSummary>({
     lines: [],
     total: 0,
@@ -576,6 +625,7 @@ export default function MenuClient({
       const json = await parseJsonSafe(res);
       if (!res.ok) throw new Error(String(json?.error || `Remove failed (${res.status})`));
       await loadEstimateSummary(estimateId);
+      setEditingLineId((current) => (current === lineId ? null : current));
     } catch (err) {
       console.error("[menu] remove line failed", err);
     } finally {
@@ -625,8 +675,7 @@ export default function MenuClient({
       visibleOffers.filter((offer) => {
         const category = normalizeCategory(offer.catalog_category || offer.products?.category);
         if (category !== "flower") return false;
-        const allowCopack = (offer as any).allow_copack;
-        return allowCopack !== false;
+        return offer.allow_pre_roll !== false;
       }),
     [visibleOffers]
   );
@@ -684,9 +733,9 @@ export default function MenuClient({
     const wrongCategory = visibleOffers.filter(
       (offer) => normalizeCategory(offer.catalog_category || offer.products?.category) !== "flower"
     ).length;
-    const allowCopackFalse = visibleOffers.filter((offer) => {
+    const allowPreRollFalse = visibleOffers.filter((offer) => {
       const category = normalizeCategory(offer.catalog_category || offer.products?.category);
-      return category === "flower" && (offer as any).allow_copack === false;
+      return category === "flower" && offer.allow_pre_roll === false;
     }).length;
 
     console.log("[menu:preroll-sources]", {
@@ -700,7 +749,7 @@ export default function MenuClient({
         inactive: 0,
         wrongCategory,
         missingPublishedOffer,
-        allowCopackFalse,
+        allowPreRollFalse,
       },
     });
   }, [selectedCategory, preRollSourceOffers, initialOffers, visibleOffers, canShowDraft, showDraftOffers]);
@@ -728,6 +777,60 @@ export default function MenuClient({
 
   function cardStateForOffer(offer: Offer): OfferCardState {
     return cardStateByOfferId[String(offer.id || "")] || defaultCardState(offer, selectedCategory, menuMode);
+  }
+
+  function cancelEditingLine() {
+    setEditingLineId(null);
+  }
+
+  function startEditingLine(lineId: string) {
+    const line = estimateSummary.lines.find((entry) => entry.id === lineId);
+    if (!line) return;
+    const offer = offerById.get(String(line.offerId || ""));
+    if (!offer) return;
+
+    const offerCategory = normalizeCategory(offer.catalog_category || offer.products?.category) || "flower";
+    const nextCategory = line.mode === "pre_roll" ? "pre_roll" : offerCategory;
+    const nextMenuMode = line.mode === "bulk" ? "bulk" : "copack";
+    const quantity = Math.max(0, Number(line.quantity || 0));
+    const quantityUnit = String(line.quantityUnit || "").toLowerCase();
+    const startingWeightLbs = quantityUnit === "g" ? quantity / GRAMS_PER_LB : quantity;
+    const startingWeightGrams = quantityUnit === "lb" ? quantity * GRAMS_PER_LB : quantity;
+
+    setSearch("");
+    setSelectedCategory(nextCategory);
+    setMenuMode(nextMenuMode);
+    setEditingLineId(line.id);
+    setCardStateByOfferId((prev) => ({
+      ...prev,
+      [String(offer.id || "")]: {
+        ...(prev[String(offer.id || "")] || defaultCardState(offer, nextCategory, nextMenuMode)),
+        expanded: true,
+        mode: line.mode === "pre_roll" ? "pre_roll" : line.mode === "copack" ? "copack" : "bulk",
+        startingWeightLbs,
+        startingWeightGrams,
+        advancedTargetUnits: Math.max(1, Number(line.units || 1)),
+        showAdvancedUnits: line.mode !== "bulk",
+        unitSize: String(line.unitSize || (line.mode === "pre_roll" ? PRE_ROLL_UNIT_SIZES[0] : "3.5g")),
+        packagingMode: String(line.packagingMode || "").toLowerCase() === "customer" ? "customer" : "jcrad",
+        packagingSkuId: String(line.packagingSkuId || ""),
+        secondaryPackagingSkuId: String(line.secondaryPackagingSkuId || ""),
+        preRollPackQty: Math.max(1, Number(line.preRollPackQty || 1)),
+        preRollMode: String(line.preRollMode || PRE_ROLL_MODES[0]),
+        internalInfusionProductId: String(line.internalInfusionProductId || ""),
+        externalLiquidProductId: String(line.externalLiquidProductId || ""),
+        externalDryProductId: String(line.externalDryProductId || ""),
+        notes: String(line.notes || ""),
+        frontFile: null,
+        backFile: null,
+      },
+    }));
+
+    if (typeof window !== "undefined") {
+      window.setTimeout(() => {
+        document.querySelector(`[data-offer-card-id="${String(offer.id || "")}"]`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 50);
+    }
   }
 
   const filterGroups = useMemo(() => {
@@ -873,8 +976,14 @@ export default function MenuClient({
         const cardState = cardStateForOffer(offer);
         const cardMode = cardState.mode;
         const apiMode = cardMode === "pre_roll" ? "copack" : cardMode;
-        const addAllowed = apiMode === "bulk" ? !!offer.allow_bulk : !!offer.allow_copack;
+        const isEditingThisOffer = editingLineId != null && estimateSummary.lines.some((line) => line.id === editingLineId && line.offerId === id);
+        const addAllowed = cardMode === "pre_roll"
+          ? offer.allow_pre_roll !== false
+          : apiMode === "bulk"
+            ? !!offer.allow_bulk
+            : !!offer.allow_copack;
         const isPreRoll = cardMode === "pre_roll";
+        const canUsePreRoll = category === "flower" && offer.allow_pre_roll !== false;
         const minOrder = Math.max(0, Number(offer.min_order || 0));
         const estimatorCategory = (category === "concentrate" || category === "vape" ? category : "flower") as "flower" | "concentrate" | "vape";
         const unitSizeOptions = isPreRoll
@@ -971,7 +1080,13 @@ export default function MenuClient({
           secondaryPackagingSkuId: cardState.secondaryPackagingSkuId,
           preRollPackQty: cardState.preRollPackQty,
           preRollMode: cardState.preRollMode,
-          allowedModes: category === "flower" ? ["bulk", "copack", "pre_roll"] : ["bulk", "copack"],
+          allowedModes: category === "flower"
+            ? (["bulk", "copack", ...(canUsePreRoll ? ["pre_roll" as const] : [])].filter((modeOption) => {
+              if (modeOption === "bulk") return !!offer.allow_bulk;
+              if (modeOption === "copack") return !!offer.allow_copack;
+              return canUsePreRoll;
+            }) as CardMode[])
+            : (["bulk", "copack"].filter((modeOption) => (modeOption === "bulk" ? !!offer.allow_bulk : !!offer.allow_copack)) as CardMode[]),
           internalInfusionProductId: cardState.internalInfusionProductId,
           externalLiquidProductId: cardState.externalLiquidProductId,
           externalDryProductId: cardState.externalDryProductId,
@@ -1063,6 +1178,11 @@ export default function MenuClient({
           pricingLabel: pricingLabelForOffer(offer),
           addDisabled: !addAllowed || Boolean(concentrateMinimumOrderError),
           addLoading: !!busyByOfferId[id],
+          addButtonLabel: isEditingThisOffer ? "Save Changes" : "Add to Estimate",
+          isEditing: isEditingThisOffer,
+          bulkSummaryLabel: category === "flower" && cardState.mode === "bulk"
+            ? `Bulk flower is quoted by the pound. Start with ${cardState.startingWeightLbs.toFixed(2)} lb${minOrder > 0 ? ` minimum ${minOrder.toFixed(2)} lb` : ""}.`
+            : undefined,
           errorText: errorByOfferId[id] || concentrateMinimumOrderError,
           copackConfig,
         };
@@ -1157,6 +1277,9 @@ export default function MenuClient({
   async function addLineToEstimate(offer: Offer) {
     const cardState = cardStateForOffer(offer);
     const estimateId = await ensureEstimateId();
+    const editingLine = editingLineId
+      ? estimateSummary.lines.find((line) => line.id === editingLineId && line.offerId === String(offer.id || ""))
+      : null;
     const category = normalizeCategory(offer.catalog_category || offer.products?.category);
     const mode = cardState.mode;
     const apiMode = mode === "pre_roll" ? "copack" : mode;
@@ -1207,6 +1330,9 @@ export default function MenuClient({
     if (apiMode === "copack" && !offer.allow_copack) {
       throw new Error("This product is not available for copack.");
     }
+    if (mode === "pre_roll" && offer.allow_pre_roll === false) {
+      throw new Error("This flower is marked unavailable for pre-roll.");
+    }
     if (apiMode === "copack" && packagingMode === "jcrad" && !cardState.packagingSkuId) {
       throw new Error(category === "vape" ? "Select a vape vessel SKU (510 cart or AIO)." : "Select a packaging SKU.");
     }
@@ -1255,29 +1381,32 @@ export default function MenuClient({
 
     let packagingSubmissionId: string | null = null;
     if (apiMode === "copack" && packagingMode === "customer") {
-      if (!cardState.frontFile || !cardState.backFile) {
+      if (!cardState.frontFile && !cardState.backFile && editingLine?.packagingSubmissionId) {
+        packagingSubmissionId = editingLine.packagingSubmissionId;
+      } else if (!cardState.frontFile || !cardState.backFile) {
         throw new Error("Upload both front and back artwork for client packaging.");
+      } else {
+        const packagingCategory = inferPackagingCategoryFromContext(mode, category);
+        if (!packagingCategory) {
+          throw new Error("Unable to infer packaging category for this product.");
+        }
+        const form = new FormData();
+        form.set("estimate_id", estimateId);
+        form.set("category", packagingCategory);
+        form.set("notes", cardState.notes || "");
+        form.set("front_file", cardState.frontFile);
+        form.set("back_file", cardState.backFile);
+        const submissionRes = await fetch("/api/packaging/submission/create", {
+          method: "POST",
+          body: form,
+        });
+        const submissionJson = await parseJsonSafe(submissionRes);
+        if (!submissionRes.ok) {
+          throw new Error(String(submissionJson?.error || `Packaging submission failed (${submissionRes.status})`));
+        }
+        packagingSubmissionId = String((submissionJson as any)?.submission?.id || "");
+        if (!packagingSubmissionId) throw new Error("Packaging submission id missing.");
       }
-      const packagingCategory = inferPackagingCategoryFromContext(mode, category);
-      if (!packagingCategory) {
-        throw new Error("Unable to infer packaging category for this product.");
-      }
-      const form = new FormData();
-      form.set("estimate_id", estimateId);
-      form.set("category", packagingCategory);
-      form.set("notes", cardState.notes || "");
-      form.set("front_file", cardState.frontFile);
-      form.set("back_file", cardState.backFile);
-      const submissionRes = await fetch("/api/packaging/submission/create", {
-        method: "POST",
-        body: form,
-      });
-      const submissionJson = await parseJsonSafe(submissionRes);
-      if (!submissionRes.ok) {
-        throw new Error(String(submissionJson?.error || `Packaging submission failed (${submissionRes.status})`));
-      }
-      packagingSubmissionId = String((submissionJson as any)?.submission?.id || "");
-      if (!packagingSubmissionId) throw new Error("Packaging submission id missing.");
     }
 
     const vapeBulkGrams = apiMode === "bulk" && category === "vape"
@@ -1288,6 +1417,7 @@ export default function MenuClient({
       : 0;
     const payload: Record<string, unknown> = {
       estimate_id: estimateId,
+      line_id: editingLine?.id || null,
       offer_id: offer.id,
       mode: apiMode,
       quantity_lbs: apiMode === "bulk" && (category === "vape" || category === "concentrate")
@@ -1359,6 +1489,7 @@ export default function MenuClient({
     const returnedEstimateId = String((json as any)?.estimate_id || estimateId);
     if (returnedEstimateId) setEstimateId(returnedEstimateId);
     await loadEstimateSummary(returnedEstimateId);
+    if (editingLine) setEditingLineId(null);
   }
 
   async function onAdd(offerId: string) {
@@ -1419,7 +1550,10 @@ export default function MenuClient({
       total={cartTotal}
       estimateHref={estimateHref}
       onRemoveLine={removeEstimateLine}
+      onEditLine={startEditingLine}
+      onCancelEdit={cancelEditingLine}
       removingLineId={removingLineId}
+      editingLineId={editingLineId}
       onSendEstimatePdf={onSendEstimatePdf}
       onRequestOrder={onRequestOrder}
       requestOrderLocked={!complianceComplete || packagingReviewPending}

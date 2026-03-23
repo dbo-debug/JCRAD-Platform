@@ -56,6 +56,7 @@ type OfferWithProduct = {
   bulk_sell_per_lb: number | null;
   allow_bulk: boolean | null;
   allow_copack: boolean | null;
+  allow_pre_roll: boolean | null;
   products: {
     id: string;
     name: string | null;
@@ -892,7 +893,7 @@ export async function POST(req: Request) {
     const { data: offerRow, error: offerErr } = await supabase
       .from("offers")
       .select(
-        "id, product_id, min_order, material_cost_per_g, material_cost_basis, material_cost_input, bulk_cost_per_lb, bulk_sell_per_lb, allow_bulk, allow_copack, products:product_id(id, name, category, type, tier, inventory_qty, inventory_unit)"
+        "id, product_id, min_order, material_cost_per_g, material_cost_basis, material_cost_input, bulk_cost_per_lb, bulk_sell_per_lb, allow_bulk, allow_copack, allow_pre_roll, products:product_id(id, name, category, type, tier, inventory_qty, inventory_unit)"
       )
       .eq("id", offer_id)
       .single();
@@ -912,10 +913,6 @@ export async function POST(req: Request) {
     if (mode === "bulk" && !offer.allow_bulk) {
       return respond({ error: "Bulk not allowed for this offer" }, { status: 400 });
     }
-    if (mode === "copack" && !offer.allow_copack) {
-      return respond({ error: "Copack not allowed for this offer" }, { status: 400 });
-    }
-
     let quantity_lbs = Number(body?.quantity_lbs || 0);
     let quantity = 0;
     let quantity_unit: "lb" | "g" | "units" = "lb";
@@ -1125,6 +1122,12 @@ export async function POST(req: Request) {
     const laborSettings = readLaborSettings(pricingByKey);
 
     const isPreRoll = isPreRollLine(mode, productCategory, pre_roll_mode);
+    if (mode === "copack" && !isPreRoll && !offer.allow_copack) {
+      return respond({ error: "Copack not allowed for this offer" }, { status: 400 });
+    }
+    if (isPreRoll && offer.allow_pre_roll === false) {
+      return respond({ error: "Pre-roll not allowed for this offer" }, { status: 400 });
+    }
     const yieldPct = isPreRoll
       ? yieldPctFromSettings({
         settings: pricingByKey,

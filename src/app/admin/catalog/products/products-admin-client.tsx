@@ -16,6 +16,7 @@ type Offer = {
   material_cost_per_g: number | null;
   allow_bulk: boolean;
   allow_copack: boolean;
+  allow_pre_roll: boolean;
 };
 
 type Product = {
@@ -47,6 +48,7 @@ type ProductForm = {
   material_cost_input: string;
   allow_bulk: boolean;
   allow_copack: boolean;
+  allow_pre_roll: boolean;
 };
 
 const FLOWER_TIERS = ["indoor", "light_assist", "full_term"];
@@ -80,6 +82,7 @@ const blankForm: ProductForm = {
   material_cost_input: "",
   allow_bulk: true,
   allow_copack: true,
+  allow_pre_roll: true,
 };
 const LB_TO_G = 453.592;
 
@@ -249,6 +252,7 @@ export default function ProductsAdminClient() {
         material_cost_input: hasInput ? materialInputNum : null,
         allow_bulk: form.allow_bulk,
         allow_copack: form.allow_copack,
+        allow_pre_roll: form.allow_pre_roll,
       },
     };
 
@@ -309,6 +313,7 @@ export default function ProductsAdminClient() {
         offer?.material_cost_input == null ? "" : String(Number(offer.material_cost_input)),
       allow_bulk: typeof offer?.allow_bulk === "boolean" ? offer.allow_bulk : true,
       allow_copack: typeof offer?.allow_copack === "boolean" ? offer.allow_copack : true,
+      allow_pre_roll: typeof offer?.allow_pre_roll === "boolean" ? offer.allow_pre_roll : true,
     });
   }
 
@@ -546,6 +551,15 @@ export default function ProductsAdminClient() {
             />
             allow_copack
           </label>
+
+          <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <input
+              type="checkbox"
+              checked={form.allow_pre_roll}
+              onChange={(e) => setForm((f) => ({ ...f, allow_pre_roll: e.target.checked }))}
+            />
+            allow_pre_roll
+          </label>
         </div>
 
         <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 10, display: "grid", gap: 6, background: "#f9fafb" }}>
@@ -636,7 +650,7 @@ export default function ProductsAdminClient() {
                 <div style={{ fontSize: 13 }}>{p.description || ""}</div>
                 <div style={{ fontSize: 13 }}>
                   {offer
-                    ? `${formatPricePerUnit(offer.bulk_sell_per_lb, { inventory_unit: p.inventory_unit, category: p.category })} | Min ${Number(offer.min_order || 0)} lbs | bulk=${String(!!offer.allow_bulk)} | copack=${String(!!offer.allow_copack)}`
+                    ? `${formatPricePerUnit(offer.bulk_sell_per_lb, { inventory_unit: p.inventory_unit, category: p.category })} | Min ${Number(offer.min_order || 0)} lbs | bulk=${String(!!offer.allow_bulk)} | copack=${String(!!offer.allow_copack)} | pre_roll=${String(offer.allow_pre_roll !== false)}`
                     : "No offer yet"}
                 </div>
                 {!offer && (

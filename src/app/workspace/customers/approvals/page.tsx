@@ -96,6 +96,36 @@ function ApprovalCard({ item }: { item: CustomerApprovalQueueItem }) {
         <QueueMeta label="Owner" value={item.ownerName || "Unassigned"} helper={item.ownerEmail || undefined} />
         <QueueMeta label="Assigned Rep" value={item.assignedRepName || "Unassigned"} helper={item.assignedRepEmail || undefined} />
       </div>
+
+      <div className="mt-4 rounded-xl border border-[#e2edf2] bg-[#f9fcfd] px-3 py-3">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#6a8290]">Linked Docs</p>
+        {item.linkedDocuments.length > 0 ? (
+          <div className="mt-2 grid gap-2 md:grid-cols-3">
+            {item.linkedDocuments.map((doc) => {
+              const content = (
+                <>
+                  <p className="text-sm font-semibold text-[#173543]">{doc.title}</p>
+                  <p className="mt-1 text-xs text-[#5b7382]">
+                    {doc.documentType} • {formatDate(doc.createdAt)}
+                  </p>
+                </>
+              );
+
+              return doc.href ? (
+                <Link key={doc.id} href={doc.href} target="_blank" className="rounded-xl border border-[#dbe9ef] bg-white px-3 py-2.5 transition hover:border-[#14b8a6]">
+                  {content}
+                </Link>
+              ) : (
+                <div key={doc.id} className="rounded-xl border border-[#dbe9ef] bg-white px-3 py-2.5">
+                  {content}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="mt-2 text-sm text-[#5b7382]">No linked docs yet.</p>
+        )}
+      </div>
     </article>
   );
 }

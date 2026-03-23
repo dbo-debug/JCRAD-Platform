@@ -12,6 +12,7 @@ type OfferWithProduct = {
   bulk_sell_per_lb: number | null;
   allow_bulk: boolean | null;
   allow_copack: boolean | null;
+  allow_pre_roll: boolean | null;
   created_at: string;
   updated_at: string;
   products: {
@@ -42,7 +43,7 @@ export async function GET(req: Request) {
   let query = supabase
     .from("offers")
     .select(
-      "id, product_id, status, min_order, bulk_cost_per_lb, bulk_sell_per_lb, allow_bulk, allow_copack, created_at, updated_at, products:product_id(id, name, category, type, tier, inventory_qty, inventory_unit)"
+      "id, product_id, status, min_order, bulk_cost_per_lb, bulk_sell_per_lb, allow_bulk, allow_copack, allow_pre_roll, created_at, updated_at, products:product_id(id, name, category, type, tier, inventory_qty, inventory_unit)"
     )
     .order("created_at", { ascending: false });
 
@@ -92,6 +93,7 @@ export async function POST(req: Request) {
       : Number(body?.bulk_sell_per_lb);
   const allow_bulk = !!body?.allow_bulk;
   const allow_copack = !!body?.allow_copack;
+  const allow_pre_roll = body?.allow_pre_roll == null ? true : !!body.allow_pre_roll;
 
   if (!product_id) return NextResponse.json({ error: "product_id required" }, { status: 400 });
   if (!["draft", "published"].includes(status)) {
@@ -142,6 +144,7 @@ export async function POST(req: Request) {
     bulk_sell_per_lb,
     allow_bulk,
     allow_copack,
+    allow_pre_roll,
   };
 
   if (id) {

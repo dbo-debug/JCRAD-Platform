@@ -66,6 +66,7 @@ export type CustomerSummary = {
     membershipRole: string;
     isPrimary: boolean;
   }>;
+  linkedDocuments: LinkedRecord[];
   counts: {
     estimates: number;
     orders: number;
@@ -814,6 +815,7 @@ function buildCustomerSummary({
     contactCount: contacts.length,
     primaryContacts,
     memberUsers,
+    linkedDocuments: linkedDocuments.slice(0, 6),
     counts: {
       estimates: linkedEstimates.length,
       orders: linkedOrders.length,

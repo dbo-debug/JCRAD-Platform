@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import { createClient } from "@/lib/supabase/client";
@@ -9,6 +10,7 @@ import type { EmailOtpType } from "@supabase/supabase-js";
 
 export default function ResetPasswordForm() {
   const supabase = useMemo(() => createClient(), []);
+  const router = useRouter();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [message, setMessage] = useState("");
@@ -106,6 +108,18 @@ export default function ResetPasswordForm() {
     };
   }, [supabase]);
 
+  useEffect(() => {
+    if (!success) return;
+
+    const timeoutId = window.setTimeout(() => {
+      router.push("/portal");
+    }, 1200);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [router, success]);
+
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubmitting(true);
@@ -131,7 +145,7 @@ export default function ResetPasswordForm() {
     }
 
     setSuccess(true);
-    setMessage("Password updated successfully. You can now continue to your dashboard.");
+    setMessage("Password updated successfully. Redirecting you to your portal...");
   }
 
   return (

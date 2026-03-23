@@ -29,6 +29,7 @@ type OfferInput = {
   material_cost_input?: unknown;
   allow_bulk?: unknown;
   allow_copack?: unknown;
+  allow_pre_roll?: unknown;
 };
 
 type CatalogItemInput = {
@@ -63,6 +64,7 @@ type OfferRow = {
   material_cost_input: number | null;
   allow_bulk: boolean | null;
   allow_copack: boolean | null;
+  allow_pre_roll: boolean | null;
   created_at: string;
   updated_at: string;
 };
@@ -132,6 +134,7 @@ export async function POST(req: Request) {
   const material_cost_input = materialInputProvided ? Number(offerInput?.material_cost_input) : null;
   const allow_bulk = asBoolean(offerInput?.allow_bulk, true);
   const allow_copack = asBoolean(offerInput?.allow_copack, true);
+  const allow_pre_roll = asBoolean(offerInput?.allow_pre_roll, true);
 
   const materialBasisProvided = material_cost_basis != null;
   if (materialBasisProvided !== materialInputProvided) {
@@ -207,8 +210,8 @@ export async function POST(req: Request) {
   if (bulk_cost_per_lb != null && (!Number.isFinite(bulk_cost_per_lb) || bulk_cost_per_lb < 0)) {
     return NextResponse.json({ error: "bulk_cost_per_lb must be null or >= 0" }, { status: 400 });
   }
-  if (typeof allow_bulk !== "boolean" || typeof allow_copack !== "boolean") {
-    return NextResponse.json({ error: "allow_bulk and allow_copack must be boolean" }, { status: 400 });
+  if (typeof allow_bulk !== "boolean" || typeof allow_copack !== "boolean" || typeof allow_pre_roll !== "boolean") {
+    return NextResponse.json({ error: "allow_bulk, allow_copack, and allow_pre_roll must be boolean" }, { status: 400 });
   }
   if (allow_bulk && (bulk_sell_per_lb == null || bulk_sell_per_lb <= 0) && (material_cost_per_g == null || material_cost_per_g <= 0)) {
     return NextResponse.json(
@@ -259,6 +262,7 @@ export async function POST(req: Request) {
     material_cost_input,
     allow_bulk,
     allow_copack,
+    allow_pre_roll,
   };
 
   const { data: existingOffer, error: existingOfferErr } = await supabase
@@ -280,7 +284,7 @@ export async function POST(req: Request) {
       .update(offerPayload)
       .eq("id", existingOfferId)
       .select(
-        "id, product_id, status, min_order, bulk_cost_per_lb, bulk_sell_per_lb, material_cost_per_g, material_cost_basis, material_cost_input, allow_bulk, allow_copack, created_at, updated_at"
+        "id, product_id, status, min_order, bulk_cost_per_lb, bulk_sell_per_lb, material_cost_per_g, material_cost_basis, material_cost_input, allow_bulk, allow_copack, allow_pre_roll, created_at, updated_at"
       )
       .single();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -290,7 +294,7 @@ export async function POST(req: Request) {
       .from("offers")
       .insert(offerPayload)
       .select(
-        "id, product_id, status, min_order, bulk_cost_per_lb, bulk_sell_per_lb, material_cost_per_g, material_cost_basis, material_cost_input, allow_bulk, allow_copack, created_at, updated_at"
+        "id, product_id, status, min_order, bulk_cost_per_lb, bulk_sell_per_lb, material_cost_per_g, material_cost_basis, material_cost_input, allow_bulk, allow_copack, allow_pre_roll, created_at, updated_at"
       )
       .single();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });

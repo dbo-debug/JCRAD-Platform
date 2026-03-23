@@ -6,6 +6,7 @@ export type Offer = {
   bulk_sell_per_lb: number | null;
   allow_bulk: boolean;
   allow_copack: boolean;
+  allow_pre_roll?: boolean | null;
   catalog_name?: string | null;
   catalog_category?: string | null;
   products: {
@@ -103,7 +104,10 @@ export type ProductCardItem = {
   pricingLabel: string;
   addDisabled: boolean;
   addLoading: boolean;
+  addButtonLabel?: string;
+  isEditing?: boolean;
   errorText?: string;
+  bulkSummaryLabel?: string;
   copackConfig?: ProductCardCopackConfig;
 };
 
@@ -126,4 +130,19 @@ export type EstimateCartLine = {
   preRollMode?: string | null;
   expectedRangeLabel?: string;
   startingWeightLabel?: string;
+  packagingSkuId?: string | null;
+  secondaryPackagingSkuId?: string | null;
+  packagingPrimaryLabel?: string | null;
+  packagingSecondaryLabel?: string | null;
+  materialTotal?: number | null;
+  packagingTotal?: number | null;
+  laborTotal?: number | null;
+  coaTotal?: number | null;
+  unitPrice?: number | null;
+  internalInfusionProductId?: string | null;
+  externalLiquidProductId?: string | null;
+  externalDryProductId?: string | null;
+  internalInfusionProductName?: string | null;
+  externalLiquidProductName?: string | null;
+  externalDryProductName?: string | null;
 };

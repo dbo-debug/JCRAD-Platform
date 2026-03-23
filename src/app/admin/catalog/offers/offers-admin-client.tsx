@@ -22,6 +22,7 @@ type Offer = {
   bulk_sell_per_lb: number;
   allow_bulk: boolean;
   allow_copack: boolean;
+  allow_pre_roll: boolean;
   products?: Product;
 };
 
@@ -40,6 +41,7 @@ const blank = {
   bulk_sell_per_lb: 0,
   allow_bulk: true,
   allow_copack: true,
+  allow_pre_roll: true,
 };
 
 export default function OffersAdminClient() {
@@ -149,6 +151,9 @@ export default function OffersAdminClient() {
         <label style={{ display: "flex", gap: 6 }}>
           <input type="checkbox" checked={form.allow_copack} onChange={(e) => setForm((f: any) => ({ ...f, allow_copack: e.target.checked }))} /> allow_copack
         </label>
+        <label style={{ display: "flex", gap: 6 }}>
+          <input type="checkbox" checked={form.allow_pre_roll} onChange={(e) => setForm((f: any) => ({ ...f, allow_pre_roll: e.target.checked }))} /> allow_pre_roll
+        </label>
 
         <div style={{ display: "flex", gap: 8 }}>
           <button onClick={saveOffer} disabled={busy}>{busy ? "Saving..." : "Save Offer"}</button>
@@ -171,7 +176,7 @@ export default function OffersAdminClient() {
                 {o.products?.category || "-"} / {o.products?.type || "-"} / {o.products?.tier || "-"}
               </div>
               <div style={{ fontSize: 13 }}>
-                Sell {formatPricePerUnit(o.bulk_sell_per_lb, o.products)} | Min {Number(o.min_order || 0)} lbs | bulk={String(o.allow_bulk)} copack={String(o.allow_copack)}
+                Sell {formatPricePerUnit(o.bulk_sell_per_lb, o.products)} | Min {Number(o.min_order || 0)} lbs | bulk={String(o.allow_bulk)} copack={String(o.allow_copack)} preroll={String(o.allow_pre_roll !== false)}
               </div>
               <div style={{ fontSize: 13 }}>
                 Product inventory: {Number(o.products?.inventory_qty || 0)} {o.products?.inventory_unit || "lb"}
@@ -186,6 +191,7 @@ export default function OffersAdminClient() {
                   bulk_sell_per_lb: Number(o.bulk_sell_per_lb || 0),
                   allow_bulk: !!o.allow_bulk,
                   allow_copack: !!o.allow_copack,
+                  allow_pre_roll: o.allow_pre_roll !== false,
                 })}>Edit</button>
               </div>
             </div>

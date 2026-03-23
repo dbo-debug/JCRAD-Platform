@@ -41,6 +41,7 @@ export type BulkProductFormValues = {
   min_order: number;
   allow_bulk: boolean;
   allow_copack: boolean;
+  allow_pre_roll: boolean;
   offer_status: "draft" | "published";
 };
 
@@ -218,6 +219,7 @@ export default function BulkProductForm({
         material_cost_input: costPerUnit,
         allow_bulk: !!form.allow_bulk,
         allow_copack: !!form.allow_copack,
+        allow_pre_roll: !!form.allow_pre_roll,
       },
       catalog_item: {
         id: form.catalog_item_id || null,
@@ -496,6 +498,14 @@ export default function BulkProductForm({
             onChange={(e) => setForm((prev) => ({ ...prev, allow_copack: e.target.checked }))}
           />
           Allow Copack
+        </label>
+        <label className="flex items-center gap-2 text-sm text-[#2f4a59]">
+          <input
+            type="checkbox"
+            checked={form.allow_pre_roll}
+            onChange={(e) => setForm((prev) => ({ ...prev, allow_pre_roll: e.target.checked }))}
+          />
+          Allow Pre-roll
         </label>
         <label className="flex items-center gap-2 text-sm text-[#2f4a59]">
           <input

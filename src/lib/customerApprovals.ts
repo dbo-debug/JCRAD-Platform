@@ -15,6 +15,13 @@ export type CustomerApprovalQueueItem = {
   readyState: "docs_linked" | "missing_docs";
   readyLabel: string;
   documentCount: number;
+  linkedDocuments: Array<{
+    id: string;
+    title: string;
+    documentType: string;
+    href: string | null;
+    createdAt: string | null;
+  }>;
   reviewHref: string;
   accountHref: string;
 };
@@ -41,6 +48,17 @@ function buildApprovalQueueItem(customer: CustomerSummary): CustomerApprovalQueu
   const readyState = documentCount > 0 ? "docs_linked" : "missing_docs";
   const readyLabel = documentCount > 0 ? `${documentCount} linked doc${documentCount === 1 ? "" : "s"}` : "No linked docs yet";
   const accountHref = `/workspace/customers/${customer.id}`;
+  const linkedDocuments = customer.linkedDocuments.slice(0, 3).map((document) => {
+    const directHref = firstText(document.file_url, document.public_url, document.url);
+
+    return {
+      id: document.id,
+      title: firstText(document.title, document.file_name, document.name) || `Document ${document.id.slice(0, 8)}`,
+      documentType: firstText(document.document_type, document.kind) || "Document",
+      href: directHref,
+      createdAt: document.updatedAt || document.createdAt,
+    };
+  });
 
   return {
     customerId: customer.id,
@@ -63,15 +81,16 @@ function buildApprovalQueueItem(customer: CustomerSummary): CustomerApprovalQueu
     readyState,
     readyLabel,
     documentCount,
+    linkedDocuments,
     reviewHref: documentCount > 0 ? `${accountHref}#customer-documents` : accountHref,
     accountHref,
   };
 }
 
 export function isCustomerApprovalCandidate(customer: CustomerSummary): boolean {
-  // Keep the queue source-of-truth aligned to explicit customer approval state.
-  // Non-approved active customers remain review candidates unless business rules later narrow this intentionally.
-  return !customer.archivedAt;
+  if (customer.archivedAt) return false;
+  if (customer.counts.documents > 0) return true;
+  return isFollowUpCustomerApprovalStatus(customer.approvalStatus);
 }
 
 export function summarizeCustomerApprovalQueue(rows: Array<{ approvalStatus: string }>) {

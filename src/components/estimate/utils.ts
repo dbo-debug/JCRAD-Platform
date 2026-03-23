@@ -122,6 +122,14 @@ function detailFromQtyRate(quantity: number, unit: string, total: number, explic
   return rateText ? `${qtyText} @ ${rateText}` : qtyText;
 }
 
+function infusionLabel(prefix: string, name: string): string {
+  return name ? `${prefix}: ${name}` : prefix;
+}
+
+function combineDetails(parts: Array<string | null | undefined>): string {
+  return parts.map((part) => String(part || "").trim()).filter(Boolean).join(" • ");
+}
+
 function baseMaterialLabel(line: EstimateLine): string {
   const category = String(line?.offers?.products?.category || "").trim().toLowerCase();
   const productName = String(line?.offers?.products?.name || "").trim();
@@ -158,6 +166,15 @@ export function buildBreakdownGroups(line: EstimateLine): BreakdownGroupData[] {
   const materialSplit = resolveMaterialSellSplit(line);
   const baseLabel = baseMaterialLabel(line);
   const baseMaterialTotal = money(pickNumber(material, "flower_sell_total", materialSplit.flower));
+  const internalInfusionName = String(
+    line?.infusion_internal_product_name || line?.infusion_inputs?.internal?.product_name || ""
+  ).trim();
+  const externalLiquidName = String(
+    line?.infusion_external_liquid_product_name || line?.infusion_inputs?.external?.liquid_product_name || ""
+  ).trim();
+  const externalDryName = String(
+    line?.infusion_external_dry_product_name || line?.infusion_inputs?.external?.dry_product_name || ""
+  ).trim();
 
   const materialsRows = positiveRows([
     {
@@ -168,34 +185,49 @@ export function buildBreakdownGroups(line: EstimateLine): BreakdownGroupData[] {
     },
     {
       id: "internal",
-      label: "Internal Infusion",
-      detail: detailFromQtyRate(
-        pickNumber(material, "internal_infusion_grams"),
-        "g",
-        pickNumber(material, "internal_infusion_sell_total")
-      ),
+      label: infusionLabel("Internal Infusion", internalInfusionName),
+      detail: combineDetails([
+        detailFromQtyRate(
+          pickNumber(material, "internal_infusion_grams"),
+          "g",
+          pickNumber(material, "internal_infusion_sell_total")
+        ),
+        internalInfusionName && !pickNumber(material, "internal_infusion_grams")
+          ? internalInfusionName
+          : "",
+      ]),
       total: money(pickNumber(material, "internal_infusion_sell_total")),
     },
     {
       id: "ext-dist",
-      label: "External Distillate",
-      detail: detailFromQtyRate(
-        pickNumber(material, "external_distillate_grams_base"),
-        "g",
-        pickNumber(material, "external_distillate_sell_total"),
-        pickNumber(material, "external_distillate_sell_per_g")
-      ),
+      label: infusionLabel("External Liquid", externalLiquidName),
+      detail: combineDetails([
+        detailFromQtyRate(
+          pickNumber(material, "external_distillate_grams_base"),
+          "g",
+          pickNumber(material, "external_distillate_sell_total"),
+          pickNumber(material, "external_distillate_sell_per_g")
+        ),
+        pickNumber(material, "external_distillate_grams_to_pull") > 0
+          ? `pull ${pickNumber(material, "external_distillate_grams_to_pull").toFixed(3)} g`
+          : "",
+      ]),
       total: money(pickNumber(material, "external_distillate_sell_total")),
     },
     {
       id: "ext-dry",
-      label: "External Dry",
-      detail: detailFromQtyRate(
-        pickNumber(material, "external_dry_grams_base"),
-        "g",
-        pickNumber(material, "external_dry_sell_total"),
-        pickNumber(material, "external_dry_sell_per_g")
-      ),
+      label: infusionLabel("External Dry", externalDryName),
+      detail: combineDetails([
+        detailFromQtyRate(
+          pickNumber(material, "external_dry_grams_base"),
+          "g",
+          pickNumber(material, "external_dry_sell_total"),
+          pickNumber(material, "external_dry_sell_per_g")
+        ),
+        pickNumber(material, "external_dry_grams_to_pull") > 0
+          ? `pull ${pickNumber(material, "external_dry_grams_to_pull").toFixed(3)} g`
+          : "",
+      ]),
       total: money(pickNumber(material, "external_dry_sell_total")),
     },
   ]);

@@ -27,6 +27,7 @@ type OfferRow = {
   material_cost_per_g: number | null;
   allow_bulk: boolean | null;
   allow_copack: boolean | null;
+  allow_pre_roll: boolean | null;
   created_at: string;
   updated_at: string;
 };
@@ -156,7 +157,7 @@ export async function GET(req: Request) {
     const { data: offers, error: offersErr } = await supabase
       .from("offers")
       .select(
-        "id, product_id, status, min_order, bulk_cost_per_lb, bulk_sell_per_lb, material_cost_basis, material_cost_input, material_cost_per_g, allow_bulk, allow_copack, created_at, updated_at"
+        "id, product_id, status, min_order, bulk_cost_per_lb, bulk_sell_per_lb, material_cost_basis, material_cost_input, material_cost_per_g, allow_bulk, allow_copack, allow_pre_roll, created_at, updated_at"
       )
       .in("product_id", productIds)
       .order("created_at", { ascending: true });

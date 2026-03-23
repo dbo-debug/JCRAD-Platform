@@ -15,6 +15,7 @@ type OfferRow = {
   bulk_sell_per_lb: number | null;
   allow_bulk: boolean;
   allow_copack: boolean;
+  allow_pre_roll: boolean;
 };
 
 type CatalogItemRow = {
@@ -395,7 +396,7 @@ export default async function MenuPage() {
   if (productIds.length > 0) {
     const { data: offersData, error: offersErr } = await supabase
       .from("offers")
-      .select("id, product_id, status, created_at, min_order, bulk_sell_per_lb, allow_bulk, allow_copack")
+      .select("id, product_id, status, created_at, min_order, bulk_sell_per_lb, allow_bulk, allow_copack, allow_pre_roll")
       .in("product_id", productIds)
       .in("status", ["published", "draft"])
       .order("created_at", { ascending: false });

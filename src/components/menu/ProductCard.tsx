@@ -41,6 +41,12 @@ export default function ProductCard({ item, onAdd }: ProductCardProps) {
       && item.copackConfig.mode === "bulk"
       && String(item.categoryLabel || "").toLowerCase() === "concentrate"
   );
+  const showBulkLbSummary = Boolean(
+    item.bulkSummaryLabel
+      && item.copackConfig
+      && item.copackConfig.mode === "bulk"
+      && String(item.categoryLabel || "").toLowerCase() === "flower"
+  );
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -81,7 +87,10 @@ export default function ProductCard({ item, onAdd }: ProductCardProps) {
   }
 
   return (
-    <article className="group flex h-full flex-col rounded-[18px] border border-[#dce6ed] bg-white p-3 shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-lg">
+    <article
+      data-offer-card-id={item.id}
+      className="group flex h-full flex-col rounded-[18px] border border-[#dce6ed] bg-white p-3 shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-lg"
+    >
       <div
         className="relative mb-3 aspect-[4/3] overflow-hidden rounded-[14px] border border-[#d9e4ea] bg-gradient-to-br from-[#f7fafc] to-[#edf3f6]"
         onMouseEnter={handleMediaMouseEnter}
@@ -162,6 +171,12 @@ export default function ProductCard({ item, onAdd }: ProductCardProps) {
             <div className="whitespace-nowrap text-[11px] font-medium text-[#6a8392]">Avail: {availabilityText}</div>
           ) : null}
         </div>
+
+        {showBulkLbSummary ? (
+          <div className="rounded-xl border border-[#d7e7e4] bg-[#f4fbf9] px-2.5 py-2 text-[11px] font-medium text-[#24505b]">
+            {item.bulkSummaryLabel}
+          </div>
+        ) : null}
 
         {item.copackConfig ? (
           <div className="space-y-2 rounded-xl border border-[#dbe6ed] bg-[#f9fcfe] p-2.5">
@@ -462,10 +477,15 @@ export default function ProductCard({ item, onAdd }: ProductCardProps) {
             disabled={item.addDisabled || item.addLoading || hasOnlyOneExternalSelection}
             className="flex-1 rounded-full bg-[#14b8a6] px-3 py-2 text-xs font-bold text-white transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-55"
           >
-            {item.addLoading ? "Adding..." : "Add to Estimate"}
+            {item.addLoading ? (item.isEditing ? "Saving..." : "Adding...") : item.addButtonLabel || "Add to Estimate"}
           </button>
         </div>
 
+        {item.isEditing ? (
+          <div className="text-[11px] font-medium text-[#0f766e]">
+            Editing this estimate line from the cart.
+          </div>
+        ) : null}
         {item.errorText ? <p className="text-xs text-[#be3a2d]">{item.errorText}</p> : null}
       </div>
     </article>

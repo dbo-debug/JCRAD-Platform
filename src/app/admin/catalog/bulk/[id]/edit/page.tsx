@@ -31,7 +31,7 @@ export default async function AdminCatalogBulkEditPage({ params }: PageProps) {
     productId
       ? supabase
         .from("offers")
-        .select("id, status, min_order, bulk_cost_per_lb, bulk_sell_per_lb, allow_bulk, allow_copack")
+        .select("id, status, min_order, bulk_cost_per_lb, bulk_sell_per_lb, allow_bulk, allow_copack, allow_pre_roll")
         .eq("product_id", productId)
         .order("created_at", { ascending: false })
         .limit(1)
@@ -66,6 +66,7 @@ export default async function AdminCatalogBulkEditPage({ params }: PageProps) {
     min_order: Number((offer as any)?.min_order || 0),
     allow_bulk: (offer as any)?.allow_bulk == null ? true : !!(offer as any).allow_bulk,
     allow_copack: (offer as any)?.allow_copack == null ? true : !!(offer as any).allow_copack,
+    allow_pre_roll: (offer as any)?.allow_pre_roll == null ? true : !!(offer as any).allow_pre_roll,
     offer_status: String((offer as any)?.status || "draft").toLowerCase() === "published" ? "published" : "draft",
   };
 

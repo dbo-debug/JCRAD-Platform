@@ -14,6 +14,7 @@ const DEFAULT_VALUES: BulkProductFormValues = {
   min_order: 0,
   allow_bulk: true,
   allow_copack: true,
+  allow_pre_roll: true,
   offer_status: "draft",
 };
 

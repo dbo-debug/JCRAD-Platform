@@ -6,7 +6,10 @@ type EstimateCartPanelProps = {
   total: number;
   estimateHref: string;
   onRemoveLine: (lineId: string) => Promise<void>;
+  onEditLine: (lineId: string) => void;
+  onCancelEdit: () => void;
   removingLineId?: string | null;
+  editingLineId?: string | null;
   onSendEstimatePdf: () => void;
   onRequestOrder: () => void;
   requestOrderLocked: boolean;
@@ -31,12 +34,26 @@ function shouldShowExpectedRange(line: EstimateCartLine): boolean {
   return true;
 }
 
+function compactPriceSummary(line: EstimateCartLine): string {
+  const parts: string[] = [];
+  if (Number.isFinite(Number(line.packagingTotal)) && Number(line.packagingTotal) > 0) parts.push(`Packaging ${asMoney(Number(line.packagingTotal))}`);
+  if (Number.isFinite(Number(line.materialTotal)) && Number(line.materialTotal) > 0) parts.push(`Materials ${asMoney(Number(line.materialTotal))}`);
+  if (Number.isFinite(Number(line.laborTotal)) && Number(line.laborTotal) > 0) parts.push(`Labor ${asMoney(Number(line.laborTotal))}`);
+  if (Number.isFinite(Number(line.coaTotal)) && Number(line.coaTotal) > 0) parts.push(`COA ${asMoney(Number(line.coaTotal))}`);
+  if (Number.isFinite(Number(line.unitPrice)) && Number(line.unitPrice) > 0) parts.push(`Unit ${asMoney(Number(line.unitPrice))}`);
+  if (Number.isFinite(Number(line.lineTotal)) && Number(line.lineTotal) > 0) parts.push(`Total ${asMoney(Number(line.lineTotal))}`);
+  return parts.join(" • ");
+}
+
 export default function EstimateCartPanel({
   lines,
   total,
   estimateHref,
   onRemoveLine,
+  onEditLine,
+  onCancelEdit,
   removingLineId,
+  editingLineId,
   onSendEstimatePdf,
   onRequestOrder,
   requestOrderLocked,
@@ -53,8 +70,15 @@ export default function EstimateCartPanel({
     if ((line.mode === "copack" || line.mode === "pre_roll") && line.units && line.unitSize) {
       parts.push(`${line.units} units @ ${line.unitSize}`);
     }
+    if (line.mode === "bulk" && line.quantityLabel) {
+      parts.push(`Quoted ${line.quantityLabel}`);
+    }
     if (line.packagingMode) {
-      parts.push(`Packaging: ${line.packagingMode === "customer" ? "Customer" : "JC RAD"}`);
+      const packagingLabel =
+        line.packagingMode === "customer"
+          ? "Customer packaging"
+          : [line.packagingPrimaryLabel, line.packagingSecondaryLabel].filter(Boolean).join(" + ") || "JC RAD packaging";
+      parts.push(packagingLabel);
     }
     return parts.join("; ");
   }
@@ -74,6 +98,19 @@ export default function EstimateCartPanel({
         </Link>
       </div>
 
+      {editingLineId ? (
+        <div className="rounded-xl border border-[#bee6df] bg-[#ecfbf8] px-3 py-2 text-xs font-medium text-[#0f766e]">
+          Editing a line in the menu.
+          <button
+            type="button"
+            onClick={onCancelEdit}
+            className="ml-2 inline-flex rounded-full border border-[#9fd6cf] px-2 py-0.5 font-semibold text-[#0f766e] transition hover:border-[#0f766e]"
+          >
+            Cancel
+          </button>
+        </div>
+      ) : null}
+
       <div className="max-h-[320px] space-y-2 overflow-auto pr-1">
         {lines.length === 0 ? (
           <p className="text-sm text-[#657f8f]">No line items yet. Add products from the catalog.</p>
@@ -82,14 +119,28 @@ export default function EstimateCartPanel({
             <div key={line.id} className="rounded-xl border border-[#dbe6ed] bg-[#fbfdfe] p-2.5">
               <div className="flex items-start justify-between gap-2">
                 <div className="text-sm font-medium text-[#223640]">{line.title}</div>
-                <button
-                  type="button"
-                  onClick={() => void onRemoveLine(line.id)}
-                  disabled={removingLineId === line.id}
-                  className="rounded-full border border-[#d9c5c5] px-2 py-0.5 text-[11px] font-semibold text-[#8a2c2c] transition hover:border-[#8a2c2c] disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {removingLineId === line.id ? "Removing..." : "Remove"}
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => onEditLine(line.id)}
+                    className={[
+                      "rounded-full border px-2 py-0.5 text-[11px] font-semibold transition",
+                      editingLineId === line.id
+                        ? "border-[#14b8a6] bg-[#ecfbf8] text-[#0f766e]"
+                        : "border-[#cfdde5] text-[#2f4a59] hover:border-[#14b8a6] hover:text-[#0f766e]",
+                    ].join(" ")}
+                  >
+                    {editingLineId === line.id ? "Editing" : "Edit"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void onRemoveLine(line.id)}
+                    disabled={removingLineId === line.id}
+                    className="rounded-full border border-[#d9c5c5] px-2 py-0.5 text-[11px] font-semibold text-[#8a2c2c] transition hover:border-[#8a2c2c] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {removingLineId === line.id ? "Removing..." : "Remove"}
+                  </button>
+                </div>
               </div>
               <div className="mt-1 text-xs text-[#6a8392]">
                 {line.quantityLabel}
@@ -107,7 +158,7 @@ export default function EstimateCartPanel({
                 <div className="mt-1 text-xs text-[#6a8392]">Stickers: 3 per finished unit (auto-included)</div>
               ) : null}
               <div className="mt-1 text-xs text-[#365160]">
-                {line.lineTotal == null ? "Pricing pending" : asMoney(line.lineTotal)}
+                {line.lineTotal == null ? "Pricing pending" : compactPriceSummary(line)}
               </div>
               {String(line.notes || "").includes("Packaging Review Pending") || line.packagingSubmissionId ? (
                 <div className="mt-1 inline-flex rounded-full border border-[#f2d58f] bg-[#fff8e7] px-2 py-0.5 text-[11px] font-medium text-[#9a6a15]">
