@@ -1,10 +1,11 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import { createClient } from "@/lib/supabase/client";
+import type { EmailOtpType } from "@supabase/supabase-js";
 
 export default function ResetPasswordForm() {
   const supabase = useMemo(() => createClient(), []);
@@ -13,6 +14,97 @@ export default function ResetPasswordForm() {
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [initializing, setInitializing] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    function finish(nextMessage?: string) {
+      if (cancelled) return;
+      if (nextMessage) setMessage(nextMessage);
+      setInitializing(false);
+    }
+
+    async function initializeRecovery() {
+      const currentUrl = new URL(window.location.href);
+      const hashParams = new URLSearchParams(currentUrl.hash.startsWith("#") ? currentUrl.hash.slice(1) : currentUrl.hash);
+      const errorDescription =
+        currentUrl.searchParams.get("error_description") || hashParams.get("error_description") || "";
+      const errorCode = currentUrl.searchParams.get("error") || hashParams.get("error") || "";
+      if (errorDescription || errorCode) {
+        finish(decodeURIComponent(errorDescription || errorCode).replace(/\+/g, " "));
+        return;
+      }
+
+      const tokenHash = currentUrl.searchParams.get("token_hash") || currentUrl.searchParams.get("token");
+      const type = (currentUrl.searchParams.get("type") || hashParams.get("type") || "") as EmailOtpType;
+      const accessToken = hashParams.get("access_token");
+      const refreshToken = hashParams.get("refresh_token");
+
+      if (tokenHash && type === "recovery") {
+        const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type });
+        if (error) {
+          finish("Reset link is invalid or expired.");
+          return;
+        }
+        window.history.replaceState(window.history.state, "", "/reset-password");
+        finish();
+        return;
+      }
+
+      if (accessToken && refreshToken) {
+        const { error } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+        if (error) {
+          finish("Reset link is invalid or expired.");
+          return;
+        }
+        window.history.replaceState(window.history.state, "", "/reset-password");
+        finish();
+        return;
+      }
+
+      const hasCode = currentUrl.searchParams.has("code");
+      if (!hasCode) {
+        finish();
+        return;
+      }
+
+      const authStatePromise = new Promise<void>((resolve) => {
+        const {
+          data: { subscription },
+        } = supabase.auth.onAuthStateChange((event) => {
+          if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") {
+            subscription.unsubscribe();
+            resolve();
+          }
+        });
+
+        window.setTimeout(() => {
+          subscription.unsubscribe();
+          resolve();
+        }, 2000);
+      });
+
+      await authStatePromise;
+
+      const { data, error } = await supabase.auth.getSession();
+      if (error || !data.session) {
+        finish("Reset link is invalid or expired.");
+        return;
+      }
+
+      finish();
+    }
+
+    void initializeRecovery();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -72,10 +164,10 @@ export default function ResetPasswordForm() {
           <Button
             type="submit"
             fullWidth
-            disabled={submitting}
+            disabled={submitting || initializing}
             className="mt-6 rounded-full bg-[#14b8a6] text-white shadow-[0_0_0_1px_rgba(20,184,166,0.24)] hover:bg-[#14b8a6]"
           >
-            {submitting ? "Updating..." : "Update password"}
+            {initializing ? "Preparing reset..." : submitting ? "Updating..." : "Update password"}
           </Button>
         </form>
 
