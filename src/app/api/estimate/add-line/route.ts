@@ -1703,7 +1703,12 @@ export async function POST(req: Request) {
         const autoResolveRequiredPackaging =
           !isPreRoll && (productCategory === "concentrate" || productCategory === "vape");
         const requestedUnitSizeGrams = gramsFromUnitSize(unit_size);
-        const requiredPrimarySlot = primaryPackagingSlot(productCategory, isPreRoll, pre_roll_pack_qty);
+        const requiredPrimarySlot =
+          productCategory === "concentrate"
+            ? "concentrate_vessel"
+            : productCategory === "vape"
+              ? "vape_primary_hardware"
+              : primaryPackagingSlot(productCategory, isPreRoll, pre_roll_pack_qty);
         let activePackagingSkus: PackagingSkuLookupRow[] | null = null;
         const loadActivePackagingSkus = async () => {
           if (activePackagingSkus) return activePackagingSkus;
@@ -1824,7 +1829,10 @@ export async function POST(req: Request) {
         }
 
         if (productCategory === "concentrate" || isVapeHardwarePackaging) {
-          const requiredSecondarySlot = secondaryPackagingSlot(productCategory, false, pre_roll_pack_qty);
+          const requiredSecondarySlot =
+            productCategory === "concentrate"
+              ? "concentrate_secondary_bag"
+              : secondaryPackagingSlot(productCategory, false, pre_roll_pack_qty);
           let resolvedSecondaryPackagingSkuId = secondary_packaging_sku_id;
           if (!resolvedSecondaryPackagingSkuId && requiredSecondarySlot) {
             const secondarySku = resolveAutoPackagingSku({
