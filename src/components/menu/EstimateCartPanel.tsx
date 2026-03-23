@@ -34,14 +34,12 @@ function shouldShowExpectedRange(line: EstimateCartLine): boolean {
   return true;
 }
 
-function compactPriceSummary(line: EstimateCartLine): string {
+function compactBreakdownSummary(line: EstimateCartLine): string {
   const parts: string[] = [];
-  if (Number.isFinite(Number(line.packagingTotal)) && Number(line.packagingTotal) > 0) parts.push(`Packaging ${asMoney(Number(line.packagingTotal))}`);
   if (Number.isFinite(Number(line.materialTotal)) && Number(line.materialTotal) > 0) parts.push(`Materials ${asMoney(Number(line.materialTotal))}`);
   if (Number.isFinite(Number(line.laborTotal)) && Number(line.laborTotal) > 0) parts.push(`Labor ${asMoney(Number(line.laborTotal))}`);
+  if (Number.isFinite(Number(line.packagingTotal)) && Number(line.packagingTotal) > 0) parts.push(`Packaging ${asMoney(Number(line.packagingTotal))}`);
   if (Number.isFinite(Number(line.coaTotal)) && Number(line.coaTotal) > 0) parts.push(`COA ${asMoney(Number(line.coaTotal))}`);
-  if (Number.isFinite(Number(line.unitPrice)) && Number(line.unitPrice) > 0) parts.push(`Unit ${asMoney(Number(line.unitPrice))}`);
-  if (Number.isFinite(Number(line.lineTotal)) && Number(line.lineTotal) > 0) parts.push(`Total ${asMoney(Number(line.lineTotal))}`);
   return parts.join(" • ");
 }
 
@@ -73,7 +71,8 @@ export default function EstimateCartPanel({
     if (line.mode === "bulk" && line.quantityLabel) {
       parts.push(`Quoted ${line.quantityLabel}`);
     }
-    if (line.packagingMode) {
+    const hasActualPackaging = Number.isFinite(Number(line.packagingTotal)) && Number(line.packagingTotal) > 0;
+    if (line.mode !== "bulk" && line.packagingMode && (line.packagingMode === "customer" || hasActualPackaging)) {
       const packagingLabel =
         line.packagingMode === "customer"
           ? "Customer packaging"
@@ -154,11 +153,12 @@ export default function EstimateCartPanel({
               {shouldShowExpectedRange(line) ? (
                 <div className="mt-1 text-xs text-[#6a8392]">{line.expectedRangeLabel}</div>
               ) : null}
-              {(line.mode === "copack" || line.mode === "pre_roll") ? (
-                <div className="mt-1 text-xs text-[#6a8392]">Stickers: 3 per finished unit (auto-included)</div>
+              {compactBreakdownSummary(line) ? (
+                <div className="mt-1 text-xs text-[#6a8392]">{compactBreakdownSummary(line)}</div>
               ) : null}
-              <div className="mt-1 text-xs text-[#365160]">
-                {line.lineTotal == null ? "Pricing pending" : compactPriceSummary(line)}
+              <div className="mt-1 flex items-center justify-between gap-3 text-xs text-[#365160]">
+                <span>{line.unitPrice != null ? `Unit price ${asMoney(line.unitPrice)}` : "Unit price pending"}</span>
+                <span className="font-semibold">{line.lineTotal == null ? "Total pending" : `Total ${asMoney(line.lineTotal)}`}</span>
               </div>
               {String(line.notes || "").includes("Packaging Review Pending") || line.packagingSubmissionId ? (
                 <div className="mt-1 inline-flex rounded-full border border-[#f2d58f] bg-[#fff8e7] px-2 py-0.5 text-[11px] font-medium text-[#9a6a15]">

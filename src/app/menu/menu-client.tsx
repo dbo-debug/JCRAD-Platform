@@ -275,7 +275,7 @@ function defaultCardState(offer: Offer, selectedCategory: MenuCategory, menuMode
     ? concentrateStartingGrams / GRAMS_PER_LB
     : Math.max(1, Number(offer.min_order || 1));
   return {
-    expanded: false,
+    expanded: mode === "bulk" && baseCategory === "flower",
     mode,
     startingWeightLbs: defaultStartingWeightLbs,
     startingWeightGrams: baseCategory === "concentrate" ? concentrateStartingGrams : 1000,
@@ -294,6 +294,13 @@ function defaultCardState(offer: Offer, selectedCategory: MenuCategory, menuMode
     frontFile: null,
     backFile: null,
   };
+}
+
+function scrollOfferCardIntoView(offerId: string, block: ScrollLogicalPosition = "center") {
+  if (typeof window === "undefined") return;
+  window.setTimeout(() => {
+    document.querySelector(`[data-offer-card-id="${offerId}"]`)?.scrollIntoView({ behavior: "smooth", block });
+  }, 60);
 }
 
 function modeFromLine(modeRaw: unknown, preRollModeRaw: unknown): MenuMode | "pre_roll" {
@@ -826,11 +833,7 @@ export default function MenuClient({
       },
     }));
 
-    if (typeof window !== "undefined") {
-      window.setTimeout(() => {
-        document.querySelector(`[data-offer-card-id="${String(offer.id || "")}"]`)?.scrollIntoView({ behavior: "smooth", block: "start" });
-      }, 50);
-    }
+    scrollOfferCardIntoView(String(offer.id || ""), "start");
   }
 
   const filterGroups = useMemo(() => {
@@ -1108,23 +1111,26 @@ export default function MenuClient({
           packagingOptions: (category === "vape" ? vapeVesselOptions : filteredSkus).map((sku) => ({ id: String(sku.id), name: String(sku.name || "SKU") })),
           secondaryBagOptions: (category === "vape" ? vapeMylarBagOptions : secondaryBagOptions).map((sku) => ({ id: String(sku.id), name: String(sku.name || "SKU") })),
           onExpandedChange: (next) => updateCardState(offer, (prev) => ({ ...prev, expanded: next })),
-          onModeChange: (next) => updateCardState(offer, (prev) => ({
-            ...prev,
-            mode: next,
-            expanded: next === "bulk" ? prev.expanded : true,
-            unitSize:
-              next === "pre_roll"
-                ? (PRE_ROLL_UNIT_SIZES.includes(prev.unitSize as (typeof PRE_ROLL_UNIT_SIZES)[number]) ? prev.unitSize : PRE_ROLL_UNIT_SIZES[0])
-                : (CATEGORY_UNIT_SIZES[category] && CATEGORY_UNIT_SIZES[category].includes(prev.unitSize) ? prev.unitSize : unitSizeOptions[0]),
-            packagingMode: next === "pre_roll" ? "jcrad" : prev.packagingMode,
-            packagingSkuId: "",
-            secondaryPackagingSkuId: "",
-            preRollPackQty: next === "pre_roll" ? prev.preRollPackQty : 1,
-            preRollMode: next === "pre_roll" ? prev.preRollMode : PRE_ROLL_MODES[0],
-            internalInfusionProductId: next === "bulk" ? "" : prev.internalInfusionProductId,
-            externalLiquidProductId: next === "pre_roll" ? prev.externalLiquidProductId : "",
-            externalDryProductId: next === "pre_roll" ? prev.externalDryProductId : "",
-          })),
+          onModeChange: (next) => {
+            updateCardState(offer, (prev) => ({
+              ...prev,
+              mode: next,
+              expanded: next === "bulk" ? category === "flower" : true,
+              unitSize:
+                next === "pre_roll"
+                  ? (PRE_ROLL_UNIT_SIZES.includes(prev.unitSize as (typeof PRE_ROLL_UNIT_SIZES)[number]) ? prev.unitSize : PRE_ROLL_UNIT_SIZES[0])
+                  : (CATEGORY_UNIT_SIZES[category] && CATEGORY_UNIT_SIZES[category].includes(prev.unitSize) ? prev.unitSize : unitSizeOptions[0]),
+              packagingMode: next === "pre_roll" ? "jcrad" : prev.packagingMode,
+              packagingSkuId: "",
+              secondaryPackagingSkuId: "",
+              preRollPackQty: next === "pre_roll" ? prev.preRollPackQty : 1,
+              preRollMode: next === "pre_roll" ? prev.preRollMode : PRE_ROLL_MODES[0],
+              internalInfusionProductId: next === "bulk" ? "" : prev.internalInfusionProductId,
+              externalLiquidProductId: next === "pre_roll" ? prev.externalLiquidProductId : "",
+              externalDryProductId: next === "pre_roll" ? prev.externalDryProductId : "",
+            }));
+            if (next !== "bulk") scrollOfferCardIntoView(id, "center");
+          },
           onStartingWeightLbsChange: (next) => updateCardState(offer, (prev) => ({
             ...prev,
             startingWeightLbs: Number.isFinite(next) ? next : prev.startingWeightLbs,
@@ -1180,9 +1186,6 @@ export default function MenuClient({
           addLoading: !!busyByOfferId[id],
           addButtonLabel: isEditingThisOffer ? "Save Changes" : "Add to Estimate",
           isEditing: isEditingThisOffer,
-          bulkSummaryLabel: category === "flower" && cardState.mode === "bulk"
-            ? `Bulk flower is quoted by the pound. Start with ${cardState.startingWeightLbs.toFixed(2)} lb${minOrder > 0 ? ` minimum ${minOrder.toFixed(2)} lb` : ""}.`
-            : undefined,
           errorText: errorByOfferId[id] || concentrateMinimumOrderError,
           copackConfig,
         };

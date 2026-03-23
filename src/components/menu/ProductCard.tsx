@@ -41,13 +41,6 @@ export default function ProductCard({ item, onAdd }: ProductCardProps) {
       && item.copackConfig.mode === "bulk"
       && String(item.categoryLabel || "").toLowerCase() === "concentrate"
   );
-  const showBulkLbSummary = Boolean(
-    item.bulkSummaryLabel
-      && item.copackConfig
-      && item.copackConfig.mode === "bulk"
-      && String(item.categoryLabel || "").toLowerCase() === "flower"
-  );
-
   useEffect(() => {
     if (typeof window === "undefined") return;
     setCanHoverPreview(window.matchMedia("(hover: hover) and (pointer: fine)").matches);
@@ -171,12 +164,6 @@ export default function ProductCard({ item, onAdd }: ProductCardProps) {
             <div className="whitespace-nowrap text-[11px] font-medium text-[#6a8392]">Avail: {availabilityText}</div>
           ) : null}
         </div>
-
-        {showBulkLbSummary ? (
-          <div className="rounded-xl border border-[#d7e7e4] bg-[#f4fbf9] px-2.5 py-2 text-[11px] font-medium text-[#24505b]">
-            {item.bulkSummaryLabel}
-          </div>
-        ) : null}
 
         {item.copackConfig ? (
           <div className="space-y-2 rounded-xl border border-[#dbe6ed] bg-[#f9fcfe] p-2.5">

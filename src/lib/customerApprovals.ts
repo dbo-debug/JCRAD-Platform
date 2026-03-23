@@ -1,6 +1,16 @@
 import { loadCustomerWorkspaceIndex, type CustomerSummary } from "@/lib/customerWorkspace";
 import { isApprovedCustomerApprovalStatus, isFollowUpCustomerApprovalStatus, normalizeCustomerApprovalStatus } from "@/lib/customerApproval";
 
+const APPROVAL_DOCUMENT_TYPES = new Set([
+  "cannabis_license",
+  "license",
+  "sellers_permit",
+  "seller_permit",
+  "w9",
+  "irs_form_8300",
+  "8300",
+]);
+
 export type CustomerApprovalQueueItem = {
   customerId: string;
   companyName: string;
@@ -43,12 +53,22 @@ function firstText(...values: Array<unknown>): string | null {
   return null;
 }
 
+function isApprovalDocument(document: Record<string, unknown>): boolean {
+  const type = String(document.document_type || document.kind || "").trim().toLowerCase();
+  return APPROVAL_DOCUMENT_TYPES.has(type);
+}
+
+function getApprovalDocuments(customer: CustomerSummary) {
+  return customer.linkedDocuments.filter((document) => isApprovalDocument(document as Record<string, unknown>));
+}
+
 function buildApprovalQueueItem(customer: CustomerSummary): CustomerApprovalQueueItem {
-  const documentCount = customer.counts.documents;
+  const approvalDocuments = getApprovalDocuments(customer);
+  const documentCount = approvalDocuments.length;
   const readyState = documentCount > 0 ? "docs_linked" : "missing_docs";
   const readyLabel = documentCount > 0 ? `${documentCount} linked doc${documentCount === 1 ? "" : "s"}` : "No linked docs yet";
   const accountHref = `/workspace/customers/${customer.id}`;
-  const linkedDocuments = customer.linkedDocuments.slice(0, 3).map((document) => {
+  const linkedDocuments = approvalDocuments.slice(0, 3).map((document) => {
     const directHref = firstText(document.file_url, document.public_url, document.url);
 
     return {
@@ -89,8 +109,8 @@ function buildApprovalQueueItem(customer: CustomerSummary): CustomerApprovalQueu
 
 export function isCustomerApprovalCandidate(customer: CustomerSummary): boolean {
   if (customer.archivedAt) return false;
-  if (customer.counts.documents > 0) return true;
-  return isFollowUpCustomerApprovalStatus(customer.approvalStatus);
+  if (isApprovedCustomerApprovalStatus(customer.approvalStatus)) return false;
+  return getApprovalDocuments(customer).length > 0;
 }
 
 export function summarizeCustomerApprovalQueue(rows: Array<{ approvalStatus: string }>) {
