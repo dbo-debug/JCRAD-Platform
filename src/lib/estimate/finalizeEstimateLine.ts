@@ -1,4 +1,5 @@
 import { DEFAULT_LABOR_SETTINGS, laborUnitCost, money, type LaborSettings } from "@/lib/pricing";
+import { resolveUnitSellPrice } from "@/lib/pricing-defaults";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 type SupabaseClient = ReturnType<typeof createAdminClient>;
@@ -273,23 +274,53 @@ export async function finalizeEstimateLine(args: {
 
   let packagingUnitCost = toFiniteNonNegative(lineRow.packaging_unit_cost) ?? 0;
   let packagingType = "flower_in_bag";
+  const infusionInputsRecord =
+    lineRow.infusion_inputs && typeof lineRow.infusion_inputs === "object"
+      ? (lineRow.infusion_inputs as Record<string, unknown>)
+      : {};
+  const costBreakdown =
+    infusionInputsRecord.cost_breakdown && typeof infusionInputsRecord.cost_breakdown === "object"
+      ? (infusionInputsRecord.cost_breakdown as Record<string, unknown>)
+      : {};
+  const packagingBreakdown =
+    costBreakdown.packaging && typeof costBreakdown.packaging === "object"
+      ? (costBreakdown.packaging as Record<string, unknown>)
+      : {};
+  const packagingSellFromBreakdown = (() => {
+    const totalSell = toFiniteNonNegative(packagingBreakdown.total_sell_total);
+    if (totalSell == null) return null;
+    const unitCount =
+      toFiniteNonNegative(packagingBreakdown.unit_count)
+      ?? toFiniteNonNegative(lineRow.unit_range_high)
+      ?? toFiniteNonNegative(lineRow.units);
+    if (unitCount == null || unitCount <= 0) return null;
+    return money(totalSell / unitCount);
+  })();
 
   const isJcRadPackaging = String(lineRow.packaging_mode || "").toLowerCase() === "jcrad";
   const packagingSkuId = String(lineRow.packaging_sku_id || "");
   if (isJcRadPackaging && packagingSkuId) {
     const { data: sku, error: skuError } = await supabase
       .from("packaging_skus")
-      .select("id, packaging_type, unit_cost")
+      .select("id, packaging_type, unit_cost, sell_price")
       .eq("id", packagingSkuId)
       .single();
     if (skuError || !sku) {
       throw new Error(skuError?.message || "Packaging SKU not found for estimate line");
     }
-    const skuRow = sku as unknown as PackagingSkuRow;
+    const skuRow = sku as unknown as PackagingSkuRow & { sell_price?: number | null };
 
     packagingType = String(skuRow.packaging_type || "flower_in_bag");
-    if (toFiniteNonNegative(lineRow.packaging_unit_cost) == null) {
-      packagingUnitCost = money(Number(skuRow.unit_cost || 0));
+    if (toFiniteNonNegative(lineRow.packaging_unit_cost) == null || packagingUnitCost <= 0) {
+      packagingUnitCost =
+        packagingSellFromBreakdown
+        ?? money(
+          resolveUnitSellPrice({
+            explicitSellPrice: skuRow.sell_price,
+            cost: skuRow.unit_cost,
+            markupPct: marginPctDecimal,
+          }).sellPrice ?? 0
+        );
     }
   } else {
     packagingType = inferPackagingType(category);
@@ -300,10 +331,7 @@ export async function finalizeEstimateLine(args: {
 
   const isPreRoll = String(lineRow.mode || "").toLowerCase() === "copack" && category === "flower" && !!lineRow.pre_roll_mode;
   const infusionType = String(lineRow.infusion_type || "").toLowerCase();
-  const infusionInputs =
-    lineRow.infusion_inputs && typeof lineRow.infusion_inputs === "object"
-      ? (lineRow.infusion_inputs as Record<string, unknown>)
-      : {};
+  const infusionInputs = infusionInputsRecord;
   const internalInfusion =
     infusionInputs.internal && typeof infusionInputs.internal === "object"
       ? (infusionInputs.internal as Record<string, unknown>)

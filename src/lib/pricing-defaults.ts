@@ -11,6 +11,12 @@ function finitePositive(value: unknown): number | null {
   return n;
 }
 
+function finiteNonNegative(value: unknown): number | null {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return n;
+}
+
 export function defaultSellUnitForCategory(category: unknown): PriceUnit {
   const normalized = normalizePricingCategory(category);
   return normalized === "flower" ? "per_lb" : "per_g";
@@ -60,3 +66,24 @@ export function deriveSellPricingFromCost(args: {
   return { sellPerLb, sellPerG, derivedFromCost, unit };
 }
 
+export function resolveUnitSellPrice(args: {
+  explicitSellPrice?: unknown;
+  cost?: unknown;
+  markupPct?: unknown;
+}): { sellPrice: number | null; derivedFromCost: boolean } {
+  const explicitSellPrice = finiteNonNegative(args.explicitSellPrice);
+  if (explicitSellPrice != null) {
+    return { sellPrice: explicitSellPrice, derivedFromCost: false };
+  }
+
+  const cost = finiteNonNegative(args.cost);
+  if (cost == null) {
+    return { sellPrice: null, derivedFromCost: false };
+  }
+
+  const markupPct = Number.isFinite(Number(args.markupPct)) ? Math.max(0, Number(args.markupPct)) : DEFAULT_MARKUP_PCT;
+  return {
+    sellPrice: cost * (1 + markupPct),
+    derivedFromCost: true,
+  };
+}

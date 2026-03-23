@@ -13,6 +13,7 @@ import {
   selectPackagingTier,
   type LaborSettings,
 } from "@/lib/pricing";
+import { resolveUnitSellPrice } from "@/lib/pricing-defaults";
 import { skuSupportsPackagingCompatibilityContext } from "@/lib/packaging/compatibility";
 import {
   primaryPackagingSlotForEstimate,
@@ -270,12 +271,16 @@ function secondaryPackagingSlot(category: string, isPreRoll: boolean, preRollPac
 }
 
 function comparePackagingSkuPreference(a: PackagingSkuLookupRow, b: PackagingSkuLookupRow) {
-  const sellA = Number(a.sell_price);
-  const sellB = Number(b.sell_price);
   const costA = Number(a.unit_cost);
   const costB = Number(b.unit_cost);
-  const safeSellA = Number.isFinite(sellA) && sellA >= 0 ? sellA : Number.POSITIVE_INFINITY;
-  const safeSellB = Number.isFinite(sellB) && sellB >= 0 ? sellB : Number.POSITIVE_INFINITY;
+  const safeSellA = resolveUnitSellPrice({
+    explicitSellPrice: a.sell_price,
+    cost: Number.isFinite(costA) && costA >= 0 ? costA : null,
+  }).sellPrice ?? Number.POSITIVE_INFINITY;
+  const safeSellB = resolveUnitSellPrice({
+    explicitSellPrice: b.sell_price,
+    cost: Number.isFinite(costB) && costB >= 0 ? costB : null,
+  }).sellPrice ?? Number.POSITIVE_INFINITY;
   if (safeSellA !== safeSellB) return safeSellA - safeSellB;
   const safeCostA = Number.isFinite(costA) && costA >= 0 ? costA : Number.POSITIVE_INFINITY;
   const safeCostB = Number.isFinite(costB) && costB >= 0 ? costB : Number.POSITIVE_INFINITY;
@@ -1725,6 +1730,34 @@ export async function POST(req: Request) {
         };
 
         let resolvedPackagingSkuId = packaging_sku_id;
+        if (productCategory === "concentrate" && isDev) {
+          const activeSkus = await loadActivePackagingSkus();
+          const primaryCandidates = activeSkus
+            .filter((row) =>
+              skuSupportsPackagingEstimatorSlot(row, requiredPrimarySlot)
+              && skuMatchesRequiredPrimaryPackagingType(row, productCategory)
+              && skuMatchesRequiredPrimaryCapacity({
+                row,
+                category: productCategory,
+                unitSizeGrams: requestedUnitSizeGrams,
+              })
+            )
+            .map((row) => ({
+              id: row.id,
+              name: row.name ?? null,
+              packaging_type: row.packaging_type ?? null,
+              estimator_slots: row.estimator_slots ?? null,
+              packaging_role: row.packaging_role ?? null,
+              unit_cost: row.unit_cost ?? null,
+              sell_price: row.sell_price ?? null,
+            }));
+          console.log(`[add-line:${requestId}] concentrate-primary-candidates`, {
+            required_primary_slot: requiredPrimarySlot,
+            requested_primary_packaging_sku_id: body?.packaging_sku_id ?? null,
+            candidate_count: primaryCandidates.length,
+            candidates: primaryCandidates,
+          });
+        }
         if (autoResolveRequiredPackaging) {
           const activeSkus = await loadActivePackagingSkus();
           const providedPrimarySku = resolvedPackagingSkuId
@@ -1757,7 +1790,7 @@ export async function POST(req: Request) {
 
         const { data: sku, error: skuErr } = await supabase
           .from("packaging_skus")
-          .select("id, name, packaging_type, category, size_grams, pack_qty, vape_device, vape_fill_grams, applies_to, applies_to_contexts, estimator_slots, unit_cost, sell_price")
+          .select("id, name, packaging_type, category, size_grams, pack_qty, vape_device, vape_fill_grams, applies_to, applies_to_contexts, estimator_slots, packaging_role, unit_cost, sell_price")
           .eq("id", resolvedPackagingSkuId)
           .single();
         mark("after packaging_skus select");
@@ -1814,14 +1847,44 @@ export async function POST(req: Request) {
         );
 
         packagingType = String((sku as any).packaging_type || "flower_in_bag");
-        void selectedTier;
         let packagingUnitCostInternal = money(Number((sku as any).unit_cost || 0));
-        let packagingPrimarySellPerUnit = Number((sku as any).sell_price);
-        if (!Number.isFinite(packagingPrimarySellPerUnit) || packagingPrimarySellPerUnit < 0) {
-          packagingPrimarySellPerUnit = money(packagingUnitCostInternal * markupMultiplier);
+        const packagingPrimaryResolution = resolveUnitSellPrice({
+          explicitSellPrice: (sku as any).sell_price,
+          cost: packagingUnitCostInternal,
+          markupPct: targetMarkupPct,
+        });
+        let packagingPrimarySellPerUnit = money(packagingPrimaryResolution.sellPrice ?? 0);
+        if (
+          productCategory === "concentrate"
+          && packagingType === "concentrate_jar"
+          && (packagingPrimaryResolution.sellPrice == null || (packagingPrimaryResolution.derivedFromCost && packagingPrimarySellPerUnit <= 0))
+          && selectedTier
+          && Number.isFinite(Number(selectedTier.unit_price))
+          && Number(selectedTier.unit_price) > 0
+        ) {
+          packagingPrimarySellPerUnit = money(Number(selectedTier.unit_price));
+        }
+        if (productCategory === "concentrate" && isDev) {
+          console.log(`[add-line:${requestId}] concentrate-primary-selection`, {
+            required_primary_slot: requiredPrimarySlot,
+            selected_primary_jar_sku_id: (sku as any).id ?? null,
+            selected_primary_jar_name: (sku as any).name ?? null,
+            selected_primary_jar_packaging_type: (sku as any).packaging_type ?? null,
+            selected_primary_jar_estimator_slots: (sku as any).estimator_slots ?? null,
+            selected_primary_jar_packaging_role: (sku as any).packaging_role ?? null,
+            selected_primary_jar_unit_cost: (sku as any).unit_cost ?? null,
+            selected_primary_jar_sell_price: (sku as any).sell_price ?? null,
+            selected_primary_jar_selected_tier_unit_price: selectedTier?.unit_price ?? null,
+            selected_primary_jar_selected_tier_moq: selectedTier?.moq ?? null,
+            selected_primary_jar_resolved_sell_per_unit: packagingPrimarySellPerUnit,
+          });
         }
         packaging_primary_cost_total = packagingUnitCostInternal;
-        packaging_primary_label = String((sku as any).name || "").trim() || packaging_primary_label;
+        packaging_primary_label =
+          String((sku as any).name || "").trim()
+          || (productCategory === "concentrate" && packagingType === "concentrate_jar"
+            ? `Concentrate Jar ${Number((sku as any).size_grams || 1)}g`
+            : packaging_primary_label);
         const isVapeHardwarePackaging =
           productCategory === "vape" && (packagingType === "vape_510_cart" || packagingType === "vape_all_in_one");
         if (isVapeHardwarePackaging) {
@@ -1884,10 +1947,13 @@ export async function POST(req: Request) {
           }
 
           packaging_secondary_cost_total = money(Number((secondarySku as any).unit_cost || 0));
-          let packagingSecondarySellPerUnit = Number((secondarySku as any).sell_price);
-          if (!Number.isFinite(packagingSecondarySellPerUnit) || packagingSecondarySellPerUnit < 0) {
-            packagingSecondarySellPerUnit = money(packaging_secondary_cost_total * markupMultiplier);
-          }
+          const packagingSecondarySellPerUnit = money(
+            resolveUnitSellPrice({
+              explicitSellPrice: (secondarySku as any).sell_price,
+              cost: packaging_secondary_cost_total,
+              markupPct: targetMarkupPct,
+            }).sellPrice ?? 0
+          );
           packaging_secondary_label = String((secondarySku as any).name || "").trim() || packaging_secondary_label;
           if (isVapeHardwarePackaging) {
             packaging_secondary_label = String((secondarySku as any).name || "3.5g mylar bag");
@@ -1904,6 +1970,7 @@ export async function POST(req: Request) {
             requested_primary_packaging_sku_id: body?.packaging_sku_id ?? null,
             resolved_primary_packaging_sku_id: packaging_sku_id,
             resolved_secondary_packaging_sku_id: secondary_packaging_sku_id,
+            required_primary_slot: requiredPrimarySlot,
             packaging_primary_label,
             packaging_secondary_label,
             units,
@@ -1983,6 +2050,8 @@ export async function POST(req: Request) {
         packaging_sku_id,
         secondary_packaging_sku_id,
         quoted_units_high: quotedUnitsHigh,
+        final_packaging_primary_label: packaging_primary_label,
+        final_packaging_primary_sell_total: packaging_primary_sell_total,
         packaging: [
           { kind: "primary", label: packaging_primary_label, sell_total: packaging_primary_sell_total },
           { kind: "secondary", label: packaging_secondary_label, sell_total: packaging_secondary_sell_total },
