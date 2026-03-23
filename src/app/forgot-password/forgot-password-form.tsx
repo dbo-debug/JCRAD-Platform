@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
+import { getCanonicalAppOrigin } from "@/lib/auth/appUrl";
 
 export default function ForgotPasswordForm() {
   const supabase = useMemo(() => createClient(), []);
@@ -19,8 +20,7 @@ export default function ForgotPasswordForm() {
     setMessage("");
     setSuccess(false);
 
-    const origin = window.location.origin;
-    const redirectTo = `${origin}/auth/callback?next=/reset-password`;
+    const redirectTo = `${getCanonicalAppOrigin(window.location.origin)}/auth/callback?next=/reset-password`;
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo });
 
     setSubmitting(false);
