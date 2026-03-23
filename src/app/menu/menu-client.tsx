@@ -1201,18 +1201,13 @@ export default function MenuClient({
           && isVapeVesselSku(packagingSkus.find((sku) => String(sku.id) === String(cardState.packagingSkuId)))
         )
       );
-    const autoResolveRequiredPackaging = apiMode === "copack"
-      && packagingMode === "jcrad"
-      && mode !== "pre_roll"
-      && (category === "concentrate" || category === "vape");
-
     if (apiMode === "bulk" && !offer.allow_bulk) {
       throw new Error("This product is not available for bulk.");
     }
     if (apiMode === "copack" && !offer.allow_copack) {
       throw new Error("This product is not available for copack.");
     }
-    if (apiMode === "copack" && packagingMode === "jcrad" && !cardState.packagingSkuId && !autoResolveRequiredPackaging) {
+    if (apiMode === "copack" && packagingMode === "jcrad" && !cardState.packagingSkuId) {
       throw new Error(category === "vape" ? "Select a vape vessel SKU (510 cart or AIO)." : "Select a packaging SKU.");
     }
     if (apiMode === "bulk" && category === "vape" && cardState.startingWeightGrams <= 0) {
@@ -1233,7 +1228,7 @@ export default function MenuClient({
     if ((mode === "copack" || mode === "pre_roll") && (category === "concentrate" || category === "vape") && cardState.startingWeightGrams <= 0) {
       throw new Error("Starting grams must be > 0.");
     }
-    if (requiresSecondaryBag && !cardState.secondaryPackagingSkuId && !autoResolveRequiredPackaging) {
+    if (requiresSecondaryBag && !cardState.secondaryPackagingSkuId) {
       throw new Error(category === "vape" ? "Select a 3.5g mylar bag SKU." : "Select a secondary bag for concentrate copack.");
     }
     if (apiMode === "copack" && packagingMode === "jcrad" && category === "vape" && cardState.packagingSkuId) {

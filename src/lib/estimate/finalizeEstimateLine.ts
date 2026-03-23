@@ -289,15 +289,15 @@ export async function finalizeEstimateLine(args: {
     costBreakdown.packaging && typeof costBreakdown.packaging === "object"
       ? (costBreakdown.packaging as Record<string, unknown>)
       : {};
-  const packagingSellFromBreakdown = (() => {
-    const totalSell = toFiniteNonNegative(packagingBreakdown.total_sell_total);
-    if (totalSell == null) return null;
+  const packagingCostFromBreakdown = (() => {
+    const totalCost = toFiniteNonNegative(packagingBreakdown.total_cost_total);
+    if (totalCost == null) return null;
     const unitCount =
       toFiniteNonNegative(packagingBreakdown.unit_count)
       ?? toFiniteNonNegative(lineRow.unit_range_high)
       ?? toFiniteNonNegative(lineRow.units);
     if (unitCount == null || unitCount <= 0) return null;
-    return money(totalSell / unitCount);
+    return money(totalCost / unitCount);
   })();
 
   const isJcRadPackaging = String(lineRow.packaging_mode || "").toLowerCase() === "jcrad";
@@ -314,9 +314,11 @@ export async function finalizeEstimateLine(args: {
     const skuRow = sku as unknown as PackagingSkuRow & { sell_price?: number | null };
 
     packagingType = String(skuRow.packaging_type || "flower_in_bag");
-    if (toFiniteNonNegative(lineRow.packaging_unit_cost) == null || packagingUnitCost <= 0) {
+    if (packagingCostFromBreakdown != null) {
+      packagingUnitCost = packagingCostFromBreakdown;
+    } else if (toFiniteNonNegative(lineRow.packaging_unit_cost) == null || packagingUnitCost <= 0) {
       packagingUnitCost =
-        packagingSellFromBreakdown
+        toFiniteNonNegative(skuRow.unit_cost)
         ?? money(
           resolveUnitSellPrice({
             explicitSellPrice: skuRow.sell_price,

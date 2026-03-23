@@ -2082,7 +2082,7 @@ export async function POST(req: Request) {
     packaging_sell_total = money(
       packaging_base_sell_total + sticker_sell_total + heat_shrink_sell_total + cone_sell_total
     );
-    packaging_unit_cost = quotedUnitsHigh > 0 ? money(packaging_sell_total / quotedUnitsHigh) : 0;
+    packaging_unit_cost = quotedUnitsHigh > 0 ? money(packaging_cost_total / quotedUnitsHigh) : 0;
     packaging_total = packaging_sell_total;
 
     if (isDev && productCategory === "concentrate") {

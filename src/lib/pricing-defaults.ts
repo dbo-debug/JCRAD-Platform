@@ -6,12 +6,14 @@ export const DEFAULT_MARKUP_PCT = 0.2;
 export type PriceUnit = "per_lb" | "per_g";
 
 function finitePositive(value: unknown): number | null {
+  if (value == null || value === "") return null;
   const n = Number(value);
   if (!Number.isFinite(n) || n <= 0) return null;
   return n;
 }
 
 function finiteNonNegative(value: unknown): number | null {
+  if (value == null || value === "") return null;
   const n = Number(value);
   if (!Number.isFinite(n) || n < 0) return null;
   return n;
