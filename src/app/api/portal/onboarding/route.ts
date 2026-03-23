@@ -7,6 +7,14 @@ const DOCUMENTS_BUCKET = "catalog-public";
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
 type GenericRow = Record<string, unknown>;
+type FinalizedUpload = {
+  document_type: string;
+  title?: string;
+  file_name?: string;
+  bucket?: string;
+  object_path?: string;
+  file_url?: string;
+};
 
 const REQUIRED_DOC_KEYS = new Set(["cannabis_license", "sellers_permit", "w9", "irs_form_8300"]);
 
@@ -136,6 +144,27 @@ async function resolveCustomerAccount(admin: ReturnType<typeof createAdminClient
   };
 }
 
+async function getAuthenticatedContext() {
+  const supabase = await createClient();
+  const { data: authData } = await supabase.auth.getUser();
+  const user = authData?.user ?? null;
+
+  if (!user) {
+    return { error: NextResponse.json({ error: "Authentication required" }, { status: 401 }) } as const;
+  }
+
+  const admin = createAdminClient();
+  const customer = await resolveCustomerAccount(admin, user.id, user.email || null);
+
+  if (!customer?.id) {
+    return {
+      error: NextResponse.json({ error: "No linked customer account found for this user." }, { status: 400 }),
+    } as const;
+  }
+
+  return { user, admin, customer } as const;
+}
+
 async function insertCustomerDocument(
   admin: ReturnType<typeof createAdminClient>,
   payload: {
@@ -211,24 +240,113 @@ async function insertCustomerDocument(
   throw new Error(lastError instanceof Error ? lastError.message : "Failed to save customer document");
 }
 
+async function finalizeUploads(args: {
+  admin: ReturnType<typeof createAdminClient>;
+  userId: string;
+  customerId: string;
+  approvalStatus: string;
+  uploads: FinalizedUpload[];
+}) {
+  const insertedDocuments: Array<{ id?: string; documentType: string; title: string }> = [];
+
+  for (const upload of args.uploads) {
+    const documentType = normalizeDocumentType(upload.document_type);
+    if (!REQUIRED_DOC_KEYS.has(documentType)) {
+      throw new Error(`Unsupported onboarding document type: ${upload.document_type}`);
+    }
+    const objectPath = firstText(upload.object_path) || "";
+    const bucket = firstText(upload.bucket) || DOCUMENTS_BUCKET;
+    const fileName = firstText(upload.file_name, upload.title) || `${documentType}.${objectPath.split(".").pop() || "bin"}`;
+    const title = firstText(upload.title, upload.file_name) || fileName;
+    let fileUrl = firstText(upload.file_url) || "";
+
+    if (!objectPath) {
+      throw new Error(`Missing storage path for ${documentType}.`);
+    }
+
+    if (!fileUrl) {
+      const { data: publicData } = args.admin.storage.from(bucket).getPublicUrl(objectPath);
+      fileUrl = String(publicData?.publicUrl || "").trim();
+    }
+
+    const inserted = await insertCustomerDocument(args.admin, {
+      user_id: args.userId,
+      customer_account_id: args.customerId,
+      title,
+      file_name: fileName,
+      document_type: documentType,
+      bucket,
+      object_path: objectPath,
+      file_url: fileUrl,
+    });
+    insertedDocuments.push({
+      id: firstText((inserted as GenericRow | null)?.id) || undefined,
+      documentType,
+      title,
+    });
+  }
+
+  if (!isApprovedCustomerApprovalStatus(args.approvalStatus)) {
+    const updateRes = await args.admin
+      .from("customers")
+      .update({ approval_status: "needs_review" })
+      .eq("id", args.customerId)
+      .neq("approval_status", "approved");
+    if (updateRes.error && !isMissingColumnError(updateRes.error)) {
+      throw new Error(`Approval status update failed: ${updateRes.error.message}`);
+    }
+  }
+
+  return insertedDocuments;
+}
+
+export async function GET() {
+  try {
+    const context = await getAuthenticatedContext();
+    if ("error" in context) return context.error;
+
+    return NextResponse.json({
+      ok: true,
+      customer_account_id: context.customer.id,
+      bucket: DOCUMENTS_BUCKET,
+      max_upload_bytes: MAX_UPLOAD_BYTES,
+      required_document_types: Array.from(REQUIRED_DOC_KEYS),
+    });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Failed to prepare onboarding upload";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
 export async function POST(req: Request) {
   try {
-    const supabase = await createClient();
-    const { data: authData } = await supabase.auth.getUser();
-    const user = authData?.user ?? null;
+    const context = await getAuthenticatedContext();
+    if ("error" in context) return context.error;
 
-    if (!user) {
-      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    const contentType = String(req.headers.get("content-type") || "").toLowerCase();
+    if (contentType.includes("application/json")) {
+      const body = await req.json().catch(() => null);
+      const uploads = Array.isArray(body?.uploads) ? (body.uploads as FinalizedUpload[]) : [];
+      if (uploads.length === 0) {
+        return NextResponse.json({ error: "Upload at least one onboarding document." }, { status: 400 });
+      }
+
+      const insertedDocuments = await finalizeUploads({
+        admin: context.admin,
+        userId: context.user.id,
+        customerId: context.customer.id,
+        approvalStatus: context.customer.approvalStatus,
+        uploads,
+      });
+
+      return NextResponse.json({
+        ok: true,
+        customer_account_id: context.customer.id,
+        documents: insertedDocuments,
+      });
     }
 
     const form = await req.formData();
-    const admin = createAdminClient();
-    const customer = await resolveCustomerAccount(admin, user.id, user.email || null);
-
-    if (!customer?.id) {
-      return NextResponse.json({ error: "No linked customer account found for this user." }, { status: 400 });
-    }
-
     const uploads = await Promise.all(
       Array.from(form.entries())
         .filter(([key, value]) => REQUIRED_DOC_KEYS.has(key) && value instanceof File && value.size > 0)
@@ -239,21 +357,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Upload at least one onboarding document." }, { status: 400 });
     }
 
+    const finalizedUploads: FinalizedUpload[] = [];
     for (const upload of uploads) {
       if (upload.file.size > MAX_UPLOAD_BYTES) {
         return NextResponse.json({ error: `${upload.file.name} exceeds the 10MB limit.` }, { status: 400 });
       }
-    }
 
-    const insertedDocuments: Array<{ id?: string; documentType: string; title: string }> = [];
-
-    for (const upload of uploads) {
       const ext = extensionFromFile(upload.file);
-      const objectPath = `customer-documents/${customer.id}/${upload.key}/${Date.now()}-${safeFileName(upload.file.name || `${upload.key}.${ext}`)}`;
+      const objectPath = `customer-documents/${context.customer.id}/${upload.key}/${Date.now()}-${safeFileName(upload.file.name || `${upload.key}.${ext}`)}`;
       const contentType = String(upload.file.type || "").trim() || "application/octet-stream";
       const bytes = new Uint8Array(await upload.file.arrayBuffer());
 
-      const storageRes = await admin.storage.from(DOCUMENTS_BUCKET).upload(objectPath, bytes, {
+      const storageRes = await context.admin.storage.from(DOCUMENTS_BUCKET).upload(objectPath, bytes, {
         upsert: true,
         contentType,
       });
@@ -261,40 +376,28 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: `Storage upload failed: ${storageRes.error.message}` }, { status: 500 });
       }
 
-      const { data: publicData } = admin.storage.from(DOCUMENTS_BUCKET).getPublicUrl(objectPath);
-      const fileUrl = String(publicData?.publicUrl || "").trim();
-
-      const inserted = await insertCustomerDocument(admin, {
-        user_id: user.id,
-        customer_account_id: customer.id,
+      const { data: publicData } = context.admin.storage.from(DOCUMENTS_BUCKET).getPublicUrl(objectPath);
+      finalizedUploads.push({
+        document_type: upload.key,
         title: upload.file.name || upload.key,
         file_name: upload.file.name || `${upload.key}.${ext}`,
-        document_type: upload.key,
         bucket: DOCUMENTS_BUCKET,
         object_path: objectPath,
-        file_url: fileUrl,
-      });
-      insertedDocuments.push({
-        id: firstText((inserted as GenericRow | null)?.id) || undefined,
-        documentType: upload.key,
-        title: upload.file.name || upload.key,
+        file_url: String(publicData?.publicUrl || "").trim(),
       });
     }
 
-    if (!isApprovedCustomerApprovalStatus(customer.approvalStatus)) {
-      const updateRes = await admin
-        .from("customers")
-        .update({ approval_status: "needs_review" })
-        .eq("id", customer.id)
-        .neq("approval_status", "approved");
-      if (updateRes.error && !isMissingColumnError(updateRes.error)) {
-        return NextResponse.json({ error: `Approval status update failed: ${updateRes.error.message}` }, { status: 500 });
-      }
-    }
+    const insertedDocuments = await finalizeUploads({
+      admin: context.admin,
+      userId: context.user.id,
+      customerId: context.customer.id,
+      approvalStatus: context.customer.approvalStatus,
+      uploads: finalizedUploads,
+    });
 
     return NextResponse.json({
       ok: true,
-      customer_account_id: customer.id,
+      customer_account_id: context.customer.id,
       documents: insertedDocuments,
     });
   } catch (error: unknown) {
