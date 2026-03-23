@@ -35,22 +35,27 @@ export default function OnboardingUploadForm() {
     }
 
     startTransition(async () => {
-      const res = await fetch("/api/portal/onboarding", {
-        method: "POST",
-        body: formData,
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setError(String(json?.error || "Upload failed."));
-        return;
-      }
+      try {
+        const res = await fetch("/api/portal/onboarding", {
+          method: "POST",
+          body: formData,
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          const fallback = `Upload failed${res.status ? ` (${res.status})` : ""}.`;
+          setError(String(json?.error || fallback));
+          return;
+        }
 
-      setMessage("Documents uploaded. A team member will review your documents within 24 hours.");
-      setFiles({});
-      const inputs = document.querySelectorAll<HTMLInputElement>('input[type=\"file\"]');
-      inputs.forEach((input) => {
-        input.value = "";
-      });
+        setMessage("Documents uploaded. A team member will review your documents within 24 hours.");
+        setFiles({});
+        const inputs = document.querySelectorAll<HTMLInputElement>('input[type=\"file\"]');
+        inputs.forEach((input) => {
+          input.value = "";
+        });
+      } catch (submitError) {
+        setError(submitError instanceof Error ? submitError.message : "Upload failed.");
+      }
     });
   }
 
@@ -72,9 +77,7 @@ export default function OnboardingUploadForm() {
               onChange={(event) => setFile(doc.key, event.target.files?.[0] || null)}
             />
 
-            <p className="mt-3 text-xs text-[#5d7685]">
-              Upload the latest available file for {doc.label.toLowerCase()}.
-            </p>
+            <p className="mt-3 text-xs text-[#5d7685]">{files[doc.key] ? "File selected" : "Upload document"}</p>
           </Card>
         ))}
       </section>

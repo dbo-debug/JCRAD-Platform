@@ -41,19 +41,43 @@ function isMissingColumnError(error: unknown): boolean {
   return code === "42703" || code === "PGRST204" || (lower.includes("column") && lower.includes("does not exist"));
 }
 
-async function resolveCustomerAccount(admin: ReturnType<typeof createAdminClient>, userId: string, email: string | null) {
-  const membershipRes = await admin
+function normalizeDocumentType(value: string): string {
+  return String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+}
+
+async function loadCustomerMembershipIds(admin: ReturnType<typeof createAdminClient>, userId: string): Promise<string[]> {
+  const primaryRes = await admin
     .from("customer_users")
     .select("customer_id, is_primary")
     .eq("user_id", userId)
     .order("is_primary", { ascending: false });
-  if (membershipRes.error && !isMissingColumnError(membershipRes.error)) {
-    throw new Error(membershipRes.error.message);
+
+  if (!primaryRes.error) {
+    return ((primaryRes.data || []) as GenericRow[])
+      .map((row) => String(row.customer_id || "").trim())
+      .filter(Boolean);
   }
 
-  const membershipIds = ((membershipRes.data || []) as GenericRow[])
+  if (!isMissingColumnError(primaryRes.error)) {
+    throw new Error(primaryRes.error.message);
+  }
+
+  const fallbackRes = await admin
+    .from("customer_users")
+    .select("customer_id")
+    .eq("user_id", userId);
+
+  if (fallbackRes.error) {
+    throw new Error(fallbackRes.error.message);
+  }
+
+  return ((fallbackRes.data || []) as GenericRow[])
     .map((row) => String(row.customer_id || "").trim())
     .filter(Boolean);
+}
+
+async function resolveCustomerAccount(admin: ReturnType<typeof createAdminClient>, userId: string, email: string | null) {
+  const membershipIds = await loadCustomerMembershipIds(admin, userId);
 
   const normalizedEmail = normalizeEmail(email);
   let companyName = "";
@@ -125,40 +149,52 @@ async function insertCustomerDocument(
     file_url: string;
   }
 ) {
+  const documentType = normalizeDocumentType(payload.document_type);
   const attempts: Array<Record<string, unknown>> = [
     {
       user_id: payload.user_id,
       customer_account_id: payload.customer_account_id,
       title: payload.title,
       file_name: payload.file_name,
-      document_type: payload.document_type,
+      document_type: documentType,
+      kind: documentType,
       bucket: payload.bucket,
       object_path: payload.object_path,
       file_url: payload.file_url,
+      public_url: payload.file_url,
+      url: payload.file_url,
     },
     {
       user_id: payload.user_id,
       customer_account_id: payload.customer_account_id,
       title: payload.title,
       file_name: payload.file_name,
-      document_type: payload.document_type,
+      document_type: documentType,
+      kind: documentType,
       file_url: payload.file_url,
+      public_url: payload.file_url,
+      url: payload.file_url,
     },
     {
       user_id: payload.user_id,
       customer_account_id: payload.customer_account_id,
       title: payload.title,
       file_name: payload.file_name,
-      document_type: payload.document_type,
+      document_type: documentType,
+      kind: documentType,
     },
     {
       user_id: payload.user_id,
       customer_account_id: payload.customer_account_id,
       title: payload.title,
+      document_type: documentType,
+      kind: documentType,
     },
     {
       user_id: payload.user_id,
       customer_account_id: payload.customer_account_id,
+      document_type: documentType,
+      kind: documentType,
     },
   ];
 
@@ -176,87 +212,93 @@ async function insertCustomerDocument(
 }
 
 export async function POST(req: Request) {
-  const supabase = await createClient();
-  const { data: authData } = await supabase.auth.getUser();
-  const user = authData?.user ?? null;
+  try {
+    const supabase = await createClient();
+    const { data: authData } = await supabase.auth.getUser();
+    const user = authData?.user ?? null;
 
-  if (!user) {
-    return NextResponse.json({ error: "Authentication required" }, { status: 401 });
-  }
-
-  const form = await req.formData();
-  const admin = createAdminClient();
-  const customer = await resolveCustomerAccount(admin, user.id, user.email || null);
-
-  if (!customer?.id) {
-    return NextResponse.json({ error: "No linked customer account found for this user." }, { status: 400 });
-  }
-
-  const uploads = await Promise.all(
-    Array.from(form.entries())
-      .filter(([key, value]) => REQUIRED_DOC_KEYS.has(key) && value instanceof File && value.size > 0)
-      .map(async ([key, value]) => ({ key, file: value as File }))
-  );
-
-  if (uploads.length === 0) {
-    return NextResponse.json({ error: "Upload at least one onboarding document." }, { status: 400 });
-  }
-
-  for (const upload of uploads) {
-    if (upload.file.size > MAX_UPLOAD_BYTES) {
-      return NextResponse.json({ error: `${upload.file.name} exceeds the 10MB limit.` }, { status: 400 });
-    }
-  }
-
-  const insertedDocuments: Array<{ id?: string; documentType: string; title: string }> = [];
-
-  for (const upload of uploads) {
-    const ext = extensionFromFile(upload.file);
-    const objectPath = `customer-documents/${customer.id}/${upload.key}/${Date.now()}-${safeFileName(upload.file.name || `${upload.key}.${ext}`)}`;
-    const contentType = String(upload.file.type || "").trim() || "application/octet-stream";
-
-    const storageRes = await admin.storage.from(DOCUMENTS_BUCKET).upload(objectPath, upload.file, {
-      upsert: true,
-      contentType,
-    });
-    if (storageRes.error) {
-      return NextResponse.json({ error: storageRes.error.message }, { status: 500 });
+    if (!user) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
     }
 
-    const { data: publicData } = admin.storage.from(DOCUMENTS_BUCKET).getPublicUrl(objectPath);
-    const fileUrl = String(publicData?.publicUrl || "").trim();
+    const form = await req.formData();
+    const admin = createAdminClient();
+    const customer = await resolveCustomerAccount(admin, user.id, user.email || null);
 
-    const inserted = await insertCustomerDocument(admin, {
-      user_id: user.id,
+    if (!customer?.id) {
+      return NextResponse.json({ error: "No linked customer account found for this user." }, { status: 400 });
+    }
+
+    const uploads = await Promise.all(
+      Array.from(form.entries())
+        .filter(([key, value]) => REQUIRED_DOC_KEYS.has(key) && value instanceof File && value.size > 0)
+        .map(async ([key, value]) => ({ key: normalizeDocumentType(key), file: value as File }))
+    );
+
+    if (uploads.length === 0) {
+      return NextResponse.json({ error: "Upload at least one onboarding document." }, { status: 400 });
+    }
+
+    for (const upload of uploads) {
+      if (upload.file.size > MAX_UPLOAD_BYTES) {
+        return NextResponse.json({ error: `${upload.file.name} exceeds the 10MB limit.` }, { status: 400 });
+      }
+    }
+
+    const insertedDocuments: Array<{ id?: string; documentType: string; title: string }> = [];
+
+    for (const upload of uploads) {
+      const ext = extensionFromFile(upload.file);
+      const objectPath = `customer-documents/${customer.id}/${upload.key}/${Date.now()}-${safeFileName(upload.file.name || `${upload.key}.${ext}`)}`;
+      const contentType = String(upload.file.type || "").trim() || "application/octet-stream";
+      const bytes = new Uint8Array(await upload.file.arrayBuffer());
+
+      const storageRes = await admin.storage.from(DOCUMENTS_BUCKET).upload(objectPath, bytes, {
+        upsert: true,
+        contentType,
+      });
+      if (storageRes.error) {
+        return NextResponse.json({ error: `Storage upload failed: ${storageRes.error.message}` }, { status: 500 });
+      }
+
+      const { data: publicData } = admin.storage.from(DOCUMENTS_BUCKET).getPublicUrl(objectPath);
+      const fileUrl = String(publicData?.publicUrl || "").trim();
+
+      const inserted = await insertCustomerDocument(admin, {
+        user_id: user.id,
+        customer_account_id: customer.id,
+        title: upload.file.name || upload.key,
+        file_name: upload.file.name || `${upload.key}.${ext}`,
+        document_type: upload.key,
+        bucket: DOCUMENTS_BUCKET,
+        object_path: objectPath,
+        file_url: fileUrl,
+      });
+      insertedDocuments.push({
+        id: firstText((inserted as GenericRow | null)?.id) || undefined,
+        documentType: upload.key,
+        title: upload.file.name || upload.key,
+      });
+    }
+
+    if (!isApprovedCustomerApprovalStatus(customer.approvalStatus)) {
+      const updateRes = await admin
+        .from("customers")
+        .update({ approval_status: "needs_review" })
+        .eq("id", customer.id)
+        .neq("approval_status", "approved");
+      if (updateRes.error && !isMissingColumnError(updateRes.error)) {
+        return NextResponse.json({ error: `Approval status update failed: ${updateRes.error.message}` }, { status: 500 });
+      }
+    }
+
+    return NextResponse.json({
+      ok: true,
       customer_account_id: customer.id,
-      title: upload.file.name || upload.key,
-      file_name: upload.file.name || `${upload.key}.${ext}`,
-      document_type: upload.key,
-      bucket: DOCUMENTS_BUCKET,
-      object_path: objectPath,
-      file_url: fileUrl,
+      documents: insertedDocuments,
     });
-    insertedDocuments.push({
-      id: firstText((inserted as GenericRow | null)?.id) || undefined,
-      documentType: upload.key,
-      title: upload.file.name || upload.key,
-    });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Upload failed";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
-
-  if (!isApprovedCustomerApprovalStatus(customer.approvalStatus)) {
-    const updateRes = await admin
-      .from("customers")
-      .update({ approval_status: "needs_review" })
-      .eq("id", customer.id)
-      .neq("approval_status", "approved");
-    if (updateRes.error && !isMissingColumnError(updateRes.error)) {
-      return NextResponse.json({ error: updateRes.error.message }, { status: 500 });
-    }
-  }
-
-  return NextResponse.json({
-    ok: true,
-    customer_account_id: customer.id,
-    documents: insertedDocuments,
-  });
 }

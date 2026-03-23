@@ -411,17 +411,19 @@ export default function ProductCard({ item, onAdd }: ProductCardProps) {
                         ) : null}
                       </>
                     ) : (
-                      <div className="space-y-2 rounded-lg border border-[#dbe6ed] bg-[#f9fcfe] p-2">
+                      <div className="min-w-0 space-y-2 overflow-hidden rounded-lg border border-[#dbe6ed] bg-[#f9fcfe] p-2">
                         <div className="grid gap-1">
                           <span className="font-medium text-[#2f4a59]">Front artwork</span>
                           <input
                             type="file"
                             accept="image/*,.pdf"
                             onChange={(e) => item.copackConfig?.onFrontFileChange(e.target.files?.[0] || null)}
-                            className="rounded-lg border border-[#cfdde5] bg-white px-2 py-1.5 text-[11px] text-[#1f2937]"
+                            className="block w-full min-w-0 max-w-full rounded-lg border border-[#cfdde5] bg-white px-2 py-1.5 text-[11px] text-[#1f2937] file:mr-2 file:max-w-full file:overflow-hidden file:text-ellipsis file:whitespace-nowrap"
                           />
                           {item.copackConfig.frontFileName ? (
-                            <span className="text-[10px] text-[#5b7382]">{item.copackConfig.frontFileName}</span>
+                            <span className="block max-w-full truncate text-[10px] text-[#5b7382]" title={item.copackConfig.frontFileName}>
+                              {item.copackConfig.frontFileName}
+                            </span>
                           ) : null}
                         </div>
                         <div className="grid gap-1">
@@ -430,14 +432,16 @@ export default function ProductCard({ item, onAdd }: ProductCardProps) {
                             type="file"
                             accept="image/*,.pdf"
                             onChange={(e) => item.copackConfig?.onBackFileChange(e.target.files?.[0] || null)}
-                            className="rounded-lg border border-[#cfdde5] bg-white px-2 py-1.5 text-[11px] text-[#1f2937]"
+                            className="block w-full min-w-0 max-w-full rounded-lg border border-[#cfdde5] bg-white px-2 py-1.5 text-[11px] text-[#1f2937] file:mr-2 file:max-w-full file:overflow-hidden file:text-ellipsis file:whitespace-nowrap"
                           />
                           {item.copackConfig.backFileName ? (
-                            <span className="text-[10px] text-[#5b7382]">{item.copackConfig.backFileName}</span>
+                            <span className="block max-w-full truncate text-[10px] text-[#5b7382]" title={item.copackConfig.backFileName}>
+                              {item.copackConfig.backFileName}
+                            </span>
                           ) : null}
                         </div>
                         <p className="text-[11px] text-[#355060]">
-                          Artwork is uploaded inline and attached to this estimate line.
+                          {item.copackConfig.frontFileName || item.copackConfig.backFileName ? "Artwork selected" : "Upload artwork"}
                         </p>
                       </div>
                     )}

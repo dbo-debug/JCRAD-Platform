@@ -53,6 +53,14 @@ function firstText(...values: Array<unknown>): string | null {
   return null;
 }
 
+function buildStoragePublicHref(document: Record<string, unknown>): string | null {
+  const bucket = firstText(document.bucket);
+  const objectPath = firstText(document.object_path);
+  const baseUrl = firstText(process.env.NEXT_PUBLIC_SUPABASE_URL);
+  if (!bucket || !objectPath || !baseUrl) return null;
+  return `${baseUrl.replace(/\/+$/, "")}/storage/v1/object/public/${bucket}/${objectPath.replace(/^\/+/, "")}`;
+}
+
 function isApprovalDocument(document: Record<string, unknown>): boolean {
   const type = String(document.document_type || document.kind || "").trim().toLowerCase();
   return APPROVAL_DOCUMENT_TYPES.has(type);
@@ -69,7 +77,7 @@ function buildApprovalQueueItem(customer: CustomerSummary): CustomerApprovalQueu
   const readyLabel = documentCount > 0 ? `${documentCount} linked doc${documentCount === 1 ? "" : "s"}` : "No linked docs yet";
   const accountHref = `/workspace/customers/${customer.id}`;
   const linkedDocuments = approvalDocuments.slice(0, 3).map((document) => {
-    const directHref = firstText(document.file_url, document.public_url, document.url);
+    const directHref = firstText(document.file_url, document.public_url, document.url) || buildStoragePublicHref(document as Record<string, unknown>);
 
     return {
       id: document.id,
