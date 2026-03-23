@@ -12,6 +12,7 @@ type SignupFormProps = {
 
 export default function SignupForm({ returnTo }: SignupFormProps) {
   const supabase = useMemo(() => createClient(), []);
+  const loginHref = returnTo ? `/login?returnTo=${encodeURIComponent(returnTo)}` : "/login";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -59,21 +60,21 @@ export default function SignupForm({ returnTo }: SignupFormProps) {
         user_id: data?.user?.id || null,
         user_email: data?.user?.email || email.trim().toLowerCase(),
         metadata: {
-          source: data?.session ? "instant_session" : "email_confirmation_pending",
+          source: data?.session ? "password_signup" : "missing_session",
           return_to: returnTo || "/dashboard",
         },
       }),
     }).catch(() => {});
 
-    setSubmitting(false);
-    setSuccess(true);
-
-    if (data.session) {
-      window.location.href = returnTo || "/dashboard";
+    if (!data.session) {
+      setMessage("Account created, but no session was started. Disable email confirmation in Supabase Auth and try again.");
+      setSubmitting(false);
       return;
     }
 
-    setMessage("Account created. Check your email to confirm, then sign in.");
+    setSuccess(true);
+    setSubmitting(false);
+    window.location.href = returnTo || "/dashboard";
   }
 
   return (
@@ -123,7 +124,7 @@ export default function SignupForm({ returnTo }: SignupFormProps) {
 
           <p className="mt-4 text-center text-sm text-[#4a6575]">
             Already have an account?{" "}
-            <Link href="/login" className="font-semibold text-[#0f766e] underline underline-offset-4">
+            <Link href={loginHref} className="font-semibold text-[#0f766e] underline underline-offset-4">
               Sign in
             </Link>
           </p>

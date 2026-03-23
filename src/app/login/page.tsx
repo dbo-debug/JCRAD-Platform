@@ -1,4 +1,5 @@
 import AppShell from "@/components/layout/AppShell";
+import { safeInternalReturnTo } from "@/lib/auth/canAccessEstimator";
 import LoginForm from "./login-form";
 
 type LoginPageProps = {
@@ -7,7 +8,9 @@ type LoginPageProps = {
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const params = await searchParams;
-  const returnTo = typeof params?.returnTo === "string" && params.returnTo.trim() ? params.returnTo : "/dashboard";
+  const returnTo = safeInternalReturnTo(
+    typeof params?.returnTo === "string" && params.returnTo.trim() ? params.returnTo : "/dashboard"
+  );
 
   return (
     <AppShell>

@@ -12,6 +12,7 @@ type LoginFormProps = {
 
 export default function LoginForm({ returnTo }: LoginFormProps) {
   const supabase = useMemo(() => createClient(), []);
+  const signupHref = returnTo ? `/signup?returnTo=${encodeURIComponent(returnTo)}` : "/signup";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
@@ -89,7 +90,7 @@ export default function LoginForm({ returnTo }: LoginFormProps) {
 
           <p className="mt-4 text-center text-sm text-[#4a6575]">
             Need an account?{" "}
-            <Link href="/signup" className="font-semibold text-[#0f766e] underline underline-offset-4">
+            <Link href={signupHref} className="font-semibold text-[#0f766e] underline underline-offset-4">
               Create account
             </Link>
           </p>

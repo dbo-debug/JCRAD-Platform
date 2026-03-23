@@ -1,4 +1,5 @@
 import AppShell from "@/components/layout/AppShell";
+import { safeInternalReturnTo } from "@/lib/auth/canAccessEstimator";
 import SignupForm from "./signup-form";
 
 type SignupPageProps = {
@@ -7,7 +8,9 @@ type SignupPageProps = {
 
 export default async function SignupPage({ searchParams }: SignupPageProps) {
   const params = await searchParams;
-  const returnTo = typeof params?.returnTo === "string" && params.returnTo.trim() ? params.returnTo : "/dashboard";
+  const returnTo = safeInternalReturnTo(
+    typeof params?.returnTo === "string" && params.returnTo.trim() ? params.returnTo : "/dashboard"
+  );
 
   return (
     <AppShell>
