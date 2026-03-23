@@ -120,15 +120,59 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: stopsError.message }, { status: 500 });
   }
 
+  let queueCleanupWarning: string | null = null;
   if (queueIds.length > 0) {
     const { error: queueError } = await supabase.from("route_stop_queue").delete().eq("added_by_user_id", staff.userId).in("id", queueIds);
     if (queueError) {
-      await supabase.from("routes").delete().eq("id", route.id);
-      return NextResponse.json({ error: queueError.message }, { status: 500 });
+      queueCleanupWarning = queueError.message || "Route saved, but pending stop cleanup failed";
     }
   }
 
-  return NextResponse.json({ ok: true, route_id: route.id });
+  return NextResponse.json({ ok: true, route_id: route.id, queue_cleanup_warning: queueCleanupWarning });
+}
+
+export async function PATCH(req: Request) {
+  const staff = await getStaffContext();
+  if (!staff) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const body = await req.json().catch(() => ({}));
+  const routeId = asText(body.route_id);
+  const assignedUserId = asText(body.assigned_user_id);
+  const status = asText(body.status);
+
+  if (!routeId) {
+    return NextResponse.json({ error: "route_id is required" }, { status: 400 });
+  }
+  if (!assignedUserId && !status) {
+    return NextResponse.json({ error: "Provide a route update field" }, { status: 400 });
+  }
+  if (status && !["draft", "assigned", "in_progress", "completed", "archived"].includes(status)) {
+    return NextResponse.json({ error: "Invalid route status" }, { status: 400 });
+  }
+  if (staff.role === "sales" && assignedUserId && assignedUserId !== staff.userId) {
+    return NextResponse.json({ error: "Sales staff can only assign routes to themselves" }, { status: 403 });
+  }
+
+  const payload: Record<string, string> = {
+    updated_at: new Date().toISOString(),
+  };
+  if ("assigned_user_id" in body) {
+    if (!assignedUserId) {
+      return NextResponse.json({ error: "assigned_user_id is required" }, { status: 400 });
+    }
+    payload.assigned_user_id = assignedUserId;
+  }
+  if ("status" in body && status) {
+    payload.status = status;
+  }
+
+  const supabase = createAdminClient();
+  const { error } = await supabase.from("routes").update(payload).eq("id", routeId);
+  if (error) {
+    return NextResponse.json({ error: error.message || "Failed to update route" }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true, route_id: routeId, status: payload.status || null, assigned_user_id: payload.assigned_user_id || null });
 }
 
 export async function DELETE(req: Request) {

@@ -78,7 +78,36 @@ function buildRouteProgress(route: SavedRouteDetail) {
 }
 
 export default function SavedRouteRunner({ route }: SavedRouteRunnerProps) {
+  const router = useRouter();
   const progress = useMemo(() => buildRouteProgress(route), [route]);
+  const [routeStatus, setRouteStatus] = useState(route.status || "draft");
+  const [routeBusy, setRouteBusy] = useState<"start" | "complete" | null>(null);
+  const [routeMessage, setRouteMessage] = useState<string | null>(null);
+
+  async function updateRouteStatus(nextStatus: "in_progress" | "completed") {
+    setRouteBusy(nextStatus === "in_progress" ? "start" : "complete");
+    setRouteMessage(null);
+
+    try {
+      const res = await fetch("/api/workspace/routes", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          route_id: route.id,
+          status: nextStatus,
+        }),
+      });
+      const json = await parseJsonSafe(res);
+      if (!res.ok) throw new Error(String(json.error || `Save failed (${res.status})`));
+      setRouteStatus(nextStatus);
+      setRouteMessage(nextStatus === "in_progress" ? "Route started." : "Route marked completed.");
+      router.refresh();
+    } catch (error) {
+      setRouteMessage(error instanceof Error ? error.message : "Route update failed");
+    } finally {
+      setRouteBusy(null);
+    }
+  }
 
   return (
     <div className="space-y-5">
@@ -88,12 +117,35 @@ export default function SavedRouteRunner({ route }: SavedRouteRunnerProps) {
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6c8797]">Saved Route Runner</p>
             <h2 className="mt-2 text-2xl font-semibold text-[#173543]">{route.name}</h2>
             <p className="mt-2 text-sm text-[#5c7483]">
-              {route.routeDate || "No date"} • {route.assignedUserLabel || "Unassigned rep"} • {route.stops.length} stops • {route.status}
+              {route.routeDate || "No date"} • {route.assignedUserLabel || "Unassigned rep"} • {route.stops.length} stops • {routeStatus}
             </p>
             <p className="mt-1 text-sm text-[#5c7483]">
               Origin {route.originName} • {route.originAddress}
             </p>
             {route.notes ? <p className="mt-2 text-sm text-[#5c7483]">{route.notes}</p> : null}
+            <div className="mt-3 flex flex-wrap gap-2">
+              {routeStatus !== "in_progress" && routeStatus !== "completed" ? (
+                <button
+                  type="button"
+                  onClick={() => void updateRouteStatus("in_progress")}
+                  disabled={routeBusy !== null}
+                  className="rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95 disabled:opacity-60"
+                >
+                  {routeBusy === "start" ? "Starting..." : "Start Route"}
+                </button>
+              ) : null}
+              {routeStatus === "in_progress" ? (
+                <button
+                  type="button"
+                  onClick={() => void updateRouteStatus("completed")}
+                  disabled={routeBusy !== null}
+                  className="rounded-full border border-[#d0dde5] bg-white px-4 py-2 text-sm font-semibold text-[#24404d] transition hover:border-[#14b8a6] hover:text-[#0f766e] disabled:opacity-60"
+                >
+                  {routeBusy === "complete" ? "Completing..." : "Complete Route"}
+                </button>
+              ) : null}
+            </div>
+            {routeMessage ? <p className="mt-2 text-sm text-[#4f6877]">{routeMessage}</p> : null}
           </div>
           <div className="grid w-full gap-2 rounded-2xl border border-[#dbe8ef] bg-white/90 p-4 text-sm text-[#506877] shadow-sm sm:max-w-[360px]">
             <MetricLine label="Start Time" value={route.plannedStartTime || "Not set"} />

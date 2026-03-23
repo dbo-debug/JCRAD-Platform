@@ -41,6 +41,7 @@ export type ProductCardCopackConfig = {
   showAdvancedUnits: boolean;
   expectedRangeLabel: string;
   expectedDisclaimer?: string;
+  minimumOrderLabel?: string;
   startingWeightLabel: string;
   startingWeightUnit: "lb" | "g";
   unitSize: string;

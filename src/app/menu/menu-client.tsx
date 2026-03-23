@@ -270,11 +270,15 @@ function defaultCardState(offer: Offer, selectedCategory: MenuCategory, menuMode
     : CATEGORY_UNIT_SIZES[baseCategory] && CATEGORY_UNIT_SIZES[baseCategory].length > 0
       ? CATEGORY_UNIT_SIZES[baseCategory][0]
       : "3.5g";
+  const concentrateStartingGrams = Math.max(1, Number(offer.min_order || 0) || 1000);
+  const defaultStartingWeightLbs = baseCategory === "concentrate"
+    ? concentrateStartingGrams / GRAMS_PER_LB
+    : Math.max(1, Number(offer.min_order || 1));
   return {
     expanded: false,
     mode,
-    startingWeightLbs: Math.max(1, Number(offer.min_order || 1)),
-    startingWeightGrams: 1000,
+    startingWeightLbs: defaultStartingWeightLbs,
+    startingWeightGrams: baseCategory === "concentrate" ? concentrateStartingGrams : 1000,
     advancedTargetUnits: 100,
     showAdvancedUnits: false,
     unitSize: defaultUnitSize,
@@ -639,11 +643,31 @@ export default function MenuClient({
           : menuMode === "copack"
             ? "copack"
             : "bulk";
-        if (current.mode !== desiredMode) {
+        const desiredUnitSizeOptions = desiredMode === "pre_roll"
+          ? [...PRE_ROLL_UNIT_SIZES]
+          : CATEGORY_UNIT_SIZES[baseCategory] && CATEGORY_UNIT_SIZES[baseCategory].length > 0
+            ? CATEGORY_UNIT_SIZES[baseCategory]
+            : ["3.5g"];
+        const desiredUnitSize = desiredUnitSizeOptions.includes(current.unitSize)
+          ? current.unitSize
+          : desiredUnitSizeOptions[0];
+        const desiredPreRollPackQty =
+          desiredMode === "pre_roll" && current.preRollPackQty === 5 && desiredUnitSize === "1g"
+            ? 1
+            : current.preRollPackQty;
+        if (
+          current.mode !== desiredMode
+          || current.unitSize !== desiredUnitSize
+          || current.preRollPackQty !== desiredPreRollPackQty
+        ) {
           next[offerId] = {
             ...current,
             mode: desiredMode,
+            unitSize: desiredUnitSize,
             packagingMode: desiredMode === "pre_roll" ? "jcrad" : current.packagingMode,
+            packagingSkuId: "",
+            secondaryPackagingSkuId: "",
+            preRollPackQty: desiredPreRollPackQty,
           };
         }
       }
@@ -695,6 +719,7 @@ export default function MenuClient({
 
   function updateCardState(offer: Offer, updater: (prev: OfferCardState) => OfferCardState) {
     const offerId = String(offer.id || "");
+    setErrorByOfferId((prev) => (prev[offerId] ? { ...prev, [offerId]: "" } : prev));
     setCardStateByOfferId((prev) => {
       const current = prev[offerId] || defaultCardState(offer, selectedCategory, menuMode);
       return { ...prev, [offerId]: updater(current) };
@@ -850,6 +875,7 @@ export default function MenuClient({
         const apiMode = cardMode === "pre_roll" ? "copack" : cardMode;
         const addAllowed = apiMode === "bulk" ? !!offer.allow_bulk : !!offer.allow_copack;
         const isPreRoll = cardMode === "pre_roll";
+        const minOrder = Math.max(0, Number(offer.min_order || 0));
         const estimatorCategory = (category === "concentrate" || category === "vape" ? category : "flower") as "flower" | "concentrate" | "vape";
         const unitSizeOptions = isPreRoll
           ? [...PRE_ROLL_UNIT_SIZES]
@@ -903,6 +929,12 @@ export default function MenuClient({
             || (category === "vape" && isVapeVesselSku(selectedVapePackagingSku))
           )
           && !isPreRoll;
+        const concentrateMinimumOrderError = category === "concentrate"
+          && apiMode === "bulk"
+          && minOrder > 0
+          && cardState.startingWeightGrams < minOrder
+          ? `Minimum bulk order is ${minOrder.toLocaleString()} g.`
+          : "";
         const expectedRange = deriveExpectedRange({
           category,
           mode: cardState.mode,
@@ -928,6 +960,9 @@ export default function MenuClient({
           showAdvancedUnits: cardState.showAdvancedUnits,
           expectedRangeLabel: expectedRange.label,
           expectedDisclaimer: expectedRange.disclaimer,
+          minimumOrderLabel: category === "concentrate" && apiMode === "bulk" && minOrder > 0
+            ? `Minimum order: ${minOrder.toLocaleString()} g`
+            : undefined,
           startingWeightLabel: startingWeightUnit === "lb" ? "Starting lbs" : "Starting grams",
           startingWeightUnit,
           unitSize: cardState.unitSize,
@@ -962,7 +997,13 @@ export default function MenuClient({
             ...prev,
             mode: next,
             expanded: next === "bulk" ? prev.expanded : true,
+            unitSize:
+              next === "pre_roll"
+                ? (PRE_ROLL_UNIT_SIZES.includes(prev.unitSize as (typeof PRE_ROLL_UNIT_SIZES)[number]) ? prev.unitSize : PRE_ROLL_UNIT_SIZES[0])
+                : (CATEGORY_UNIT_SIZES[category] && CATEGORY_UNIT_SIZES[category].includes(prev.unitSize) ? prev.unitSize : unitSizeOptions[0]),
             packagingMode: next === "pre_roll" ? "jcrad" : prev.packagingMode,
+            packagingSkuId: "",
+            secondaryPackagingSkuId: "",
             preRollPackQty: next === "pre_roll" ? prev.preRollPackQty : 1,
             preRollMode: next === "pre_roll" ? prev.preRollMode : PRE_ROLL_MODES[0],
             internalInfusionProductId: next === "bulk" ? "" : prev.internalInfusionProductId,
@@ -983,14 +1024,24 @@ export default function MenuClient({
             advancedTargetUnits: Number.isFinite(next) ? next : prev.advancedTargetUnits,
           })),
           onShowAdvancedUnitsChange: (next) => updateCardState(offer, (prev) => ({ ...prev, showAdvancedUnits: next })),
-          onUnitSizeChange: (next) => updateCardState(offer, (prev) => ({ ...prev, unitSize: next })),
+          onUnitSizeChange: (next) => updateCardState(offer, (prev) => ({
+            ...prev,
+            unitSize: next,
+            packagingSkuId: "",
+            preRollPackQty: prev.mode === "pre_roll" && prev.preRollPackQty === 5 && next === "1g" ? 1 : prev.preRollPackQty,
+          })),
           onPackagingModeChange: (next) => updateCardState(offer, (prev) => ({
             ...prev,
             packagingMode: prev.mode === "pre_roll" ? "jcrad" : next,
           })),
           onPackagingSkuChange: (next) => updateCardState(offer, (prev) => ({ ...prev, packagingSkuId: next })),
           onSecondaryPackagingSkuChange: (next) => updateCardState(offer, (prev) => ({ ...prev, secondaryPackagingSkuId: next })),
-          onPreRollPackQtyChange: (next) => updateCardState(offer, (prev) => ({ ...prev, preRollPackQty: next })),
+          onPreRollPackQtyChange: (next) => updateCardState(offer, (prev) => ({
+            ...prev,
+            preRollPackQty: next,
+            packagingSkuId: "",
+            secondaryPackagingSkuId: next >= 2 ? prev.secondaryPackagingSkuId : "",
+          })),
           onPreRollModeChange: (next) => updateCardState(offer, (prev) => ({ ...prev, preRollMode: next })),
           onInternalInfusionProductChange: (next) => updateCardState(offer, (prev) => ({ ...prev, internalInfusionProductId: next })),
           onExternalLiquidProductChange: (next) => updateCardState(offer, (prev) => ({ ...prev, externalLiquidProductId: next })),
@@ -1010,9 +1061,9 @@ export default function MenuClient({
           badges: productBadgesForOffer(offer).map((label) => ({ label })),
           availabilityLabel: availabilityLabelForOffer(offer),
           pricingLabel: pricingLabelForOffer(offer),
-          addDisabled: !addAllowed,
+          addDisabled: !addAllowed || Boolean(concentrateMinimumOrderError),
           addLoading: !!busyByOfferId[id],
-          errorText: errorByOfferId[id] || "",
+          errorText: errorByOfferId[id] || concentrateMinimumOrderError,
           copackConfig,
         };
       });
@@ -1110,6 +1161,7 @@ export default function MenuClient({
     const mode = cardState.mode;
     const apiMode = mode === "pre_roll" ? "copack" : mode;
     const packagingMode = apiMode === "bulk" ? null : cardState.packagingMode;
+    const minOrder = Math.max(0, Number(offer.min_order || 0));
     const expectedRange = deriveExpectedRange({
       category,
       mode,
@@ -1162,8 +1214,14 @@ export default function MenuClient({
     if (apiMode === "bulk" && category === "vape" && cardState.startingWeightGrams <= 0) {
       throw new Error("Bulk requires quantity liters > 0.");
     }
+    if (apiMode === "bulk" && category === "concentrate" && cardState.startingWeightGrams <= 0) {
+      throw new Error("Bulk requires quantity grams > 0.");
+    }
     if (apiMode === "bulk" && category !== "vape" && cardState.startingWeightLbs <= 0) {
       throw new Error("Bulk requires quantity lbs > 0.");
+    }
+    if (apiMode === "bulk" && category === "concentrate" && minOrder > 0 && cardState.startingWeightGrams < minOrder) {
+      throw new Error(`Minimum bulk order is ${minOrder.toLocaleString()} g.`);
     }
     if ((mode === "copack" || mode === "pre_roll") && category === "flower" && cardState.startingWeightLbs <= 0) {
       throw new Error("Starting lbs must be > 0.");
@@ -1226,19 +1284,22 @@ export default function MenuClient({
     const vapeBulkGrams = apiMode === "bulk" && category === "vape"
       ? Math.max(0, Number(cardState.startingWeightGrams || 0))
       : 0;
+    const concentrateBulkGrams = apiMode === "bulk" && category === "concentrate"
+      ? Math.max(0, Number(cardState.startingWeightGrams || 0))
+      : 0;
     const payload: Record<string, unknown> = {
       estimate_id: estimateId,
       offer_id: offer.id,
       mode: apiMode,
-      quantity_lbs: apiMode === "bulk" && category === "vape"
-        ? vapeBulkGrams / GRAMS_PER_LB
+      quantity_lbs: apiMode === "bulk" && (category === "vape" || category === "concentrate")
+        ? (category === "vape" ? vapeBulkGrams : concentrateBulkGrams) / GRAMS_PER_LB
         : Math.max(0, Number(cardState.startingWeightLbs || 0)),
-      quantity: (apiMode === "bulk" && category === "vape")
-        ? vapeBulkGrams
+      quantity: (apiMode === "bulk" && (category === "vape" || category === "concentrate"))
+        ? (category === "vape" ? vapeBulkGrams : concentrateBulkGrams)
         : (category === "concentrate" || category === "vape")
         ? Math.max(0, Number(cardState.startingWeightGrams || 0))
         : Math.max(0, Number(cardState.startingWeightLbs || 0)),
-      quantity_unit: (apiMode === "bulk" && category === "vape")
+      quantity_unit: (apiMode === "bulk" && (category === "vape" || category === "concentrate"))
         ? "g"
         : (category === "concentrate" || category === "vape")
           ? "g"

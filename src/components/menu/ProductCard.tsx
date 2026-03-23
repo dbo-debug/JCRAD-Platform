@@ -36,6 +36,11 @@ export default function ProductCard({ item, onAdd }: ProductCardProps) {
       && item.copackConfig.mode === "bulk"
       && String(item.categoryLabel || "").toLowerCase() === "vape"
   );
+  const isConcentrateBulk = Boolean(
+    item.copackConfig
+      && item.copackConfig.mode === "bulk"
+      && String(item.categoryLabel || "").toLowerCase() === "concentrate"
+  );
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -191,19 +196,30 @@ export default function ProductCard({ item, onAdd }: ProductCardProps) {
               <div className="space-y-2 text-[11px] text-[#304b5a]">
                 {item.copackConfig.mode === "bulk" ? (
                   <label className="grid gap-1">
-                    <span className="font-medium">{isVapeBulk ? "Bulk L" : "Bulk lbs"}</span>
+                    <span className="font-medium">{isVapeBulk ? "Bulk L" : isConcentrateBulk ? "Bulk grams" : "Bulk lbs"}</span>
                     <input
                       type="number"
                       min={0}
-                      step={isVapeBulk ? "0.1" : "0.01"}
-                      value={isVapeBulk ? litersFromGrams(item.copackConfig.startingWeightGrams) : item.copackConfig.startingWeightLbs}
+                      step={isVapeBulk ? "0.1" : isConcentrateBulk ? "1" : "0.01"}
+                      value={
+                        isVapeBulk
+                          ? litersFromGrams(item.copackConfig.startingWeightGrams)
+                          : isConcentrateBulk
+                            ? item.copackConfig.startingWeightGrams
+                            : item.copackConfig.startingWeightLbs
+                      }
                       onChange={(e) =>
                         isVapeBulk
                           ? item.copackConfig?.onStartingWeightGramsChange(gramsFromLiters(Number(e.target.value)))
-                          : item.copackConfig?.onStartingWeightLbsChange(Number(e.target.value))
+                          : isConcentrateBulk
+                            ? item.copackConfig?.onStartingWeightGramsChange(Number(e.target.value))
+                            : item.copackConfig?.onStartingWeightLbsChange(Number(e.target.value))
                       }
                       className="rounded-lg border border-[#cfdde5] bg-white px-2 py-1.5 text-[11px] text-[#1f2937]"
                     />
+                    {item.copackConfig.minimumOrderLabel ? (
+                      <span className="text-[11px] text-[#6a8392]">{item.copackConfig.minimumOrderLabel}</span>
+                    ) : null}
                   </label>
                 ) : (
                   <>

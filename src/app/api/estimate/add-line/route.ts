@@ -1178,8 +1178,14 @@ export async function POST(req: Request) {
       if (quantity_lbs <= 0 || quantity <= 0) {
         return respond({ error: "quantity_lbs must be > 0" }, { status: 400 });
       }
-      if (Number(offer.min_order || 0) > 0 && quantity_lbs < Number(offer.min_order || 0)) {
-        return respond({ error: `Minimum bulk order is ${offer.min_order} lbs` }, { status: 400 });
+      const minimumOrder = Number(offer.min_order || 0);
+      if (minimumOrder > 0) {
+        if (productCategory === "concentrate" && quantity_unit === "g" && quantity < minimumOrder) {
+          return respond({ error: `Minimum bulk order is ${offer.min_order} g` }, { status: 400 });
+        }
+        if (productCategory !== "concentrate" && quantity_lbs < minimumOrder) {
+          return respond({ error: `Minimum bulk order is ${offer.min_order} lbs` }, { status: 400 });
+        }
       }
       if (Number.isFinite(material_cost_per_g_value) && material_cost_per_g_value > 0) {
         material_cost_total = money(material_cost_per_g_value * LB_TO_G * quantity_lbs);

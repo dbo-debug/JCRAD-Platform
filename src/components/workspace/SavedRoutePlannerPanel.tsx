@@ -189,6 +189,7 @@ export default function SavedRoutePlannerPanel({
   const [overtimeApproved, setOvertimeApproved] = useState(false);
   const [previewNeedsRefresh, setPreviewNeedsRefresh] = useState(false);
   const [savedRoutesState, setSavedRoutesState] = useState(savedRoutes);
+  const [routeActionById, setRouteActionById] = useState<Record<string, "assign" | null>>({});
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState<"generate_pending" | "generate_territory" | "save" | "queue" | "reoptimize" | "delete_route" | null>(null);
 
@@ -580,11 +581,35 @@ export default function SavedRoutePlannerPanel({
       if (!res.ok) throw new Error(String(json.error || `Save failed (${res.status})`));
 
       const routeId = String(json.route_id || "");
+      const queueCleanupWarning = String(json.queue_cleanup_warning || "").trim();
       const usedQueueIds = new Set(draftStops.map((stop) => stop.queueId).filter((value): value is string => Boolean(value)));
       if (usedQueueIds.size > 0) {
         setPendingStops((current) => current.filter((stop) => !usedQueueIds.has(stop.id)));
       }
-      setStatusMessage("Saved route.");
+      if (routeId) {
+        const assignedUserLabel = routeRepOptions.find((option) => option.userId === assignedUserId)?.label || assignedUserId;
+        const nextSummary: SavedRouteSummary = {
+          id: routeId,
+          name: routeName,
+          territoryCode: derivedRouteTerritoryCode || null,
+          originName: JC_RAD_HQ.name,
+          originAddress: JC_RAD_HQ.address,
+          assignedUserId,
+          assignedUserLabel,
+          routeDate,
+          status: "assigned",
+          plannedStartTime: startTime,
+          maxStops: normalizedMaxStops,
+          lunchMinutes: draftPlan.lunchMinutes,
+          estimatedTotalMinutes: draftPlan.estimatedTotalMinutes,
+          estimatedReturnTime: draftPlan.estimatedReturnTime,
+          stopCount: draftStops.length,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        setSavedRoutesState((current) => [nextSummary, ...current.filter((route) => route.id !== routeId)].slice(0, 40));
+      }
+      setStatusMessage(queueCleanupWarning ? `Saved route. Pending stop cleanup still needs attention: ${queueCleanupWarning}` : "Saved route.");
       setDraftStops([]);
       setDraftPlan(null);
       setDraftSource(null);
@@ -626,6 +651,45 @@ export default function SavedRoutePlannerPanel({
       setStatusMessage(error instanceof Error ? error.message : "Delete failed");
     } finally {
       setBusy(null);
+    }
+  }
+
+  async function updateSavedRouteAssignment(routeId: string, assignedUserId: string) {
+    if (!routeId || !assignedUserId) return;
+
+    setRouteActionById((current) => ({ ...current, [routeId]: "assign" }));
+    setStatusMessage(null);
+
+    try {
+      const res = await fetch("/api/workspace/routes", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          route_id: routeId,
+          assigned_user_id: assignedUserId,
+        }),
+      });
+      const json = await parseJsonSafe(res);
+      if (!res.ok) throw new Error(String(json.error || `Assignment failed (${res.status})`));
+
+      const assignedUserLabel = routeRepOptions.find((option) => option.userId === assignedUserId)?.label || assignedUserId;
+      setSavedRoutesState((current) =>
+        current.map((route) =>
+          route.id === routeId
+            ? {
+                ...route,
+                assignedUserId,
+                assignedUserLabel,
+              }
+            : route
+        )
+      );
+      setStatusMessage("Route assignment updated.");
+      router.refresh();
+    } catch (error) {
+      setStatusMessage(error instanceof Error ? error.message : "Assignment failed");
+    } finally {
+      setRouteActionById((current) => ({ ...current, [routeId]: null }));
     }
   }
 
@@ -1091,6 +1155,26 @@ export default function SavedRoutePlannerPanel({
                       <p className="text-sm text-[#5c7483]">
                         {route.routeDate || "No date"} • {route.assignedUserLabel || "Unassigned rep"} • {route.stopCount} stops
                       </p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <label className="text-sm text-[#5c7483]">
+                          <span className="sr-only">Assign route</span>
+                          <select
+                            value={route.assignedUserId || ""}
+                            onChange={(event) => void updateSavedRouteAssignment(route.id, event.target.value)}
+                            disabled={busy !== null || routeActionById[route.id] === "assign"}
+                            className="rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm text-[#24404d] outline-none transition focus:border-[#14b8a6] disabled:opacity-60"
+                          >
+                            <option value="" disabled>
+                              Assign rep
+                            </option>
+                            {routeRepOptions.map((option) => (
+                              <option key={option.userId} value={option.userId}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      </div>
                       <div className="flex flex-wrap gap-2">
                         <Link href={`/workspace/routes/run?routeId=${route.id}`} className="rounded-full bg-[#173543] px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-[#0f2a35]">
                           Open Runner

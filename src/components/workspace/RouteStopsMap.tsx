@@ -201,7 +201,7 @@ function decodeGooglePolyline(encoded: string) {
 }
 
 function getGoogleMapsApiKey() {
-  const value = String(process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "").trim();
+  const value = String(process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY || "").trim();
   return value || null;
 }
 
@@ -289,6 +289,7 @@ export default function RouteStopsMap({
   }, [fallbackPathPoints, polylinePoints]);
   const selectedOrderIndex = selectedStop ? orderedProjectedStops.findIndex((stop) => stop.customer.id === selectedStop.customer.id) : -1;
   const [googleMapStatus, setGoogleMapStatus] = useState<"idle" | "ready" | "failed">("idle");
+  const [googleMapError, setGoogleMapError] = useState<string | null>(null);
   const googleMapsApiKey = getGoogleMapsApiKey();
   const shouldAttemptGoogleMap = Boolean(plannedRoute && googleMapsApiKey);
   const googleMapReady = shouldAttemptGoogleMap && googleMapStatus === "ready";
@@ -300,10 +301,16 @@ export default function RouteStopsMap({
     let cancelled = false;
     loadGoogleMapsClient(googleMapsApiKey || "")
       .then(() => {
-        if (!cancelled) setGoogleMapStatus("ready");
+        if (!cancelled) {
+          setGoogleMapStatus("ready");
+          setGoogleMapError(null);
+        }
       })
-      .catch(() => {
-        if (!cancelled) setGoogleMapStatus("failed");
+      .catch((error) => {
+        if (!cancelled) {
+          setGoogleMapStatus("failed");
+          setGoogleMapError(error instanceof Error ? error.message : "Google Maps failed to load");
+        }
       });
 
     return () => {
@@ -415,7 +422,9 @@ export default function RouteStopsMap({
           <div className="grid gap-4">
             {plannedRoute && googleMapFailed ? (
               <div className="rounded-2xl border border-[#f1ddad] bg-[#fff9eb] px-4 py-3 text-sm text-[#8a5a08]">
-                Google Maps preview is unavailable in this browser session. Showing the projected fallback preview instead.
+                {googleMapsApiKey
+                  ? `Google Maps preview is unavailable in this browser session${googleMapError ? `: ${googleMapError}.` : "."} Showing the projected fallback preview instead.`
+                  : "Google Maps preview is not configured for the browser. Set NEXT_PUBLIC_GOOGLE_MAPS_API_KEY or NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY to enable the live planner map. Showing the projected fallback preview instead."}
               </div>
             ) : null}
             {selectedStop ? (
