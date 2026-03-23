@@ -1970,6 +1970,21 @@ export async function POST(req: Request) {
 
         packaging_base_cost_total = money(packagingUnitCostInternal * units);
         packaging_primary_sell_total = money(packagingPrimarySellPerUnit * units);
+        if (
+          productCategory === "concentrate"
+          && packaging_primary_sell_total <= 0
+          && packaging_primary_cost_total > 0
+          && units > 0
+        ) {
+          const primarySellFallbackPerUnit = money(
+            resolveUnitSellPrice({
+              explicitSellPrice: null,
+              cost: packaging_primary_cost_total,
+              markupPct: targetMarkupPct,
+            }).sellPrice ?? 0
+          );
+          packaging_primary_sell_total = money(primarySellFallbackPerUnit * units);
+        }
         if (packaging_secondary_cost_total <= 0) {
           packaging_secondary_sell_total = 0;
         }
