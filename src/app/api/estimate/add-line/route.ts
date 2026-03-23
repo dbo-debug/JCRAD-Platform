@@ -293,6 +293,19 @@ function skuMatchesRequiredPrimaryPackagingType(
   return packagingType === "vape_510_cart" || packagingType === "vape_all_in_one";
 }
 
+function skuMatchesRequiredPrimaryCapacity(args: {
+  row: PackagingSkuLookupRow;
+  category: "concentrate" | "vape";
+  unitSizeGrams: number;
+}) {
+  if (args.category === "concentrate") return true;
+  return skuMatchesEstimatePrimaryCapacity(args.row, {
+    category: args.category,
+    isPreRoll: false,
+    unitSizeGrams: args.unitSizeGrams,
+  });
+}
+
 function resolveAutoPackagingSku(args: {
   rows: PackagingSkuLookupRow[];
   slot: ReturnType<typeof primaryPackagingSlotForEstimate> | NonNullable<ReturnType<typeof secondaryPackagingSlotForEstimate>>;
@@ -305,9 +318,9 @@ function resolveAutoPackagingSku(args: {
     if (!skuSupportsPackagingEstimatorSlot(row, args.slot)) return false;
     if (args.primary) {
       if (!skuMatchesRequiredPrimaryPackagingType(row, args.category)) return false;
-      return skuMatchesEstimatePrimaryCapacity(row, {
+      return skuMatchesRequiredPrimaryCapacity({
+        row,
         category: args.category,
-        isPreRoll: false,
         unitSizeGrams: args.unitSizeGrams,
       });
     }
@@ -1713,9 +1726,9 @@ export async function POST(req: Request) {
           const providedPrimarySkuValid = providedPrimarySku
             ? skuSupportsPackagingEstimatorSlot(providedPrimarySku, requiredPrimarySlot)
               && skuMatchesRequiredPrimaryPackagingType(providedPrimarySku, productCategory)
-              && skuMatchesEstimatePrimaryCapacity(providedPrimarySku, {
+              && skuMatchesRequiredPrimaryCapacity({
+                row: providedPrimarySku,
                 category: productCategory,
-                isPreRoll: false,
                 unitSizeGrams: requestedUnitSizeGrams,
               })
             : false;
@@ -1752,11 +1765,14 @@ export async function POST(req: Request) {
         if (!skuSupportsPackagingEstimatorSlot(sku as Record<string, unknown>, requiredPrimarySlot)) {
           return respond({ error: "Selected packaging SKU does not match the estimator packaging slot" }, { status: 400 });
         }
-        if (!skuMatchesEstimatePrimaryCapacity(sku as Record<string, unknown>, {
-          category: productCategory === "concentrate" || productCategory === "vape" ? productCategory : "flower",
-          isPreRoll,
-          unitSizeGrams: requestedUnitSizeGrams,
-        })) {
+        if (
+          productCategory === "vape"
+          && !skuMatchesEstimatePrimaryCapacity(sku as Record<string, unknown>, {
+            category: "vape",
+            isPreRoll,
+            unitSizeGrams: requestedUnitSizeGrams,
+          })
+        ) {
           return respond({ error: "Selected packaging SKU does not match the required fill size" }, { status: 400 });
         }
         if (isPreRoll) {
