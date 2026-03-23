@@ -1201,6 +1201,10 @@ export default function MenuClient({
           && isVapeVesselSku(packagingSkus.find((sku) => String(sku.id) === String(cardState.packagingSkuId)))
         )
       );
+    const autoResolveRequiredPackaging = apiMode === "copack"
+      && packagingMode === "jcrad"
+      && mode !== "pre_roll"
+      && (category === "concentrate" || category === "vape");
 
     if (apiMode === "bulk" && !offer.allow_bulk) {
       throw new Error("This product is not available for bulk.");
@@ -1208,7 +1212,7 @@ export default function MenuClient({
     if (apiMode === "copack" && !offer.allow_copack) {
       throw new Error("This product is not available for copack.");
     }
-    if (apiMode === "copack" && packagingMode === "jcrad" && !cardState.packagingSkuId) {
+    if (apiMode === "copack" && packagingMode === "jcrad" && !cardState.packagingSkuId && !autoResolveRequiredPackaging) {
       throw new Error(category === "vape" ? "Select a vape vessel SKU (510 cart or AIO)." : "Select a packaging SKU.");
     }
     if (apiMode === "bulk" && category === "vape" && cardState.startingWeightGrams <= 0) {
@@ -1229,15 +1233,15 @@ export default function MenuClient({
     if ((mode === "copack" || mode === "pre_roll") && (category === "concentrate" || category === "vape") && cardState.startingWeightGrams <= 0) {
       throw new Error("Starting grams must be > 0.");
     }
-    if (requiresSecondaryBag && !cardState.secondaryPackagingSkuId) {
+    if (requiresSecondaryBag && !cardState.secondaryPackagingSkuId && !autoResolveRequiredPackaging) {
       throw new Error(category === "vape" ? "Select a 3.5g mylar bag SKU." : "Select a secondary bag for concentrate copack.");
     }
-    if (apiMode === "copack" && packagingMode === "jcrad" && category === "vape") {
+    if (apiMode === "copack" && packagingMode === "jcrad" && category === "vape" && cardState.packagingSkuId) {
       const vesselSku = packagingSkus.find((sku) => String(sku.id) === String(cardState.packagingSkuId));
       if (!vesselSku || !isVapeVesselSku(vesselSku)) {
         throw new Error("Select a vape vessel SKU (510 cart or AIO).");
       }
-      if (isVapeVesselSku(vesselSku)) {
+      if (isVapeVesselSku(vesselSku) && cardState.secondaryPackagingSkuId) {
         const bagSku = packagingSkus.find((sku) => String(sku.id) === String(cardState.secondaryPackagingSkuId));
         if (!bagSku || !isMylar35Sku(bagSku)) {
           throw new Error("Select a 3.5g mylar bag SKU.");

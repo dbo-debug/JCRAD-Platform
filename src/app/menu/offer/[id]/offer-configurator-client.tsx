@@ -81,6 +81,10 @@ export default function OfferConfiguratorClient({
 
   const invalidPreRollPackSelection = isPreRollMode && preRollPackQty === 5 && unitSize === "1g";
   const requiresSecondaryBag = mode === "copack" && packagingMode === "jcrad" && category === "concentrate";
+  const autoResolveRequiredPackaging = mode === "copack"
+    && packagingMode === "jcrad"
+    && !isPreRollMode
+    && (category === "concentrate" || category === "vape");
 
   const filteredSkus = useMemo(() => {
     return packagingSkus.filter((s) => {
@@ -179,7 +183,7 @@ export default function OfferConfiguratorClient({
       if (invalidPreRollPackSelection) {
         throw new Error("5-pack pre-rolls are only allowed in 0.5g or 0.75g.");
       }
-      if (requiresSecondaryBag && !secondaryBagSkuId) {
+      if (requiresSecondaryBag && !secondaryBagSkuId && !autoResolveRequiredPackaging) {
         throw new Error("Secondary bag (required) must be selected for concentrate JC RAD packaging.");
       }
 
@@ -228,9 +232,11 @@ export default function OfferConfiguratorClient({
           units,
           unit_size: unitSize,
           packaging_mode: apiMode === "bulk" ? null : packagingMode,
-          packaging_sku_id: apiMode === "copack" && packagingMode === "jcrad" ? packagingSkuId : null,
+          packaging_sku_id: apiMode === "copack" && packagingMode === "jcrad" ? packagingSkuId || null : null,
           secondary_packaging_sku_id:
-            apiMode === "copack" && packagingMode === "jcrad" && category === "concentrate" ? secondaryBagSkuId : null,
+            apiMode === "copack" && packagingMode === "jcrad" && category === "concentrate"
+              ? secondaryBagSkuId || null
+              : null,
           packaging_submission_id: packagingSubmissionId,
           extra_touch_points: apiMode === "copack" && packagingMode === "customer" ? extraTouchPoints : 0,
           pre_roll_mode: isPreRollMode ? preRollMode : null,
@@ -391,8 +397,8 @@ export default function OfferConfiguratorClient({
           disabled={
             busy ||
             invalidPreRollPackSelection ||
-            ((mode !== "bulk") && packagingMode === "jcrad" && !packagingSkuId) ||
-            (requiresSecondaryBag && !secondaryBagSkuId)
+            ((mode !== "bulk") && packagingMode === "jcrad" && !packagingSkuId && !autoResolveRequiredPackaging) ||
+            (requiresSecondaryBag && !secondaryBagSkuId && !autoResolveRequiredPackaging)
           }
         >
           {busy ? "Adding..." : "Add to Estimate"}

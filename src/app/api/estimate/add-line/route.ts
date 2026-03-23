@@ -24,6 +24,25 @@ import { getEstimatePackagingReviewState } from "@/lib/packaging/reviewStatus";
 
 type SupabaseClient = ReturnType<typeof createAdminClient>;
 
+type PackagingSkuLookupRow = {
+  id: string;
+  name?: string | null;
+  packaging_type?: string | null;
+  category?: string | null;
+  size_grams?: number | null;
+  pack_qty?: number | null;
+  vape_device?: string | null;
+  vape_fill_grams?: number | null;
+  applies_to?: string | null;
+  applies_to_contexts?: unknown;
+  estimator_slots?: unknown;
+  workflow_contexts?: unknown;
+  packaging_role?: string | null;
+  unit_cost?: number | null;
+  sell_price?: number | null;
+  active?: boolean | null;
+};
+
 type OfferWithProduct = {
   id: string;
   product_id: string;
@@ -247,6 +266,48 @@ function secondaryPackagingSlot(category: string, isPreRoll: boolean, preRollPac
     isPreRoll,
     preRollPackQty,
   });
+}
+
+function comparePackagingSkuPreference(a: PackagingSkuLookupRow, b: PackagingSkuLookupRow) {
+  const sellA = Number(a.sell_price);
+  const sellB = Number(b.sell_price);
+  const costA = Number(a.unit_cost);
+  const costB = Number(b.unit_cost);
+  const safeSellA = Number.isFinite(sellA) && sellA >= 0 ? sellA : Number.POSITIVE_INFINITY;
+  const safeSellB = Number.isFinite(sellB) && sellB >= 0 ? sellB : Number.POSITIVE_INFINITY;
+  if (safeSellA !== safeSellB) return safeSellA - safeSellB;
+  const safeCostA = Number.isFinite(costA) && costA >= 0 ? costA : Number.POSITIVE_INFINITY;
+  const safeCostB = Number.isFinite(costB) && costB >= 0 ? costB : Number.POSITIVE_INFINITY;
+  if (safeCostA !== safeCostB) return safeCostA - safeCostB;
+  const nameCompare = String(a.name || "").localeCompare(String(b.name || ""));
+  if (nameCompare !== 0) return nameCompare;
+  return String(a.id || "").localeCompare(String(b.id || ""));
+}
+
+function resolveAutoPackagingSku(args: {
+  rows: PackagingSkuLookupRow[];
+  slot: ReturnType<typeof primaryPackagingSlotForEstimate> | NonNullable<ReturnType<typeof secondaryPackagingSlotForEstimate>>;
+  category: "concentrate" | "vape";
+  unitSizeGrams: number;
+  primary: boolean;
+}): PackagingSkuLookupRow | null {
+  const filtered = args.rows.filter((row) => {
+    if (!row.active) return false;
+    if (!skuSupportsPackagingEstimatorSlot(row, args.slot)) return false;
+    if (args.primary) {
+      if (packagingCategoryForSku(row) !== args.category) return false;
+      return skuMatchesEstimatePrimaryCapacity(row, {
+        category: args.category,
+        isPreRoll: false,
+        unitSizeGrams: args.unitSizeGrams,
+      });
+    }
+    return true;
+  });
+
+  if (filtered.length === 0) return null;
+  filtered.sort(comparePackagingSkuPreference);
+  return filtered[0] || null;
 }
 
 type InfusionType = "none" | "internal" | "external";
@@ -833,8 +894,8 @@ export async function POST(req: Request) {
     const providedQuantityUnit = String(body?.quantity_unit || "").toLowerCase();
 
     const packaging_mode = body?.packaging_mode ? String(body.packaging_mode) : "jcrad";
-    const packaging_sku_id = body?.packaging_sku_id ? String(body.packaging_sku_id) : null;
-    const secondary_packaging_sku_id = body?.secondary_packaging_sku_id
+    let packaging_sku_id = body?.packaging_sku_id ? String(body.packaging_sku_id) : null;
+    let secondary_packaging_sku_id = body?.secondary_packaging_sku_id
       ? String(body.secondary_packaging_sku_id)
       : null;
     const packaging_submission_id = body?.packaging_submission_id ? String(body.packaging_submission_id) : null;
@@ -1616,14 +1677,44 @@ export async function POST(req: Request) {
       let packagingType = "flower_in_bag";
 
       if (packaging_mode === "jcrad") {
-        if (!packaging_sku_id) {
+        const autoResolveRequiredPackaging =
+          !isPreRoll && (productCategory === "concentrate" || productCategory === "vape");
+        const requestedUnitSizeGrams = gramsFromUnitSize(unit_size);
+        const requiredPrimarySlot = primaryPackagingSlot(productCategory, isPreRoll, pre_roll_pack_qty);
+        let activePackagingSkus: PackagingSkuLookupRow[] | null = null;
+        const loadActivePackagingSkus = async () => {
+          if (activePackagingSkus) return activePackagingSkus;
+          const { data, error } = await supabase
+            .from("packaging_skus")
+            .select(
+              "id, name, packaging_type, category, size_grams, pack_qty, vape_device, vape_fill_grams, applies_to, applies_to_contexts, estimator_slots, workflow_contexts, packaging_role, unit_cost, sell_price, active"
+            )
+            .eq("active", true);
+          if (error) throw new Error(error.message);
+          activePackagingSkus = (data || []) as PackagingSkuLookupRow[];
+          return activePackagingSkus;
+        };
+
+        let resolvedPackagingSkuId = packaging_sku_id;
+        if (!resolvedPackagingSkuId && autoResolveRequiredPackaging) {
+          const primarySku = resolveAutoPackagingSku({
+            rows: await loadActivePackagingSkus(),
+            slot: requiredPrimarySlot,
+            category: productCategory,
+            unitSizeGrams: requestedUnitSizeGrams,
+            primary: true,
+          });
+          resolvedPackagingSkuId = primarySku?.id || null;
+        }
+
+        if (!resolvedPackagingSkuId) {
           return respond({ error: "packaging_sku_id required for JC RAD packaging" }, { status: 400 });
         }
 
         const { data: sku, error: skuErr } = await supabase
           .from("packaging_skus")
           .select("id, name, packaging_type, category, size_grams, pack_qty, vape_device, vape_fill_grams, applies_to, applies_to_contexts, estimator_slots, unit_cost, sell_price")
-          .eq("id", packaging_sku_id)
+          .eq("id", resolvedPackagingSkuId)
           .single();
         mark("after packaging_skus select");
 
@@ -1634,14 +1725,13 @@ export async function POST(req: Request) {
         const skuCategory = packagingCategoryForSku(
           sku as { category?: unknown; applies_to?: unknown; packaging_type?: unknown }
         );
-        const requiredPrimarySlot = primaryPackagingSlot(productCategory, isPreRoll, pre_roll_pack_qty);
         if (!skuSupportsPackagingEstimatorSlot(sku as Record<string, unknown>, requiredPrimarySlot)) {
           return respond({ error: "Selected packaging SKU does not match the estimator packaging slot" }, { status: 400 });
         }
         if (!skuMatchesEstimatePrimaryCapacity(sku as Record<string, unknown>, {
           category: productCategory === "concentrate" || productCategory === "vape" ? productCategory : "flower",
           isPreRoll,
-          unitSizeGrams: gramsFromUnitSize(unit_size),
+          unitSizeGrams: requestedUnitSizeGrams,
         })) {
           return respond({ error: "Selected packaging SKU does not match the required fill size" }, { status: 400 });
         }
@@ -1663,7 +1753,7 @@ export async function POST(req: Request) {
         const { data: skuPriceTiers, error: skuPriceErr } = await supabase
           .from("packaging_price_tiers")
           .select("moq, unit_price")
-          .eq("packaging_sku_id", packaging_sku_id);
+          .eq("packaging_sku_id", resolvedPackagingSkuId);
         mark("after packaging_price_tiers select");
 
         const pricingTierTableMissing = String(skuPriceErr?.message || "").toLowerCase().includes("packaging_price_tiers");
@@ -1692,12 +1782,25 @@ export async function POST(req: Request) {
         }
 
         if (productCategory === "concentrate" || isVapeHardwarePackaging) {
-          if (!secondary_packaging_sku_id) {
+          const requiredSecondarySlot = secondaryPackagingSlot(productCategory, false, pre_roll_pack_qty);
+          let resolvedSecondaryPackagingSkuId = secondary_packaging_sku_id;
+          if (!resolvedSecondaryPackagingSkuId && requiredSecondarySlot) {
+            const secondarySku = resolveAutoPackagingSku({
+              rows: await loadActivePackagingSkus(),
+              slot: requiredSecondarySlot,
+              category: productCategory,
+              unitSizeGrams: requestedUnitSizeGrams,
+              primary: false,
+            });
+            resolvedSecondaryPackagingSkuId = secondarySku?.id || null;
+          }
+
+          if (!resolvedSecondaryPackagingSkuId) {
             return respond(
               {
                 error: productCategory === "vape"
-                  ? "Secondary bag (required) must be selected for vape JC RAD packaging."
-                  : "Secondary bag (required) must be selected for concentrate JC RAD packaging.",
+                  ? "Secondary bag (required) could not be auto-resolved for vape JC RAD packaging."
+                  : "Secondary bag (required) could not be auto-resolved for concentrate JC RAD packaging.",
               },
               { status: 400 }
             );
@@ -1708,14 +1811,13 @@ export async function POST(req: Request) {
             .select(
               "id, name, packaging_type, size_grams, active, applies_to, applies_to_contexts, estimator_slots, workflow_contexts, packaging_role, unit_cost, sell_price"
             )
-            .eq("id", secondary_packaging_sku_id)
+            .eq("id", resolvedSecondaryPackagingSkuId)
             .single();
 
           if (secondaryErr || !secondarySku) {
             return respond({ error: secondaryErr?.message || "Secondary packaging SKU not found" }, { status: 404 });
           }
 
-          const requiredSecondarySlot = secondaryPackagingSlot(productCategory, false, pre_roll_pack_qty);
           const secondaryContextOk =
             requiredSecondarySlot != null
               && skuSupportsPackagingEstimatorSlot(secondarySku as Record<string, unknown>, requiredSecondarySlot);
@@ -1742,7 +1844,10 @@ export async function POST(req: Request) {
           }
           packagingUnitCostInternal = money(packagingUnitCostInternal + packaging_secondary_cost_total);
           packaging_secondary_sell_total = money(packagingSecondarySellPerUnit * units);
+          secondary_packaging_sku_id = resolvedSecondaryPackagingSkuId;
         }
+
+        packaging_sku_id = resolvedPackagingSkuId;
 
         packaging_base_cost_total = money(packagingUnitCostInternal * units);
         packaging_primary_sell_total = money(packagingPrimarySellPerUnit * units);
