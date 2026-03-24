@@ -411,7 +411,14 @@ function InlinePill({ label, tone }: { label: string; tone: "neutral" | "warn" |
         ? "border-[#f1ddad] bg-[#fff9eb] text-[#9a6b00]"
         : "border-[#d7e6ed] bg-[#f8fbfc] text-[#4f6877]";
 
-  return <span className={["rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em]", toneClass].join(" ")}>{label}</span>;
+  return (
+    <span
+      title={label}
+      className={["inline-flex max-w-full min-w-0 items-center truncate rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em]", toneClass].join(" ")}
+    >
+      {label}
+    </span>
+  );
 }
 
 function RouteStopCard({ customer }: { customer: CustomerSummary }) {

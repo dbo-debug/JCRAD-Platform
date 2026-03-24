@@ -1224,9 +1224,11 @@ function CustomerCard({
         <div className="min-w-0 rounded-[18px] border border-[#e3edf2] bg-[#f8fbfc] px-3 py-2.5">
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#7a909d]">Coverage</p>
           <p className="mt-1 truncate font-medium text-[#294653]">{primaryContact?.name || "No primary contact"}</p>
-          <p className="mt-1 truncate text-xs text-[#7a909d]">
-            {primaryContact?.email || customer.primaryContactEmail || "No email"}
-            {(primaryContact?.phone || customer.mainPhone) ? ` • ${primaryContact?.phone || customer.mainPhone}` : ""}
+          <p className="mt-1 flex min-w-0 items-start gap-1 text-xs text-[#7a909d]">
+            <span title={primaryContact?.email || customer.primaryContactEmail || "No email"} className="min-w-0 truncate">
+              {primaryContact?.email || customer.primaryContactEmail || "No email"}
+            </span>
+            {(primaryContact?.phone || customer.mainPhone) ? <span className="shrink-0">• {primaryContact?.phone || customer.mainPhone}</span> : null}
           </p>
         </div>
 

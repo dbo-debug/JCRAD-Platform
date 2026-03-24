@@ -354,10 +354,10 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
 
 function SummaryCard({ label, value, helper }: { label: string; value: string; helper?: string }) {
   return (
-    <div className="rounded-2xl border border-[#dbe9ef] bg-white p-4 shadow-sm">
+    <div className="min-w-0 rounded-2xl border border-[#dbe9ef] bg-white p-4 shadow-sm">
       <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#5d7685]">{label}</p>
-      <p className="mt-1.5 text-base font-semibold text-[#173543]">{value}</p>
-      {helper ? <p className="mt-1 text-sm text-[#4a6575]">{helper}</p> : null}
+      <p title={value} className="mt-1.5 truncate text-base font-semibold text-[#173543]">{value}</p>
+      {helper ? <p title={helper} className="mt-1 truncate text-sm text-[#4a6575]">{helper}</p> : null}
     </div>
   );
 }
@@ -380,7 +380,14 @@ function HeaderBadge({
             ? "border-[#ffd3cf] bg-[#fff2f0] text-[#b44b40]"
             : "border-[#d7e6ed] bg-[#f8fbfc] text-[#4f6877]";
 
-  return <span className={["rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em]", toneClass].join(" ")}>{label}</span>;
+  return (
+    <span
+      title={label}
+      className={["inline-flex max-w-full min-w-0 items-center truncate rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em]", toneClass].join(" ")}
+    >
+      {label}
+    </span>
+  );
 }
 
 function ActivityCard({

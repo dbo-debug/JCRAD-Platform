@@ -74,7 +74,7 @@ const VISIT_STATUS_OPTIONS = [
 ];
 
 const sectionClass = "rounded-2xl border border-[#dbe9ef] bg-white p-4 shadow-sm";
-const inputClass = "rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a]";
+const inputClass = "min-w-0 w-full rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a]";
 
 async function parseJsonSafe(res: Response): Promise<Record<string, unknown>> {
   const contentType = res.headers.get("content-type") || "";
@@ -171,7 +171,14 @@ function StatusPill({ label, tone = "neutral" }: { label: string; tone?: "neutra
         ? "border-[#f1ddad] bg-[#fff9eb] text-[#9a6b00]"
         : "border-[#d7e6ed] bg-[#f8fbfc] text-[#4f6877]";
 
-  return <span className={["rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em]", toneClass].join(" ")}>{label}</span>;
+  return (
+    <span
+      title={label}
+      className={["inline-flex max-w-full min-w-0 items-center truncate rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em]", toneClass].join(" ")}
+    >
+      {label}
+    </span>
+  );
 }
 
 function SectionHeader({ title, description, action }: { title: string; description?: string; action?: ReactNode }) {
@@ -697,7 +704,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
             <h2 className="mt-1 text-xl font-semibold">Work the account without hunting through the page</h2>
             <p className="mt-1 text-sm text-[#d3e6eb]">Calls and email fire immediately. The other actions jump straight into the existing account, task, activity, route, and timeline sections.</p>
           </div>
-          <div className="rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-sm text-[#d7edf0]">
+          <div className="max-w-full rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-sm text-[#d7edf0]">
             {territoryCode || "No territory"} • {routeDay || "No route day"} • {visitStatus ? titleCase(visitStatus) : "No visit status"}
           </div>
         </div>
@@ -744,8 +751,8 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
           }
         />
 
-        <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1.65fr)_minmax(280px,0.95fr)]">
-          <div className="space-y-3">
+        <div className="mt-3 grid gap-3 2xl:grid-cols-[minmax(0,1.65fr)_minmax(280px,0.95fr)]">
+          <div className="min-w-0 space-y-3">
             <div className="flex flex-wrap gap-2">
               <StatusPill label={territoryCode ? `Territory ${territoryCode}` : "Territory Missing"} tone={territoryCode ? "ok" : "warn"} />
               <StatusPill label={routeDay ? `Route ${routeDay}` : "Route Day Missing"} tone={routeDay ? "ok" : "warn"} />
@@ -799,8 +806,8 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
               </div>
             </div>
 
-            <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-12">
-              <label className="grid gap-1 text-sm text-[#4a6575] xl:col-span-5">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-12">
+              <label className="grid min-w-0 gap-1 text-sm text-[#4a6575] xl:col-span-5">
                 <span>Territory</span>
                 <select
                   value={territoryCode}
@@ -824,7 +831,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
                 </select>
               </label>
 
-              <label className="grid gap-1 text-sm text-[#4a6575] xl:col-span-3">
+              <label className="grid min-w-0 gap-1 text-sm text-[#4a6575] xl:col-span-3">
                 <span>Route Day</span>
                 <select value={routeDay} onChange={(event) => setRouteDay(event.target.value)} disabled={routeBusy} className={inputClass}>
                   <option value="">Unassigned</option>
@@ -836,7 +843,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
                 </select>
               </label>
 
-              <label className="grid gap-1 text-sm text-[#4a6575] xl:col-span-4">
+              <label className="grid min-w-0 gap-1 text-sm text-[#4a6575] md:col-span-2 xl:col-span-4">
                 <span>Assigned Route Rep</span>
                 <select
                   value={assignedRouteRepUserId}
@@ -853,7 +860,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
                 </select>
               </label>
 
-              <label className="grid gap-1 text-sm text-[#4a6575] xl:col-span-3">
+              <label className="grid min-w-0 gap-1 text-sm text-[#4a6575] xl:col-span-3">
                 <span>Priority</span>
                 <select value={routePriority} onChange={(event) => setRoutePriority(event.target.value)} disabled={routeBusy} className={inputClass}>
                   <option value="">Unassigned</option>
@@ -865,7 +872,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
                 </select>
               </label>
 
-              <label className="grid gap-1 text-sm text-[#4a6575] xl:col-span-4">
+              <label className="grid min-w-0 gap-1 text-sm text-[#4a6575] xl:col-span-4">
                 <span>Visit Status</span>
                 <select value={visitStatus} onChange={(event) => setVisitStatus(event.target.value)} disabled={routeBusy} className={inputClass}>
                   <option value="">Unassigned</option>
@@ -877,33 +884,33 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
                 </select>
               </label>
 
-              <label className="grid gap-1 text-sm text-[#4a6575] xl:col-span-5">
+              <label className="grid min-w-0 gap-1 text-sm text-[#4a6575] xl:col-span-5">
                 <span>Next Visit Due</span>
                 <input type="datetime-local" value={nextVisitDueAt} onChange={(event) => setNextVisitDueAt(event.target.value)} disabled={routeBusy} className={inputClass} />
               </label>
 
-              <label className="grid gap-1 text-sm text-[#4a6575] xl:col-span-5">
+              <label className="grid min-w-0 gap-1 text-sm text-[#4a6575] xl:col-span-5">
                 <span>Last Visit</span>
                 <input type="datetime-local" value={lastVisitAt} onChange={(event) => setLastVisitAt(event.target.value)} disabled={routeBusy} className={inputClass} />
               </label>
 
-              <label className="grid gap-1 text-sm text-[#4a6575] xl:col-span-3">
+              <label className="grid min-w-0 gap-1 text-sm text-[#4a6575] xl:col-span-3">
                 <span>Latitude</span>
                 <input type="number" step="0.000001" value={latitude} onChange={(event) => setLatitude(event.target.value)} disabled={routeBusy} className={inputClass} />
               </label>
 
-              <label className="grid gap-1 text-sm text-[#4a6575] xl:col-span-4">
+              <label className="grid min-w-0 gap-1 text-sm text-[#4a6575] xl:col-span-4">
                 <span>Longitude</span>
                 <input type="number" step="0.000001" value={longitude} onChange={(event) => setLongitude(event.target.value)} disabled={routeBusy} className={inputClass} />
               </label>
             </div>
           </div>
 
-          <aside className="grid gap-3 rounded-2xl border border-[#e1ebf1] bg-[#fbfdfe] p-3 text-sm text-[#4a6575]">
-            <div>
+          <aside className="grid min-w-0 gap-3 rounded-2xl border border-[#e1ebf1] bg-[#fbfdfe] p-3 text-sm text-[#4a6575]">
+            <div className="min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8398a5]">Routing Snapshot</p>
               <div className="mt-2 space-y-1.5">
-                <p className="font-medium text-[#173543]">{territoryMeta?.label || "Territory not assigned"}</p>
+                <p className="break-words font-medium text-[#173543]">{territoryMeta?.label || "Territory not assigned"}</p>
                 <p>{routeDay ? `Default run day: ${routeDay}` : "Route day still open"}</p>
                 <p>{assignedRouteRepUserId ? "Route rep assigned" : "No route rep assigned"}</p>
               </div>
