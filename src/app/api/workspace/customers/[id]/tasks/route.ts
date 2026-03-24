@@ -20,6 +20,34 @@ function asPriority(value: unknown): number | null {
   return parsed;
 }
 
+async function resolveAssignedUserId(args: {
+  requestedAssignedUserId: string | null;
+  staff: NonNullable<Awaited<ReturnType<typeof getStaffContext>>>;
+}) {
+  if (args.staff.role !== "admin") {
+    return args.staff.userId;
+  }
+
+  const requestedAssignedUserId = asText(args.requestedAssignedUserId);
+  if (!requestedAssignedUserId) return null;
+
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, role")
+    .eq("id", requestedAssignedUserId)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+
+  const role = String(data?.role || "").trim().toLowerCase();
+  if (role !== "admin" && role !== "sales") {
+    throw new Error("assigned_user_id must reference a valid staff user");
+  }
+
+  return String(data?.id || "").trim() || null;
+}
+
 export async function POST(req: Request, context: { params: Promise<{ id: string }> }) {
   const staff = await getStaffContext();
   if (!staff) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -29,7 +57,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
 
   const title = asText(body.title);
   const dueDate = asDate(body.due_date);
-  const assignedUserId = asText(body.assigned_user_id);
+  const requestedAssignedUserId = asText(body.assigned_user_id);
   const priority = asPriority(body.priority);
 
   if (!title) {
@@ -45,6 +73,18 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   }
 
   const supabase = createAdminClient();
+  let assignedUserId: string | null = null;
+
+  try {
+    assignedUserId = await resolveAssignedUserId({
+      requestedAssignedUserId,
+      staff,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Invalid assigned_user_id";
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
+
   const { data: taskRow, error } = await supabase
     .from("customer_tasks")
     .insert({

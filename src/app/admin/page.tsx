@@ -95,7 +95,9 @@ const MODULE_CARDS = [
   },
 ] as const;
 
-const SALES_VISIBLE_MODULE_CARDS = MODULE_CARDS.filter((card) => card.adminOnly !== true);
+const SALES_VISIBLE_MODULE_CARDS = MODULE_CARDS.filter(
+  (card) => !("adminOnly" in card) || card.adminOnly !== true
+);
 
 function normalizeStatus(value: unknown): string {
   return String(value || "").trim().toLowerCase();
