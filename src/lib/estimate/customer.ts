@@ -3,6 +3,11 @@ import { createAdminClient } from "@/lib/supabase/admin";
 type AdminClient = ReturnType<typeof createAdminClient>;
 type GenericRow = Record<string, unknown>;
 
+export type EstimateResolvedCustomer = {
+  customerId: string;
+  matchType: "account" | "user" | "email" | "company";
+};
+
 export type EstimateAttachedCustomer = {
   id: string;
   company_name: string | null;
@@ -27,6 +32,11 @@ function firstText(...values: Array<unknown>): string | null {
     if (text) return text;
   }
   return null;
+}
+
+function normalizeText(value: unknown): string | null {
+  const text = String(value || "").trim().toLowerCase();
+  return text || null;
 }
 
 function buildProfileMap(rows: GenericRow[]) {
@@ -140,6 +150,151 @@ async function loadCustomerContext(admin: AdminClient, customerIds: string[]) {
     memberships,
     profileById: buildProfileMap((profilesRes.data || []) as GenericRow[]),
   };
+}
+
+async function loadActiveCustomerIds(admin: AdminClient, customerIds: string[]) {
+  const uniqueIds = Array.from(new Set(customerIds.map((value) => String(value || "").trim()).filter(Boolean)));
+  if (uniqueIds.length === 0) return [] as string[];
+
+  const { data, error } = await admin
+    .from("customers")
+    .select("id, record_kind")
+    .in("id", uniqueIds);
+
+  if (error) throw new Error(error.message);
+
+  return ((data || []) as GenericRow[])
+    .filter((row) => {
+      const recordKind = String(row.record_kind || "customer").trim().toLowerCase();
+      return !recordKind || recordKind === "customer";
+    })
+    .map((row) => String(row.id || "").trim())
+    .filter(Boolean);
+}
+
+async function resolveCustomerIdsByEmail(admin: AdminClient, email: string): Promise<string[]> {
+  const normalizedEmail = normalizeText(email);
+  if (!normalizedEmail) return [];
+
+  const [customerRes, contactRes] = await Promise.all([
+    admin.from("customers").select("id").ilike("primary_contact_email", normalizedEmail),
+    admin.from("customer_contacts").select("customer_id").ilike("email", normalizedEmail),
+  ]);
+
+  if (customerRes.error) throw new Error(customerRes.error.message);
+  if (contactRes.error) throw new Error(contactRes.error.message);
+
+  const activeCustomerIds = await loadActiveCustomerIds(admin, [
+    ...(customerRes.data || []).map((row: GenericRow) => String(row.id || "").trim()),
+    ...(contactRes.data || []).map((row: GenericRow) => String(row.customer_id || "").trim()),
+  ]);
+
+  return Array.from(new Set(activeCustomerIds));
+}
+
+async function resolveCustomerIdsByCompany(admin: AdminClient, companyName: string): Promise<string[]> {
+  const normalizedCompanyName = normalizeText(companyName);
+  if (!normalizedCompanyName) return [];
+
+  const { data, error } = await admin
+    .from("customers")
+    .select("id, company_name, record_kind")
+    .ilike("company_name", companyName);
+
+  if (error) throw new Error(error.message);
+
+  return ((data || []) as GenericRow[])
+    .filter((row) => {
+      const recordKind = String(row.record_kind || "customer").trim().toLowerCase();
+      return (!recordKind || recordKind === "customer") && normalizeText(row.company_name) === normalizedCompanyName;
+    })
+    .map((row) => String(row.id || "").trim())
+    .filter(Boolean);
+}
+
+export async function resolveEstimateCustomerForAuthenticatedUser(
+  admin: AdminClient,
+  args: {
+    userId: string | null | undefined;
+    userEmail?: string | null;
+    companyName?: string | null;
+  }
+): Promise<EstimateResolvedCustomer | null> {
+  const userId = String(args.userId || "").trim();
+
+  if (userId) {
+    const { data, error } = await admin
+      .from("customer_users")
+      .select("customer_id, is_primary, status")
+      .eq("user_id", userId);
+
+    if (error) throw new Error(error.message);
+
+    const membershipRows = (data || []) as GenericRow[];
+    const activeCustomerIds = await loadActiveCustomerIds(
+      admin,
+      membershipRows
+        .filter((row) => {
+          const status = normalizeText(row.status);
+          return !status || status === "active";
+        })
+        .map((row) => String(row.customer_id || "").trim())
+    );
+
+    if (activeCustomerIds.length === 1) {
+      return { customerId: activeCustomerIds[0], matchType: "user" };
+    }
+
+    const primaryMembershipIds = membershipRows
+      .filter((row) => row.is_primary === true)
+      .map((row) => String(row.customer_id || "").trim())
+      .filter((customerId) => activeCustomerIds.includes(customerId));
+
+    if (primaryMembershipIds.length === 1) {
+      return { customerId: primaryMembershipIds[0], matchType: "user" };
+    }
+  }
+
+  const emailMatches = await resolveCustomerIdsByEmail(admin, String(args.userEmail || ""));
+  if (emailMatches.length === 1) {
+    return { customerId: emailMatches[0], matchType: "email" };
+  }
+
+  const companyMatches = await resolveCustomerIdsByCompany(admin, String(args.companyName || ""));
+  if (companyMatches.length === 1) {
+    return { customerId: companyMatches[0], matchType: "company" };
+  }
+
+  return null;
+}
+
+export async function resolveEstimateCustomerFromFields(
+  admin: AdminClient,
+  args: {
+    customerAccountId?: string | null;
+    customerEmail?: string | null;
+    customerName?: string | null;
+  }
+): Promise<EstimateResolvedCustomer | null> {
+  const existingCustomerId = String(args.customerAccountId || "").trim();
+  if (existingCustomerId) {
+    const activeCustomerIds = await loadActiveCustomerIds(admin, [existingCustomerId]);
+    if (activeCustomerIds.length === 1) {
+      return { customerId: activeCustomerIds[0], matchType: "account" };
+    }
+  }
+
+  const emailMatches = await resolveCustomerIdsByEmail(admin, String(args.customerEmail || ""));
+  if (emailMatches.length === 1) {
+    return { customerId: emailMatches[0], matchType: "email" };
+  }
+
+  const companyMatches = await resolveCustomerIdsByCompany(admin, String(args.customerName || ""));
+  if (companyMatches.length === 1) {
+    return { customerId: companyMatches[0], matchType: "company" };
+  }
+
+  return null;
 }
 
 export async function loadEstimateAttachedCustomer(admin: AdminClient, customerId: string): Promise<EstimateAttachedCustomer | null> {

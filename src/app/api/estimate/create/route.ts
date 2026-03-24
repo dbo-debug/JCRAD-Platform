@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { logPlatformEvent } from "@/lib/events/logPlatformEvent";
-import { loadEstimateAttachedCustomer } from "@/lib/estimate/customer";
+import { loadEstimateAttachedCustomer, resolveEstimateCustomerForAuthenticatedUser } from "@/lib/estimate/customer";
 import { getStaffContext } from "@/lib/getStaffContext";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -38,18 +38,26 @@ export async function POST(req: Request) {
 
   const staff = await getStaffContext();
   const requestedCustomerAccountId = staff ? String(body?.customer_account_id || "").trim() : "";
-  const attachedCustomer = requestedCustomerAccountId ? await loadEstimateAttachedCustomer(supabase, requestedCustomerAccountId) : null;
+  const resolvedCustomer = !staff && user
+    ? await resolveEstimateCustomerForAuthenticatedUser(supabase, {
+      userId: user.id,
+      userEmail: user.email || null,
+      companyName: String(requesterProfile?.company_name || ""),
+    })
+    : null;
+  const attachedCustomerId = requestedCustomerAccountId || resolvedCustomer?.customerId || "";
+  const attachedCustomer = attachedCustomerId ? await loadEstimateAttachedCustomer(supabase, attachedCustomerId) : null;
   if (requestedCustomerAccountId && !attachedCustomer) {
     return respond({ error: "Customer not found" }, { status: 404 });
   }
   const customer_name = attachedCustomer
     ? attachedCustomer.contact_name || attachedCustomer.company_name || ""
-    : body?.customer_name
+    : staff && body?.customer_name
       ? String(body.customer_name)
       : String(requesterProfile?.company_name || user?.email || "");
   const customer_email = attachedCustomer
     ? String(attachedCustomer.email || "").trim().toLowerCase()
-    : body?.customer_email
+    : staff && body?.customer_email
       ? String(body.customer_email).trim().toLowerCase()
       : String(user?.email || "").trim().toLowerCase();
   const customer_phone = attachedCustomer ? String(attachedCustomer.phone || "") : body?.customer_phone ? String(body.customer_phone) : "";

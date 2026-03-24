@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
+import EstimateLeadFollowUpPanel from "@/components/workspace/EstimateLeadFollowUpPanel";
 import { loadCustomerApprovalQueue, summarizeCustomerApprovalQueue } from "@/lib/customerApprovals";
 import { loadCustomerWorkspaceIndex } from "@/lib/customerWorkspace";
 import { getRouteEligibilityReason, isRouteEligibleCustomer } from "@/lib/routeEligibility";
@@ -117,15 +118,6 @@ function formatRelativeTime(value: string | null): string {
   return `${diffDay}d ago`;
 }
 
-function formatMoney(value: number | null): string {
-  if (!Number.isFinite(Number(value))) return "Pending total";
-  return Number(value).toLocaleString(undefined, {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 2,
-  });
-}
-
 function getPendingOrderCount(rows: OrderRow[]): number {
   return rows.reduce((count, row) => {
     const status = normalizeStatus(row.status) || "pending";
@@ -215,8 +207,6 @@ export default async function AdminDashboardPage() {
     const status = normalizeStatus(row.status);
     return !status || status === "draft";
   });
-  const recentEstimates = estimates.slice(0, 6);
-
   const pendingOrdersCount = getPendingOrderCount(orders);
   const approvalStatusCounts = summarizeCustomerApprovalQueue(approvalQueue);
   const approvalDocsLinkedCount = approvalQueue.filter((item) => item.readyState === "docs_linked").length;
@@ -441,51 +431,7 @@ export default async function AdminDashboardPage() {
             </div>
           </Panel>
 
-          <Panel
-            title="Recent Estimates"
-            description="Latest estimate activity and packaging lock state."
-          >
-            {recentEstimates.length === 0 ? (
-              <p className="text-sm text-[#5b7382]">No estimates yet.</p>
-            ) : (
-              <div className="space-y-2">
-                {recentEstimates.map((row) => {
-                  const status = normalizeStatus(row.status) || "draft";
-                  return (
-                    <div
-                      key={row.id}
-                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#dbe9ef] bg-white px-3 py-2 text-sm"
-                    >
-                      <div>
-                        <p className="font-semibold text-[#173543]">
-                          {String(row.customer_name || row.customer_email || "Estimate")} • #{row.id.slice(0, 8)}
-                        </p>
-                        <p className="text-xs text-[#5b7382]">
-                          {formatDate(row.updated_at || row.created_at)} • {formatMoney(row.total)}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="rounded-full bg-[#f2f7fa] px-2 py-0.5 text-xs font-semibold text-[#4f6877]">
-                          {status}
-                        </span>
-                        {row.packaging_review_pending ? (
-                          <span className="rounded-full bg-[#fff3dd] px-2 py-0.5 text-xs font-semibold text-[#8a5a08]">
-                            packaging pending
-                          </span>
-                        ) : null}
-                        <Link
-                          href={`/estimate/${encodeURIComponent(row.id)}/print`}
-                          className="rounded-full border border-[#cfdce4] px-2 py-1 text-xs font-semibold text-[#294452] hover:border-[#14b8a6] hover:text-[#0f766e]"
-                        >
-                          View
-                        </Link>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </Panel>
+          <EstimateLeadFollowUpPanel description="Latest estimate activity with direct account and lead follow-up." />
         </div>
 
         <div className="space-y-4 xl:col-span-2">
