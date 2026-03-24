@@ -179,65 +179,38 @@ async function insertCustomerDocument(
   }
 ) {
   const documentType = normalizeDocumentType(payload.document_type);
-  const attempts: Array<Record<string, unknown>> = [
-    {
-      user_id: payload.user_id,
-      customer_account_id: payload.customer_account_id,
-      title: payload.title,
-      file_name: payload.file_name,
-      document_type: documentType,
-      kind: documentType,
-      bucket: payload.bucket,
-      object_path: payload.object_path,
-      file_url: payload.file_url,
-      public_url: payload.file_url,
-      url: payload.file_url,
-    },
-    {
-      user_id: payload.user_id,
-      customer_account_id: payload.customer_account_id,
-      title: payload.title,
-      file_name: payload.file_name,
-      document_type: documentType,
-      kind: documentType,
-      file_url: payload.file_url,
-      public_url: payload.file_url,
-      url: payload.file_url,
-    },
-    {
-      user_id: payload.user_id,
-      customer_account_id: payload.customer_account_id,
-      title: payload.title,
-      file_name: payload.file_name,
-      document_type: documentType,
-      kind: documentType,
-    },
-    {
-      user_id: payload.user_id,
-      customer_account_id: payload.customer_account_id,
-      title: payload.title,
-      document_type: documentType,
-      kind: documentType,
-    },
-    {
-      user_id: payload.user_id,
-      customer_account_id: payload.customer_account_id,
-      document_type: documentType,
-      kind: documentType,
-    },
-  ];
+  const preferredPayload = {
+    user_id: payload.user_id,
+    customer_account_id: payload.customer_account_id,
+    title: payload.title,
+    file_name: payload.file_name,
+    document_type: documentType,
+    bucket: payload.bucket,
+    object_path: payload.object_path,
+    file_url: payload.file_url,
+  } satisfies Record<string, unknown>;
 
-  let lastError: unknown = null;
-  for (const attempt of attempts) {
-    const result = await admin.from("customer_documents").insert(attempt).select("id").maybeSingle();
-    if (!result.error) return result.data;
-    lastError = result.error;
-    if (!isMissingColumnError(result.error)) {
-      throw new Error(result.error.message);
-    }
+  const preferredResult = await admin.from("customer_documents").insert(preferredPayload);
+  if (!preferredResult.error) return;
+  if (!isMissingColumnError(preferredResult.error)) {
+    throw new Error(preferredResult.error.message);
   }
 
-  throw new Error(lastError instanceof Error ? lastError.message : "Failed to save customer document");
+  const minimalPayload = {
+    user_id: payload.user_id,
+    customer_account_id: payload.customer_account_id,
+    title: payload.title,
+    file_name: payload.file_name,
+    document_type: documentType,
+  } satisfies Record<string, unknown>;
+
+  const minimalResult = await admin.from("customer_documents").insert(minimalPayload);
+  if (!minimalResult.error) return;
+  if (!isMissingColumnError(minimalResult.error)) {
+    throw new Error(minimalResult.error.message);
+  }
+
+  throw new Error(`customer_documents insert failed: ${minimalResult.error.message}`);
 }
 
 async function finalizeUploads(args: {
@@ -269,7 +242,7 @@ async function finalizeUploads(args: {
       fileUrl = String(publicData?.publicUrl || "").trim();
     }
 
-    const inserted = await insertCustomerDocument(args.admin, {
+    await insertCustomerDocument(args.admin, {
       user_id: args.userId,
       customer_account_id: args.customerId,
       title,
@@ -280,7 +253,6 @@ async function finalizeUploads(args: {
       file_url: fileUrl,
     });
     insertedDocuments.push({
-      id: firstText((inserted as GenericRow | null)?.id) || undefined,
       documentType,
       title,
     });
