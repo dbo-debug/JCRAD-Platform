@@ -164,6 +164,7 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
           status={detail.customer.status}
           stage={detail.customer.stage}
           primaryContactEmail={detail.customer.primaryContactEmail}
+          mainPhone={detail.customer.mainPhone}
           assignedSalesUserId={detail.customer.assignedSalesUserId}
           territoryCode={detail.customer.territoryCode}
           routeDay={detail.customer.routeDay}
@@ -191,7 +192,7 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
           primaryContact={primaryContact}
         />
 
-        <Panel title="Activity Timeline">
+        <Panel title="Activity Timeline" id="customer-activity-timeline">
           <div className="space-y-2.5">
             {detail.activity.map((item) => (
               <ActivityCard key={item.id} item={item} />
@@ -415,9 +416,9 @@ function ActivityCard({
   );
 }
 
-function Panel({ title, children }: { title: string; children: ReactNode }) {
+function Panel({ title, children, id }: { title: string; children: ReactNode; id?: string }) {
   return (
-    <section className="rounded-2xl border border-[#dbe9ef] bg-white p-4 shadow-sm">
+    <section id={id} className="scroll-mt-28 rounded-2xl border border-[#dbe9ef] bg-white p-4 shadow-sm">
       <h2 className="text-base font-semibold text-[#173543]">{title}</h2>
       <div className="mt-3">{children}</div>
     </section>

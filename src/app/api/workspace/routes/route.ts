@@ -167,6 +167,26 @@ export async function PATCH(req: Request) {
   }
 
   const supabase = createAdminClient();
+  const { data: existingRoute, error: existingRouteError } = await supabase
+    .from("routes")
+    .select("id, assigned_user_id, created_by")
+    .eq("id", routeId)
+    .maybeSingle();
+
+  if (existingRouteError) {
+    return NextResponse.json({ error: existingRouteError.message || "Failed to load route" }, { status: 500 });
+  }
+  if (!existingRoute) {
+    return NextResponse.json({ error: "Route not found" }, { status: 404 });
+  }
+  if (
+    staff.role === "sales" &&
+    String(existingRoute.assigned_user_id || "").trim() !== staff.userId &&
+    String(existingRoute.created_by || "").trim() !== staff.userId
+  ) {
+    return NextResponse.json({ error: "Sales staff can only update their own routes" }, { status: 403 });
+  }
+
   const { error } = await supabase.from("routes").update(payload).eq("id", routeId);
   if (error) {
     return NextResponse.json({ error: error.message || "Failed to update route" }, { status: 500 });
@@ -178,6 +198,9 @@ export async function PATCH(req: Request) {
 export async function DELETE(req: Request) {
   const staff = await getStaffContext();
   if (!staff) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (staff.role !== "admin") {
+    return NextResponse.json({ error: "Only admins can erase saved routes" }, { status: 403 });
+  }
 
   const body = await req.json().catch(() => ({}));
   const routeId = asText(body.route_id);

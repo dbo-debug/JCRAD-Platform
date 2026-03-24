@@ -1,5 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import type { StaffContext } from "@/lib/getStaffContext";
 import { loadCustomerWorkspaceIndex, type CustomerSummary } from "@/lib/customerWorkspace";
+import { canSalesAccessRoute, scopeRouteCustomersForStaff } from "@/lib/routeScope";
 import { loadPendingRouteStops, type PendingRouteStop } from "@/lib/routeStopQueue";
 import { formatTerritoryOptionLabel, loadTerritories } from "@/lib/territories";
 
@@ -38,6 +40,7 @@ export type SavedRouteSummary = {
   estimatedTotalMinutes: number | null;
   estimatedReturnTime: string | null;
   stopCount: number;
+  createdByUserId: string | null;
   createdAt: string | null;
   updatedAt: string | null;
 };
@@ -66,9 +69,19 @@ export type SavedRouteDetail = Omit<SavedRouteSummary, "stopCount"> & {
   stops: SavedRouteStop[];
 };
 
-export async function loadRouteWorkspaceData(currentUserId: string): Promise<RouteWorkspaceData> {
-  const [{ customers }, referenceData, savedRoutes] = await Promise.all([loadCustomerWorkspaceIndex(), loadRouteReferenceData(), loadSavedRoutes()]);
-  const pendingStops = await loadPendingRouteStops({ userId: currentUserId, customers });
+export async function loadRouteWorkspaceData(staff: StaffContext): Promise<RouteWorkspaceData> {
+  const [{ customers: allCustomers }, referenceData, savedRoutes, pendingQueueRows] = await Promise.all([
+    loadCustomerWorkspaceIndex(),
+    loadRouteReferenceData(),
+    loadSavedRoutes(staff),
+    loadRouteStopQueueRowsForScope(staff.userId),
+  ]);
+  const customers = scopeRouteCustomersForStaff({
+    staff,
+    customers: allCustomers,
+    pendingQueueRows,
+  });
+  const pendingStops = await loadPendingRouteStops({ userId: staff.userId, customers: allCustomers });
 
   return {
     customers,
@@ -140,15 +153,21 @@ function asNumber(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-export async function loadSavedRoutes(): Promise<SavedRouteSummary[]> {
+export async function loadSavedRoutes(staff?: StaffContext): Promise<SavedRouteSummary[]> {
   const supabase = createAdminClient();
+  let routesQuery = supabase
+    .from("routes")
+    .select("id, name, territory_code, origin_name, origin_address, assigned_user_id, route_date, status, planned_start_time, max_stops, lunch_minutes, estimated_total_minutes, estimated_return_time, created_by, created_at, updated_at")
+    .order("route_date", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(40);
+
+  if (staff?.role === "sales") {
+    routesQuery = routesQuery.or(`assigned_user_id.eq.${staff.userId},created_by.eq.${staff.userId}`);
+  }
+
   const [routesRes, stopsRes, routeRepOptions] = await Promise.all([
-    supabase
-      .from("routes")
-      .select("id, name, territory_code, origin_name, origin_address, assigned_user_id, route_date, status, planned_start_time, max_stops, lunch_minutes, estimated_total_minutes, estimated_return_time, created_at, updated_at")
-      .order("route_date", { ascending: false })
-      .order("created_at", { ascending: false })
-      .limit(40),
+    routesQuery,
     supabase.from("route_stops").select("route_id"),
     loadRouteRepOptions(),
   ]);
@@ -174,6 +193,7 @@ export async function loadSavedRoutes(): Promise<SavedRouteSummary[]> {
       if (!id || !name || !originName || !originAddress) return null;
 
       const assignedUserId = asText(row.assigned_user_id);
+      const createdByUserId = asText(row.created_by);
 
       return {
         id,
@@ -191,6 +211,7 @@ export async function loadSavedRoutes(): Promise<SavedRouteSummary[]> {
         estimatedTotalMinutes: asNumber(row.estimated_total_minutes),
         estimatedReturnTime: asText(row.estimated_return_time),
         stopCount: stopCountByRouteId.get(id) || 0,
+        createdByUserId,
         createdAt: asText(row.created_at),
         updatedAt: asText(row.updated_at),
       } satisfies SavedRouteSummary;
@@ -198,7 +219,7 @@ export async function loadSavedRoutes(): Promise<SavedRouteSummary[]> {
     .filter((route): route is SavedRouteSummary => Boolean(route));
 }
 
-export async function loadSavedRouteDetail(routeId: string): Promise<SavedRouteDetail | null> {
+export async function loadSavedRouteDetail(routeId: string, staff?: StaffContext): Promise<SavedRouteDetail | null> {
   const id = String(routeId || "").trim();
   if (!id) return null;
 
@@ -207,7 +228,7 @@ export async function loadSavedRouteDetail(routeId: string): Promise<SavedRouteD
     supabase
       .from("routes")
       .select(
-        "id, name, territory_code, origin_name, origin_address, origin_latitude, origin_longitude, assigned_user_id, route_date, status, planned_start_time, max_stops, lunch_minutes, estimated_drive_minutes, estimated_visit_minutes, estimated_total_minutes, estimated_return_time, notes, created_at, updated_at"
+        "id, name, territory_code, origin_name, origin_address, origin_latitude, origin_longitude, assigned_user_id, route_date, status, planned_start_time, max_stops, lunch_minutes, estimated_drive_minutes, estimated_visit_minutes, estimated_total_minutes, estimated_return_time, notes, created_by, created_at, updated_at"
       )
       .eq("id", id)
       .maybeSingle(),
@@ -227,6 +248,16 @@ export async function loadSavedRouteDetail(routeId: string): Promise<SavedRouteD
 
   const routeRow = routeRes.data as Record<string, unknown> | null;
   if (!routeRow) return null;
+  if (
+    staff &&
+    !canSalesAccessRoute({
+      staff,
+      assignedUserId: asText(routeRow.assigned_user_id),
+      createdByUserId: asText(routeRow.created_by),
+    })
+  ) {
+    return null;
+  }
 
   const routeRepLabelMap = new Map(routeRepOptions.map((option) => [option.userId, option.label]));
   const customerById = new Map(customerIndex.customers.map((customer) => [customer.id, customer]));
@@ -284,8 +315,59 @@ export async function loadSavedRouteDetail(routeId: string): Promise<SavedRouteD
     estimatedTotalMinutes: asNumber(routeRow.estimated_total_minutes),
     estimatedReturnTime: asText(routeRow.estimated_return_time),
     notes: asText(routeRow.notes),
+    createdByUserId: asText(routeRow.created_by),
     createdAt: asText(routeRow.created_at),
     updatedAt: asText(routeRow.updated_at),
     stops,
   };
+}
+
+async function loadRouteStopQueueRowsForScope(userId: string) {
+  const normalizedUserId = asText(userId);
+  if (!normalizedUserId) return [];
+
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("route_stop_queue")
+    .select("id, customer_id, added_by_user_id, created_at")
+    .eq("added_by_user_id", normalizedUserId);
+
+  if (error) {
+    const message = String(error.message || "").toLowerCase();
+    const details = String((error as { details?: unknown }).details || "").toLowerCase();
+    const missingRelation =
+      error.code === "42P01" ||
+      error.code === "PGRST205" ||
+      (message.includes("relation") && message.includes("does not exist")) ||
+      message.includes("schema cache") ||
+      (details.includes("relation") && details.includes("does not exist")) ||
+      details.includes("schema cache");
+    if (missingRelation) return [];
+    throw new Error(error.message);
+  }
+
+  return ((data || []) as Array<Record<string, unknown>>)
+    .map((row) => {
+      const queueId = asText(row.id);
+      const customerId = asText(row.customer_id);
+      const addedByUserId = asText(row.added_by_user_id);
+      if (!queueId || !customerId || !addedByUserId) return null;
+
+      return {
+        id: queueId,
+        customerId,
+        addedByUserId,
+        createdAt: asText(row.created_at),
+      };
+    })
+    .filter(
+      (
+        row
+      ): row is {
+        id: string;
+        customerId: string;
+        addedByUserId: string;
+        createdAt: string | null;
+      } => Boolean(row)
+    );
 }

@@ -7,6 +7,7 @@ import type { CustomerSummary } from "@/lib/customerWorkspace";
 import { isRouteEligibleCustomer } from "@/lib/routeEligibility";
 import type { PendingRouteStop } from "@/lib/routeStopQueue";
 import type { RouteRepOption, TerritoryOption } from "@/lib/routeWorkspace";
+import RouteStopsMap from "@/components/workspace/RouteStopsMap";
 import {
   buildTerritoryStats,
   formatDate,
@@ -304,6 +305,7 @@ export default function CustomerWorkspaceIndex({
   const [pendingStops, setPendingStops] = useState<PendingRouteStop[]>(initialPendingStops);
   const [visibleGeocodeBusy, setVisibleGeocodeBusy] = useState(false);
   const [visibleGeocodeStatus, setVisibleGeocodeStatus] = useState<string | null>(null);
+  const [showFilteredMap, setShowFilteredMap] = useState(false);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(
     Boolean(
       initialFilters.territory ||
@@ -895,12 +897,22 @@ export default function CustomerWorkspaceIndex({
               <span className="rounded-full border border-[#d7e6ed] bg-white px-3 py-1.5 text-sm text-[#4f6877]">{visibleCustomers.length} visible</span>
               <span className="rounded-full border border-[#f1ddad] bg-[#fff9eb] px-3 py-1.5 text-sm text-[#8a5b00]">{hallOfFlowersCount} Hall of Flowers</span>
               <span className="rounded-full border border-[#ffd3cf] bg-[#fff2f0] px-3 py-1.5 text-sm text-[#b44b40]">{hotLeadCount} hot</span>
+              <button
+                type="button"
+                onClick={() => setShowFilteredMap((current) => !current)}
+                className={[
+                  "rounded-full border px-3 py-1.5 text-sm font-semibold transition",
+                  showFilteredMap ? "border-[#14b8a6] bg-[#effcf9] text-[#0f766e]" : "border-[#d7e6ed] bg-white text-[#4f6877] hover:border-[#14b8a6]",
+                ].join(" ")}
+              >
+                {showFilteredMap ? "Hide Map" : "Map Filtered Accounts"}
+              </button>
             </div>
           </div>
         </section>
 
         <section className={["sticky z-30 space-y-3 rounded-[24px] border border-[#dbe8ef] bg-white/95 p-3 shadow-[0_10px_22px_rgba(16,42,67,0.08)] backdrop-blur supports-[backdrop-filter]:bg-white/90 xl:px-4 xl:py-4", WORKSPACE_STICKY_TOP_CLASS].join(" ")}>
-          <div className="grid gap-2 xl:grid-cols-[minmax(260px,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] xl:items-center">
+          <div className="grid gap-2 xl:grid-cols-2 2xl:grid-cols-[minmax(260px,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] xl:items-center">
             <input
               value={draftSearch}
               onChange={(event) => setDraftSearch(event.target.value)}
@@ -1052,6 +1064,17 @@ export default function CustomerWorkspaceIndex({
             onActionChange={setBulkAction}
             onApply={() => void applyBulkAction()}
             onClear={clearSelection}
+          />
+        ) : null}
+
+        {showFilteredMap ? (
+          <RouteStopsMap
+            customers={visibleCustomers}
+            title="Filtered Accounts Map"
+            description="This map uses the exact customer workspace filters currently on screen so nearby accounts are easy to spot before queueing or building routes."
+            emptyLabel="No filtered accounts have coordinates yet. Keep using the list view or geocode the visible accounts first."
+            secondaryActionLabel="Open Account"
+            secondaryActionHref={(customerId) => `/workspace/customers/${customerId}`}
           />
         ) : null}
 

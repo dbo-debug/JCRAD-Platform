@@ -34,6 +34,7 @@ type RouteRunnerProps = {
   routeRepOptions: RouteRepOption[];
   territoryOptions: TerritoryOption[];
   currentUserId: string;
+  staffRole: "admin" | "sales";
   focusCustomerId?: string;
   initialFilters: {
     q: string;
@@ -69,7 +70,7 @@ function addDaysDateValue(days: number) {
   return date.toISOString().slice(0, 10);
 }
 
-export default function RouteRunner({ customers, routeRepOptions, territoryOptions, currentUserId, focusCustomerId, initialFilters }: RouteRunnerProps) {
+export default function RouteRunner({ customers, routeRepOptions, territoryOptions, currentUserId, staffRole, focusCustomerId, initialFilters }: RouteRunnerProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [search, setSearch] = useState(initialFilters.q);
@@ -185,7 +186,7 @@ export default function RouteRunner({ customers, routeRepOptions, territoryOptio
       </section>
 
       <section className="rounded-[28px] border border-[#dbe8ef] bg-white p-5 shadow-[0_12px_32px_rgba(16,42,67,0.06)] lg:px-6">
-        <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-[minmax(0,1.4fr)_repeat(4,minmax(0,0.9fr))]">
+        <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-[minmax(0,1.4fr)_repeat(4,minmax(0,0.9fr))]">
           <label className="grid gap-1 text-sm text-[#4b6676]">
             <span className="font-medium">Search stops</span>
             <input
@@ -196,17 +197,19 @@ export default function RouteRunner({ customers, routeRepOptions, territoryOptio
             />
           </label>
 
-          <label className="grid gap-1 text-sm text-[#4b6676]">
-            <span className="font-medium">Scope</span>
-            <select
-              value={scope}
-              onChange={(event) => startTransition(() => setScope(event.target.value as "mine" | "all"))}
-              className="rounded-2xl border border-[#cedde6] bg-[#fbfdfe] px-4 py-3 text-sm text-[#173543] outline-none transition focus:border-[#14b8a6] focus:bg-white"
-            >
-              <option value="mine">Assigned to me</option>
-              <option value="all">All reps</option>
-            </select>
-          </label>
+          {staffRole === "admin" ? (
+            <label className="grid gap-1 text-sm text-[#4b6676]">
+              <span className="font-medium">Scope</span>
+              <select
+                value={scope}
+                onChange={(event) => startTransition(() => setScope(event.target.value as "mine" | "all"))}
+                className="rounded-2xl border border-[#cedde6] bg-[#fbfdfe] px-4 py-3 text-sm text-[#173543] outline-none transition focus:border-[#14b8a6] focus:bg-white"
+              >
+                <option value="mine">Assigned to me</option>
+                <option value="all">All reps</option>
+              </select>
+            </label>
+          ) : null}
 
           <SelectFilter label="Route Day" value={routeDayFilter} onChange={setRouteDayFilter} options={routeDays} />
           <SelectFilter label="Territory" value={territoryFilter} onChange={setTerritoryFilter} options={territoryOptions} />
@@ -266,7 +269,7 @@ export default function RouteRunner({ customers, routeRepOptions, territoryOptio
           </div>
           <Link
             href="/workspace/routes"
-            className="ml-auto inline-flex rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543]"
+            className="inline-flex rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543] lg:ml-auto"
           >
             Back to Planner
           </Link>

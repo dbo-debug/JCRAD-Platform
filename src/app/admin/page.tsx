@@ -8,6 +8,7 @@ import { getRouteEligibilityReason, isRouteEligibleCustomer } from "@/lib/routeE
 import { loadSavedRoutes } from "@/lib/routeWorkspace";
 import { requireStaff } from "@/lib/requireStaff";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { loadScopedCustomerTasks } from "@/lib/taskWorkspace";
 import { normalizePackagingCategory, type PackagingCategory } from "@/lib/packaging/category";
 
 export const dynamic = "force-dynamic";
@@ -56,6 +57,7 @@ type CustomerTaskRow = {
   title: string | null;
   due_date: string | null;
   status: string | null;
+  assigned_user_id: string | null;
 };
 
 const CLOSED_ORDER_STATUSES = new Set(["fulfilled", "completed", "cancelled", "rejected", "closed"]);
@@ -161,7 +163,7 @@ export default async function AdminDashboardPage() {
   const supabase = createAdminClient();
   const referenceNow = Date.parse(new Date().toISOString());
 
-  const [estimateRes, orderRes, submissionRes, eventRes, routeStopQueueRes, taskRes, customerIndex, savedRoutes, approvalQueue] = await Promise.all([
+  const [estimateRes, orderRes, submissionRes, eventRes, routeStopQueueRes, taskRows, customerIndex, savedRoutes, approvalQueue] = await Promise.all([
     supabase
       .from("estimates")
       .select("id, status, total, customer_name, customer_email, packaging_review_pending, created_at, updated_at")
@@ -183,11 +185,7 @@ export default async function AdminDashboardPage() {
       .order("created_at", { ascending: false })
       .limit(20),
     supabase.from("route_stop_queue").select("id"),
-    supabase
-      .from("customer_tasks")
-      .select("id, customer_id, title, due_date, status")
-      .order("created_at", { ascending: false })
-      .limit(2000),
+    loadScopedCustomerTasks({ staff, limit: 2000 }),
     loadCustomerWorkspaceIndex(),
     loadSavedRoutes(),
     isAdmin ? loadCustomerApprovalQueue() : Promise.resolve([]),
@@ -197,7 +195,7 @@ export default async function AdminDashboardPage() {
   const orders = (orderRes.data || []) as OrderRow[];
   const submissions = (submissionRes.data || []) as PackagingSubmissionRow[];
   const platformEvents = (eventRes.data || []) as PlatformEventRow[];
-  const customerTasks = (taskRes.data || []) as CustomerTaskRow[];
+  const customerTasks = taskRows as CustomerTaskRow[];
   const customers = customerIndex.customers;
 
   const routeReadyAccounts = customers.filter((customer) => isRouteEligibleCustomer(customer));
@@ -283,7 +281,7 @@ export default async function AdminDashboardPage() {
   const hasOrderError = Boolean(orderRes.error);
   const hasSubmissionError = Boolean(submissionRes.error);
   const hasEventError = Boolean(eventRes.error);
-  const hasTaskError = Boolean(taskRes.error);
+  const hasTaskError = false;
   const hasRouteQueueError = Boolean(routeStopQueueRes.error);
 
   return (
@@ -323,8 +321,9 @@ export default async function AdminDashboardPage() {
         <MetricCard
           label="Open Tasks"
           value={openTasks.length}
-          href="/workspace/tasks"
+          href="/workspace/tasks?view=open"
           helper={`${overdueTaskCount} overdue`}
+          helperHref={overdueTaskCount > 0 ? "/workspace/tasks?view=overdue" : undefined}
         />
         <MetricCard
           label="Draft Estimates"
@@ -519,22 +518,24 @@ export default async function AdminDashboardPage() {
           <Panel
             title="Task Follow-Up Visibility"
             description="Open follow-up workload across customer accounts."
-            href="/workspace/tasks"
+            href="/workspace/tasks?view=open"
             hrefLabel="Open tasks"
           >
             <div className="grid grid-cols-3 gap-2">
               <StatusPill label="Open" value={openTasks.length} tone="warn" />
-              <StatusPill label="Overdue" value={overdueTaskCount} tone="bad" />
+              <Link href="/workspace/tasks?view=overdue" className="block">
+                <StatusPill label="Overdue" value={overdueTaskCount} tone="bad" />
+              </Link>
               <StatusPill label="Customers" value={customersNeedingFollowUp} tone="ok" />
             </div>
             <div className="mt-3 space-y-2">
               {openTasks.slice(0, 4).map((task) => (
-                <div key={task.id} className="rounded-lg border border-[#dbe9ef] bg-white px-3 py-2 text-sm">
+                <Link key={task.id} href={isTaskOverdue(task, referenceNow) ? "/workspace/tasks?view=overdue" : "/workspace/tasks?view=open"} className="block rounded-lg border border-[#dbe9ef] bg-white px-3 py-2 text-sm transition hover:border-[#14b8a6] hover:bg-[#f6fbfd]">
                   <p className="font-semibold text-[#173543]">{task.title || "Untitled task"}</p>
                   <p className="text-xs text-[#5b7382]">
                     {normalizeStatus(task.status) || "open"} • due {formatDate(task.due_date)}
                   </p>
-                </div>
+                </Link>
               ))}
               {openTasks.length === 0 ? <p className="text-sm text-[#5b7382]">No open customer tasks.</p> : null}
             </div>
@@ -576,22 +577,43 @@ function MetricCard({
   value,
   href,
   helper,
+  helperHref,
 }: {
   label: string;
   value: number;
   href: string;
   helper?: string;
+  helperHref?: string;
 }) {
   return (
-    <Link
-      href={href}
-      className="rounded-xl border border-[#dbe9ef] bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-[#14b8a6] hover:shadow-[0_12px_24px_-22px_rgba(16,24,40,0.45)]"
-    >
-      <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#5d7685]">{label}</p>
-      <p className="mt-2 text-3xl font-semibold text-[#173543]">{value}</p>
-      {helper ? <p className="mt-1 text-xs text-[#6d8593]">{helper}</p> : null}
-    </Link>
+    <div className="rounded-xl border border-[#dbe9ef] bg-white p-4 shadow-sm">
+      <Link
+        href={href}
+        className="block transition hover:-translate-y-0.5 hover:text-[#0f766e]"
+      >
+        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#5d7685]">{label}</p>
+        <p className="mt-2 text-3xl font-semibold text-[#173543]">{value}</p>
+      </Link>
+      {helper ? (
+        helperHref ? (
+          <Link
+            href={helperHref}
+            className="mt-2 inline-flex rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-2.5 py-1 text-xs font-semibold text-[#4f6877] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
+          >
+            {helper}
+          </Link>
+        ) : (
+          <p className="mt-1 text-xs text-[#6d8593]">{helper}</p>
+        )
+      ) : null}
+    </div>
   );
+}
+
+function isTaskOverdue(task: Pick<CustomerTaskRow, "due_date" | "status">, referenceNow: number) {
+  if (CLOSED_TASK_STATUSES.has(normalizeStatus(task.status))) return false;
+  const due = Date.parse(String(task.due_date || ""));
+  return Number.isFinite(due) && due < referenceNow;
 }
 
 function Panel({

@@ -303,7 +303,7 @@ export default function RoutePlannerIndex({ customers, routeRepOptions, territor
                     {territory.noRouteDay > 0 ? <InlinePill tone="warn" label={`${territory.noRouteDay} without route day`} /> : null}
                   </div>
                 </div>
-                <div className="grid gap-2 sm:grid-cols-3 xl:min-w-[520px] xl:grid-cols-6">
+                <div className="grid gap-2 sm:grid-cols-3 2xl:min-w-[520px] xl:grid-cols-4 2xl:grid-cols-6">
                   <MiniMetric label="Accounts" value={territory.accountCount} />
                   <MiniMetric label="Due Today" value={territory.dueToday} />
                   <MiniMetric label="Visited Today" value={territory.visitedToday} />

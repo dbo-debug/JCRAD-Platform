@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { VISIT_OUTCOMES } from "@/components/workspace/routeUtils";
 
@@ -29,6 +29,7 @@ type CustomerDetailManagerProps = {
   status: string;
   stage: string | null;
   primaryContactEmail: string | null;
+  mainPhone: string | null;
   assignedSalesUserId: string | null;
   territoryCode: string | null;
   routeDay: string | null;
@@ -135,6 +136,19 @@ function buildCoordinateMapHref(latitude: string, longitude: string) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${latitude.trim()},${longitude.trim()}`)}`;
 }
 
+function normalizeTelHref(value: string | null | undefined) {
+  const phone = String(value || "").trim();
+  if (!phone) return null;
+  const normalized = phone.replace(/[^\d+]/g, "");
+  const digits = normalized.replace(/\D/g, "");
+  return digits.length >= 7 ? `tel:${normalized}` : null;
+}
+
+function normalizeMailtoHref(value: string | null | undefined) {
+  const email = String(value || "").trim();
+  return email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? `mailto:${email}` : null;
+}
+
 function addDaysDateValue(days: number) {
   const date = new Date();
   date.setDate(date.getDate() + days);
@@ -180,6 +194,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
   const [noteBusy, setNoteBusy] = useState(false);
   const [activityBusy, setActivityBusy] = useState(false);
   const [taskBusy, setTaskBusy] = useState(false);
+  const [routeQueueBusy, setRouteQueueBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -224,6 +239,9 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
   const [routeOutcomeTaskEnabled, setRouteOutcomeTaskEnabled] = useState(false);
   const [routeOutcomeTaskTitle, setRouteOutcomeTaskTitle] = useState("");
   const [routeOutcomeTaskDueDate, setRouteOutcomeTaskDueDate] = useState("");
+  const taskTitleInputRef = useRef<HTMLInputElement | null>(null);
+  const activitySummaryInputRef = useRef<HTMLInputElement | null>(null);
+  const accountCompanyInputRef = useRef<HTMLInputElement | null>(null);
 
   const composedAddress = [address1, address2, [city, stateCode, postalCode].filter(Boolean).join(", ")].filter(Boolean).join(" • ") || null;
   const addressMapHref = buildAddressMapHref({
@@ -236,6 +254,8 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
   const territoryMeta = props.territoryOptions.find((option) => option.code === territoryCode) || null;
   const hasCoords = hasValidCoordinates(latitude, longitude);
   const hasAddress = Boolean(address1.trim() || city.trim() || stateCode.trim() || postalCode.trim());
+  const callHref = normalizeTelHref(props.primaryContact?.phone || props.mainPhone);
+  const emailHref = normalizeMailtoHref(props.primaryContact?.email || primaryContactEmail);
   const coordinateCoverageState =
     hasCoords ? "has_coords" : geocodeStatus === "failed" ? "failed" : geocodeStatus === "needs_review" ? "needs_review" : hasAddress ? "address_ready" : "missing_address";
   const coordinateStatusLabel =
@@ -364,6 +384,36 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
       const json = await parseJsonSafe(res);
       if (!res.ok) throw new Error(String(json.error || `Save failed (${res.status})`));
       await refreshWithMessage("Primary contact updated.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setContactBusy(false);
+    }
+  }
+
+  async function addContact() {
+    setContactBusy(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const res = await fetch(`/api/workspace/customers/${props.customerId}/contacts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: contactName,
+          email: contactEmail,
+          phone: contactPhone,
+          title: contactTitle,
+        }),
+      });
+      const json = await parseJsonSafe(res);
+      if (!res.ok) throw new Error(String(json.error || `Save failed (${res.status})`));
+      setContactName("");
+      setContactEmail("");
+      setContactPhone("");
+      setContactTitle("");
+      await refreshWithMessage("Contact added. Primary contact unchanged.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
     } finally {
@@ -603,12 +653,68 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
     }
   }
 
+  function jumpToSection(sectionId: string, focusTarget?: HTMLElement | null) {
+    const section = document.getElementById(sectionId);
+    if (section) {
+      section.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    window.setTimeout(() => {
+      focusTarget?.focus();
+    }, 180);
+  }
+
+  async function addToRoute() {
+    setRouteQueueBusy(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const res = await fetch("/api/workspace/route-stop-queue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ customer_ids: [props.customerId] }),
+      });
+      const json = await parseJsonSafe(res);
+      if (!res.ok) throw new Error(String(json.error || `Queue failed (${res.status})`));
+      router.push("/workspace/routes");
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Queue failed");
+    } finally {
+      setRouteQueueBusy(false);
+    }
+  }
+
   return (
     <div className="space-y-3">
       {error ? <p className="rounded-xl border border-[#f1d1d1] bg-[#fff5f5] px-3 py-2 text-sm text-[#991b1b]">{error}</p> : null}
       {success ? <p className="rounded-xl border border-[#bfe8df] bg-[#effcf8] px-3 py-2 text-sm text-[#0f766e]">{success}</p> : null}
 
-      <section className={sectionClass}>
+      <section className="rounded-[28px] border border-[#cfe5e8] bg-[linear-gradient(180deg,#173543_0%,#1d4658_100%)] p-4 text-white shadow-[0_16px_40px_rgba(16,42,67,0.16)]">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#9fd9d2]">Quick Actions</p>
+            <h2 className="mt-1 text-xl font-semibold">Work the account without hunting through the page</h2>
+            <p className="mt-1 text-sm text-[#d3e6eb]">Calls and email fire immediately. The other actions jump straight into the existing account, task, activity, route, and timeline sections.</p>
+          </div>
+          <div className="rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-sm text-[#d7edf0]">
+            {territoryCode || "No territory"} • {routeDay || "No route day"} • {visitStatus ? titleCase(visitStatus) : "No visit status"}
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-8">
+          <ActionButton href={callHref} label="Call" />
+          <ActionButton href={emailHref} label="Email" />
+          <ActionButton label="Text" disabled helper="Coming soon" />
+          <ActionButton label="New Task" onClick={() => jumpToSection("customer-create-task", taskTitleInputRef.current)} />
+          <ActionButton label="Account" onClick={() => jumpToSection("customer-account-management", accountCompanyInputRef.current)} />
+          <ActionButton label="Log Activity" onClick={() => jumpToSection("customer-log-activity", activitySummaryInputRef.current)} />
+          <ActionButton label={routeQueueBusy ? "Adding..." : "Add to Route"} onClick={() => void addToRoute()} disabled={routeQueueBusy} />
+          <ActionButton label="Recent Activity" onClick={() => jumpToSection("customer-activity-timeline")} />
+        </div>
+      </section>
+
+      <section id="customer-route-field-ops" className={[sectionClass, "scroll-mt-28"].join(" ")}>
         <SectionHeader
           title="Route & Field Ops"
           description="Territory-driven stop planning, routing readiness, and field execution."
@@ -875,12 +981,12 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
       </section>
 
       <div className="grid gap-3 xl:grid-cols-2">
-        <section className={sectionClass}>
+        <section id="customer-account-management" className={[sectionClass, "scroll-mt-28"].join(" ")}>
           <SectionHeader title="Account Management" />
           <div className="mt-3 grid gap-3 md:grid-cols-2">
             <label className="grid gap-1 text-sm text-[#4a6575]">
               <span>Company Name</span>
-              <input value={companyName} onChange={(e) => setCompanyName(e.target.value)} disabled={props.staffRole !== "admin" || accountBusy} className={inputClass} />
+              <input ref={accountCompanyInputRef} value={companyName} onChange={(e) => setCompanyName(e.target.value)} disabled={props.staffRole !== "admin" || accountBusy} className={inputClass} />
             </label>
 
             <label className="grid gap-1 text-sm text-[#4a6575]">
@@ -954,8 +1060,20 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
           </div>
         </section>
 
-        <section className={sectionClass}>
-          <SectionHeader title="Primary Contact" />
+        <section id="customer-primary-contact" className={[sectionClass, "scroll-mt-28"].join(" ")}>
+          <SectionHeader
+            title="Primary Contact"
+            action={
+              <button
+                type="button"
+                onClick={() => void addContact()}
+                disabled={contactBusy}
+                className="rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm font-semibold text-[#24404d] transition hover:border-[#14b8a6] hover:text-[#0f766e] disabled:opacity-60"
+              >
+                {contactBusy ? "Saving..." : "Add Contact"}
+              </button>
+            }
+          />
           <div className="mt-3 grid gap-3 md:grid-cols-2">
             <label className="grid gap-1 text-sm text-[#4a6575]">
               <span>Name</span>
@@ -983,7 +1101,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
       </div>
 
       <div className="grid gap-3 xl:grid-cols-2">
-        <section className={sectionClass}>
+        <section className={[sectionClass, "scroll-mt-28"].join(" ")}>
           <SectionHeader title="Add Internal Note" />
           <textarea
             value={note}
@@ -1000,12 +1118,12 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
           </div>
         </section>
 
-        <section className={sectionClass}>
+        <section id="customer-create-task" className={[sectionClass, "scroll-mt-28"].join(" ")}>
           <SectionHeader title="Create Task" />
           <div className="mt-3 grid gap-3 md:grid-cols-2">
             <label className="grid gap-1 text-sm text-[#4a6575] md:col-span-2">
               <span>Title</span>
-              <input value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} disabled={taskBusy} className={inputClass} placeholder="Send updated pricing sheet." />
+              <input ref={taskTitleInputRef} value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} disabled={taskBusy} className={inputClass} placeholder="Send updated pricing sheet." />
             </label>
             <label className="grid gap-1 text-sm text-[#4a6575]">
               <span>Due Date</span>
@@ -1041,7 +1159,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
         </section>
       </div>
 
-      <section className={sectionClass}>
+      <section id="customer-log-activity" className={[sectionClass, "scroll-mt-28"].join(" ")}>
         <SectionHeader title="Log Activity" />
         <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-[0.8fr_1.2fr]">
           <label className="grid gap-1 text-sm text-[#4a6575]">
@@ -1056,7 +1174,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
           </label>
           <label className="grid gap-1 text-sm text-[#4a6575]">
             <span>Summary</span>
-            <input value={activitySummary} onChange={(e) => setActivitySummary(e.target.value)} disabled={activityBusy} className={inputClass} placeholder="Called buyer to confirm next steps." />
+            <input ref={activitySummaryInputRef} value={activitySummary} onChange={(e) => setActivitySummary(e.target.value)} disabled={activityBusy} className={inputClass} placeholder="Called buyer to confirm next steps." />
           </label>
           <label className="grid gap-1 text-sm text-[#4a6575] md:col-span-2">
             <span>Details</span>
@@ -1077,5 +1195,40 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
         </div>
       </section>
     </div>
+  );
+}
+
+function ActionButton({
+  href,
+  label,
+  onClick,
+  disabled = false,
+  helper,
+}: {
+  href?: string | null;
+  label: string;
+  onClick?: () => void;
+  disabled?: boolean;
+  helper?: string;
+}) {
+  const className = [
+    "flex min-h-12 items-center justify-center rounded-[18px] border px-3 py-3 text-center text-sm font-semibold transition",
+    disabled || (!href && !onClick)
+      ? "cursor-not-allowed border-white/10 bg-white/10 text-[#9db8c2]"
+      : "border-[#7fd0c7] bg-[#effcf9] text-[#173543] hover:border-white hover:bg-white",
+  ].join(" ");
+
+  if (href && !disabled) {
+    return (
+      <a href={href} className={className}>
+        {label}
+      </a>
+    );
+  }
+
+  return (
+    <button type="button" onClick={onClick} disabled={disabled || (!href && !onClick)} className={className}>
+      {helper ? `${label} · ${helper}` : label}
+    </button>
   );
 }

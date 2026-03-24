@@ -15,6 +15,7 @@ import { getRouteEligibilityReason, isRouteEligibleCustomer } from "@/lib/routeE
 type SavedRoutePlannerPanelProps = {
   customers: CustomerSummary[];
   currentUserId: string;
+  staffRole: "admin" | "sales";
   pendingStops: PendingRouteStop[];
   routeRepOptions: RouteRepOption[];
   territoryOptions: TerritoryOption[];
@@ -168,6 +169,7 @@ function deriveRouteTerritoryCode(stops: DraftStop[], explicitTerritoryCode: str
 export default function SavedRoutePlannerPanel({
   customers,
   currentUserId,
+  staffRole,
   pendingStops: initialPendingStops,
   routeRepOptions,
   territoryOptions,
@@ -604,6 +606,7 @@ export default function SavedRoutePlannerPanel({
           estimatedTotalMinutes: draftPlan.estimatedTotalMinutes,
           estimatedReturnTime: draftPlan.estimatedReturnTime,
           stopCount: draftStops.length,
+          createdByUserId: currentUserId,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
@@ -819,7 +822,13 @@ export default function SavedRoutePlannerPanel({
           </div>
 
           <div className="mt-4 grid gap-4 lg:grid-cols-2">
-            <PlannerSelect label="Assigned Rep" value={assignedUserId} onChange={setAssignedUserId} options={routeRepOptions.map((option) => ({ value: option.userId, label: option.label }))} />
+            <PlannerSelect
+              label="Assigned Rep"
+              value={assignedUserId}
+              onChange={setAssignedUserId}
+              disabled={staffRole !== "admin"}
+              options={routeRepOptions.map((option) => ({ value: option.userId, label: option.label }))}
+            />
             <PlannerInput label="Route Date" type="date" value={routeDate} onChange={setRouteDate} />
             <PlannerInput label="Max Stops" type="number" value={maxStops} onChange={setMaxStops} min="1" max="40" />
             <PlannerSelect label="Territory Override" value={territoryCode} onChange={setTerritoryCode} options={territoryOptions.map((option) => ({ value: option.value, label: option.label }))} />
@@ -1161,7 +1170,7 @@ export default function SavedRoutePlannerPanel({
                           <select
                             value={route.assignedUserId || ""}
                             onChange={(event) => void updateSavedRouteAssignment(route.id, event.target.value)}
-                            disabled={busy !== null || routeActionById[route.id] === "assign"}
+                            disabled={staffRole !== "admin" || busy !== null || routeActionById[route.id] === "assign"}
                             className="rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm text-[#24404d] outline-none transition focus:border-[#14b8a6] disabled:opacity-60"
                           >
                             <option value="" disabled>
@@ -1179,14 +1188,16 @@ export default function SavedRoutePlannerPanel({
                         <Link href={`/workspace/routes/run?routeId=${route.id}`} className="rounded-full bg-[#173543] px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-[#0f2a35]">
                           Open Runner
                         </Link>
-                        <button
-                          type="button"
-                          onClick={() => void deleteSavedRoute(route.id)}
-                          disabled={busy !== null}
-                          className="rounded-full border border-[#f2d1d1] bg-white px-3 py-1.5 text-sm font-semibold text-[#9a3d3d] transition hover:bg-[#fff7f7] disabled:opacity-60"
-                        >
-                          {busy === "delete_route" ? "Deleting..." : "Erase Route"}
-                        </button>
+                        {staffRole === "admin" ? (
+                          <button
+                            type="button"
+                            onClick={() => void deleteSavedRoute(route.id)}
+                            disabled={busy !== null}
+                            className="rounded-full border border-[#f2d1d1] bg-white px-3 py-1.5 text-sm font-semibold text-[#9a3d3d] transition hover:bg-[#fff7f7] disabled:opacity-60"
+                          >
+                            {busy === "delete_route" ? "Deleting..." : "Erase Route"}
+                          </button>
+                        ) : null}
                       </div>
                     </div>
                   </div>
@@ -1340,11 +1351,13 @@ function PlannerSelect({
   label,
   value,
   onChange,
+  disabled = false,
   options,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  disabled?: boolean;
   options: Array<{ value: string; label: string }>;
 }) {
   return (
@@ -1353,7 +1366,8 @@ function PlannerSelect({
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="rounded-2xl border border-[#cedde6] bg-white px-4 py-3 text-sm text-[#173543] outline-none transition focus:border-[#14b8a6]"
+        disabled={disabled}
+        className="rounded-2xl border border-[#cedde6] bg-white px-4 py-3 text-sm text-[#173543] outline-none transition focus:border-[#14b8a6] disabled:opacity-60"
       >
         <option value="">Select</option>
         {options.map((option) => (

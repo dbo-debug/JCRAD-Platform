@@ -17,7 +17,7 @@ export default async function WorkspaceRoutesPage({
   const staff = await requireStaff();
   const [params, { customers, routeRepOptions, territoryOptions, savedRoutes, pendingStops }, plannerDefaults] = await Promise.all([
     searchParams,
-    loadRouteWorkspaceData(staff.userId),
+    loadRouteWorkspaceData(staff),
     loadSegmentBuilderSettings(),
   ]);
 
@@ -30,6 +30,7 @@ export default async function WorkspaceRoutesPage({
       <SavedRoutePlannerPanel
         customers={customers}
         currentUserId={staff.userId}
+        staffRole={staff.role}
         pendingStops={pendingStops}
         routeRepOptions={routeRepOptions}
         territoryOptions={territoryOptions}
