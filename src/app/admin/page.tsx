@@ -6,6 +6,7 @@ import { loadCustomerApprovalQueue, summarizeCustomerApprovalQueue } from "@/lib
 import { loadCustomerWorkspaceIndex } from "@/lib/customerWorkspace";
 import { getRouteEligibilityReason, isRouteEligibleCustomer } from "@/lib/routeEligibility";
 import { loadSavedRoutes } from "@/lib/routeWorkspace";
+import { requireStaff } from "@/lib/requireStaff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { normalizePackagingCategory, type PackagingCategory } from "@/lib/packaging/category";
 
@@ -90,6 +91,7 @@ const MODULE_CARDS = [
     title: "Packaging",
     description: "Packaging operations, reviews, and catalog maintenance.",
     href: "/admin/packaging",
+    adminOnly: true,
   },
 ] as const;
 
@@ -150,6 +152,8 @@ function metadataSummary(metadata: Record<string, unknown> | null): string {
 }
 
 export default async function AdminDashboardPage() {
+  const staff = await requireStaff();
+  const isAdmin = staff.role === "admin";
   const supabase = createAdminClient();
   const referenceNow = Date.parse(new Date().toISOString());
 
@@ -182,7 +186,7 @@ export default async function AdminDashboardPage() {
       .limit(2000),
     loadCustomerWorkspaceIndex(),
     loadSavedRoutes(),
-    loadCustomerApprovalQueue(),
+    isAdmin ? loadCustomerApprovalQueue() : Promise.resolve([]),
   ]);
 
   const estimates = (estimateRes.data || []) as EstimateRow[];
@@ -242,18 +246,6 @@ export default async function AdminDashboardPage() {
       tone: "warn",
     },
     {
-      label: "Packaging submissions need review",
-      count: packagingPending.length,
-      href: "/admin/packaging/submissions",
-      tone: "warn",
-    },
-    {
-      label: "Pending customer approvals",
-      count: approvalQueue.length,
-      href: "/workspace/customers/approvals",
-      tone: "warn",
-    },
-    {
       label: "Orders pending progression",
       count: pendingOrdersCount,
       href: "/admin/orders",
@@ -265,6 +257,22 @@ export default async function AdminDashboardPage() {
       href: "/workspace/tasks",
       tone: "neutral",
     },
+    ...(isAdmin
+      ? [
+        {
+          label: "Packaging submissions need review",
+          count: packagingPending.length,
+          href: "/admin/packaging/submissions",
+          tone: "warn" as const,
+        },
+        {
+          label: "Pending customer approvals",
+          count: approvalQueue.length,
+          href: "/workspace/customers/approvals",
+          tone: "warn" as const,
+        },
+      ]
+      : []),
   ] as const;
 
   const hasEstimateError = Boolean(estimateRes.error);
@@ -278,7 +286,9 @@ export default async function AdminDashboardPage() {
     <div className="space-y-6">
       <AdminPageHeader
         title="Command Center"
-        description="Unified admin and operations dashboard for customers, routes, tasks, orders, menu, packaging, and route execution."
+        description={isAdmin
+          ? "Unified admin and operations dashboard for customers, routes, tasks, orders, menu, packaging, and route execution."
+          : "Internal sales command center for CRM follow-up, estimates, routes, and task execution."}
       />
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-8">
@@ -324,18 +334,22 @@ export default async function AdminDashboardPage() {
           href="/admin/orders"
           helper="Open order progression"
         />
-        <MetricCard
-          label="Pending Customer Approvals"
-          value={approvalQueue.length}
-          href="/workspace/customers/approvals"
-          helper={`${approvalDocsLinkedCount} with docs`}
-        />
-        <MetricCard
-          label="Packaging Review Queue"
-          value={packagingPending.length}
-          href="/admin/packaging/submissions"
-          helper={`${packagingApproved.length} approved • ${packagingRejected.length} rejected`}
-        />
+        {isAdmin ? (
+          <MetricCard
+            label="Pending Customer Approvals"
+            value={approvalQueue.length}
+            href="/workspace/customers/approvals"
+            helper={`${approvalDocsLinkedCount} with docs`}
+          />
+        ) : null}
+        {isAdmin ? (
+          <MetricCard
+            label="Packaging Review Queue"
+            value={packagingPending.length}
+            href="/admin/packaging/submissions"
+            helper={`${packagingApproved.length} approved • ${packagingRejected.length} rejected`}
+          />
+        ) : null}
       </section>
 
       {(hasEstimateError || hasOrderError || hasSubmissionError || hasEventError || hasTaskError || hasRouteQueueError) ? (
@@ -352,6 +366,7 @@ export default async function AdminDashboardPage() {
           >
             <div className="grid gap-3 md:grid-cols-2">
               {MODULE_CARDS.map((card) => (
+                (!("adminOnly" in card) || !card.adminOnly || isAdmin) ? (
                 <Link
                   key={card.href}
                   href={card.href}
@@ -360,6 +375,7 @@ export default async function AdminDashboardPage() {
                   <p className="font-semibold text-[#173543]">{card.title}</p>
                   <p className="mt-1 text-sm text-[#5b7382]">{card.description}</p>
                 </Link>
+                ) : null
               ))}
             </div>
           </Panel>
@@ -435,64 +451,68 @@ export default async function AdminDashboardPage() {
         </div>
 
         <div className="space-y-4 xl:col-span-2">
-          <Panel
-            title="Packaging Review Visibility"
-            description="Customer packaging submissions by status and category."
-            href="/admin/packaging/submissions"
-            hrefLabel="Manage submissions"
-          >
-            <div className="grid grid-cols-3 gap-2">
-              <StatusPill label="Pending" value={packagingPending.length} tone="warn" />
-              <StatusPill label="Approved" value={packagingApproved.length} tone="ok" />
-              <StatusPill label="Rejected" value={packagingRejected.length} tone="bad" />
-            </div>
-            <div className="mt-3 flex flex-wrap gap-2 text-xs text-[#5b7382]">
-              <span>Flower: {packagingByCategory.get("flower") || 0}</span>
-              <span>Pre-roll: {packagingByCategory.get("pre_roll") || 0}</span>
-              <span>Vape: {packagingByCategory.get("vape") || 0}</span>
-              <span>Concentrate: {packagingByCategory.get("concentrate") || 0}</span>
-            </div>
-            <div className="mt-3 space-y-2">
-              {recentPackagingSubmissions.slice(0, 4).map((row) => (
-                <div key={row.id} className="rounded-lg border border-[#dbe9ef] bg-white px-3 py-2 text-sm">
-                  <p className="font-semibold text-[#173543]">{row.customer_name || row.customer_email || "Submission"}</p>
-                  <p className="text-xs text-[#5b7382]">
-                    {normalizePackagingCategory(row.category) || "unknown"} • {normalizeStatus(row.status) || "pending"} • {formatDate(row.created_at)}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </Panel>
+          {isAdmin ? (
+            <Panel
+              title="Packaging Review Visibility"
+              description="Customer packaging submissions by status and category."
+              href="/admin/packaging/submissions"
+              hrefLabel="Manage submissions"
+            >
+              <div className="grid grid-cols-3 gap-2">
+                <StatusPill label="Pending" value={packagingPending.length} tone="warn" />
+                <StatusPill label="Approved" value={packagingApproved.length} tone="ok" />
+                <StatusPill label="Rejected" value={packagingRejected.length} tone="bad" />
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2 text-xs text-[#5b7382]">
+                <span>Flower: {packagingByCategory.get("flower") || 0}</span>
+                <span>Pre-roll: {packagingByCategory.get("pre_roll") || 0}</span>
+                <span>Vape: {packagingByCategory.get("vape") || 0}</span>
+                <span>Concentrate: {packagingByCategory.get("concentrate") || 0}</span>
+              </div>
+              <div className="mt-3 space-y-2">
+                {recentPackagingSubmissions.slice(0, 4).map((row) => (
+                  <div key={row.id} className="rounded-lg border border-[#dbe9ef] bg-white px-3 py-2 text-sm">
+                    <p className="font-semibold text-[#173543]">{row.customer_name || row.customer_email || "Submission"}</p>
+                    <p className="text-xs text-[#5b7382]">
+                      {normalizePackagingCategory(row.category) || "unknown"} • {normalizeStatus(row.status) || "pending"} • {formatDate(row.created_at)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </Panel>
+          ) : null}
 
-          <Panel
-            title="Customer Approval Visibility"
-            description="Onboarding/compliance status using production-safe customer/profile linkage."
-            href="/workspace/customers/approvals"
-            hrefLabel="Open approvals"
-          >
-            <div className="grid grid-cols-3 gap-2">
-              <StatusPill label="Pending" value={approvalStatusCounts.pending} tone="warn" />
-              <StatusPill label="With Docs" value={approvalDocsLinkedCount} tone="ok" />
-              <StatusPill label="Follow-up" value={approvalStatusCounts.followUp} tone="bad" />
-            </div>
-            <div className="mt-3 space-y-2">
-              {approvalQueue.slice(0, 4).map((item) => (
-                <Link
-                  key={item.customerId}
-                  href={item.reviewHref}
-                  className="block rounded-lg border border-[#dbe9ef] bg-white px-3 py-2 text-sm transition hover:border-[#14b8a6] hover:bg-[#f6fbfd]"
-                >
-                  <p className="font-semibold text-[#173543]">{item.companyName}</p>
-                  <p className="text-xs text-[#5b7382]">
-                    {item.contactName || item.contactEmail || "No contact mapped"} • {item.approvalStatus}
-                  </p>
-                </Link>
-              ))}
-              {approvalQueue.length === 0 ? (
-                <p className="text-sm text-[#5b7382]">No pending customer approvals.</p>
-              ) : null}
-            </div>
-          </Panel>
+          {isAdmin ? (
+            <Panel
+              title="Customer Approval Visibility"
+              description="Onboarding/compliance status using production-safe customer/profile linkage."
+              href="/workspace/customers/approvals"
+              hrefLabel="Open approvals"
+            >
+              <div className="grid grid-cols-3 gap-2">
+                <StatusPill label="Pending" value={approvalStatusCounts.pending} tone="warn" />
+                <StatusPill label="With Docs" value={approvalDocsLinkedCount} tone="ok" />
+                <StatusPill label="Follow-up" value={approvalStatusCounts.followUp} tone="bad" />
+              </div>
+              <div className="mt-3 space-y-2">
+                {approvalQueue.slice(0, 4).map((item) => (
+                  <Link
+                    key={item.customerId}
+                    href={item.reviewHref}
+                    className="block rounded-lg border border-[#dbe9ef] bg-white px-3 py-2 text-sm transition hover:border-[#14b8a6] hover:bg-[#f6fbfd]"
+                  >
+                    <p className="font-semibold text-[#173543]">{item.companyName}</p>
+                    <p className="text-xs text-[#5b7382]">
+                      {item.contactName || item.contactEmail || "No contact mapped"} • {item.approvalStatus}
+                    </p>
+                  </Link>
+                ))}
+                {approvalQueue.length === 0 ? (
+                  <p className="text-sm text-[#5b7382]">No pending customer approvals.</p>
+                ) : null}
+              </div>
+            </Panel>
+          ) : null}
 
           <Panel
             title="Task Follow-Up Visibility"

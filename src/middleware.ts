@@ -28,15 +28,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(gateUrl);
   }
 
-  // Keep the existing Supabase auth behavior limited to /portal paths only.
-  // Other routes should continue without portal auth enforcement.
-  if (!pathname.startsWith("/portal")) {
-    return NextResponse.next({
-      request: { headers: request.headers },
-    });
-  }
-
-  let response = NextResponse.next({
+  const response = NextResponse.next({
     request: { headers: request.headers },
   });
 
@@ -61,6 +53,46 @@ export async function middleware(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  if (pathname.startsWith("/admin")) {
+    if (!user) {
+      const loginUrl = request.nextUrl.clone();
+      loginUrl.pathname = "/login";
+      loginUrl.searchParams.set("returnTo", `${request.nextUrl.pathname}${request.nextUrl.search}`);
+      return NextResponse.redirect(loginUrl);
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    const role = String(profile?.role || "").trim().toLowerCase();
+    const isStaff = role === "admin" || role === "sales";
+
+    if (!isStaff) {
+      const dashboardUrl = request.nextUrl.clone();
+      dashboardUrl.pathname = "/dashboard";
+      dashboardUrl.search = "";
+      return NextResponse.redirect(dashboardUrl);
+    }
+
+    if (role !== "admin" && pathname !== "/admin") {
+      const commandCenterUrl = request.nextUrl.clone();
+      commandCenterUrl.pathname = "/admin";
+      commandCenterUrl.search = "";
+      return NextResponse.redirect(commandCenterUrl);
+    }
+
+    return response;
+  }
+
+  // Keep the existing Supabase auth behavior limited to /portal paths only.
+  // Other routes should continue without portal auth enforcement.
+  if (!pathname.startsWith("/portal")) {
+    return response;
+  }
 
   if (!user) {
     const loginUrl = request.nextUrl.clone();

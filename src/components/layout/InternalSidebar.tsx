@@ -23,8 +23,7 @@ const NAV_SECTIONS: NavSection[] = [
   {
     label: "Command",
     items: [
-      { label: "Dashboard", href: "/workspace" },
-      { label: "Command Center", href: "/admin", adminOnly: true },
+      { label: "Command Center", href: "/admin" },
       { label: "Customers", href: "/workspace/customers" },
       { label: "Sources", href: "/workspace/sources" },
       { label: "Quick Add Lead", href: "/workspace/events/quick-add" },
@@ -70,7 +69,7 @@ export default function InternalSidebar({ role }: InternalSidebarProps) {
   return (
     <aside className="w-72 border-r border-[var(--surface-border)] bg-white px-4 py-6">
       <Link
-        href={role === "admin" ? "/admin" : "/workspace"}
+        href="/admin"
         className="mb-6 inline-flex items-center gap-2 rounded-xl border border-[#d7e6ed] bg-[#f7fbfd] px-2 py-1.5 shadow-sm"
       >
         <Image src="/brand/BLACK.png" alt="JC RAD Inc." width={108} height={32} className="h-8 w-auto" priority />

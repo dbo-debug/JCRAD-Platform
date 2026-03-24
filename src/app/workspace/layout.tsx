@@ -13,7 +13,7 @@ export default async function WorkspaceLayout({ children }: WorkspaceLayoutProps
 
   return (
     <SurfaceShell>
-      <Header isAuthenticated dashboardHref="/workspace" />
+      <Header isAuthenticated dashboardHref="/admin" />
       <div className="flex min-h-[calc(100vh-5rem)] [--workspace-header-offset:5rem]">
         <InternalSidebar role={staff.role} />
         <section className="min-w-0 flex-1 bg-[var(--surface-card)] p-6 text-[var(--text)] xl:p-8">{children}</section>

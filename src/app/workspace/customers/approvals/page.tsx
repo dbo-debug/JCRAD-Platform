@@ -3,7 +3,7 @@ import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import CustomerApprovalActions from "@/components/workspace/CustomerApprovalActions";
 import { loadCustomerApprovalQueue, type CustomerApprovalQueueItem } from "@/lib/customerApprovals";
 import { isFollowUpCustomerApprovalStatus, normalizeCustomerApprovalStatus } from "@/lib/customerApproval";
-import { requireStaff } from "@/lib/requireStaff";
+import { requireAdmin } from "@/lib/requireAdmin";
 
 function formatDate(value: string | null): string {
   if (!value) return "Unknown";
@@ -141,7 +141,7 @@ function QueueMeta({ label, value, helper }: { label: string; value: string; hel
 }
 
 export default async function WorkspaceCustomerApprovalsPage() {
-  await requireStaff();
+  await requireAdmin();
   const queue = await loadCustomerApprovalQueue();
   const docsLinkedCount = queue.filter((item) => item.readyState === "docs_linked").length;
   const followUpCount = queue.filter((item) => isFollowUpCustomerApprovalStatus(item.approvalStatus)).length;
