@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { startTransition, useEffect, useState } from "react";
+import { startTransition, useEffect, useMemo, useState } from "react";
 import type { CustomerSummary } from "@/lib/customerWorkspace";
 import { isRouteEligibleCustomer } from "@/lib/routeEligibility";
 import type { PendingRouteStop } from "@/lib/routeStopQueue";
@@ -67,6 +67,7 @@ type OrganizeBy = "none" | "territory" | "owner" | "route_day" | "stage";
 
 const ROUTE_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const WORKSPACE_STICKY_TOP_CLASS = "top-[calc(var(--workspace-header-offset,5rem)+1rem)]";
+const CUSTOMER_SEGMENT_STORAGE_KEY_PREFIX = "jc-rad:customer-segment";
 const BULK_ACTIONS: Array<{ key: BulkActionKind; label: string }> = [
   { key: "assign_sales_rep", label: "Assign Sales Rep" },
   { key: "assign_territory", label: "Assign Territory" },
@@ -296,6 +297,7 @@ export default function CustomerWorkspaceIndex({
   );
   const [referenceNow] = useState(() => Date.now());
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
+  const [hydratedSegmentKey, setHydratedSegmentKey] = useState<string | null>(null);
   const [bulkAction, setBulkAction] = useState<BulkActionState>({
     kind: staffRole === "admin" ? "assign_sales_rep" : "assign_territory",
     value: "",
@@ -319,6 +321,9 @@ export default function CustomerWorkspaceIndex({
 
   const activeCustomers = customers.filter((customer) => !customer.archivedAt);
   const archivedCustomers = customers.filter((customer) => Boolean(customer.archivedAt));
+  const customerIds = useMemo(() => customers.map((customer) => customer.id), [customers]);
+  const customerIdsKey = customerIds.join("|");
+  const segmentStorageKey = `${CUSTOMER_SEGMENT_STORAGE_KEY_PREFIX}:${currentUserId}`;
   const statuses = Array.from(new Set(customers.map((customer) => customer.status).filter(Boolean))).sort((a, b) => a.localeCompare(b));
   const stages = Array.from(new Set(customers.map((customer) => customer.stage).filter((value): value is string => Boolean(value)))).sort((a, b) => a.localeCompare(b));
   const owners = Array.from(new Set(customers.map((customer) => customer.assignedSalesName).filter((value): value is string => Boolean(value)))).sort((a, b) => a.localeCompare(b));
@@ -431,7 +436,6 @@ export default function CustomerWorkspaceIndex({
   const visibleCustomerIds = visibleCustomers.map((customer) => customer.id);
   const visibleCustomerIdSet = new Set(visibleCustomerIds);
   const pendingCustomerIdSet = new Set(pendingStops.map((stop) => stop.customerId));
-  const visibleCustomerIdsKey = visibleCustomerIds.join("|");
   const selectedVisibleCustomerIds = selectedCustomerIds.filter((id) => visibleCustomerIdSet.has(id));
   const selectedVisibleCustomers = visibleCustomers.filter((customer) => selectedVisibleCustomerIds.includes(customer.id));
   const allVisibleSelected = visibleCustomers.length > 0 && selectedVisibleCustomerIds.length === visibleCustomers.length;
@@ -539,12 +543,46 @@ export default function CustomerWorkspaceIndex({
               ];
 
   useEffect(() => {
-    const nextVisibleIds = new Set(visibleCustomerIdsKey ? visibleCustomerIdsKey.split("|") : []);
+    const availableCustomerIds = new Set(customerIds);
+    try {
+      const stored = window.sessionStorage.getItem(segmentStorageKey);
+      if (!stored) {
+        setSelectedCustomerIds([]);
+        setHydratedSegmentKey(segmentStorageKey);
+        return;
+      }
+
+      const parsed = JSON.parse(stored);
+      const nextIds = Array.isArray(parsed)
+        ? parsed.filter(
+            (value, index, values): value is string =>
+              typeof value === "string" && availableCustomerIds.has(value) && values.indexOf(value) === index
+          )
+        : [];
+      setSelectedCustomerIds(nextIds);
+    } catch {
+      setSelectedCustomerIds([]);
+    } finally {
+      setHydratedSegmentKey(segmentStorageKey);
+    }
+  }, [customerIds, customerIdsKey, segmentStorageKey]);
+
+  useEffect(() => {
+    const availableCustomerIds = new Set(customerIds);
     setSelectedCustomerIds((current) => {
-      const next = current.filter((id) => nextVisibleIds.has(id));
+      const next = current.filter((id) => availableCustomerIds.has(id));
       return sameIds(current, next) ? current : next;
     });
-  }, [visibleCustomerIdsKey]);
+  }, [customerIds, customerIdsKey]);
+
+  useEffect(() => {
+    if (hydratedSegmentKey !== segmentStorageKey) return;
+    if (selectedCustomerIds.length === 0) {
+      window.sessionStorage.removeItem(segmentStorageKey);
+      return;
+    }
+    window.sessionStorage.setItem(segmentStorageKey, JSON.stringify(selectedCustomerIds));
+  }, [hydratedSegmentKey, segmentStorageKey, selectedCustomerIds]);
 
   useEffect(() => {
     if (staffRole === "admin") return;
@@ -1019,7 +1057,7 @@ export default function CustomerWorkspaceIndex({
                   {allVisibleSelected ? "All selected" : `Select ${visibleCustomers.length}`}
                 </button>
                 <button type="button" onClick={clearSelection} disabled={selectedCustomerIds.length === 0} className={denseButtonClass()}>
-                  Clear selection
+                  Clear Segment
                 </button>
                 {staffRole === "admin" ? (
                   <button
@@ -1037,7 +1075,10 @@ export default function CustomerWorkspaceIndex({
 
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4f6877]">
-              Selected {selectedVisibleCustomerIds.length} of {visibleCustomers.length}
+              Selected visible {selectedVisibleCustomerIds.length} of {visibleCustomers.length}
+            </span>
+            <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4f6877]">
+              Segment {selectedCustomerIds.length}
             </span>
             <span className="rounded-full border border-[#bfe8e2] bg-[#f5fffd] px-3 py-1.5 text-sm font-medium text-[#0f766e]">
               Pending Stops {pendingStops.length}
@@ -1048,6 +1089,9 @@ export default function CustomerWorkspaceIndex({
             <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4f6877]">
               URL state synced
             </span>
+            <button type="button" onClick={clearSelection} disabled={selectedCustomerIds.length === 0} className={denseButtonClass()}>
+              Clear Segment
+            </button>
             {visibleGeocodeStatus ? <span className="text-sm text-[#4f6877]">{visibleGeocodeStatus}</span> : null}
           </div>
         </section>
