@@ -4,13 +4,22 @@ import { createClient } from "@/lib/supabase/server";
 import { isApprovedCustomerApprovalStatus } from "@/lib/customerApproval";
 import { CUSTOMER_DOCUMENTS_BUCKET, isPublicStorageBucket } from "@/lib/storageBuckets";
 
-const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 
 type GenericRow = Record<string, unknown>;
+type PreparedUpload = {
+  document_type: string;
+  title?: string;
+  file_name?: string;
+  content_type?: string;
+  file_size?: number;
+};
 type FinalizedUpload = {
   document_type: string;
   title?: string;
   file_name?: string;
+  content_type?: string;
+  file_size?: number;
   bucket?: string;
   object_path?: string;
   file_url?: string;
@@ -34,11 +43,6 @@ function safeFileName(value: string): string {
   return value.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "") || "upload";
 }
 
-function extensionFromFile(file: File): string {
-  const ext = String(file.name || "").split(".").pop()?.trim().toLowerCase() || "";
-  return ext || "bin";
-}
-
 function isMissingColumnError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error || "");
   const code =
@@ -51,6 +55,14 @@ function isMissingColumnError(error: unknown): boolean {
 
 function normalizeDocumentType(value: string): string {
   return String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+}
+
+function firstNumber(...values: Array<unknown>): number | null {
+  for (const value of values) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
 }
 
 async function loadCustomerMembershipIds(admin: ReturnType<typeof createAdminClient>, userId: string): Promise<string[]> {
@@ -237,6 +249,11 @@ async function finalizeUploads(args: {
       throw new Error(`Missing storage path for ${documentType}.`);
     }
 
+    const info = await args.admin.storage.from(bucket).info(objectPath);
+    if (info.error) {
+      throw new Error(`Uploaded file not found for ${documentType}: ${info.error.message}`);
+    }
+
     if (!fileUrl && isPublicStorageBucket(bucket)) {
       const { data: publicData } = args.admin.storage.from(bucket).getPublicUrl(objectPath);
       fileUrl = String(publicData?.publicUrl || "").trim();
@@ -272,6 +289,53 @@ async function finalizeUploads(args: {
   return insertedDocuments;
 }
 
+async function prepareUploads(args: {
+  admin: ReturnType<typeof createAdminClient>;
+  customerId: string;
+  uploads: PreparedUpload[];
+}) {
+  const preparedUploads = [];
+
+  for (const upload of args.uploads) {
+    const documentType = normalizeDocumentType(upload.document_type);
+    if (!REQUIRED_DOC_KEYS.has(documentType)) {
+      throw new Error(`Unsupported onboarding document type: ${upload.document_type}`);
+    }
+
+    const fileName = firstText(upload.file_name, upload.title);
+    if (!fileName) {
+      throw new Error(`file_name required for ${documentType}`);
+    }
+
+    const fileSize = firstNumber(upload.file_size);
+    if (fileSize != null && fileSize > MAX_UPLOAD_BYTES) {
+      throw new Error(`${fileName} exceeds the 25MB limit.`);
+    }
+
+    const contentType = firstText(upload.content_type) || "application/octet-stream";
+    const ext = String(fileName).split(".").pop()?.trim().toLowerCase() || "bin";
+    const objectPath = `customer-documents/${args.customerId}/${documentType}/${Date.now()}-${safeFileName(fileName || `${documentType}.${ext}`)}`;
+    const signed = await args.admin.storage.from(CUSTOMER_DOCUMENTS_BUCKET).createSignedUploadUrl(objectPath);
+    if (signed.error || !signed.data?.token) {
+      throw new Error(signed.error?.message || `Failed to prepare upload for ${fileName}`);
+    }
+
+    preparedUploads.push({
+      document_type: documentType,
+      title: firstText(upload.title, fileName) || fileName,
+      file_name: fileName,
+      content_type: contentType,
+      file_size: fileSize,
+      bucket: CUSTOMER_DOCUMENTS_BUCKET,
+      object_path: objectPath,
+      upload_token: String(signed.data.token),
+      signed_url: String(signed.data.signedUrl || "").trim() || null,
+    });
+  }
+
+  return preparedUploads;
+}
+
 export async function GET() {
   try {
     const context = await getAuthenticatedContext();
@@ -298,11 +362,32 @@ export async function POST(req: Request) {
     const contentType = String(req.headers.get("content-type") || "").toLowerCase();
     if (contentType.includes("application/json")) {
       const body = await req.json().catch(() => null);
+      const intent = String(body?.intent || "").trim().toLowerCase();
+
+      if (intent === "prepare") {
+        const uploads = Array.isArray(body?.uploads) ? (body.uploads as PreparedUpload[]) : [];
+        if (uploads.length === 0) {
+          return NextResponse.json({ error: "Select at least one onboarding document to upload." }, { status: 400 });
+        }
+
+        const preparedUploads = await prepareUploads({
+          admin: context.admin,
+          customerId: context.customer.id,
+          uploads,
+        });
+
+        return NextResponse.json({
+          ok: true,
+          customer_account_id: context.customer.id,
+          bucket: CUSTOMER_DOCUMENTS_BUCKET,
+          uploads: preparedUploads,
+        });
+      }
+
       const uploads = Array.isArray(body?.uploads) ? (body.uploads as FinalizedUpload[]) : [];
       if (uploads.length === 0) {
         return NextResponse.json({ error: "Upload at least one onboarding document." }, { status: 400 });
       }
-
       const insertedDocuments = await finalizeUploads({
         admin: context.admin,
         userId: context.user.id,
@@ -317,60 +402,10 @@ export async function POST(req: Request) {
         documents: insertedDocuments,
       });
     }
-
-    const form = await req.formData();
-    const uploads = await Promise.all(
-      Array.from(form.entries())
-        .filter(([key, value]) => REQUIRED_DOC_KEYS.has(key) && value instanceof File && value.size > 0)
-        .map(async ([key, value]) => ({ key: normalizeDocumentType(key), file: value as File }))
+    return NextResponse.json(
+      { error: "Use the onboarding signed-upload JSON flow." },
+      { status: 415 }
     );
-
-    if (uploads.length === 0) {
-      return NextResponse.json({ error: "Upload at least one onboarding document." }, { status: 400 });
-    }
-
-    const finalizedUploads: FinalizedUpload[] = [];
-    for (const upload of uploads) {
-      if (upload.file.size > MAX_UPLOAD_BYTES) {
-        return NextResponse.json({ error: `${upload.file.name} exceeds the 10MB limit.` }, { status: 400 });
-      }
-
-      const ext = extensionFromFile(upload.file);
-      const objectPath = `customer-documents/${context.customer.id}/${upload.key}/${Date.now()}-${safeFileName(upload.file.name || `${upload.key}.${ext}`)}`;
-      const contentType = String(upload.file.type || "").trim() || "application/octet-stream";
-      const bytes = new Uint8Array(await upload.file.arrayBuffer());
-
-      const storageRes = await context.admin.storage.from(CUSTOMER_DOCUMENTS_BUCKET).upload(objectPath, bytes, {
-        upsert: true,
-        contentType,
-      });
-      if (storageRes.error) {
-        return NextResponse.json({ error: `Storage upload failed: ${storageRes.error.message}` }, { status: 500 });
-      }
-
-      finalizedUploads.push({
-        document_type: upload.key,
-        title: upload.file.name || upload.key,
-        file_name: upload.file.name || `${upload.key}.${ext}`,
-        bucket: CUSTOMER_DOCUMENTS_BUCKET,
-        object_path: objectPath,
-        file_url: "",
-      });
-    }
-
-    const insertedDocuments = await finalizeUploads({
-      admin: context.admin,
-      userId: context.user.id,
-      customerId: context.customer.id,
-      approvalStatus: context.customer.approvalStatus,
-      uploads: finalizedUploads,
-    });
-
-    return NextResponse.json({
-      ok: true,
-      customer_account_id: context.customer.id,
-      documents: insertedDocuments,
-    });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Upload failed";
     return NextResponse.json({ error: message }, { status: 500 });

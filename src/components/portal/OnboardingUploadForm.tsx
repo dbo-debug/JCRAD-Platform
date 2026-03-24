@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
+import { createClient } from "@/lib/supabase/client";
 
 const REQUIRED_DOCS = [
   { key: "cannabis_license", label: "Cannabis License" },
@@ -13,9 +14,10 @@ const REQUIRED_DOCS = [
 ] as const;
 
 type UploadState = Record<string, File | null>;
-const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 
 export default function OnboardingUploadForm() {
+  const supabase = useMemo(() => createClient(), []);
   const [files, setFiles] = useState<UploadState>({});
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -31,28 +33,110 @@ export default function OnboardingUploadForm() {
 
     startTransition(async () => {
       try {
-        const formData = new FormData();
+        const selectedUploads: Array<{
+          document_type: string;
+          title: string;
+          file_name: string;
+          content_type: string;
+          file_size: number;
+          file: File;
+        }> = [];
 
         for (const doc of REQUIRED_DOCS) {
           const file = files[doc.key];
           if (!file) continue;
           if (file.size > MAX_UPLOAD_BYTES) {
-            throw new Error(`${file.name} exceeds the 10MB limit.`);
+            throw new Error(`${file.name} exceeds the 25MB limit.`);
           }
-          formData.append(doc.key, file);
+          selectedUploads.push({
+            document_type: doc.key,
+            title: file.name || doc.label,
+            file_name: file.name || doc.label,
+            content_type: String(file.type || "").trim() || "application/octet-stream",
+            file_size: file.size,
+            file,
+          });
         }
 
-        if (Array.from(formData.keys()).length === 0) {
+        if (selectedUploads.length === 0) {
           throw new Error("Upload at least one onboarding document.");
         }
 
-        const res = await fetch("/api/portal/onboarding", {
+        const prepareRes = await fetch("/api/portal/onboarding", {
           method: "POST",
-          body: formData,
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            intent: "prepare",
+            uploads: selectedUploads.map((upload) => ({
+              document_type: upload.document_type,
+              title: upload.title,
+              file_name: upload.file_name,
+              content_type: upload.content_type,
+              file_size: upload.file_size,
+            })),
+          }),
         });
-        const json = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          throw new Error(String(json?.error || `Upload finalize failed (${res.status})`));
+        const prepareJson = await prepareRes.json().catch(() => ({}));
+        if (!prepareRes.ok) {
+          throw new Error(String(prepareJson?.error || `Upload prepare failed (${prepareRes.status})`));
+        }
+
+        const preparedUploads = Array.isArray(prepareJson?.uploads)
+          ? (prepareJson.uploads as Array<{
+              document_type: string;
+              title: string;
+              file_name: string;
+              content_type: string;
+              file_size: number;
+              bucket: string;
+              object_path: string;
+              upload_token: string;
+            }>)
+          : [];
+
+        if (preparedUploads.length !== selectedUploads.length) {
+          throw new Error("Upload preparation returned an unexpected file count.");
+        }
+
+        for (const preparedUpload of preparedUploads) {
+          const localUpload = selectedUploads.find((upload) => upload.document_type === preparedUpload.document_type);
+          if (!localUpload) {
+            throw new Error(`Missing selected file for ${preparedUpload.document_type}.`);
+          }
+
+          const uploadResult = await supabase.storage
+            .from(preparedUpload.bucket)
+            .uploadToSignedUrl(preparedUpload.object_path, preparedUpload.upload_token, localUpload.file, {
+              cacheControl: "3600",
+              contentType: preparedUpload.content_type,
+              upsert: false,
+            });
+
+          if (uploadResult.error) {
+            throw new Error(uploadResult.error.message || `Failed to upload ${localUpload.file_name}.`);
+          }
+        }
+
+        const finalizeRes = await fetch("/api/portal/onboarding", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            intent: "finalize",
+            uploads: preparedUploads.map((upload) => ({
+              document_type: upload.document_type,
+              title: upload.title,
+              file_name: upload.file_name,
+              content_type: upload.content_type,
+              file_size: upload.file_size,
+              bucket: upload.bucket,
+              object_path: upload.object_path,
+              file_url: "",
+            })),
+          }),
+        });
+        const finalizeJson = await finalizeRes.json().catch(() => ({}));
+        if (!finalizeRes.ok) {
+          throw new Error(String(finalizeJson?.error || `Upload finalize failed (${finalizeRes.status})`));
         }
 
         setMessage("Documents uploaded. A team member will review your documents within 24 hours.");
@@ -72,6 +156,7 @@ export default function OnboardingUploadForm() {
       <div className="rounded-2xl border border-[#dbe9ef] bg-[#f9fcfd] px-4 py-3 text-sm text-[#355060]">
         Upload only what you have. If your company uses a single onboarding packet, attach that under <span className="font-semibold text-[#173543]">Cannabis License</span> and you do not need to upload all four documents separately.
       </div>
+      <p className="text-sm text-[#5d7685]">Up to 25 MB per file. PDFs work best for onboarding packets and compliance documents.</p>
 
       <section className="grid gap-4 md:grid-cols-2">
         {REQUIRED_DOCS.map((doc) => (
