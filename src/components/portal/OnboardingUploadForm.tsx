@@ -1,10 +1,9 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
-import { createClient } from "@/lib/supabase/client";
 
 const REQUIRED_DOCS = [
   { key: "cannabis_license", label: "Cannabis License" },
@@ -14,23 +13,9 @@ const REQUIRED_DOCS = [
 ] as const;
 
 type UploadState = Record<string, File | null>;
-const DOCUMENTS_BUCKET = "catalog-public";
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
-function normalizeDocumentType(value: string): string {
-  return String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
-}
-
-function safeFileName(value: string): string {
-  return value.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "") || "upload";
-}
-
-function extensionFromFile(file: File): string {
-  return String(file.name || "").split(".").pop()?.trim().toLowerCase() || "bin";
-}
-
 export default function OnboardingUploadForm() {
-  const supabase = useMemo(() => createClient(), []);
   const [files, setFiles] = useState<UploadState>({});
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -46,25 +31,7 @@ export default function OnboardingUploadForm() {
 
     startTransition(async () => {
       try {
-        const prepRes = await fetch("/api/portal/onboarding", { method: "GET" });
-        const prepJson = await prepRes.json().catch(() => ({}));
-        if (!prepRes.ok) {
-          throw new Error(String(prepJson?.error || `Upload prep failed (${prepRes.status})`));
-        }
-        const customerAccountId = String(prepJson?.customer_account_id || "").trim();
-        const bucket = String(prepJson?.bucket || DOCUMENTS_BUCKET).trim() || DOCUMENTS_BUCKET;
-        if (!customerAccountId) {
-          throw new Error("No linked customer account found for this user.");
-        }
-
-        const uploads: Array<{
-          document_type: string;
-          title: string;
-          file_name: string;
-          bucket: string;
-          object_path: string;
-          file_url: string;
-        }> = [];
+        const formData = new FormData();
 
         for (const doc of REQUIRED_DOCS) {
           const file = files[doc.key];
@@ -72,40 +39,16 @@ export default function OnboardingUploadForm() {
           if (file.size > MAX_UPLOAD_BYTES) {
             throw new Error(`${file.name} exceeds the 10MB limit.`);
           }
-
-          const documentType = normalizeDocumentType(doc.key);
-          const ext = extensionFromFile(file);
-          const objectPath = `customer-documents/${customerAccountId}/${documentType}/${Date.now()}-${safeFileName(file.name || `${documentType}.${ext}`)}`;
-          const contentType = String(file.type || "").trim() || "application/octet-stream";
-
-          const { error: uploadError } = await supabase.storage.from(bucket).upload(objectPath, file, {
-            cacheControl: "3600",
-            contentType,
-            upsert: false,
-          });
-          if (uploadError) {
-            throw new Error(uploadError.message || `Failed to upload ${doc.label}.`);
-          }
-
-          const { data: publicData } = supabase.storage.from(bucket).getPublicUrl(objectPath);
-          uploads.push({
-            document_type: documentType,
-            title: file.name || doc.label,
-            file_name: file.name || `${documentType}.${ext}`,
-            bucket,
-            object_path: objectPath,
-            file_url: String(publicData?.publicUrl || "").trim(),
-          });
+          formData.append(doc.key, file);
         }
 
-        if (uploads.length === 0) {
+        if (Array.from(formData.keys()).length === 0) {
           throw new Error("Upload at least one onboarding document.");
         }
 
         const res = await fetch("/api/portal/onboarding", {
           method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ uploads }),
+          body: formData,
         });
         const json = await res.json().catch(() => ({}));
         if (!res.ok) {

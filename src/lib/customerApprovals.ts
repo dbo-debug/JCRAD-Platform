@@ -1,5 +1,7 @@
+import { createAdminClient } from "@/lib/supabase/admin";
 import { loadCustomerWorkspaceIndex, type CustomerSummary } from "@/lib/customerWorkspace";
 import { isApprovedCustomerApprovalStatus, isFollowUpCustomerApprovalStatus, normalizeCustomerApprovalStatus } from "@/lib/customerApproval";
+import { isPublicStorageBucket } from "@/lib/storageBuckets";
 
 const APPROVAL_DOCUMENT_TYPES = new Set([
   "cannabis_license",
@@ -53,12 +55,25 @@ function firstText(...values: Array<unknown>): string | null {
   return null;
 }
 
-function buildStoragePublicHref(document: Record<string, unknown>): string | null {
+async function resolveDocumentHref(
+  admin: ReturnType<typeof createAdminClient>,
+  document: Record<string, unknown>
+): Promise<string | null> {
   const bucket = firstText(document.bucket);
   const objectPath = firstText(document.object_path);
-  const baseUrl = firstText(process.env.NEXT_PUBLIC_SUPABASE_URL);
-  if (!bucket || !objectPath || !baseUrl) return null;
-  return `${baseUrl.replace(/\/+$/, "")}/storage/v1/object/public/${bucket}/${objectPath.replace(/^\/+/, "")}`;
+  if (bucket && objectPath) {
+    if (isPublicStorageBucket(bucket)) {
+      const { data } = admin.storage.from(bucket).getPublicUrl(objectPath);
+      return String(data?.publicUrl || "").trim() || null;
+    }
+
+    const { data, error } = await admin.storage.from(bucket).createSignedUrl(objectPath, 60 * 60 * 24);
+    if (!error) {
+      return String(data?.signedUrl || "").trim() || null;
+    }
+  }
+
+  return firstText(document.file_url, document.public_url, document.url);
 }
 
 function isApprovalDocument(document: Record<string, unknown>): boolean {
@@ -70,14 +85,17 @@ function getApprovalDocuments(customer: CustomerSummary) {
   return customer.linkedDocuments.filter((document) => isApprovalDocument(document as Record<string, unknown>));
 }
 
-function buildApprovalQueueItem(customer: CustomerSummary): CustomerApprovalQueueItem {
+async function buildApprovalQueueItem(
+  admin: ReturnType<typeof createAdminClient>,
+  customer: CustomerSummary
+): Promise<CustomerApprovalQueueItem> {
   const approvalDocuments = getApprovalDocuments(customer);
   const documentCount = approvalDocuments.length;
   const readyState = documentCount > 0 ? "docs_linked" : "missing_docs";
   const readyLabel = documentCount > 0 ? `${documentCount} linked doc${documentCount === 1 ? "" : "s"}` : "No linked docs yet";
   const accountHref = `/workspace/customers/${customer.id}`;
-  const linkedDocuments = approvalDocuments.slice(0, 3).map((document) => {
-    const directHref = firstText(document.file_url, document.public_url, document.url) || buildStoragePublicHref(document as Record<string, unknown>);
+  const linkedDocuments = await Promise.all(approvalDocuments.slice(0, 3).map(async (document) => {
+    const directHref = await resolveDocumentHref(admin, document as Record<string, unknown>);
 
     return {
       id: document.id,
@@ -86,7 +104,7 @@ function buildApprovalQueueItem(customer: CustomerSummary): CustomerApprovalQueu
       href: directHref,
       createdAt: document.updatedAt || document.createdAt,
     };
-  });
+  }));
 
   return {
     customerId: customer.id,
@@ -137,19 +155,20 @@ export function summarizeCustomerApprovalQueue(rows: Array<{ approvalStatus: str
 }
 
 export async function loadCustomerApprovalQueue(): Promise<CustomerApprovalQueueItem[]> {
+  const admin = createAdminClient();
   const { customers } = await loadCustomerWorkspaceIndex();
   const rawPending = customers.filter((customer) => normalizeCustomerApprovalStatus(customer.approvalStatus) === "pending").length;
   const rawApproved = customers.filter((customer) => isApprovedCustomerApprovalStatus(customer.approvalStatus)).length;
   const rawFollowUp = customers.filter((customer) => isFollowUpCustomerApprovalStatus(customer.approvalStatus)).length;
   const approvalCandidates = customers.filter(isCustomerApprovalCandidate);
   const queue = approvalCandidates
-    .filter((customer) => !isApprovedCustomerApprovalStatus(customer.approvalStatus))
-    .map(buildApprovalQueueItem)
-    .sort((left, right) => {
-      const leftTime = Date.parse(String(left.submittedAt || ""));
-      const rightTime = Date.parse(String(right.submittedAt || ""));
-      return (Number.isFinite(rightTime) ? rightTime : 0) - (Number.isFinite(leftTime) ? leftTime : 0);
-    });
+    .filter((customer) => !isApprovedCustomerApprovalStatus(customer.approvalStatus));
+  const items = await Promise.all(queue.map((customer) => buildApprovalQueueItem(admin, customer)));
+  const sortedItems = items.sort((left, right) => {
+    const leftTime = Date.parse(String(left.submittedAt || ""));
+    const rightTime = Date.parse(String(right.submittedAt || ""));
+    return (Number.isFinite(rightTime) ? rightTime : 0) - (Number.isFinite(leftTime) ? leftTime : 0);
+  });
 
   console.log("[customerApprovals] queue_metrics", {
     total_customers_loaded: customers.length,
@@ -157,8 +176,8 @@ export async function loadCustomerApprovalQueue(): Promise<CustomerApprovalQueue
     raw_approved_by_approval_status: rawApproved,
     raw_follow_up_by_approval_status: rawFollowUp,
     approval_candidates_after_filter: approvalCandidates.length,
-    queue_items_returned: queue.length,
+    queue_items_returned: items.length,
   } satisfies Record<string, number>);
 
-  return queue;
+  return sortedItems;
 }

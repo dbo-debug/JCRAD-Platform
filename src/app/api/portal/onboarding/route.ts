@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { isApprovedCustomerApprovalStatus } from "@/lib/customerApproval";
+import { CUSTOMER_DOCUMENTS_BUCKET, isPublicStorageBucket } from "@/lib/storageBuckets";
 
-const DOCUMENTS_BUCKET = "catalog-public";
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
 type GenericRow = Record<string, unknown>;
@@ -228,7 +228,7 @@ async function finalizeUploads(args: {
       throw new Error(`Unsupported onboarding document type: ${upload.document_type}`);
     }
     const objectPath = firstText(upload.object_path) || "";
-    const bucket = firstText(upload.bucket) || DOCUMENTS_BUCKET;
+    const bucket = firstText(upload.bucket) || CUSTOMER_DOCUMENTS_BUCKET;
     const fileName = firstText(upload.file_name, upload.title) || `${documentType}.${objectPath.split(".").pop() || "bin"}`;
     const title = firstText(upload.title, upload.file_name) || fileName;
     let fileUrl = firstText(upload.file_url) || "";
@@ -237,7 +237,7 @@ async function finalizeUploads(args: {
       throw new Error(`Missing storage path for ${documentType}.`);
     }
 
-    if (!fileUrl) {
+    if (!fileUrl && isPublicStorageBucket(bucket)) {
       const { data: publicData } = args.admin.storage.from(bucket).getPublicUrl(objectPath);
       fileUrl = String(publicData?.publicUrl || "").trim();
     }
@@ -280,7 +280,7 @@ export async function GET() {
     return NextResponse.json({
       ok: true,
       customer_account_id: context.customer.id,
-      bucket: DOCUMENTS_BUCKET,
+      bucket: CUSTOMER_DOCUMENTS_BUCKET,
       max_upload_bytes: MAX_UPLOAD_BYTES,
       required_document_types: Array.from(REQUIRED_DOC_KEYS),
     });
@@ -340,7 +340,7 @@ export async function POST(req: Request) {
       const contentType = String(upload.file.type || "").trim() || "application/octet-stream";
       const bytes = new Uint8Array(await upload.file.arrayBuffer());
 
-      const storageRes = await context.admin.storage.from(DOCUMENTS_BUCKET).upload(objectPath, bytes, {
+      const storageRes = await context.admin.storage.from(CUSTOMER_DOCUMENTS_BUCKET).upload(objectPath, bytes, {
         upsert: true,
         contentType,
       });
@@ -348,14 +348,13 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: `Storage upload failed: ${storageRes.error.message}` }, { status: 500 });
       }
 
-      const { data: publicData } = context.admin.storage.from(DOCUMENTS_BUCKET).getPublicUrl(objectPath);
       finalizedUploads.push({
         document_type: upload.key,
         title: upload.file.name || upload.key,
         file_name: upload.file.name || `${upload.key}.${ext}`,
-        bucket: DOCUMENTS_BUCKET,
+        bucket: CUSTOMER_DOCUMENTS_BUCKET,
         object_path: objectPath,
-        file_url: String(publicData?.publicUrl || "").trim(),
+        file_url: "",
       });
     }
 
