@@ -4,6 +4,8 @@ import InternalSidebar from "@/components/layout/InternalSidebar";
 import SurfaceShell from "@/components/layout/SurfaceShell";
 import { requireStaff } from "@/lib/requireStaff";
 
+export const dynamic = "force-dynamic";
+
 type AdminLayoutProps = {
   children: ReactNode;
 };

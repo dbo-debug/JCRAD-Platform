@@ -95,6 +95,8 @@ const MODULE_CARDS = [
   },
 ] as const;
 
+const SALES_VISIBLE_MODULE_CARDS = MODULE_CARDS.filter((card) => card.adminOnly !== true);
+
 function normalizeStatus(value: unknown): string {
   return String(value || "").trim().toLowerCase();
 }
@@ -365,8 +367,7 @@ export default async function AdminDashboardPage() {
             description="Major platform modules now sit under one internal shell."
           >
             <div className="grid gap-3 md:grid-cols-2">
-              {MODULE_CARDS.map((card) => (
-                (!("adminOnly" in card) || !card.adminOnly || isAdmin) ? (
+              {(isAdmin ? MODULE_CARDS : SALES_VISIBLE_MODULE_CARDS).map((card) => (
                 <Link
                   key={card.href}
                   href={card.href}
@@ -375,7 +376,6 @@ export default async function AdminDashboardPage() {
                   <p className="font-semibold text-[#173543]">{card.title}</p>
                   <p className="mt-1 text-sm text-[#5b7382]">{card.description}</p>
                 </Link>
-                ) : null
               ))}
             </div>
           </Panel>
