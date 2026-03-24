@@ -182,8 +182,6 @@ async function insertCustomerDocument(
   payload: {
     user_id: string;
     customer_account_id: string;
-    title: string;
-    file_name: string;
     document_type: string;
     bucket: string;
     object_path: string;
@@ -194,12 +192,9 @@ async function insertCustomerDocument(
   const preferredPayload = {
     user_id: payload.user_id,
     customer_account_id: payload.customer_account_id,
-    title: payload.title,
-    file_name: payload.file_name,
-    document_type: documentType,
-    bucket: payload.bucket,
-    object_path: payload.object_path,
+    doc_type: documentType,
     file_url: payload.file_url,
+    status: "pending",
   } satisfies Record<string, unknown>;
 
   const preferredResult = await admin.from("customer_documents").insert(preferredPayload);
@@ -208,21 +203,22 @@ async function insertCustomerDocument(
     throw new Error(preferredResult.error.message);
   }
 
-  const minimalPayload = {
+  const fallbackPayload = {
     user_id: payload.user_id,
     customer_account_id: payload.customer_account_id,
-    title: payload.title,
-    file_name: payload.file_name,
     document_type: documentType,
+    bucket: payload.bucket,
+    object_path: payload.object_path,
+    file_url: payload.file_url,
   } satisfies Record<string, unknown>;
 
-  const minimalResult = await admin.from("customer_documents").insert(minimalPayload);
-  if (!minimalResult.error) return;
-  if (!isMissingColumnError(minimalResult.error)) {
-    throw new Error(minimalResult.error.message);
+  const fallbackResult = await admin.from("customer_documents").insert(fallbackPayload);
+  if (!fallbackResult.error) return;
+  if (!isMissingColumnError(fallbackResult.error)) {
+    throw new Error(fallbackResult.error.message);
   }
 
-  throw new Error(`customer_documents insert failed: ${minimalResult.error.message}`);
+  throw new Error(`customer_documents insert failed: ${fallbackResult.error.message}`);
 }
 
 async function finalizeUploads(args: {
@@ -258,12 +254,13 @@ async function finalizeUploads(args: {
       const { data: publicData } = args.admin.storage.from(bucket).getPublicUrl(objectPath);
       fileUrl = String(publicData?.publicUrl || "").trim();
     }
+    if (!fileUrl) {
+      fileUrl = `${bucket}:${objectPath}`;
+    }
 
     await insertCustomerDocument(args.admin, {
       user_id: args.userId,
       customer_account_id: args.customerId,
-      title,
-      file_name: fileName,
       document_type: documentType,
       bucket,
       object_path: objectPath,

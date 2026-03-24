@@ -55,12 +55,24 @@ function firstText(...values: Array<unknown>): string | null {
   return null;
 }
 
+function parseStorageReference(value: unknown): { bucket: string; objectPath: string } | null {
+  const raw = String(value || "").trim();
+  const separator = raw.indexOf(":");
+  if (separator <= 0) return null;
+  const bucket = raw.slice(0, separator).trim();
+  const objectPath = raw.slice(separator + 1).trim().replace(/^\/+/, "");
+  if (!bucket || !objectPath) return null;
+  return { bucket, objectPath };
+}
+
 async function resolveDocumentHref(
   admin: ReturnType<typeof createAdminClient>,
   document: Record<string, unknown>
 ): Promise<string | null> {
-  const bucket = firstText(document.bucket);
-  const objectPath = firstText(document.object_path);
+  const directUrl = firstText(document.file_url, document.public_url, document.url);
+  const storageRef = parseStorageReference(directUrl);
+  const bucket = firstText(document.bucket, storageRef?.bucket);
+  const objectPath = firstText(document.object_path, storageRef?.objectPath);
   if (bucket && objectPath) {
     if (isPublicStorageBucket(bucket)) {
       const { data } = admin.storage.from(bucket).getPublicUrl(objectPath);
@@ -73,11 +85,11 @@ async function resolveDocumentHref(
     }
   }
 
-  return firstText(document.file_url, document.public_url, document.url);
+  return directUrl;
 }
 
 function isApprovalDocument(document: Record<string, unknown>): boolean {
-  const type = String(document.document_type || document.kind || "").trim().toLowerCase();
+  const type = String(document.document_type || document.kind || document.doc_type || "").trim().toLowerCase();
   return APPROVAL_DOCUMENT_TYPES.has(type);
 }
 
@@ -100,7 +112,7 @@ async function buildApprovalQueueItem(
     return {
       id: document.id,
       title: firstText(document.title, document.file_name, document.name) || `Document ${document.id.slice(0, 8)}`,
-      documentType: firstText(document.document_type, document.kind) || "Document",
+      documentType: firstText(document.document_type, document.kind, document.doc_type) || "Document",
       href: directHref,
       createdAt: document.updatedAt || document.createdAt,
     };
