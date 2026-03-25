@@ -1430,13 +1430,13 @@ function RouteActionButton({
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex shrink-0 flex-col items-end gap-1 self-start">
       <button
         type="button"
         onClick={() => void handlePendingToggle()}
         disabled={busy}
         className={[
-          "inline-flex h-8 items-center justify-center rounded-full px-3 text-sm font-semibold transition",
+          "inline-flex h-8 min-w-[112px] items-center justify-center whitespace-nowrap rounded-full px-3 text-sm font-semibold transition",
           pendingSelected
             ? "border border-[#bfe8e2] bg-[#f5fffd] text-[#0f766e] hover:border-[#14b8a6]"
             : "border border-[#cddbe4] bg-white text-[#21424d] hover:border-[#14b8a6] hover:text-[#0f766e]",
@@ -1445,7 +1445,7 @@ function RouteActionButton({
         {busy ? "Saving..." : pendingSelected ? "In Route" : "Add to Route"}
       </button>
       {routeHref ? (
-        <Link href={routeHref} className="inline-flex h-8 items-center rounded-full border border-[#bfe8e2] px-3 text-sm font-medium text-[#0f766e] transition hover:text-[#0b5f58]">
+        <Link href={routeHref} className="inline-flex h-7 items-center whitespace-nowrap rounded-full border border-[#bfe8e2] px-3 text-xs font-semibold uppercase tracking-[0.08em] text-[#0f766e] transition hover:text-[#0b5f58]">
           View Route
         </Link>
       ) : null}

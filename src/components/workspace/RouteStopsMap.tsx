@@ -19,6 +19,7 @@ type RouteStopsMapProps = {
   onAddSelectedCustomers?: () => void;
   addSelectedCustomersLabel?: string;
   selectionScopeLabel?: string;
+  preferLiveGooglePreview?: boolean;
   plannedRoute?: {
     origin: {
       name: string;
@@ -301,6 +302,7 @@ export default function RouteStopsMap({
   onAddSelectedCustomers,
   addSelectedCustomersLabel = "Add Selected to Route",
   selectionScopeLabel = "Current map",
+  preferLiveGooglePreview = false,
   plannedRoute,
 }: RouteStopsMapProps) {
   const withCoords = useMemo(() => customers.map(projectCustomer).filter((stop): stop is ProjectedStop => Boolean(stop)), [customers]);
@@ -348,9 +350,9 @@ export default function RouteStopsMap({
   const [googleMapStatus, setGoogleMapStatus] = useState<"idle" | "ready" | "failed">("idle");
   const [googleMapError, setGoogleMapError] = useState<string | null>(null);
   const googleMapsApiKey = getGoogleMapsApiKey();
-  const shouldAttemptGoogleMap = Boolean(plannedRoute && googleMapsApiKey);
+  const shouldAttemptGoogleMap = Boolean(plannedRoute && googleMapsApiKey && preferLiveGooglePreview);
   const googleMapReady = shouldAttemptGoogleMap && googleMapStatus === "ready";
-  const googleMapFailed = Boolean(plannedRoute) && (!googleMapsApiKey || googleMapStatus === "failed");
+  const googleMapFailed = Boolean(plannedRoute && preferLiveGooglePreview) && (!googleMapsApiKey || googleMapStatus === "failed");
 
   useEffect(() => {
     if (!shouldAttemptGoogleMap) return;

@@ -1334,23 +1334,30 @@ function ActionButton({
   helper?: string;
 }) {
   const className = [
-    "flex min-h-10 items-center justify-center rounded-full border px-3 py-2 text-center text-sm font-semibold transition",
+    "flex h-9 items-center justify-center whitespace-nowrap rounded-full border px-3 text-[13px] font-semibold tracking-[0.01em] transition",
     disabled || (!href && !onClick)
-      ? "cursor-not-allowed border-white/10 bg-white/10 text-[#9db8c2]"
-      : "border-white/10 bg-white/12 text-white hover:border-[#8de0d6] hover:bg-[#effcf9] hover:text-[#173543]",
+      ? "cursor-not-allowed border-white/8 bg-white/[0.06] text-[#89a8b2]"
+      : "border-white/10 bg-white/[0.08] text-[#f2fbfd] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] hover:border-[#8de0d6] hover:bg-white/[0.14]",
   ].join(" ");
+
+  const labelContent = (
+    <span className="truncate">
+      {label}
+      {helper ? <span className="ml-1 text-[11px] font-medium uppercase tracking-[0.08em] text-current/75">{helper}</span> : null}
+    </span>
+  );
 
   if (href && !disabled) {
     return (
       <a href={href} className={className}>
-        {label}
+        {labelContent}
       </a>
     );
   }
 
   return (
     <button type="button" onClick={onClick} disabled={disabled || (!href && !onClick)} className={className}>
-      {helper ? `${label} · ${helper}` : label}
+      {labelContent}
     </button>
   );
 }
