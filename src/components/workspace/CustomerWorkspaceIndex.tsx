@@ -7,7 +7,7 @@ import type { CustomerSummary } from "@/lib/customerWorkspace";
 import { isRouteEligibleCustomer } from "@/lib/routeEligibility";
 import type { PendingRouteStop } from "@/lib/routeStopQueue";
 import type { RouteRepOption, TerritoryOption } from "@/lib/routeWorkspace";
-import RouteStopsMap from "@/components/workspace/RouteStopsMap";
+import CustomerSelectionMap from "@/components/workspace/CustomerSelectionMap";
 import {
   buildTerritoryStats,
   formatDate,
@@ -59,7 +59,7 @@ type BulkActionState = {
 type SavedViewKey = "all" | "pipeline" | "unassigned" | "missing_primary" | "with_orders" | "hall_of_flowers" | "archived";
 type SortKey = "activity_desc" | "name_asc" | "name_desc" | "orders_desc" | "owner_asc";
 type ContactCoverageFilter = "all" | "has_contacts" | "missing_primary" | "no_contacts";
-type RouteReadinessFilter = "all" | "route_ready" | "no_territory" | "no_route_day" | "no_route_rep" | "no_coords" | "address_ready";
+type RouteReadinessFilter = "all" | "route_ready" | "no_territory" | "no_route_rep" | "no_coords" | "address_ready";
 type OrderStateFilter = "all" | "has_orders" | "no_orders";
 type HotLeadFilter = "all" | "hot" | "not_hot";
 type TaskStateFilter = "all" | "has_open_task" | "no_open_task" | "overdue_task";
@@ -231,14 +231,12 @@ function toolbarSelectClass() {
 }
 
 function getRouteReadiness(customer: CustomerSummary): Exclude<RouteReadinessFilter, "all"> | "other" {
-  if (customer.territoryCode && customer.routeDay && customer.assignedRouteRepUserId && isRouteEligibleCustomer(customer)) return "route_ready";
   if (!customer.territoryCode) return "no_territory";
-  if (!customer.routeDay) return "no_route_day";
   if (!customer.assignedRouteRepUserId) return "no_route_rep";
   const coordinateState = getCoordinateCoverageState(customer);
   if (coordinateState === "address_ready") return "address_ready";
   if (coordinateState !== "has_coords") return "no_coords";
-  return "other";
+  return isRouteEligibleCustomer(customer) ? "route_ready" : "other";
 }
 
 function compareGroupLabels(left: string, right: string) {
@@ -295,7 +293,6 @@ export default function CustomerWorkspaceIndex({
   const [routeReadiness, setRouteReadiness] = useState<RouteReadinessFilter>(
     initialFilters.routeReadiness === "route_ready" ||
       initialFilters.routeReadiness === "no_territory" ||
-      initialFilters.routeReadiness === "no_route_day" ||
       initialFilters.routeReadiness === "no_route_rep" ||
       initialFilters.routeReadiness === "no_coords" ||
       initialFilters.routeReadiness === "address_ready"
@@ -328,7 +325,7 @@ export default function CustomerWorkspaceIndex({
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkStatusMessage, setBulkStatusMessage] = useState<string | null>(null);
   const [pendingStops, setPendingStops] = useState<PendingRouteStop[]>(initialPendingStops);
-  const [visibleGeocodeBusy, setVisibleGeocodeBusy] = useState(false);
+  const [geocodeBusyMode, setGeocodeBusyMode] = useState<"visible" | "segment" | "needs_coords" | null>(null);
   const [visibleGeocodeStatus, setVisibleGeocodeStatus] = useState<string | null>(null);
   const [showFilteredMap, setShowFilteredMap] = useState(false);
   const [mapSurfaceMode, setMapSurfaceMode] = useState<"visible" | "segment">("visible");
@@ -785,10 +782,15 @@ export default function CustomerWorkspaceIndex({
     });
   }
 
-  async function geocodeVisibleResults() {
-    if (staffRole !== "admin" || visibleCustomers.length === 0 || visibleGeocodeBusy) return;
+  async function geocodeCustomers(customerIds: string[], mode: "visible" | "segment" | "needs_coords", emptyMessage: string) {
+    if (staffRole !== "admin" || customerIds.length === 0 || geocodeBusyMode) {
+      if (staffRole === "admin" && customerIds.length === 0) {
+        setVisibleGeocodeStatus(emptyMessage);
+      }
+      return;
+    }
 
-    setVisibleGeocodeBusy(true);
+    setGeocodeBusyMode(mode);
     setVisibleGeocodeStatus(null);
 
     try {
@@ -797,23 +799,39 @@ export default function CustomerWorkspaceIndex({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           limit: 50,
-          customer_ids: visibleCustomerIds.slice(0, 50),
+          customer_ids: customerIds.slice(0, 50),
         }),
       });
       const json = await parseJsonSafe(res);
-      if (!res.ok) throw new Error(String(json.error || `Visible geocode failed (${res.status})`));
+      if (!res.ok) throw new Error(String(json.error || `Geocode prep failed (${res.status})`));
 
       setVisibleGeocodeStatus(
-        `Processed visible results: attempted ${Number(json.attempted || 0)} • geocoded ${Number(json.geocoded || 0)} • failed ${Number(json.failed || 0)} • missing ${Number(
+        `Geocode prep complete: attempted ${Number(json.attempted || 0)} • geocoded ${Number(json.geocoded || 0)} • failed ${Number(json.failed || 0)} • missing ${Number(
           json.missing_address || 0
         )}`
       );
       router.refresh();
     } catch (error) {
-      setVisibleGeocodeStatus(error instanceof Error ? error.message : "Visible geocode failed");
+      setVisibleGeocodeStatus(error instanceof Error ? error.message : "Geocode prep failed");
     } finally {
-      setVisibleGeocodeBusy(false);
+      setGeocodeBusyMode(null);
     }
+  }
+
+  async function geocodeVisibleResults() {
+    await geocodeCustomers(visibleCustomerIds, "visible", "No visible accounts to geocode.");
+  }
+
+  async function geocodeSelectedSegment() {
+    await geocodeCustomers(selectedCustomerIds, "segment", "The current segment is empty.");
+  }
+
+  async function geocodeVisibleNeedsCoords() {
+    await geocodeCustomers(
+      visibleCustomers.filter((customer) => getCoordinateCoverageState(customer) !== "has_coords").map((customer) => customer.id),
+      "needs_coords",
+      "Visible accounts already have usable coordinates."
+    );
   }
 
   async function applyBulkAction() {
@@ -981,7 +999,7 @@ export default function CustomerWorkspaceIndex({
             <MetricLine label="Visible" value={String(visibleCustomers.length)} />
             <MetricLine label="Assigned" value={String(visibleWithOwners)} />
             <MetricLine label="Contacts" value={String(visibleWithContacts)} />
-            <MetricLine label="Route Ready" value={String(routeReadyCount)} />
+            <MetricLine label="Route Available" value={String(routeReadyCount)} />
             <MetricLine label="Orders" value={String(visibleWithOrders)} />
           </div>
         </section>
@@ -1097,11 +1115,11 @@ export default function CustomerWorkspaceIndex({
                   value={routeReadiness}
                   onChange={(value) => setRouteReadiness(value as RouteReadinessFilter)}
                   options={[
-                    { value: "route_ready", label: "Route Ready" },
+                    { value: "route_ready", label: "Route Available" },
                     { value: "no_territory", label: "No Territory" },
                     { value: "no_route_rep", label: "No Route Rep" },
-                    { value: "no_coords", label: "No Coordinates" },
-                    { value: "address_ready", label: "Address Ready, No Coords" },
+                    { value: "no_coords", label: "Needs Coordinates" },
+                    { value: "address_ready", label: "Address Ready" },
                   ]}
                 />
                 <FilterSelect
@@ -1149,14 +1167,32 @@ export default function CustomerWorkspaceIndex({
                   Clear Segment
                 </button>
                 {staffRole === "admin" ? (
-                  <button
-                    type="button"
-                    onClick={() => void geocodeVisibleResults()}
-                    disabled={visibleCustomers.length === 0 || visibleGeocodeBusy}
-                    className={denseButtonClass()}
-                  >
-                    {visibleGeocodeBusy ? "Geocoding..." : "Geocode visible"}
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => void geocodeVisibleResults()}
+                      disabled={visibleCustomers.length === 0 || geocodeBusyMode !== null}
+                      className={denseButtonClass()}
+                    >
+                      {geocodeBusyMode === "visible" ? "Geocoding..." : "Geocode Visible"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void geocodeSelectedSegment()}
+                      disabled={selectedCustomerIds.length === 0 || geocodeBusyMode !== null}
+                      className={denseButtonClass()}
+                    >
+                      {geocodeBusyMode === "segment" ? "Geocoding..." : "Geocode Segment"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void geocodeVisibleNeedsCoords()}
+                      disabled={visibleCustomers.every((customer) => getCoordinateCoverageState(customer) === "has_coords") || geocodeBusyMode !== null}
+                      className={denseButtonClass()}
+                    >
+                      {geocodeBusyMode === "needs_coords" ? "Geocoding..." : "Geocode Needs Coords"}
+                    </button>
+                  </>
                 ) : null}
               </div>
             </section>
@@ -1201,11 +1237,11 @@ export default function CustomerWorkspaceIndex({
         ) : null}
 
         {showFilteredMap ? (
-          <RouteStopsMap
+          <CustomerSelectionMap
             customers={mapCustomers}
             title="Filtered Accounts Map"
             description="Use the current visible results or your saved segment as a territory-planning workbench. Click map points to build a route draft by proximity, then send the selected accounts straight into the pending route."
-            emptyLabel={mapSurfaceMode === "segment" ? "The current saved segment has no mappable accounts yet." : "No filtered accounts have coordinates yet. Keep using the list view or geocode the visible accounts first."}
+            emptyLabel={mapSurfaceMode === "segment" ? "The current saved segment has no mappable accounts yet." : "No filtered accounts are route-available yet. Geocode the visible set here before moving into route planning."}
             secondaryActionLabel="Open Account"
             secondaryActionHref={(customerId) => `/workspace/customers/${customerId}`}
             selectedCustomerIds={mapScopedSelectedCustomerIds}
@@ -1656,7 +1692,7 @@ function RouteReadinessPill({ state }: { state: ReturnType<typeof getRouteReadin
 
   const label =
     state === "route_ready"
-      ? "Route Ready"
+            ? "Route Available"
       : state === "no_territory"
         ? "No Territory"
         : state === "no_route_rep"
@@ -1664,10 +1700,8 @@ function RouteReadinessPill({ state }: { state: ReturnType<typeof getRouteReadin
           : state === "address_ready"
             ? "Address Ready"
             : state === "no_coords"
-              ? "No Coords"
-              : state === "no_route_day"
-                ? "Planning Open"
-                : "Route Open";
+              ? "Needs Coordinates"
+              : "Route Open";
 
   return <span className={["rounded-full border px-2.5 py-1 text-xs font-semibold", toneClass].join(" ")}>{label}</span>;
 }

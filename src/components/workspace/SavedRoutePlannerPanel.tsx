@@ -7,7 +7,7 @@ import type { CustomerSummary } from "@/lib/customerWorkspace";
 import type { SegmentBuilderSettings } from "@/lib/segmentBuilderSettings";
 import type { PendingRouteStop } from "@/lib/routeStopQueue";
 import type { RouteRepOption, SavedRouteSummary, TerritoryOption } from "@/lib/routeWorkspace";
-import RouteStopsMap from "@/components/workspace/RouteStopsMap";
+import PlannedRoutePreviewMap from "@/components/workspace/PlannedRoutePreviewMap";
 import { formatBusinessDateTime, formatBusinessDateTimeLong } from "@/lib/businessTime";
 import { JC_RAD_HQ } from "@/lib/routePlanning";
 import { getRouteEligibilityReason, isRouteEligibleCustomer } from "@/lib/routeEligibility";
@@ -151,13 +151,13 @@ function routeStatusTone(args: { fitsWithinShift: boolean; previewNeedsRefresh: 
 }
 
 function readinessReasonLabel(reason: RouteReadinessItem["reason"]) {
-  if (reason === "missing_address") return "Missing address";
-  if (reason === "missing_coordinates") return "Missing coordinates";
-  if (reason === "invalid_coordinates") return "Invalid coordinates";
-  if (reason === "geocode_needs_attention") return "Geocode needs attention";
-  if (reason === "not_eligible_for_current_planning_set") return "Not eligible for current planning set";
-  if (reason === "not_in_finalized_preview") return "Not included in finalized preview";
-  return "Included";
+  if (reason === "missing_address") return "Needs address";
+  if (reason === "missing_coordinates") return "Needs coordinates";
+  if (reason === "invalid_coordinates") return "Needs coordinates review";
+  if (reason === "geocode_needs_attention") return "Needs geocode review";
+  if (reason === "not_eligible_for_current_planning_set") return "Queued beyond current stop limit";
+  if (reason === "not_in_finalized_preview") return "Queued, not in current preview";
+  return "Available";
 }
 
 function deriveRouteTerritoryCode(stops: DraftStop[], explicitTerritoryCode: string) {
@@ -388,7 +388,7 @@ export default function SavedRoutePlannerPanel({
       setStatusMessage(
         plan.orderedStops.length > 0
           ? `Generated a ${plan.orderedStops.length}-stop ${args.source === "pending" ? "pending-stop" : "territory"} route with ${plan.provider === "google" ? "Google routing" : "fallback routing"}.`
-          : "No route-ready customers were available for route planning."
+          : "No route-available stops were available for route planning."
       );
     } catch (error) {
       setStatusMessage(error instanceof Error ? error.message : "Route planning failed");
@@ -612,7 +612,7 @@ export default function SavedRoutePlannerPanel({
         };
         setSavedRoutesState((current) => [nextSummary, ...current.filter((route) => route.id !== routeId)].slice(0, 40));
       }
-      setStatusMessage(queueCleanupWarning ? `Saved route. Pending stop cleanup still needs attention: ${queueCleanupWarning}` : "Saved route.");
+      setStatusMessage(queueCleanupWarning ? `Saved route. A few queued stops still need prep in Customers: ${queueCleanupWarning}` : "Saved route.");
       setDraftStops([]);
       setDraftPlan(null);
       setDraftSource(null);
@@ -703,12 +703,12 @@ export default function SavedRoutePlannerPanel({
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6c8797]">Route Command Center</p>
           <h2 className="mt-2 text-2xl font-semibold text-[#173543]">Build, review, and save field routes from one cleaner planning surface</h2>
           <p className="mt-2 text-sm text-[#5c7483]">
-            The itinerary now drives stop order and removals. Pending stops stay in the CRM queue, but only geocoded route-ready locations can enter route generation.
+            The itinerary drives stop order and removals. Prep geocoding in Customers first, then use this planner to work from the route-available queue and finalize the route.
           </p>
         </div>
         <div className="grid w-full gap-2 rounded-2xl border border-[#dbe8ef] bg-white/90 p-4 text-sm text-[#506877] shadow-sm sm:max-w-[340px]">
           <MetricLine label="Pending Stops" value={String(pendingStops.length)} />
-          <MetricLine label="Route-Ready" value={String(routeReadyPendingStops.length)} />
+          <MetricLine label="Route-Available" value={String(routeReadyPendingStops.length)} />
           <MetricLine label="Draft Stops" value={String(draftStops.length)} />
           <MetricLine label="Drive Minutes" value={String(draftPlan?.estimatedDriveMinutes || 0)} />
           <MetricLine label="Projected Return" value={draftPlan?.projectedReturnTime ? formatDateTime(draftPlan.projectedReturnTime) : "Not set"} />
@@ -721,7 +721,7 @@ export default function SavedRoutePlannerPanel({
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Pending Stop Queue</p>
               <h3 className="mt-1 text-lg font-semibold text-[#173543]">{pendingStops.length} queued stops for this planner</h3>
-              <p className="mt-1 text-sm text-[#5c7483]">Build from the pending queue first. Stops stay visible here even when they are blocked from route generation.</p>
+              <p className="mt-1 text-sm text-[#5c7483]">Build from the pending queue first. If any queued stops still need geocode prep, handle that in Customers and come back here to finalize the route.</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <button
@@ -744,8 +744,12 @@ export default function SavedRoutePlannerPanel({
           </div>
 
           <div className="mt-4 flex flex-wrap gap-2 text-sm text-[#4f6877]">
-            <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5">Route-ready now {routeReadyPendingStops.length}</span>
-            <span className="rounded-full border border-[#f2ddb0] bg-[#fff9ea] px-3 py-1.5 text-[#9a640a]">Blocked until geocoded {pendingStops.length - routeReadyPendingStops.length}</span>
+            <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5">Route-available now {routeReadyPendingStops.length}</span>
+            {pendingStops.length > routeReadyPendingStops.length ? (
+              <span className="rounded-full border border-[#f2ddb0] bg-[#fff9ea] px-3 py-1.5 text-[#9a640a]">
+                Prep in Customers {pendingStops.length - routeReadyPendingStops.length}
+              </span>
+            ) : null}
             <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5">Max stops/day {normalizedMaxStops}</span>
           </div>
 
@@ -763,12 +767,13 @@ export default function SavedRoutePlannerPanel({
                             "rounded-full border px-2.5 py-1 text-[11px] font-semibold",
                             isEligible ? "border-[#cfe8e4] bg-[#effaf7] text-[#0f766e]" : "border-[#f2ddb0] bg-[#fff9ea] text-[#9a640a]",
                           ].join(" ")}
+                          title={!isEligible ? readinessReasonLabel(getRouteEligibilityReason(stop.customer)) : undefined}
                         >
-                          {isEligible ? "Route-ready" : readinessReasonLabel(getRouteEligibilityReason(stop.customer))}
+                          {isEligible ? "Route-available" : "Prep in Customers"}
                         </span>
                       </div>
                       <p className="mt-1 text-sm text-[#5c7483]">
-                        {stop.customer.address1 || stop.customer.city || "No address on file"} • {stop.customer.territoryCode || "Territory open"} • {stop.customer.routeDay || "No route day"}
+                        {stop.customer.address1 || stop.customer.city || "No address on file"} • {stop.customer.territoryCode || "Territory open"}
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -800,7 +805,7 @@ export default function SavedRoutePlannerPanel({
         <section className="rounded-[24px] border border-[#dbe8ef] bg-white p-4 shadow-sm">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Route Setup</p>
-            <h3 className="mt-1 text-lg font-semibold text-[#173543]">Set the route frame, then build from the eligible stop set</h3>
+            <h3 className="mt-1 text-lg font-semibold text-[#173543]">Set the route frame, then build from the route-available stop set</h3>
           </div>
 
           <div className="mt-4 rounded-[22px] border border-[#dbe8ef] bg-[linear-gradient(180deg,#f8fcfd_0%,#f3f8fa_100%)] p-4">
@@ -855,7 +860,7 @@ export default function SavedRoutePlannerPanel({
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Territory Backup Build</p>
-                <p className="mt-1 text-sm text-[#5c7483]">Use the same route builder against a territory’s route-ready customer set when the pending queue is not the right entry point.</p>
+                <p className="mt-1 text-sm text-[#5c7483]">Use the same route builder against a territory’s route-available customer set when the pending queue is not the right entry point.</p>
               </div>
               <button
                 type="button"
@@ -867,7 +872,7 @@ export default function SavedRoutePlannerPanel({
               </button>
             </div>
             <p className="mt-3 text-sm text-[#5c7483]">
-              {selectedTerritory ? `${candidateCustomers.length} route-ready customers in ${selectedTerritory.label}.` : "Choose a territory override to build a territory-first route."}
+              {selectedTerritory ? `${candidateCustomers.length} route-available customers in ${selectedTerritory.label}.` : "Choose a territory override to build a territory-first route."}
             </p>
           </div>
 
@@ -878,28 +883,28 @@ export default function SavedRoutePlannerPanel({
       <section className="mt-5 rounded-[24px] border border-[#dbe8ef] bg-white p-4 shadow-sm">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Route Readiness</p>
-            <h3 className="mt-1 text-lg font-semibold text-[#173543]">Only route-ready stops can enter generation</h3>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Planning Set</p>
+            <h3 className="mt-1 text-lg font-semibold text-[#173543]">Planner works from the route-available subset</h3>
             <p className="mt-1 text-sm text-[#5c7483]">
-              Pending stops stay in the queue even when blocked. The planner only uses stops with an address, valid coordinates, and no unresolved geocode issue.
+              Queued stops stay in the CRM queue. This panel keeps the route-available set visible here and pushes geocode prep back to Customers where it belongs.
             </p>
           </div>
           <div className="grid gap-2 rounded-2xl border border-[#dbe8ef] bg-[#fbfdfe] p-4 text-sm text-[#506877] sm:min-w-[240px]">
             <MetricLine label="Queued Stops" value={String(readinessCounts.queued)} />
-            <MetricLine label="Route-Ready" value={String(readinessCounts.routeReady)} />
-            <MetricLine label="Excluded" value={String(readinessCounts.excluded)} />
+            <MetricLine label="Route-Available" value={String(readinessCounts.routeReady)} />
+            <MetricLine label="Needs Prep" value={String(readinessCounts.excluded)} />
             {draftPlan ? <MetricLine label="In Preview" value={String(readinessCounts.included)} /> : null}
           </div>
         </div>
 
         <div className="mt-4 flex flex-wrap gap-2 text-sm">
           <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-[#4f6877]">Max stops in current planning set: {normalizedMaxStops}</span>
-          <span className="rounded-full border border-[#cfe8e4] bg-[#effaf7] px-3 py-1.5 text-[#0f766e]">Ready now: {readinessItems.filter((item) => item.status === "route_ready").length}</span>
+          <span className="rounded-full border border-[#cfe8e4] bg-[#effaf7] px-3 py-1.5 text-[#0f766e]">Available now: {readinessItems.filter((item) => item.status === "route_ready").length}</span>
           {draftPlan ? (
             <span className="rounded-full border border-[#d6ebea] bg-white px-3 py-1.5 text-[#355966]">Included in preview: {readinessCounts.included}</span>
           ) : null}
           {readinessExcludedItems.length > 0 ? (
-            <span className="rounded-full border border-[#f2ddb0] bg-[#fff9ea] px-3 py-1.5 text-[#9a640a]">Review excluded stops before building or saving</span>
+            <span className="rounded-full border border-[#f2ddb0] bg-[#fff9ea] px-3 py-1.5 text-[#9a640a]">Prep remaining queued stops in Customers as needed</span>
           ) : null}
         </div>
 
@@ -924,27 +929,28 @@ export default function SavedRoutePlannerPanel({
                           item.status === "included" ? "border-[#cfe8e4] bg-[#effaf7] text-[#0f766e]" : "border-[#d7e6ed] bg-[#f8fbfc] text-[#4f6877]",
                         ].join(" ")}
                       >
-                        {item.status === "included" ? "Included in preview" : "Route-ready"}
+                        {item.status === "included" ? "Included in preview" : "Route-available"}
                       </span>
                     </div>
                     <p className="mt-1 text-sm text-[#5c7483]">
-                      {item.customer.territoryCode || "Territory open"} • {item.customer.routeDay || "No route day"} • {item.customer.address1 || item.customer.city || "Address on file"}
+                      {item.customer.territoryCode || "Territory open"} • {item.customer.address1 || item.customer.city || "Address on file"}
                     </p>
                   </div>
                 ))}
               {readinessItems.filter((item) => item.status !== "excluded").length === 0 ? (
-                <p className="text-sm text-[#5d7685]">No queued stops are route-ready yet.</p>
+                <p className="text-sm text-[#5d7685]">No queued stops are route-available yet.</p>
               ) : null}
             </div>
           </div>
 
-          <div className="rounded-[22px] border border-[#dbe8ef] bg-[#fbfdfe] p-4">
+          <div className="rounded-[22px] border border-[#ece2c9] bg-[#fffdf8] p-4">
             <div className="flex items-center justify-between gap-3">
-              <h4 className="text-sm font-semibold uppercase tracking-[0.12em] text-[#6f8897]">Excluded Stops</h4>
+              <h4 className="text-sm font-semibold uppercase tracking-[0.12em] text-[#7d6b44]">Needs Prep In Customers</h4>
               <span className="rounded-full border border-[#f2ddb0] bg-[#fff9ea] px-2.5 py-1 text-xs font-semibold text-[#9a640a]">
                 {readinessExcludedItems.length}
               </span>
             </div>
+            <p className="mt-2 text-sm text-[#7d6b44]">These queued stops stay intact here, but they should be geocoded or corrected in Customers before route planning.</p>
             <div className="mt-3 space-y-2">
               {readinessExcludedItems.map((item) => (
                 <div key={item.queueId} className="rounded-xl border border-[#f0dfba] bg-white px-3 py-2">
@@ -959,7 +965,7 @@ export default function SavedRoutePlannerPanel({
                   </p>
                 </div>
               ))}
-              {readinessExcludedItems.length === 0 ? <p className="text-sm text-[#5d7685]">No queued stops are excluded from the current planning set.</p> : null}
+              {readinessExcludedItems.length === 0 ? <p className="text-sm text-[#5d7685]">All queued stops are route-available for the current planning set.</p> : null}
             </div>
           </div>
         </div>
@@ -968,7 +974,7 @@ export default function SavedRoutePlannerPanel({
       <div className="mt-5 grid gap-5 2xl:grid-cols-[minmax(0,1.35fr)_minmax(380px,0.95fr)]">
         <section className="space-y-5">
           {draftMapCustomers.length > 0 && draftPlan ? (
-            <RouteStopsMap
+            <PlannedRoutePreviewMap
               customers={draftMapCustomers}
               title="Route Preview"
               description="Use the map as a live preview and the itinerary as the working control surface. The stop strip mirrors the finalized order without duplicating the full stop card UI."

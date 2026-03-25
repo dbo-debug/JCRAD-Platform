@@ -122,7 +122,6 @@ export function getRouteSearchText(customer: CustomerSummary) {
   return [
     customer.name,
     customer.territoryCode,
-    customer.routeDay,
     customer.visitStatus,
     customer.assignedRouteRepName,
     customer.assignedRouteRepEmail,
@@ -147,9 +146,6 @@ export function getCoordinateCoverageState(customer: CustomerSummary): Exclude<C
 }
 
 export function sortCustomersForRoute(left: CustomerSummary, right: CustomerSummary) {
-  const dayDelta = getRouteDayRank(left.routeDay) - getRouteDayRank(right.routeDay);
-  if (dayDelta !== 0) return dayDelta;
-
   const leftPriority = left.routePriority ?? Number.MAX_SAFE_INTEGER;
   const rightPriority = right.routePriority ?? Number.MAX_SAFE_INTEGER;
   if (leftPriority !== rightPriority) return leftPriority - rightPriority;

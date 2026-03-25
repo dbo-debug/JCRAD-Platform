@@ -6,13 +6,12 @@ import { startTransition, useDeferredValue, useEffect, useState } from "react";
 import type { CustomerSummary } from "@/lib/customerWorkspace";
 import type { RouteRepOption, TerritoryOption } from "@/lib/routeWorkspace";
 import RouteStopsMap from "@/components/workspace/RouteStopsMap";
+import { isRouteEligibleCustomer } from "@/lib/routeEligibility";
 import {
   buildRouteStats,
   buildTerritoryStats,
-  CoordinateCoverageFilter,
   formatDate,
   formatDateTime,
-  getCoordinateCoverageState,
   getRouteSearchText,
   normalizeMailtoHref,
   normalizeTelHref,
@@ -51,29 +50,17 @@ export default function RoutePlannerIndex({ customers, routeRepOptions, territor
   const router = useRouter();
   const pathname = usePathname();
   const [search, setSearch] = useState(initialFilters.q);
-  const [routeDayFilter, setRouteDayFilter] = useState(initialFilters.routeDay || "all");
   const [territoryFilter, setTerritoryFilter] = useState(initialFilters.territory || "all");
   const [repFilter, setRepFilter] = useState(initialFilters.rep || "all");
   const [visitStatusFilter, setVisitStatusFilter] = useState(initialFilters.visitStatus || "all");
   const [routePriorityFilter, setRoutePriorityFilter] = useState(initialFilters.priority || "all");
-  const [coordinateStatusFilter, setCoordinateStatusFilter] = useState<CoordinateCoverageFilter>(
-    initialFilters.coordinateStatus === "has_coords" ||
-      initialFilters.coordinateStatus === "needs_coords" ||
-      initialFilters.coordinateStatus === "failed" ||
-      initialFilters.coordinateStatus === "needs_review" ||
-      initialFilters.coordinateStatus === "address_ready" ||
-      initialFilters.coordinateStatus === "missing_address"
-      ? initialFilters.coordinateStatus
-      : "all"
-  );
   const [territorySort, setTerritorySort] = useState<TerritorySortMode>(
     initialFilters.territorySort === "due_today" || initialFilters.territorySort === "follow_up_needed" ? initialFilters.territorySort : "account_count"
   );
   const [territoryFocus, setTerritoryFocus] = useState<TerritoryFocusMode>(
     initialFilters.territoryFocus === "my_territories" ||
       initialFilters.territoryFocus === "unassigned_territories" ||
-      initialFilters.territoryFocus === "due_heavy" ||
-      initialFilters.territoryFocus === "cleanup"
+      initialFilters.territoryFocus === "due_heavy"
       ? initialFilters.territoryFocus
       : "all"
   );
@@ -81,21 +68,18 @@ export default function RoutePlannerIndex({ customers, routeRepOptions, territor
   const [referenceNow] = useState(() => Date.now());
   const deferredSearch = useDeferredValue(search);
 
-  const routeDays = uniqueOptions(customers.map((customer) => customer.routeDay));
   const visitStatuses = uniqueOptions(customers.map((customer) => customer.visitStatus));
   const routePriorities = uniqueOptions(customers.map((customer) => (customer.routePriority === null ? null : String(customer.routePriority))));
 
   const visibleCustomers = [...customers]
     .filter((customer) => {
+      if (!isRouteEligibleCustomer(customer)) return false;
       const query = normalizeText(deferredSearch);
       if (query && !getRouteSearchText(customer).includes(query)) return false;
-      if (routeDayFilter !== "all" && normalizeText(customer.routeDay) !== normalizeText(routeDayFilter)) return false;
       if (territoryFilter !== "all" && normalizeText(customer.territoryCode) !== normalizeText(territoryFilter)) return false;
       if (repFilter !== "all" && customer.assignedRouteRepUserId !== repFilter) return false;
       if (visitStatusFilter !== "all" && normalizeText(customer.visitStatus) !== normalizeText(visitStatusFilter)) return false;
       if (routePriorityFilter !== "all" && String(customer.routePriority ?? "") !== routePriorityFilter) return false;
-      if (coordinateStatusFilter === "needs_coords" && customer.latitude !== null && customer.longitude !== null) return false;
-      if (coordinateStatusFilter !== "all" && coordinateStatusFilter !== "needs_coords" && getCoordinateCoverageState(customer) !== coordinateStatusFilter) return false;
       return true;
     })
     .sort(sortCustomersForRoute);
@@ -114,25 +98,22 @@ export default function RoutePlannerIndex({ customers, routeRepOptions, territor
       if (territoryFocus === "my_territories") return territory.ownerUserId === currentUserId;
       if (territoryFocus === "unassigned_territories") return territory.ownerState === "unassigned" || territory.unassignedRep > 0;
       if (territoryFocus === "due_heavy") return territory.dueToday > 0;
-      if (territoryFocus === "cleanup") return territory.noCoords > 0 || territory.unassignedRep > 0 || territory.noRouteDay > 0;
       return true;
     });
 
   useEffect(() => {
     const params = new URLSearchParams();
     setQueryParam(params, "q", search.trim(), [""]);
-    setQueryParam(params, "routeDay", routeDayFilter);
     setQueryParam(params, "territory", territoryFilter);
     setQueryParam(params, "rep", repFilter);
     setQueryParam(params, "visitStatus", visitStatusFilter);
     setQueryParam(params, "priority", routePriorityFilter);
-    setQueryParam(params, "coordStatus", coordinateStatusFilter);
     setQueryParam(params, "territorySort", territorySort, ["account_count", ""]);
     setQueryParam(params, "territoryFocus", territoryFocus);
     setQueryParam(params, "view", viewMode, ["list", ""]);
     const next = params.toString();
     router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false });
-  }, [coordinateStatusFilter, pathname, repFilter, routeDayFilter, routePriorityFilter, router, search, territoryFilter, territoryFocus, territorySort, viewMode, visitStatusFilter]);
+  }, [pathname, repFilter, routePriorityFilter, router, search, territoryFilter, territoryFocus, territorySort, viewMode, visitStatusFilter]);
 
   return (
     <div className="space-y-5">
@@ -142,49 +123,35 @@ export default function RoutePlannerIndex({ customers, routeRepOptions, territor
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6c8797]">Route Planning</p>
             <h2 className="mt-2 text-2xl font-semibold text-[#173543]">Operational stop list for field coverage, rep assignment, and visit cadence</h2>
             <p className="mt-2 max-w-3xl text-sm text-[#5c7483]">
-              Filter by route day, territory, assigned rep, visit state, and priority. Accounts are grouped for daily execution even before map tools are added.
+              Filter by territory, assigned rep, visit state, and priority. This planner stays focused on route-available, geocoded stops so route generation starts from the eligible set.
             </p>
           </div>
           <div className="grid w-full gap-3 rounded-2xl border border-[#dbe8ef] bg-white/85 p-4 shadow-sm sm:max-w-[320px] xl:w-[320px] xl:flex-none">
+            <MetricLine label="Eligible Stops" value={String(visibleCustomers.length)} />
             <MetricLine label="Due Today" value={String(stats.dueToday)} />
             <MetricLine label="Visited Today" value={String(stats.visitedToday)} />
             <MetricLine label="Follow-Up Needed" value={String(stats.followUpNeeded)} />
             <MetricLine label="No Territory" value={String(stats.noTerritory)} />
-            <MetricLine label="No Coords" value={String(stats.noCoords)} />
           </div>
         </div>
       </section>
 
       <section className="rounded-[28px] border border-[#dbe8ef] bg-white p-5 shadow-[0_12px_32px_rgba(16,42,67,0.06)] lg:px-6">
-        <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-[minmax(0,1.4fr)_repeat(5,minmax(0,0.85fr))]">
+        <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-[minmax(0,1.4fr)_repeat(4,minmax(0,0.9fr))]">
           <label className="grid gap-1 text-sm text-[#4b6676]">
             <span className="font-medium">Search stops</span>
             <input
               value={search}
               onChange={(event) => startTransition(() => setSearch(event.target.value))}
-              placeholder="Search account, contact, territory, route day, rep"
+              placeholder="Search account, contact, territory, rep"
               className="rounded-2xl border border-[#cedde6] bg-[#fbfdfe] px-4 py-3 text-sm text-[#173543] outline-none transition focus:border-[#14b8a6] focus:bg-white"
             />
           </label>
 
-          <FilterSelect label="Route Day" value={routeDayFilter} onChange={setRouteDayFilter} options={routeDays} />
           <FilterSelect label="Territory" value={territoryFilter} onChange={setTerritoryFilter} options={territoryOptions} />
           <FilterSelect label="Assigned Rep" value={repFilter} onChange={setRepFilter} options={routeRepOptions.map((option) => ({ value: option.userId, label: option.label }))} />
           <FilterSelect label="Visit Status" value={visitStatusFilter} onChange={setVisitStatusFilter} options={visitStatuses} />
           <FilterSelect label="Priority" value={routePriorityFilter} onChange={setRoutePriorityFilter} options={routePriorities} />
-          <FilterSelect
-            label="Coordinates"
-            value={coordinateStatusFilter}
-            onChange={(value) => setCoordinateStatusFilter(value as CoordinateCoverageFilter)}
-            options={[
-              { value: "has_coords", label: "Map Ready" },
-              { value: "needs_coords", label: "Needs Coordinates" },
-              { value: "failed", label: "Geocode Failed" },
-              { value: "needs_review", label: "Needs Review" },
-              { value: "address_ready", label: "Has Address, Missing Coords" },
-              { value: "missing_address", label: "No Address, No Coords" },
-            ]}
-          />
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -196,7 +163,6 @@ export default function RoutePlannerIndex({ customers, routeRepOptions, territor
               { value: "my_territories", label: "My Territories" },
               { value: "unassigned_territories", label: "Unassigned Territories" },
               { value: "due_heavy", label: "Most Due Today" },
-              { value: "cleanup", label: "Needs Cleanup" },
             ]}
           />
           <FilterSelect
@@ -236,12 +202,10 @@ export default function RoutePlannerIndex({ customers, routeRepOptions, territor
             onClick={() => {
               startTransition(() => {
                 setSearch("");
-                setRouteDayFilter("all");
                 setTerritoryFilter("all");
                 setRepFilter("all");
                 setVisitStatusFilter("all");
                 setRoutePriorityFilter("all");
-                setCoordinateStatusFilter("all");
                 setTerritorySort("account_count");
                 setTerritoryFocus("all");
               });
@@ -257,8 +221,8 @@ export default function RoutePlannerIndex({ customers, routeRepOptions, territor
         <RouteStopsMap
           customers={visibleCustomers}
           title="Map View"
-          description="Map the filtered stop set by customer coordinates, keep list-only stops visible when coordinates are missing, and jump directly into account detail or the route runner."
-          emptyLabel="No filtered stops have coordinates yet. Adjust filters or keep using the list workflow while location coverage is completed."
+          description="Map the filtered route-available stop set by customer coordinates, then jump directly into account detail or the route runner."
+          emptyLabel="No route-available stops match the current filters."
           secondaryActionLabel="Run Stop"
           secondaryActionHref={(customerId) => `/workspace/routes/run?customerId=${customerId}`}
         />
@@ -300,17 +264,14 @@ export default function RoutePlannerIndex({ customers, routeRepOptions, territor
                   <div className="mt-2 flex flex-wrap gap-2">
                     <TerritoryOwnerPill ownerState={territory.ownerState} ownerLabel={territory.ownerLabel} />
                     {territory.unassignedRep > 0 ? <InlinePill tone="warn" label={`${territory.unassignedRep} without rep`} /> : null}
-                    {territory.noRouteDay > 0 ? <InlinePill tone="warn" label={`${territory.noRouteDay} without route day`} /> : null}
                   </div>
                 </div>
-                <div className="grid gap-2 sm:grid-cols-3 2xl:min-w-[520px] xl:grid-cols-4 2xl:grid-cols-6">
+                <div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-5 2xl:min-w-[460px]">
                   <MiniMetric label="Accounts" value={territory.accountCount} />
                   <MiniMetric label="Due Today" value={territory.dueToday} />
                   <MiniMetric label="Visited Today" value={territory.visitedToday} />
                   <MiniMetric label="Follow-Up" value={territory.followUpNeeded} />
-                  <MiniMetric label="No Coords" value={territory.noCoords} />
                   <MiniMetric label="No Rep" value={territory.unassignedRep} />
-                  <MiniMetric label="No Route Day" value={territory.noRouteDay} />
                 </div>
               </div>
             </summary>
@@ -393,7 +354,7 @@ export default function RoutePlannerIndex({ customers, routeRepOptions, territor
 
         {visibleCustomers.length === 0 ? (
           <div className="rounded-xl border border-dashed border-[#d3e1e8] bg-[#f9fcfd] px-4 py-6 text-sm text-[#5d7685]">
-            No route stops match the current filters.
+            No route-available stops match the current filters.
           </div>
         ) : null}
       </section>
