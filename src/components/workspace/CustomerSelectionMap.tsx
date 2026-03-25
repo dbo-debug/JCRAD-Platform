@@ -3,6 +3,15 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CustomerSummary } from "@/lib/customerWorkspace";
+import {
+  getGoogleMapsApiKey,
+  loadGoogleMapsClient,
+  subscribeToGoogleMapsFailures,
+  type GoogleLatLngLiteral,
+  type GoogleMapInstance,
+  type GoogleMarkerInstance,
+  type WindowWithGoogleMaps,
+} from "@/components/workspace/googleMapsLoader";
 import { priorityChipClass, titleCase, visitStatusChipClass } from "@/components/workspace/routeUtils";
 
 type CustomerSelectionMapProps = {
@@ -19,78 +28,6 @@ type CustomerSelectionMapProps = {
   selectionScopeLabel: string;
 };
 
-type WindowWithGoogleMaps = Window & {
-  google?: GoogleMapsClient;
-  __jcRadGoogleMapsPromise?: Promise<GoogleMapsClient>;
-};
-
-type GoogleMapsClient = {
-  maps: GoogleMapsNamespace;
-};
-
-type GoogleLatLngLiteral = {
-  lat: number;
-  lng: number;
-};
-
-type GoogleMapsNamespace = {
-  Map: new (
-    element: HTMLElement,
-    options: {
-      center: GoogleLatLngLiteral;
-      zoom: number;
-      mapTypeControl: boolean;
-      streetViewControl: boolean;
-      fullscreenControl: boolean;
-      gestureHandling: string;
-      zoomControl: boolean;
-    }
-  ) => GoogleMapInstance;
-  Marker: new (options: {
-    map: GoogleMapInstance;
-    position: GoogleLatLngLiteral;
-    title: string;
-    label?: {
-      text: string;
-      color: string;
-      fontWeight: string;
-    };
-    icon?: GoogleMarkerIcon;
-    zIndex?: number;
-  }) => GoogleMarkerInstance;
-  LatLngBounds: new () => GoogleLatLngBounds;
-  SymbolPath: {
-    CIRCLE: string;
-  };
-};
-
-type GoogleMapInstance = {
-  fitBounds: (bounds: GoogleLatLngBounds, padding?: number) => void;
-  panTo: (position: GoogleLatLngLiteral) => void;
-  setZoom: (zoom: number) => void;
-};
-
-type GoogleLatLngBounds = {
-  extend: (position: GoogleLatLngLiteral) => void;
-  isEmpty: () => boolean;
-};
-
-type GoogleMarkerIcon = {
-  path: string;
-  scale: number;
-  fillColor: string;
-  fillOpacity: number;
-  strokeColor: string;
-  strokeWeight: number;
-};
-
-type GoogleMarkerInstance = {
-  setMap: (map: GoogleMapInstance | null) => void;
-  setZIndex: (zIndex: number) => void;
-  setIcon: (icon: GoogleMarkerIcon) => void;
-  addListener: (eventName: string, handler: () => void) => void;
-};
-
 type FocusOption = {
   key: string;
   label: string;
@@ -98,44 +35,44 @@ type FocusOption = {
   zoom: number;
 };
 
-function getGoogleMapsApiKey() {
-  const value = String(process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY || "").trim();
-  return value || null;
+type ProjectedCustomer = {
+  customer: CustomerSummary;
+  x: number;
+  y: number;
+};
+
+type ProjectedFocusOption = {
+  key: string;
+  label: string;
+  point: { x: number; y: number };
+};
+
+const MAP_BOUNDS = {
+  minLat: 32.45,
+  maxLat: 42.1,
+  minLng: -124.55,
+  maxLng: -114.05,
+};
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
 }
 
-function loadGoogleMapsClient(apiKey: string) {
-  const win = window as WindowWithGoogleMaps;
-  if (win.google?.maps) return Promise.resolve(win.google);
-  if (win.__jcRadGoogleMapsPromise) return win.__jcRadGoogleMapsPromise;
+function projectPoint(latitude: number, longitude: number) {
+  const xRatio = (longitude - MAP_BOUNDS.minLng) / (MAP_BOUNDS.maxLng - MAP_BOUNDS.minLng);
+  const yRatio = (MAP_BOUNDS.maxLat - latitude) / (MAP_BOUNDS.maxLat - MAP_BOUNDS.minLat);
+  return {
+    x: clamp(xRatio * 100, 4, 96),
+    y: clamp(yRatio * 100, 6, 94),
+  };
+}
 
-  win.__jcRadGoogleMapsPromise = new Promise<GoogleMapsClient>((resolve, reject) => {
-    const existingScript = document.querySelector('script[data-jc-rad-google-maps="true"]') as HTMLScriptElement | null;
-    if (existingScript) {
-      existingScript.addEventListener("load", () => {
-        if (win.google?.maps) resolve(win.google);
-        else reject(new Error("Google Maps loaded without maps namespace"));
-      });
-      existingScript.addEventListener("error", () => reject(new Error("Google Maps failed to load")));
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}`;
-    script.async = true;
-    script.defer = true;
-    script.dataset.jcRadGoogleMaps = "true";
-    script.onload = () => {
-      if (win.google?.maps) resolve(win.google);
-      else reject(new Error("Google Maps loaded without maps namespace"));
-    };
-    script.onerror = () => reject(new Error("Google Maps failed to load"));
-    document.head.appendChild(script);
-  }).catch((error) => {
-    delete win.__jcRadGoogleMapsPromise;
-    throw error;
-  });
-
-  return win.__jcRadGoogleMapsPromise;
+function projectCustomer(customer: CustomerSummary): ProjectedCustomer | null {
+  if (customer.latitude === null || customer.longitude === null) return null;
+  return {
+    customer,
+    ...projectPoint(customer.latitude, customer.longitude),
+  };
 }
 
 function buildFocusOptions(customers: CustomerSummary[]): FocusOption[] {
@@ -184,6 +121,10 @@ export default function CustomerSelectionMap({
     () => customers.filter((customer) => customer.latitude !== null && customer.longitude !== null),
     [customers]
   );
+  const projectedCustomers = useMemo(
+    () => customers.map(projectCustomer).filter((customer): customer is ProjectedCustomer => Boolean(customer)),
+    [customers]
+  );
   const withoutCoords = useMemo(
     () => customers.filter((customer) => customer.latitude === null || customer.longitude === null),
     [customers]
@@ -194,6 +135,10 @@ export default function CustomerSelectionMap({
     [selectedCustomerIdSet, withCoords]
   );
   const focusOptions = useMemo(() => buildFocusOptions(withCoords), [withCoords]);
+  const projectedFocusOptions = useMemo<ProjectedFocusOption[]>(
+    () => focusOptions.map((option) => ({ key: option.key, label: option.label, point: projectPoint(option.center.lat, option.center.lng) })),
+    [focusOptions]
+  );
   const [focusedCustomerId, setFocusedCustomerId] = useState<string>(selectedCustomerIds[0] || withCoords[0]?.id || "");
   const [googleMapStatus, setGoogleMapStatus] = useState<"idle" | "ready" | "failed">(() =>
     getGoogleMapsApiKey() ? "idle" : "failed"
@@ -239,6 +184,13 @@ export default function CustomerSelectionMap({
       cancelled = true;
     };
   }, [googleMapsApiKey]);
+
+  useEffect(() => {
+    return subscribeToGoogleMapsFailures((message) => {
+      setGoogleMapStatus("failed");
+      setGoogleMapError(message);
+    });
+  }, []);
 
   useEffect(() => {
     if (googleMapStatus !== "ready" || !mapRef.current || !(window as WindowWithGoogleMaps).google?.maps) return;
@@ -373,13 +325,27 @@ export default function CustomerSelectionMap({
                 <div ref={mapRef} className="aspect-[1.7/1] min-h-[560px] w-full" />
               </div>
             ) : (
-              <div className="rounded-[24px] border border-[#f1ddad] bg-[#fff9eb] px-4 py-6 text-sm text-[#8a5a08] shadow-sm">
-                {googleMapError || "Google Maps is still loading for this workspace."}
-              </div>
+              <ProjectedCustomerMap
+                customers={projectedCustomers}
+                selectedCustomerIdSet={selectedCustomerIdSet}
+                focusedCustomerId={effectiveFocusedCustomerId}
+                focusOptions={projectedFocusOptions}
+                onSelectCustomer={(customerId) => {
+                  onToggleCustomerSelection(customerId);
+                  setFocusedCustomerId(customerId);
+                }}
+              />
             )}
           </div>
 
           <div className="grid gap-4">
+            {googleMapStatus !== "ready" ? (
+              <div className="rounded-2xl border border-[#f1ddad] bg-[#fff9eb] px-4 py-3 text-sm text-[#8a5a08]">
+                {googleMapStatus === "failed"
+                  ? `${googleMapError || "Google Maps is unavailable for this browser session."} Showing the projected fallback map instead.`
+                  : "Google Maps is still loading for this workspace. Showing the projected fallback map until the live map is ready."}
+              </div>
+            ) : null}
             {focusedCustomer ? (
               <div className="rounded-[24px] border border-[#dbe8ef] bg-[#fbfdfe] p-4 shadow-sm">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -515,6 +481,118 @@ function MapMetric({ label, value }: { label: string; value: string }) {
     <div className="flex items-center justify-between gap-3">
       <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7d95a3]">{label}</span>
       <span className="text-base font-semibold text-[#173543]">{value}</span>
+    </div>
+  );
+}
+
+function ProjectedCustomerMap(args: {
+  customers: ProjectedCustomer[];
+  selectedCustomerIdSet: Set<string>;
+  focusedCustomerId: string;
+  focusOptions: ProjectedFocusOption[];
+  onSelectCustomer: (customerId: string) => void;
+}) {
+  const frameRef = useRef<HTMLDivElement | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const [panX, setPanX] = useState(0);
+  const [panY, setPanY] = useState(0);
+  const [focusKey, setFocusKey] = useState("all");
+
+  function centerOnPoint(point: { x: number; y: number }, nextZoom = zoom) {
+    const frame = frameRef.current;
+    if (!frame) return;
+    const width = frame.clientWidth;
+    const height = frame.clientHeight;
+    setPanX(width / 2 - (width * point.x * nextZoom) / 100);
+    setPanY(height / 2 - (height * point.y * nextZoom) / 100);
+  }
+
+  function resetViewport() {
+    setZoom(1);
+    setPanX(0);
+    setPanY(0);
+    setFocusKey("all");
+  }
+
+  return (
+    <div className="relative overflow-hidden rounded-[24px] border border-[#dbe8ef] bg-[linear-gradient(180deg,#f6fbfd_0%,#ecf7fa_100%)] shadow-sm">
+      <div className="absolute right-3 top-3 z-20 flex flex-wrap items-center gap-2 rounded-2xl border border-white/70 bg-white/90 px-3 py-2 text-xs font-semibold text-[#35505d] shadow-sm backdrop-blur">
+        <select
+          value={focusKey}
+          onChange={(event) => {
+            const nextKey = event.target.value;
+            setFocusKey(nextKey);
+            const option = args.focusOptions.find((item) => item.key === nextKey);
+            if (option) centerOnPoint(option.point, zoom);
+          }}
+          className="rounded-full border border-[#d7e6ed] bg-white px-3 py-1 text-xs text-[#173543]"
+        >
+          {args.focusOptions.map((option) => (
+            <option key={option.key} value={option.key}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <button type="button" onClick={() => setZoom((current) => Math.min(current + 0.2, 2.4))} className="rounded-full border border-[#d7e6ed] px-2 py-1">
+          +
+        </button>
+        <button type="button" onClick={() => setZoom((current) => Math.max(current - 0.2, 1))} className="rounded-full border border-[#d7e6ed] px-2 py-1">
+          -
+        </button>
+        <button type="button" onClick={() => setPanY((current) => current + 80)} className="rounded-full border border-[#d7e6ed] px-2 py-1">
+          N
+        </button>
+        <button type="button" onClick={() => setPanY((current) => current - 80)} className="rounded-full border border-[#d7e6ed] px-2 py-1">
+          S
+        </button>
+        <button type="button" onClick={() => setPanX((current) => current + 80)} className="rounded-full border border-[#d7e6ed] px-2 py-1">
+          W
+        </button>
+        <button type="button" onClick={() => setPanX((current) => current - 80)} className="rounded-full border border-[#d7e6ed] px-2 py-1">
+          E
+        </button>
+        <button type="button" onClick={resetViewport} className="rounded-full border border-[#d7e6ed] px-3 py-1">
+          Reset
+        </button>
+      </div>
+
+      <div ref={frameRef} className="relative aspect-[1.7/1] min-h-[560px] overflow-hidden">
+        <div className="absolute inset-0 origin-top-left" style={{ transform: `translate(${panX}px, ${panY}px) scale(${zoom})` }}>
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_18%,rgba(20,184,166,0.14),transparent_26%),radial-gradient(circle_at_68%_30%,rgba(23,53,67,0.1),transparent_24%),linear-gradient(180deg,rgba(255,255,255,0.45),rgba(255,255,255,0))]" />
+          <div className="pointer-events-none absolute inset-y-0 left-[22%] w-px bg-white/80" />
+          <div className="pointer-events-none absolute inset-y-0 left-[46%] w-px bg-white/60" />
+          <div className="pointer-events-none absolute inset-y-0 left-[70%] w-px bg-white/70" />
+          <div className="pointer-events-none absolute inset-x-0 top-[26%] h-px bg-white/70" />
+          <div className="pointer-events-none absolute inset-x-0 top-[53%] h-px bg-white/60" />
+          <div className="pointer-events-none absolute inset-x-0 top-[80%] h-px bg-white/70" />
+          <div className="pointer-events-none absolute left-[8%] top-[10%] text-[11px] font-semibold uppercase tracking-[0.16em] text-[#6f8897]">North Coast</div>
+          <div className="pointer-events-none absolute left-[33%] top-[16%] text-[11px] font-semibold uppercase tracking-[0.16em] text-[#6f8897]">Sacramento</div>
+          <div className="pointer-events-none absolute left-[49%] top-[29%] text-[11px] font-semibold uppercase tracking-[0.16em] text-[#6f8897]">Bay Area</div>
+          <div className="pointer-events-none absolute left-[45%] top-[52%] text-[11px] font-semibold uppercase tracking-[0.16em] text-[#6f8897]">Central Valley</div>
+          <div className="pointer-events-none absolute left-[28%] top-[69%] text-[11px] font-semibold uppercase tracking-[0.16em] text-[#6f8897]">Los Angeles</div>
+          <div className="pointer-events-none absolute left-[18%] top-[84%] text-[11px] font-semibold uppercase tracking-[0.16em] text-[#6f8897]">San Diego</div>
+
+          {args.customers.map((customer) => {
+            const isFocused = args.focusedCustomerId === customer.customer.id;
+            const isSelected = args.selectedCustomerIdSet.has(customer.customer.id);
+
+            return (
+              <button
+                key={customer.customer.id}
+                type="button"
+                onClick={() => args.onSelectCustomer(customer.customer.id)}
+                className={[
+                  "absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-[0_8px_20px_rgba(16,42,67,0.22)] transition",
+                  isFocused ? "z-20 h-8 w-8 bg-[#173543]" : isSelected ? "z-10 h-7 w-7 bg-[#0f766e]" : "z-10 h-6 w-6 bg-[#14b8a6] hover:scale-110",
+                ].join(" ")}
+                style={{ left: `${customer.x}%`, top: `${customer.y}%` }}
+                aria-label={`Select ${customer.customer.name}`}
+                title={customer.customer.name}
+              />
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }

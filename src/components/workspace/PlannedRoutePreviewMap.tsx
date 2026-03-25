@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CustomerSummary } from "@/lib/customerWorkspace";
+import { getGoogleMapsApiKey, loadGoogleMapsClient, subscribeToGoogleMapsFailures } from "@/components/workspace/googleMapsLoader";
 import { priorityChipClass, titleCase, visitStatusChipClass } from "@/components/workspace/routeUtils";
 
 type PlannedRoutePreviewMapProps = {
@@ -191,46 +192,6 @@ function decodeGooglePolyline(encoded: string) {
   return points;
 }
 
-function getGoogleMapsApiKey() {
-  const value = String(process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY || "").trim();
-  return value || null;
-}
-
-function loadGoogleMapsClient(apiKey: string) {
-  const win = window as WindowWithGoogleMaps;
-  if (win.google?.maps) return Promise.resolve(win.google);
-  if (win.__jcRadGoogleMapsPromise) return win.__jcRadGoogleMapsPromise;
-
-  win.__jcRadGoogleMapsPromise = new Promise<GoogleMapsClient>((resolve, reject) => {
-    const existingScript = document.querySelector('script[data-jc-rad-google-maps="true"]') as HTMLScriptElement | null;
-    if (existingScript) {
-      existingScript.addEventListener("load", () => {
-        if (win.google?.maps) resolve(win.google);
-        else reject(new Error("Google Maps loaded without maps namespace"));
-      });
-      existingScript.addEventListener("error", () => reject(new Error("Google Maps failed to load")));
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}`;
-    script.async = true;
-    script.defer = true;
-    script.dataset.jcRadGoogleMaps = "true";
-    script.onload = () => {
-      if (win.google?.maps) resolve(win.google);
-      else reject(new Error("Google Maps loaded without maps namespace"));
-    };
-    script.onerror = () => reject(new Error("Google Maps failed to load"));
-    document.head.appendChild(script);
-  }).catch((error) => {
-    delete win.__jcRadGoogleMapsPromise;
-    throw error;
-  });
-
-  return win.__jcRadGoogleMapsPromise;
-}
-
 export default function PlannedRoutePreviewMap({
   customers,
   title,
@@ -300,6 +261,13 @@ export default function PlannedRoutePreviewMap({
       cancelled = true;
     };
   }, [googleMapsApiKey, shouldAttemptGoogleMap]);
+
+  useEffect(() => {
+    return subscribeToGoogleMapsFailures((message) => {
+      setGoogleMapStatus("failed");
+      setGoogleMapError(message);
+    });
+  }, []);
 
   function selectCustomer(customerId: string) {
     if (controlledSelectedCustomerId === undefined) {
