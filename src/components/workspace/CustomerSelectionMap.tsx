@@ -44,7 +44,14 @@ type ProjectedCustomer = {
 type ProjectedFocusOption = {
   key: string;
   label: string;
-  point: { x: number; y: number };
+  bounds: ProjectedBounds;
+};
+
+type ProjectedBounds = {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
 };
 
 const MAP_BOUNDS = {
@@ -73,6 +80,24 @@ function projectCustomer(customer: CustomerSummary): ProjectedCustomer | null {
     customer,
     ...projectPoint(customer.latitude, customer.longitude),
   };
+}
+
+function buildProjectedBounds(customers: ProjectedCustomer[]): ProjectedBounds | null {
+  if (customers.length === 0) return null;
+  return customers.reduce<ProjectedBounds>(
+    (bounds, customer) => ({
+      minX: Math.min(bounds.minX, customer.x),
+      maxX: Math.max(bounds.maxX, customer.x),
+      minY: Math.min(bounds.minY, customer.y),
+      maxY: Math.max(bounds.maxY, customer.y),
+    }),
+    {
+      minX: customers[0].x,
+      maxX: customers[0].x,
+      minY: customers[0].y,
+      maxY: customers[0].y,
+    }
+  );
 }
 
 function buildFocusOptions(customers: CustomerSummary[]): FocusOption[] {
@@ -136,8 +161,35 @@ export default function CustomerSelectionMap({
   );
   const focusOptions = useMemo(() => buildFocusOptions(withCoords), [withCoords]);
   const projectedFocusOptions = useMemo<ProjectedFocusOption[]>(
-    () => focusOptions.map((option) => ({ key: option.key, label: option.label, point: projectPoint(option.center.lat, option.center.lng) })),
-    [focusOptions]
+    () => {
+      const allBounds = buildProjectedBounds(projectedCustomers);
+      const options: ProjectedFocusOption[] = allBounds ? [{ key: "all", label: "Fit All Results", bounds: allBounds }] : [];
+
+      const cityGroups = new Map<string, ProjectedCustomer[]>();
+      const territoryGroups = new Map<string, ProjectedCustomer[]>();
+      projectedCustomers.forEach((customer) => {
+        const city = String(customer.customer.city || "").trim();
+        if (city) cityGroups.set(city, [...(cityGroups.get(city) || []), customer]);
+        const territory = String(customer.customer.territoryCode || "").trim();
+        if (territory) territoryGroups.set(territory, [...(territoryGroups.get(territory) || []), customer]);
+      });
+
+      function pushGroupOptions(prefix: string, labelPrefix: string, groups: Map<string, ProjectedCustomer[]>) {
+        Array.from(groups.entries())
+          .sort((left, right) => right[1].length - left[1].length || left[0].localeCompare(right[0]))
+          .slice(0, 8)
+          .forEach(([label, groupedCustomers]) => {
+            const bounds = buildProjectedBounds(groupedCustomers);
+            if (!bounds) return;
+            options.push({ key: `${prefix}:${label}`, label: `${labelPrefix} ${label}`, bounds });
+          });
+      }
+
+      pushGroupOptions("city", "City:", cityGroups);
+      pushGroupOptions("territory", "Territory:", territoryGroups);
+      return options;
+    },
+    [projectedCustomers]
   );
   const [focusedCustomerId, setFocusedCustomerId] = useState<string>(selectedCustomerIds[0] || withCoords[0]?.id || "");
   const [googleMapStatus, setGoogleMapStatus] = useState<"idle" | "ready" | "failed">(() =>
@@ -381,7 +433,7 @@ export default function CustomerSelectionMap({
                     Coordinates {(focusedCustomer.latitude as number).toFixed(4)}, {(focusedCustomer.longitude as number).toFixed(4)}
                   </p>
                 </div>
-                <div className="mt-4 flex flex-wrap gap-2">
+              <div className="mt-4 flex flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={() => onToggleCustomerSelection(focusedCustomer.id)}
@@ -397,7 +449,10 @@ export default function CustomerSelectionMap({
                   <Link href={`/workspace/customers/${focusedCustomer.id}`} className="rounded-full bg-[#173543] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#0f2a35]">
                     Open Account
                   </Link>
-                  {secondaryActionLabel && secondaryActionHref ? (
+                  {secondaryActionLabel &&
+                  secondaryActionHref &&
+                  secondaryActionLabel.trim().toLowerCase() !== "open account" &&
+                  secondaryActionHref(focusedCustomer.id) !== `/workspace/customers/${focusedCustomer.id}` ? (
                     <Link
                       href={secondaryActionHref(focusedCustomer.id)}
                       className="rounded-full border border-[#cfdde6] bg-white px-4 py-2 text-sm font-semibold text-[#24404d] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
@@ -498,21 +553,39 @@ function ProjectedCustomerMap(args: {
   const [panY, setPanY] = useState(0);
   const [focusKey, setFocusKey] = useState("all");
 
-  function centerOnPoint(point: { x: number; y: number }, nextZoom = zoom) {
+  function fitBounds(bounds: ProjectedBounds) {
     const frame = frameRef.current;
     if (!frame) return;
     const width = frame.clientWidth;
     const height = frame.clientHeight;
-    setPanX(width / 2 - (width * point.x * nextZoom) / 100);
-    setPanY(height / 2 - (height * point.y * nextZoom) / 100);
+    const paddingRatio = 0.12;
+    const boundsWidthRatio = Math.max((bounds.maxX - bounds.minX) / 100, 0.06);
+    const boundsHeightRatio = Math.max((bounds.maxY - bounds.minY) / 100, 0.08);
+    const nextZoom = Math.max(
+      1,
+      Math.min((1 - paddingRatio * 2) / boundsWidthRatio, (1 - paddingRatio * 2) / boundsHeightRatio, 2.8)
+    );
+    const centerX = (bounds.minX + bounds.maxX) / 2;
+    const centerY = (bounds.minY + bounds.maxY) / 2;
+    setZoom(nextZoom);
+    setPanX(width / 2 - (width * centerX * nextZoom) / 100);
+    setPanY(height / 2 - (height * centerY * nextZoom) / 100);
   }
 
   function resetViewport() {
-    setZoom(1);
-    setPanX(0);
-    setPanY(0);
     setFocusKey("all");
+    const allOption = args.focusOptions.find((option) => option.key === "all");
+    if (allOption) fitBounds(allOption.bounds);
   }
+
+  useEffect(() => {
+    const nextFocus = args.focusOptions.find((option) => option.key === focusKey) || args.focusOptions[0];
+    if (!nextFocus) return;
+    const frameId = window.requestAnimationFrame(() => {
+      fitBounds(nextFocus.bounds);
+    });
+    return () => window.cancelAnimationFrame(frameId);
+  }, [args.customers, args.focusOptions, focusKey]);
 
   return (
     <div className="relative overflow-hidden rounded-[24px] border border-[#dbe8ef] bg-[linear-gradient(180deg,#f6fbfd_0%,#ecf7fa_100%)] shadow-sm">
@@ -520,10 +593,7 @@ function ProjectedCustomerMap(args: {
         <select
           value={focusKey}
           onChange={(event) => {
-            const nextKey = event.target.value;
-            setFocusKey(nextKey);
-            const option = args.focusOptions.find((item) => item.key === nextKey);
-            if (option) centerOnPoint(option.point, zoom);
+            setFocusKey(event.target.value);
           }}
           className="rounded-full border border-[#d7e6ed] bg-white px-3 py-1 text-xs text-[#173543]"
         >
