@@ -203,6 +203,7 @@ export default function CustomerSelectionMap({
   const mapRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<GoogleMapInstance | null>(null);
   const markerRefs = useRef<Array<{ customerId: string; marker: GoogleMarkerInstance }>>([]);
+  const toggleCustomerSelectionRef = useRef(onToggleCustomerSelection);
   const effectiveFocusedCustomerId =
     focusedCustomerId && withCoords.some((customer) => customer.id === focusedCustomerId)
       ? focusedCustomerId
@@ -213,6 +214,10 @@ export default function CustomerSelectionMap({
     selectedMapCustomers[0] ||
     withCoords[0] ||
     null;
+
+  useEffect(() => {
+    toggleCustomerSelectionRef.current = onToggleCustomerSelection;
+  }, [onToggleCustomerSelection]);
 
   useEffect(() => {
     if (!googleMapsApiKey) return;
@@ -251,10 +256,10 @@ export default function CustomerSelectionMap({
     const map =
       mapInstanceRef.current ||
       new googleMaps.Map(mapRef.current, {
-        center: focusedCustomer
-          ? { lat: focusedCustomer.latitude as number, lng: focusedCustomer.longitude as number }
+        center: withCoords[0]
+          ? { lat: withCoords[0].latitude as number, lng: withCoords[0].longitude as number }
           : { lat: 36.9, lng: -119.5 },
-        zoom: focusedCustomer ? 9 : 6,
+        zoom: withCoords[0] ? 9 : 6,
         mapTypeControl: false,
         streetViewControl: false,
         fullscreenControl: false,
@@ -263,39 +268,50 @@ export default function CustomerSelectionMap({
       });
 
     mapInstanceRef.current = map;
-    const bounds = new googleMaps.LatLngBounds();
 
     markerRefs.current.forEach(({ marker }) => marker.setMap(null));
     markerRefs.current = withCoords.map((customer) => {
       const position = { lat: customer.latitude as number, lng: customer.longitude as number };
-      bounds.extend(position);
       const marker = new googleMaps.Marker({
         map,
         position,
         title: customer.name,
-        zIndex: selectedCustomerIdSet.has(customer.id) ? 900 : 500,
+        zIndex: 500,
       });
       marker.addListener("click", () => {
-        onToggleCustomerSelection(customer.id);
+        toggleCustomerSelectionRef.current(customer.id);
         setFocusedCustomerId(customer.id);
       });
       return { customerId: customer.id, marker };
+    });
+
+    return undefined;
+  }, [googleMapStatus, withCoords]);
+
+  useEffect(() => {
+    if (googleMapStatus !== "ready" || !mapInstanceRef.current || !(window as WindowWithGoogleMaps).google?.maps) return;
+
+    const googleMaps = (window as WindowWithGoogleMaps).google!.maps;
+    const map = mapInstanceRef.current;
+    const bounds = new googleMaps.LatLngBounds();
+
+    withCoords.forEach((customer) => {
+      bounds.extend({ lat: customer.latitude as number, lng: customer.longitude as number });
     });
 
     if (focusKey === "all") {
       if (!bounds.isEmpty()) {
         map.fitBounds(bounds, 56);
       }
-    } else {
-      const nextFocus = focusOptions.find((option) => option.key === focusKey);
-      if (nextFocus) {
-        map.panTo(nextFocus.center);
-        map.setZoom(nextFocus.zoom);
-      }
+      return;
     }
 
-    return undefined;
-  }, [focusKey, focusOptions, focusedCustomer, googleMapStatus, onToggleCustomerSelection, selectedCustomerIdSet, withCoords]);
+    const nextFocus = focusOptions.find((option) => option.key === focusKey);
+    if (nextFocus) {
+      map.panTo(nextFocus.center);
+      map.setZoom(nextFocus.zoom);
+    }
+  }, [focusKey, focusOptions, googleMapStatus, withCoords]);
 
   useEffect(() => {
     const googleMaps = (window as WindowWithGoogleMaps).google?.maps;
@@ -316,7 +332,7 @@ export default function CustomerSelectionMap({
         strokeWeight: 2,
       });
     });
-  }, [effectiveFocusedCustomerId, selectedCustomerIdSet, withCoords]);
+  }, [effectiveFocusedCustomerId, googleMapStatus, selectedCustomerIdSet, withCoords]);
 
   useEffect(() => {
     return () => {
