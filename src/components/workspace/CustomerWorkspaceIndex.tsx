@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { startTransition, useEffect, useMemo, useState } from "react";
+import { startTransition, useCallback, useEffect, useMemo, useState } from "react";
 import type { CustomerSummary } from "@/lib/customerWorkspace";
 import { isRouteEligibleCustomer } from "@/lib/routeEligibility";
 import type { PendingRouteStop } from "@/lib/routeStopQueue";
@@ -71,7 +71,6 @@ const CUSTOMER_SEGMENT_STORAGE_KEY_PREFIX = "jc-rad:customer-segment";
 const BULK_ACTIONS: Array<{ key: BulkActionKind; label: string }> = [
   { key: "assign_sales_rep", label: "Assign Sales Rep" },
   { key: "assign_territory", label: "Assign Territory" },
-  { key: "assign_route_day", label: "Assign Route Day" },
   { key: "add_to_pending_stops", label: "Add to Pending Stops" },
   { key: "remove_from_pending_stops", label: "Remove from Pending Stops" },
   { key: "convert_to_source", label: "Convert to Source" },
@@ -81,6 +80,30 @@ const BULK_ACTIONS: Array<{ key: BulkActionKind; label: string }> = [
 
 function sameIds(left: string[], right: string[]) {
   return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+function readStoredSegmentIds(storageKey: string, availableCustomerIds: Set<string>) {
+  try {
+    const stored = window.sessionStorage.getItem(storageKey);
+    if (!stored) return [];
+    const parsed = JSON.parse(stored);
+    return Array.isArray(parsed)
+      ? parsed.filter(
+          (value, index, values): value is string =>
+            typeof value === "string" && availableCustomerIds.has(value) && values.indexOf(value) === index
+        )
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeStoredSegmentIds(storageKey: string, customerIds: string[]) {
+  if (customerIds.length === 0) {
+    window.sessionStorage.removeItem(storageKey);
+    return;
+  }
+  window.sessionStorage.setItem(storageKey, JSON.stringify(customerIds));
 }
 
 async function parseJsonSafe(res: Response): Promise<Record<string, unknown>> {
@@ -308,6 +331,7 @@ export default function CustomerWorkspaceIndex({
   const [visibleGeocodeBusy, setVisibleGeocodeBusy] = useState(false);
   const [visibleGeocodeStatus, setVisibleGeocodeStatus] = useState<string | null>(null);
   const [showFilteredMap, setShowFilteredMap] = useState(false);
+  const [mapSurfaceMode, setMapSurfaceMode] = useState<"visible" | "segment">("visible");
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(
     Boolean(
       initialFilters.territory ||
@@ -435,9 +459,13 @@ export default function CustomerWorkspaceIndex({
 
   const visibleCustomerIds = visibleCustomers.map((customer) => customer.id);
   const visibleCustomerIdSet = new Set(visibleCustomerIds);
+  const selectedCustomerIdSet = new Set(selectedCustomerIds);
   const pendingCustomerIdSet = new Set(pendingStops.map((stop) => stop.customerId));
   const selectedVisibleCustomerIds = selectedCustomerIds.filter((id) => visibleCustomerIdSet.has(id));
   const selectedVisibleCustomers = visibleCustomers.filter((customer) => selectedVisibleCustomerIds.includes(customer.id));
+  const selectedSegmentCustomers = customers.filter((customer) => selectedCustomerIdSet.has(customer.id));
+  const mapCustomers = mapSurfaceMode === "segment" ? selectedSegmentCustomers : visibleCustomers;
+  const mapScopedSelectedCustomerIds = mapCustomers.filter((customer) => selectedCustomerIdSet.has(customer.id)).map((customer) => customer.id);
   const allVisibleSelected = visibleCustomers.length > 0 && selectedVisibleCustomerIds.length === visibleCustomers.length;
 
   const visibleWithContacts = visibleCustomers.filter((customer) => customer.contactCount > 0).length;
@@ -542,30 +570,24 @@ export default function CustomerWorkspaceIndex({
                 },
               ];
 
-  useEffect(() => {
+  const restoreStoredSegment = useCallback(() => {
     const availableCustomerIds = new Set(customerIds);
-    try {
-      const stored = window.sessionStorage.getItem(segmentStorageKey);
-      if (!stored) {
-        setSelectedCustomerIds([]);
-        setHydratedSegmentKey(segmentStorageKey);
-        return;
-      }
+    const nextIds = readStoredSegmentIds(segmentStorageKey, availableCustomerIds);
+    setSelectedCustomerIds((current) => (sameIds(current, nextIds) ? current : nextIds));
+    setHydratedSegmentKey(segmentStorageKey);
+  }, [customerIds, segmentStorageKey]);
 
-      const parsed = JSON.parse(stored);
-      const nextIds = Array.isArray(parsed)
-        ? parsed.filter(
-            (value, index, values): value is string =>
-              typeof value === "string" && availableCustomerIds.has(value) && values.indexOf(value) === index
-          )
-        : [];
-      setSelectedCustomerIds(nextIds);
-    } catch {
-      setSelectedCustomerIds([]);
-    } finally {
+  const persistSelectedSegment = useCallback(
+    (nextIds: string[]) => {
+      writeStoredSegmentIds(segmentStorageKey, nextIds);
       setHydratedSegmentKey(segmentStorageKey);
-    }
-  }, [customerIds, customerIdsKey, segmentStorageKey]);
+    },
+    [segmentStorageKey]
+  );
+
+  useEffect(() => {
+    restoreStoredSegment();
+  }, [customerIdsKey, restoreStoredSegment]);
 
   useEffect(() => {
     const availableCustomerIds = new Set(customerIds);
@@ -577,12 +599,39 @@ export default function CustomerWorkspaceIndex({
 
   useEffect(() => {
     if (hydratedSegmentKey !== segmentStorageKey) return;
-    if (selectedCustomerIds.length === 0) {
-      window.sessionStorage.removeItem(segmentStorageKey);
-      return;
-    }
-    window.sessionStorage.setItem(segmentStorageKey, JSON.stringify(selectedCustomerIds));
+    writeStoredSegmentIds(segmentStorageKey, selectedCustomerIds);
   }, [hydratedSegmentKey, segmentStorageKey, selectedCustomerIds]);
+
+  useEffect(() => {
+    function handlePageShow() {
+      restoreStoredSegment();
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === "visible") {
+        restoreStoredSegment();
+      }
+    }
+
+    window.addEventListener("pageshow", handlePageShow);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      window.removeEventListener("pageshow", handlePageShow);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [restoreStoredSegment]);
+
+  useEffect(() => {
+    if (pathname === "/workspace/customers") {
+      restoreStoredSegment();
+    }
+  }, [pathname, restoreStoredSegment]);
+
+  useEffect(() => {
+    if (mapSurfaceMode === "segment" && selectedCustomerIds.length === 0) {
+      setMapSurfaceMode("visible");
+    }
+  }, [mapSurfaceMode, selectedCustomerIds.length]);
 
   useEffect(() => {
     if (staffRole === "admin") return;
@@ -638,17 +687,34 @@ export default function CustomerWorkspaceIndex({
   }
 
   function toggleCustomerSelection(customerId: string) {
-    setSelectedCustomerIds((current) => (current.includes(customerId) ? current.filter((id) => id !== customerId) : [...current, customerId]));
+    setSelectedCustomerIds((current) => {
+      const next = current.includes(customerId) ? current.filter((id) => id !== customerId) : [...current, customerId];
+      persistSelectedSegment(next);
+      return next;
+    });
   }
 
   function selectAllVisible() {
     setSelectedCustomerIds(visibleCustomerIds);
+    persistSelectedSegment(visibleCustomerIds);
     setBulkStatusMessage(null);
   }
 
   function clearSelection() {
     setSelectedCustomerIds([]);
+    persistSelectedSegment([]);
     setBulkStatusMessage(null);
+  }
+
+  async function addCustomersToPendingRoute(customerIdsToAdd: string[]) {
+    const nextIds = Array.from(new Set(customerIdsToAdd.map((value) => String(value || "").trim()).filter(Boolean)));
+    if (nextIds.length === 0) return;
+    setBulkStatusMessage(null);
+    await syncPendingStops({
+      method: "POST",
+      body: { customer_ids: nextIds },
+    });
+    setBulkStatusMessage(`${nextIds.length} account${nextIds.length === 1 ? "" : "s"} added to your pending route.`);
   }
 
   function handleClearSearch() {
@@ -945,6 +1011,31 @@ export default function CustomerWorkspaceIndex({
               >
                 {showFilteredMap ? "Hide Map" : "Map Filtered Accounts"}
               </button>
+              {showFilteredMap ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setMapSurfaceMode("visible")}
+                    className={[
+                      "rounded-full border px-3 py-1.5 text-sm font-semibold transition",
+                      mapSurfaceMode === "visible" ? "border-[#173543] bg-[#173543] text-white" : "border-[#d7e6ed] bg-white text-[#4f6877] hover:border-[#173543]",
+                    ].join(" ")}
+                  >
+                    Map Visible
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMapSurfaceMode("segment")}
+                    disabled={selectedCustomerIds.length === 0}
+                    className={[
+                      "rounded-full border px-3 py-1.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50",
+                      mapSurfaceMode === "segment" ? "border-[#173543] bg-[#173543] text-white" : "border-[#d7e6ed] bg-white text-[#4f6877] hover:border-[#173543]",
+                    ].join(" ")}
+                  >
+                    Map Segment
+                  </button>
+                </div>
+              ) : null}
             </div>
           </div>
         </section>
@@ -1008,7 +1099,6 @@ export default function CustomerWorkspaceIndex({
                   options={[
                     { value: "route_ready", label: "Route Ready" },
                     { value: "no_territory", label: "No Territory" },
-                    { value: "no_route_day", label: "No Route Day" },
                     { value: "no_route_rep", label: "No Route Rep" },
                     { value: "no_coords", label: "No Coordinates" },
                     { value: "address_ready", label: "Address Ready, No Coords" },
@@ -1040,7 +1130,6 @@ export default function CustomerWorkspaceIndex({
                   options={[
                     { value: "territory", label: "Territory" },
                     { value: "owner", label: "Owner" },
-                    { value: "route_day", label: "Route Day" },
                     { value: "stage", label: "Stage" },
                   ]}
                   allowAllLabel="None"
@@ -1113,12 +1202,17 @@ export default function CustomerWorkspaceIndex({
 
         {showFilteredMap ? (
           <RouteStopsMap
-            customers={visibleCustomers}
+            customers={mapCustomers}
             title="Filtered Accounts Map"
-            description="This map uses the exact customer workspace filters currently on screen so nearby accounts are easy to spot before queueing or building routes."
-            emptyLabel="No filtered accounts have coordinates yet. Keep using the list view or geocode the visible accounts first."
+            description="Use the current visible results or your saved segment as a territory-planning workbench. Click map points to build a route draft by proximity, then send the selected accounts straight into the pending route."
+            emptyLabel={mapSurfaceMode === "segment" ? "The current saved segment has no mappable accounts yet." : "No filtered accounts have coordinates yet. Keep using the list view or geocode the visible accounts first."}
             secondaryActionLabel="Open Account"
             secondaryActionHref={(customerId) => `/workspace/customers/${customerId}`}
+            selectedCustomerIds={mapScopedSelectedCustomerIds}
+            onToggleCustomerSelection={toggleCustomerSelection}
+            onAddSelectedCustomers={() => void addCustomersToPendingRoute(mapScopedSelectedCustomerIds)}
+            addSelectedCustomersLabel="Add Selected to Pending Route"
+            selectionScopeLabel={mapSurfaceMode === "segment" ? "Saved segment" : "Visible results"}
           />
         ) : null}
 
@@ -1204,6 +1298,14 @@ function CustomerCard({
   const websiteHref = normalizeWebsiteHref(customer.website);
   const routeReadiness = getRouteReadiness(customer);
   const followUpState = getFollowUpState(customer);
+  const bestNextAction =
+    customer.overdueTaskCount > 0
+      ? "Handle overdue follow-up"
+      : !primaryContact
+        ? "Add contact details"
+        : !customer.hasOpenTask
+          ? "Create next follow-up"
+          : followUpState;
   const metadataLine = [
     customer.source ? formatSourceLabel(customer.source) : null,
     customer.importSource ? `Import ${formatSourceLabel(customer.importSource)}` : null,
@@ -1237,7 +1339,7 @@ function CustomerCard({
               </span>
             </div>
             <p className="text-sm text-[#5a7483]">
-              {[customer.city || "No city", customer.territoryCode ? `Territory ${customer.territoryCode}` : "Territory open", customer.assignedSalesName || "Unassigned owner"]
+              {[customer.city || "No city", customer.assignedSalesName || "Unassigned owner", customer.territoryCode ? `Territory ${customer.territoryCode}` : "Territory open"]
                 .filter(Boolean)
                 .join(" • ")}
             </p>
@@ -1256,6 +1358,11 @@ function CustomerCard({
         ) : null}
         <span className={["rounded-full border px-2 py-0.5 text-[11px] font-semibold", followUpChipClass(customer)].join(" ")}>{followUpState}</span>
         <RouteReadinessPill state={routeReadiness} />
+        {customer.counts.estimates > 0 ? (
+          <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-2 py-0.5 text-[11px] font-semibold text-[#4f6877]">
+            {customer.counts.estimates} estimate{customer.counts.estimates === 1 ? "" : "s"}
+          </span>
+        ) : null}
         {customer.counts.orders > 0 ? (
           <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-2 py-0.5 text-[11px] font-semibold text-[#4f6877]">
             {customer.counts.orders} order{customer.counts.orders === 1 ? "" : "s"}
@@ -1266,7 +1373,7 @@ function CustomerCard({
 
       <div className="mt-3 grid gap-3 text-sm text-[#56717f] sm:grid-cols-2">
         <div className="min-w-0 rounded-[18px] border border-[#e3edf2] bg-[#f8fbfc] px-3 py-2.5">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#7a909d]">Coverage</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#7a909d]">Contact</p>
           <p className="mt-1 truncate font-medium text-[#294653]">{primaryContact?.name || "No primary contact"}</p>
           <p className="mt-1 flex min-w-0 items-start gap-1 text-xs text-[#7a909d]">
             <span title={primaryContact?.email || customer.primaryContactEmail || "No email"} className="min-w-0 truncate">
@@ -1277,14 +1384,9 @@ function CustomerCard({
         </div>
 
         <div className="min-w-0 rounded-[18px] border border-[#e3edf2] bg-[#f8fbfc] px-3 py-2.5">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#7a909d]">Routing</p>
-          <p className="mt-1 truncate font-medium text-[#294653]">
-            {customer.routeDay || "No route day"}
-            {customer.assignedRouteRepName ? ` • ${customer.assignedRouteRepName}` : ""}
-          </p>
-          <p className="mt-1 truncate text-xs text-[#7a909d]">
-            {customer.contactCount} contacts • {activityCount} linked records
-          </p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#7a909d]">CRM Snapshot</p>
+          <p className="mt-1 truncate font-medium text-[#294653]">{bestNextAction}</p>
+          <p className="mt-1 truncate text-xs text-[#7a909d]">{customer.contactCount} contacts • {activityCount} linked records</p>
         </div>
       </div>
 
@@ -1340,11 +1442,11 @@ function RouteActionButton({
             : "border border-[#cddbe4] bg-white text-[#21424d] hover:border-[#14b8a6] hover:text-[#0f766e]",
         ].join(" ")}
       >
-        {busy ? "Saving..." : pendingSelected ? "Pending" : "Queue"}
+        {busy ? "Saving..." : pendingSelected ? "In Route" : "Add to Route"}
       </button>
       {routeHref ? (
         <Link href={routeHref} className="inline-flex h-8 items-center rounded-full border border-[#bfe8e2] px-3 text-sm font-medium text-[#0f766e] transition hover:text-[#0b5f58]">
-          Pending
+          View Route
         </Link>
       ) : null}
     </div>
@@ -1548,24 +1650,24 @@ function RouteReadinessPill({ state }: { state: ReturnType<typeof getRouteReadin
   const toneClass =
     state === "route_ready"
       ? "border-[#bde8e4] bg-[#e9fbf9] text-[#0f766e]"
-      : state === "no_territory" || state === "no_route_day" || state === "no_route_rep"
+      : state === "no_territory" || state === "no_route_rep"
         ? "border-[#f1ddad] bg-[#fff9eb] text-[#9a6b00]"
-        : "border-[#d7e6ed] bg-[#f8fbfc] text-[#4f6877]";
+      : "border-[#d7e6ed] bg-[#f8fbfc] text-[#4f6877]";
 
   const label =
     state === "route_ready"
       ? "Route Ready"
       : state === "no_territory"
         ? "No Territory"
-      : state === "no_route_day"
-          ? "No Route Day"
-          : state === "no_route_rep"
-            ? "No Route Rep"
+        : state === "no_route_rep"
+          ? "No Route Rep"
           : state === "address_ready"
             ? "Address Ready"
             : state === "no_coords"
               ? "No Coords"
-              : "Route Open";
+              : state === "no_route_day"
+                ? "Planning Open"
+                : "Route Open";
 
   return <span className={["rounded-full border px-2.5 py-1 text-xs font-semibold", toneClass].join(" ")}>{label}</span>;
 }

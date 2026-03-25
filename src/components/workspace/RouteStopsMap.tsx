@@ -14,6 +14,11 @@ type RouteStopsMapProps = {
   secondaryActionHref?: (customerId: string) => string;
   selectedCustomerId?: string | null;
   onSelectedCustomerIdChange?: (customerId: string | null) => void;
+  selectedCustomerIds?: string[];
+  onToggleCustomerSelection?: (customerId: string) => void;
+  onAddSelectedCustomers?: () => void;
+  addSelectedCustomersLabel?: string;
+  selectionScopeLabel?: string;
   plannedRoute?: {
     origin: {
       name: string;
@@ -37,6 +42,12 @@ type ProjectedStop = {
 type ProjectedPoint = {
   x: number;
   y: number;
+};
+
+type MapFocusOption = {
+  key: string;
+  label: string;
+  point: ProjectedPoint;
 };
 
 type WindowWithGoogleMaps = Window & {
@@ -166,6 +177,42 @@ function projectCustomer(customer: CustomerSummary): ProjectedStop | null {
   };
 }
 
+function buildMapFocusOptions(stops: ProjectedStop[]): MapFocusOption[] {
+  const cityGroups = new Map<string, ProjectedStop[]>();
+  const territoryGroups = new Map<string, ProjectedStop[]>();
+
+  stops.forEach((stop) => {
+    const cityKey = String(stop.customer.city || "").trim();
+    if (cityKey) {
+      cityGroups.set(cityKey, [...(cityGroups.get(cityKey) || []), stop]);
+    }
+    const territoryKey = String(stop.customer.territoryCode || "").trim();
+    if (territoryKey) {
+      territoryGroups.set(territoryKey, [...(territoryGroups.get(territoryKey) || []), stop]);
+    }
+  });
+
+  function toFocusOptions(prefix: string, labelPrefix: string, groups: Map<string, ProjectedStop[]>) {
+    return Array.from(groups.entries())
+      .sort((left, right) => right[1].length - left[1].length || left[0].localeCompare(right[0]))
+      .slice(0, 6)
+      .map(([label, group]) => ({
+        key: `${prefix}:${label}`,
+        label: `${labelPrefix} ${label}`,
+        point: {
+          x: group.reduce((sum, stop) => sum + stop.x, 0) / group.length,
+          y: group.reduce((sum, stop) => sum + stop.y, 0) / group.length,
+        },
+      }));
+  }
+
+  return [
+    { key: "all", label: "Entire Surface", point: { x: 50, y: 50 } },
+    ...toFocusOptions("city", "City:", cityGroups),
+    ...toFocusOptions("territory", "Territory:", territoryGroups),
+  ];
+}
+
 function decodeGooglePolyline(encoded: string) {
   const points: Array<{ latitude: number; longitude: number }> = [];
   let index = 0;
@@ -249,15 +296,25 @@ export default function RouteStopsMap({
   secondaryActionHref,
   selectedCustomerId: controlledSelectedCustomerId,
   onSelectedCustomerIdChange,
+  selectedCustomerIds = [],
+  onToggleCustomerSelection,
+  onAddSelectedCustomers,
+  addSelectedCustomersLabel = "Add Selected to Route",
+  selectionScopeLabel = "Current map",
   plannedRoute,
 }: RouteStopsMapProps) {
   const withCoords = useMemo(() => customers.map(projectCustomer).filter((stop): stop is ProjectedStop => Boolean(stop)), [customers]);
   const withoutCoords = useMemo(() => customers.filter((customer) => customer.latitude === null || customer.longitude === null), [customers]);
+  const selectedCustomerIdSet = useMemo(() => new Set(selectedCustomerIds), [selectedCustomerIds]);
+  const selectedMapStops = useMemo(() => withCoords.filter((stop) => selectedCustomerIdSet.has(stop.customer.id)), [selectedCustomerIdSet, withCoords]);
+  const focusOptions = useMemo(() => buildMapFocusOptions(withCoords), [withCoords]);
   const [internalSelectedCustomerId, setInternalSelectedCustomerId] = useState<string>(withCoords[0]?.customer.id || "");
   const selectedCustomerId = controlledSelectedCustomerId ?? internalSelectedCustomerId;
+  const multiSelectEnabled = !plannedRoute && Boolean(onToggleCustomerSelection);
 
   const selectedStop =
     withCoords.find((stop) => stop.customer.id === selectedCustomerId) ||
+    selectedMapStops[0] ||
     withCoords[0] ||
     null;
 
@@ -325,6 +382,13 @@ export default function RouteStopsMap({
     onSelectedCustomerIdChange?.(customerId);
   }
 
+  function handleMapPointSelection(customerId: string) {
+    if (multiSelectEnabled) {
+      onToggleCustomerSelection?.(customerId);
+    }
+    selectCustomer(customerId);
+  }
+
   return (
     <section className="rounded-[28px] border border-[#dbe8ef] bg-white p-5 shadow-[0_12px_32px_rgba(16,42,67,0.06)] lg:px-6">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
@@ -338,6 +402,7 @@ export default function RouteStopsMap({
         <div className="grid gap-2 rounded-2xl border border-[#dbe8ef] bg-[#fbfdfe] p-4 text-sm text-[#506877] shadow-sm sm:min-w-[220px]">
           <MapMetric label="Mapped Stops" value={String(withCoords.length)} />
           <MapMetric label="No Coords" value={String(withoutCoords.length)} />
+          {!plannedRoute ? <MapMetric label="Selected" value={String(selectedMapStops.length)} /> : null}
           {plannedRoute ? (
             <>
               <MapMetric label="Provider" value={plannedRoute.provider === "google" ? "Google" : "Fallback"} />
@@ -371,7 +436,10 @@ export default function RouteStopsMap({
                 svgPath={svgPath}
                 withCoords={withCoords}
                 selectedCustomerId={selectedCustomerId}
-                onSelectCustomer={selectCustomer}
+                selectedCustomerIdSet={selectedCustomerIdSet}
+                focusOptions={focusOptions}
+                onSelectCustomer={multiSelectEnabled ? handleMapPointSelection : selectCustomer}
+                multiSelectEnabled={multiSelectEnabled}
               />
             )}
 
@@ -409,7 +477,7 @@ export default function RouteStopsMap({
                         </div>
                         <p className="mt-2 line-clamp-2 text-sm font-semibold">{stop.customer.name}</p>
                         <p className={["mt-1 text-xs", isActive ? "text-white/80" : "text-[#5d7685]"].join(" ")}>
-                          {stop.customer.territoryCode || "Unassigned"} • {titleCase(stop.customer.routeDay, "No route day")}
+                          {stop.customer.territoryCode || "Unassigned"} • {stop.customer.city || "No city"}
                         </p>
                       </button>
                     );
@@ -441,7 +509,7 @@ export default function RouteStopsMap({
                     </div>
                     <p className="mt-1 text-sm font-semibold text-[#173543]">{selectedStop.customer.name}</p>
                     <p className="mt-1 text-sm text-[#58717f]">
-                      {selectedStop.customer.territoryCode || "Unassigned"} • {titleCase(selectedStop.customer.routeDay, "No route day")} • {plannedRoute ? (plannedRoute.provider === "google" ? "Google route" : "Fallback route") : "Map preview"}
+                      {selectedStop.customer.territoryCode || "Unassigned"} • {plannedRoute ? (plannedRoute.provider === "google" ? "Google route" : "Fallback route") : "Map preview"}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -466,6 +534,16 @@ export default function RouteStopsMap({
                   </p>
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
+                  {!plannedRoute ? (
+                    <button
+                      type="button"
+                      onClick={onAddSelectedCustomers}
+                      disabled={!onAddSelectedCustomers || selectedMapStops.length === 0}
+                      className="rounded-full bg-[#173543] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#0f2a35] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {addSelectedCustomersLabel}
+                    </button>
+                  ) : null}
                   <Link
                     href={`/workspace/customers/${selectedStop.customer.id}`}
                     className="rounded-full bg-[#173543] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#0f2a35]"
@@ -484,6 +562,48 @@ export default function RouteStopsMap({
               </div>
             ) : null}
 
+            {!plannedRoute ? (
+              <div className="rounded-[24px] border border-[#dbe8ef] bg-white p-4 shadow-sm">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h4 className="text-sm font-semibold uppercase tracking-[0.12em] text-[#6f8897]">Map Selection</h4>
+                    <p className="mt-1 text-sm text-[#5d7685]">
+                      {selectedMapStops.length === 0
+                        ? "Click map points to build a route draft by proximity."
+                        : `${selectedMapStops.length} account${selectedMapStops.length === 1 ? "" : "s"} selected from ${selectionScopeLabel.toLowerCase()}.`}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={onAddSelectedCustomers}
+                    disabled={!onAddSelectedCustomers || selectedMapStops.length === 0}
+                    className="rounded-full border border-[#173543] px-3 py-1.5 text-sm font-semibold text-[#173543] transition hover:bg-[#173543] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {addSelectedCustomersLabel}
+                  </button>
+                </div>
+                {selectedMapStops.length > 0 ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {selectedMapStops.slice(0, 8).map((stop) => (
+                      <button
+                        key={stop.customer.id}
+                        type="button"
+                        onClick={() => handleMapPointSelection(stop.customer.id)}
+                        className="rounded-full border border-[#cfe8e4] bg-[#effaf7] px-3 py-1 text-xs font-semibold text-[#0f766e]"
+                      >
+                        {stop.customer.name}
+                      </button>
+                    ))}
+                    {selectedMapStops.length > 8 ? (
+                      <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1 text-xs font-semibold text-[#4f6877]">
+                        +{selectedMapStops.length - 8} more
+                      </span>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
             <div className="rounded-[24px] border border-[#dbe8ef] bg-white p-4 shadow-sm">
               <div className="flex items-center justify-between gap-3">
                 <h4 className="text-sm font-semibold uppercase tracking-[0.12em] text-[#6f8897]">Stops Without Coordinates</h4>
@@ -496,7 +616,7 @@ export default function RouteStopsMap({
                   <div key={customer.id} className="rounded-xl border border-[#e1ebf1] bg-[#fbfdfe] px-3 py-2 text-sm text-[#4f6877]">
                     <p className="font-semibold text-[#173543]">{customer.name}</p>
                     <p className="mt-1">
-                      Territory {customer.territoryCode || "Unassigned"} • {titleCase(customer.routeDay, "No route day")}
+                      Territory {customer.territoryCode || "Unassigned"} • {customer.city || "No city"}
                     </p>
                   </div>
                 ))}
@@ -518,70 +638,143 @@ function ProjectedRouteMap(args: {
   svgPath: string | null;
   withCoords: ProjectedStop[];
   selectedCustomerId: string;
+  selectedCustomerIdSet: Set<string>;
+  focusOptions: MapFocusOption[];
   onSelectCustomer: (customerId: string) => void;
+  multiSelectEnabled: boolean;
 }) {
+  const frameRef = useRef<HTMLDivElement | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const [panX, setPanX] = useState(0);
+  const [panY, setPanY] = useState(0);
+  const [focusKey, setFocusKey] = useState("all");
+
+  function centerOnPoint(point: ProjectedPoint, nextZoom = zoom) {
+    const frame = frameRef.current;
+    if (!frame) return;
+    const width = frame.clientWidth;
+    const height = frame.clientHeight;
+    setPanX(width / 2 - (width * point.x * nextZoom) / 100);
+    setPanY(height / 2 - (height * point.y * nextZoom) / 100);
+  }
+
+  function resetViewport() {
+    setZoom(1);
+    setPanX(0);
+    setPanY(0);
+    setFocusKey("all");
+  }
+
   return (
     <div className="relative overflow-hidden rounded-[24px] border border-[#dbe8ef] bg-[linear-gradient(180deg,#f6fbfd_0%,#ecf7fa_100%)] shadow-sm">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_18%,rgba(20,184,166,0.14),transparent_26%),radial-gradient(circle_at_68%_30%,rgba(23,53,67,0.1),transparent_24%),linear-gradient(180deg,rgba(255,255,255,0.45),rgba(255,255,255,0))]" />
-      <div className="pointer-events-none absolute inset-y-0 left-[22%] w-px bg-white/80" />
-      <div className="pointer-events-none absolute inset-y-0 left-[46%] w-px bg-white/60" />
-      <div className="pointer-events-none absolute inset-y-0 left-[70%] w-px bg-white/70" />
-      <div className="pointer-events-none absolute inset-x-0 top-[26%] h-px bg-white/70" />
-      <div className="pointer-events-none absolute inset-x-0 top-[53%] h-px bg-white/60" />
-      <div className="pointer-events-none absolute inset-x-0 top-[80%] h-px bg-white/70" />
-      <div className="pointer-events-none absolute left-[8%] top-[10%] text-[11px] font-semibold uppercase tracking-[0.16em] text-[#6f8897]">North Coast</div>
-      <div className="pointer-events-none absolute left-[33%] top-[16%] text-[11px] font-semibold uppercase tracking-[0.16em] text-[#6f8897]">Sacramento</div>
-      <div className="pointer-events-none absolute left-[49%] top-[29%] text-[11px] font-semibold uppercase tracking-[0.16em] text-[#6f8897]">Bay Area</div>
-      <div className="pointer-events-none absolute left-[45%] top-[52%] text-[11px] font-semibold uppercase tracking-[0.16em] text-[#6f8897]">Central Valley</div>
-      <div className="pointer-events-none absolute left-[28%] top-[69%] text-[11px] font-semibold uppercase tracking-[0.16em] text-[#6f8897]">Los Angeles</div>
-      <div className="pointer-events-none absolute left-[18%] top-[84%] text-[11px] font-semibold uppercase tracking-[0.16em] text-[#6f8897]">San Diego</div>
-
-      <div className="relative aspect-[1.7/1] min-h-[520px]">
-        {args.svgPath ? (
-          <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="pointer-events-none absolute inset-0 h-full w-full">
-            <path
-              d={args.svgPath}
-              fill="none"
-              stroke={args.plannedRoute?.polyline ? "#173543" : "#14b8a6"}
-              strokeWidth={args.plannedRoute?.polyline ? 1.2 : 0.9}
-              strokeDasharray={args.plannedRoute?.polyline ? undefined : "2.5 2.5"}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              opacity={0.9}
-            />
-          </svg>
+      <div className="absolute right-3 top-3 z-20 flex flex-wrap items-center gap-2 rounded-2xl border border-white/70 bg-white/90 px-3 py-2 text-xs font-semibold text-[#35505d] shadow-sm backdrop-blur">
+        {!args.plannedRoute ? (
+          <select
+            value={focusKey}
+            onChange={(event) => {
+              const nextKey = event.target.value;
+              setFocusKey(nextKey);
+              const option = args.focusOptions.find((item) => item.key === nextKey);
+              if (option) centerOnPoint(option.point, zoom);
+            }}
+            className="rounded-full border border-[#d7e6ed] bg-white px-3 py-1 text-xs text-[#173543]"
+          >
+            {args.focusOptions.map((option) => (
+              <option key={option.key} value={option.key}>
+                {option.label}
+              </option>
+            ))}
+          </select>
         ) : null}
+        <button type="button" onClick={() => setZoom((current) => Math.min(current + 0.2, 2.4))} className="rounded-full border border-[#d7e6ed] px-2 py-1">
+          +
+        </button>
+        <button type="button" onClick={() => setZoom((current) => Math.max(current - 0.2, 1))} className="rounded-full border border-[#d7e6ed] px-2 py-1">
+          -
+        </button>
+        <button type="button" onClick={() => setPanY((current) => current + 80)} className="rounded-full border border-[#d7e6ed] px-2 py-1">
+          N
+        </button>
+        <button type="button" onClick={() => setPanY((current) => current - 80)} className="rounded-full border border-[#d7e6ed] px-2 py-1">
+          S
+        </button>
+        <button type="button" onClick={() => setPanX((current) => current + 80)} className="rounded-full border border-[#d7e6ed] px-2 py-1">
+          W
+        </button>
+        <button type="button" onClick={() => setPanX((current) => current - 80)} className="rounded-full border border-[#d7e6ed] px-2 py-1">
+          E
+        </button>
+        <button type="button" onClick={resetViewport} className="rounded-full border border-[#d7e6ed] px-3 py-1">
+          Reset
+        </button>
+      </div>
 
-        {args.projectedOrigin ? (
-          <div className="absolute -translate-x-1/2 -translate-y-1/2" style={{ left: `${args.projectedOrigin.x}%`, top: `${args.projectedOrigin.y}%` }}>
-            <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-[#f97316] text-[11px] font-bold text-white shadow-[0_8px_20px_rgba(16,42,67,0.22)]">
-              HQ
+      <div ref={frameRef} className="relative aspect-[1.7/1] min-h-[520px] overflow-hidden">
+        <div
+          className="absolute inset-0 origin-top-left"
+          style={{ transform: `translate(${panX}px, ${panY}px) scale(${zoom})` }}
+        >
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_18%,rgba(20,184,166,0.14),transparent_26%),radial-gradient(circle_at_68%_30%,rgba(23,53,67,0.1),transparent_24%),linear-gradient(180deg,rgba(255,255,255,0.45),rgba(255,255,255,0))]" />
+          <div className="pointer-events-none absolute inset-y-0 left-[22%] w-px bg-white/80" />
+          <div className="pointer-events-none absolute inset-y-0 left-[46%] w-px bg-white/60" />
+          <div className="pointer-events-none absolute inset-y-0 left-[70%] w-px bg-white/70" />
+          <div className="pointer-events-none absolute inset-x-0 top-[26%] h-px bg-white/70" />
+          <div className="pointer-events-none absolute inset-x-0 top-[53%] h-px bg-white/60" />
+          <div className="pointer-events-none absolute inset-x-0 top-[80%] h-px bg-white/70" />
+          <div className="pointer-events-none absolute left-[8%] top-[10%] text-[11px] font-semibold uppercase tracking-[0.16em] text-[#6f8897]">North Coast</div>
+          <div className="pointer-events-none absolute left-[33%] top-[16%] text-[11px] font-semibold uppercase tracking-[0.16em] text-[#6f8897]">Sacramento</div>
+          <div className="pointer-events-none absolute left-[49%] top-[29%] text-[11px] font-semibold uppercase tracking-[0.16em] text-[#6f8897]">Bay Area</div>
+          <div className="pointer-events-none absolute left-[45%] top-[52%] text-[11px] font-semibold uppercase tracking-[0.16em] text-[#6f8897]">Central Valley</div>
+          <div className="pointer-events-none absolute left-[28%] top-[69%] text-[11px] font-semibold uppercase tracking-[0.16em] text-[#6f8897]">Los Angeles</div>
+          <div className="pointer-events-none absolute left-[18%] top-[84%] text-[11px] font-semibold uppercase tracking-[0.16em] text-[#6f8897]">San Diego</div>
+
+          {args.svgPath ? (
+            <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="pointer-events-none absolute inset-0 h-full w-full">
+              <path
+                d={args.svgPath}
+                fill="none"
+                stroke={args.plannedRoute?.polyline ? "#173543" : "#14b8a6"}
+                strokeWidth={args.plannedRoute?.polyline ? 1.2 : 0.9}
+                strokeDasharray={args.plannedRoute?.polyline ? undefined : "2.5 2.5"}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                opacity={0.9}
+              />
+            </svg>
+          ) : null}
+
+          {args.projectedOrigin ? (
+            <div className="absolute -translate-x-1/2 -translate-y-1/2" style={{ left: `${args.projectedOrigin.x}%`, top: `${args.projectedOrigin.y}%` }}>
+              <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-[#f97316] text-[11px] font-bold text-white shadow-[0_8px_20px_rgba(16,42,67,0.22)]">
+                HQ
+              </div>
             </div>
-          </div>
-        ) : null}
+          ) : null}
 
-        {args.withCoords.map((stop) => {
-          const isSelected = args.selectedCustomerId === stop.customer.id;
-          const pointSize = stop.customer.routePriority !== null && stop.customer.routePriority <= 2 ? "h-4 w-4" : "h-3.5 w-3.5";
-          const orderedIndex = args.plannedRoute ? args.orderedProjectedStops.findIndex((projectedStop) => projectedStop.customer.id === stop.customer.id) : -1;
+          {args.withCoords.map((stop) => {
+            const isFocused = args.selectedCustomerId === stop.customer.id;
+            const isSelected = args.selectedCustomerIdSet.has(stop.customer.id);
+            const pointSize = stop.customer.routePriority !== null && stop.customer.routePriority <= 2 ? "h-4 w-4" : "h-3.5 w-3.5";
+            const orderedIndex = args.plannedRoute ? args.orderedProjectedStops.findIndex((projectedStop) => projectedStop.customer.id === stop.customer.id) : -1;
 
-          return (
-            <button
-              key={stop.customer.id}
-              type="button"
-              onClick={() => args.onSelectCustomer(stop.customer.id)}
-              className={[
-                "absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-[0_8px_20px_rgba(16,42,67,0.22)] transition",
-                args.plannedRoute ? "flex h-8 w-8 items-center justify-center text-[11px] font-bold text-white" : pointSize,
-                isSelected ? "z-20 scale-125 bg-[#173543]" : "z-10 bg-[#14b8a6] hover:scale-110",
-              ].join(" ")}
-              style={{ left: `${stop.x}%`, top: `${stop.y}%` }}
-              aria-label={`Open stop summary for ${stop.customer.name}`}
-            >
-              {args.plannedRoute && orderedIndex >= 0 ? orderedIndex + 1 : null}
-            </button>
-          );
-        })}
+            return (
+              <button
+                key={stop.customer.id}
+                type="button"
+                onClick={() => args.onSelectCustomer(stop.customer.id)}
+                className={[
+                  "absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-[0_8px_20px_rgba(16,42,67,0.22)] transition",
+                  args.plannedRoute ? "flex h-8 w-8 items-center justify-center text-[11px] font-bold text-white" : pointSize,
+                  isFocused ? "z-20 scale-125 bg-[#173543]" : isSelected ? "z-20 scale-110 bg-[#0f766e]" : "z-10 bg-[#14b8a6] hover:scale-110",
+                ].join(" ")}
+                style={{ left: `${stop.x}%`, top: `${stop.y}%` }}
+                aria-label={args.multiSelectEnabled ? `Toggle map selection for ${stop.customer.name}` : `Open stop summary for ${stop.customer.name}`}
+              >
+                {args.plannedRoute && orderedIndex >= 0 ? orderedIndex + 1 : null}
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

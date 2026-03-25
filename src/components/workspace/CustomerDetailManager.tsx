@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { VISIT_OUTCOMES } from "@/components/workspace/routeUtils";
 
@@ -17,10 +17,12 @@ type TerritoryOption = {
 };
 
 type PrimaryContact = {
+  id?: string;
   name: string;
   email: string | null;
   phone: string | null;
   title: string | null;
+  isPrimary?: boolean;
 };
 
 type CustomerDetailManagerProps = {
@@ -55,6 +57,7 @@ type CustomerDetailManagerProps = {
   routeRepOptions: StaffOption[];
   territoryOptions: TerritoryOption[];
   primaryContact: PrimaryContact | null;
+  contacts: PrimaryContact[];
 };
 
 const ROUTE_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
@@ -234,6 +237,12 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
   const [contactEmail, setContactEmail] = useState(props.primaryContact?.email || "");
   const [contactPhone, setContactPhone] = useState(props.primaryContact?.phone || "");
   const [contactTitle, setContactTitle] = useState(props.primaryContact?.title || "");
+  const [contacts, setContacts] = useState(props.contacts);
+  const [editingContactId, setEditingContactId] = useState("");
+  const [secondaryContactName, setSecondaryContactName] = useState("");
+  const [secondaryContactEmail, setSecondaryContactEmail] = useState("");
+  const [secondaryContactPhone, setSecondaryContactPhone] = useState("");
+  const [secondaryContactTitle, setSecondaryContactTitle] = useState("");
   const [note, setNote] = useState("");
   const [activityType, setActivityType] = useState("note");
   const [activitySummary, setActivitySummary] = useState("");
@@ -277,7 +286,6 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
         : "No Address, Missing Coords";
   const missingRouteStates = [
     !territoryCode ? "No territory" : null,
-    !routeDay ? "No route day" : null,
     !hasCoords ? "No coordinates" : null,
   ].filter(Boolean) as string[];
   const hasRouteConfig = Boolean(
@@ -291,6 +299,10 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
       latitude ||
       longitude
   );
+
+  useEffect(() => {
+    setContacts(props.contacts);
+  }, [props.contacts]);
 
   async function refreshWithMessage(message: string) {
     setSuccess(message);
@@ -398,31 +410,69 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
     }
   }
 
-  async function addContact() {
+  function resetSecondaryContactDraft() {
+    setEditingContactId("");
+    setSecondaryContactName("");
+    setSecondaryContactEmail("");
+    setSecondaryContactPhone("");
+    setSecondaryContactTitle("");
+  }
+
+  function startEditingContact(contact: PrimaryContact) {
+    setEditingContactId(String(contact.id || ""));
+    setSecondaryContactName(contact.name || "");
+    setSecondaryContactEmail(contact.email || "");
+    setSecondaryContactPhone(contact.phone || "");
+    setSecondaryContactTitle(contact.title || "");
+  }
+
+  async function saveSecondaryContact() {
     setContactBusy(true);
     setError(null);
     setSuccess(null);
 
     try {
       const res = await fetch(`/api/workspace/customers/${props.customerId}/contacts`, {
-        method: "POST",
+        method: editingContactId ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: contactName,
-          email: contactEmail,
-          phone: contactPhone,
-          title: contactTitle,
+          contact_id: editingContactId || null,
+          name: secondaryContactName,
+          email: secondaryContactEmail,
+          phone: secondaryContactPhone,
+          title: secondaryContactTitle,
         }),
       });
       const json = await parseJsonSafe(res);
       if (!res.ok) throw new Error(String(json.error || `Save failed (${res.status})`));
-      setContactName("");
-      setContactEmail("");
-      setContactPhone("");
-      setContactTitle("");
-      await refreshWithMessage("Contact added. Primary contact unchanged.");
+      resetSecondaryContactDraft();
+      await refreshWithMessage(editingContactId ? "Contact updated." : "Contact added.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setContactBusy(false);
+    }
+  }
+
+  async function removeSecondaryContact(contactId: string) {
+    setContactBusy(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const res = await fetch(`/api/workspace/customers/${props.customerId}/contacts`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contact_id: contactId }),
+      });
+      const json = await parseJsonSafe(res);
+      if (!res.ok) throw new Error(String(json.error || `Delete failed (${res.status})`));
+      if (editingContactId === contactId) {
+        resetSecondaryContactDraft();
+      }
+      await refreshWithMessage("Contact removed.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Delete failed");
     } finally {
       setContactBusy(false);
     }
@@ -701,21 +751,20 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#9fd9d2]">Quick Actions</p>
-            <h2 className="mt-1 text-xl font-semibold">Work the account without hunting through the page</h2>
-            <p className="mt-1 text-sm text-[#d3e6eb]">Calls and email fire immediately. The other actions jump straight into the existing account, task, activity, route, and timeline sections.</p>
+            <h2 className="mt-1 text-lg font-semibold">Work the account without hunting through the page</h2>
+            <p className="mt-1 text-sm text-[#d3e6eb]">Calls and email fire immediately. The rest jump into the existing account, task, route, and recent-history sections.</p>
           </div>
-          <div className="max-w-full rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-sm text-[#d7edf0]">
-            {territoryCode || "No territory"} • {routeDay || "No route day"} • {visitStatus ? titleCase(visitStatus) : "No visit status"}
+          <div className="max-w-full rounded-full border border-white/15 bg-black/10 px-3 py-1.5 text-xs font-medium text-[#d7edf0]">
+            {territoryCode || "No territory"} • {visitStatus ? titleCase(visitStatus) : "No visit status"} • {hasCoords ? "Map ready" : "Needs coords"}
           </div>
         </div>
 
-        <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-8">
+        <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7">
           <ActionButton href={callHref} label="Call" />
           <ActionButton href={emailHref} label="Email" />
           <ActionButton label="Text" disabled helper="Coming soon" />
           <ActionButton label="New Task" onClick={() => jumpToSection("customer-create-task", taskTitleInputRef.current)} />
           <ActionButton label="Account" onClick={() => jumpToSection("customer-account-management", accountCompanyInputRef.current)} />
-          <ActionButton label="Log Activity" onClick={() => jumpToSection("customer-log-activity", activitySummaryInputRef.current)} />
           <ActionButton label={routeQueueBusy ? "Adding..." : "Add to Route"} onClick={() => void addToRoute()} disabled={routeQueueBusy} />
           <ActionButton label="Recent Activity" onClick={() => jumpToSection("customer-activity-timeline")} />
         </div>
@@ -755,7 +804,6 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
           <div className="min-w-0 space-y-3">
             <div className="flex flex-wrap gap-2">
               <StatusPill label={territoryCode ? `Territory ${territoryCode}` : "Territory Missing"} tone={territoryCode ? "ok" : "warn"} />
-              <StatusPill label={routeDay ? `Route ${routeDay}` : "Route Day Missing"} tone={routeDay ? "ok" : "warn"} />
               <StatusPill label={hasCoords ? "Coords Ready" : "Coords Missing"} tone={hasCoords ? "ok" : "warn"} />
               <StatusPill label={coordinateStatusLabel} tone={hasCoords ? "ok" : "warn"} />
               {visitStatus ? <StatusPill label={titleCase(visitStatus)} /> : null}
@@ -832,7 +880,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
               </label>
 
               <label className="grid min-w-0 gap-1 text-sm text-[#4a6575] xl:col-span-3">
-                <span>Route Day</span>
+                <span>Run Day (Optional)</span>
                 <select value={routeDay} onChange={(event) => setRouteDay(event.target.value)} disabled={routeBusy} className={inputClass}>
                   <option value="">Unassigned</option>
                   {ROUTE_DAYS.map((option) => (
@@ -911,7 +959,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8398a5]">Routing Snapshot</p>
               <div className="mt-2 space-y-1.5">
                 <p className="break-words font-medium text-[#173543]">{territoryMeta?.label || "Territory not assigned"}</p>
-                <p>{routeDay ? `Default run day: ${routeDay}` : "Route day still open"}</p>
+                <p>{routeDay ? `Run day saved for later: ${routeDay}` : "Run day is optional for now."}</p>
                 <p>{assignedRouteRepUserId ? "Route rep assigned" : "No route rep assigned"}</p>
               </div>
             </div>
@@ -1068,41 +1116,108 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
         </section>
 
         <section id="customer-primary-contact" className={[sectionClass, "scroll-mt-28"].join(" ")}>
-          <SectionHeader
-            title="Primary Contact"
-            action={
-              <button
-                type="button"
-                onClick={() => void addContact()}
-                disabled={contactBusy}
-                className="rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm font-semibold text-[#24404d] transition hover:border-[#14b8a6] hover:text-[#0f766e] disabled:opacity-60"
-              >
-                {contactBusy ? "Saving..." : "Add Contact"}
-              </button>
-            }
-          />
-          <div className="mt-3 grid gap-3 md:grid-cols-2">
-            <label className="grid gap-1 text-sm text-[#4a6575]">
-              <span>Name</span>
-              <input value={contactName} onChange={(e) => setContactName(e.target.value)} disabled={contactBusy} className={inputClass} />
-            </label>
-            <label className="grid gap-1 text-sm text-[#4a6575]">
-              <span>Title</span>
-              <input value={contactTitle} onChange={(e) => setContactTitle(e.target.value)} disabled={contactBusy} className={inputClass} />
-            </label>
-            <label className="grid gap-1 text-sm text-[#4a6575]">
-              <span>Email</span>
-              <input value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} disabled={contactBusy} className={inputClass} />
-            </label>
-            <label className="grid gap-1 text-sm text-[#4a6575]">
-              <span>Phone</span>
-              <input value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} disabled={contactBusy} className={inputClass} />
-            </label>
-          </div>
-          <div className="mt-3">
-            <button type="button" onClick={() => void savePrimaryContact()} disabled={contactBusy} className="rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
-              {contactBusy ? "Saving..." : "Save Primary Contact"}
-            </button>
+          <SectionHeader title="Contact Management" description="Keep the primary buyer current and maintain additional contacts from one place." />
+
+          <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+            <div className="rounded-2xl border border-[#dbe9ef] bg-[#f9fcfd] p-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7a909d]">Primary Contact</p>
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <label className="grid gap-1 text-sm text-[#4a6575]">
+                  <span>Name</span>
+                  <input value={contactName} onChange={(e) => setContactName(e.target.value)} disabled={contactBusy} className={inputClass} />
+                </label>
+                <label className="grid gap-1 text-sm text-[#4a6575]">
+                  <span>Title</span>
+                  <input value={contactTitle} onChange={(e) => setContactTitle(e.target.value)} disabled={contactBusy} className={inputClass} />
+                </label>
+                <label className="grid gap-1 text-sm text-[#4a6575]">
+                  <span>Email</span>
+                  <input value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} disabled={contactBusy} className={inputClass} />
+                </label>
+                <label className="grid gap-1 text-sm text-[#4a6575]">
+                  <span>Phone</span>
+                  <input value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} disabled={contactBusy} className={inputClass} />
+                </label>
+              </div>
+              <div className="mt-3">
+                <button type="button" onClick={() => void savePrimaryContact()} disabled={contactBusy} className="rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+                  {contactBusy ? "Saving..." : "Save Primary Contact"}
+                </button>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-[#dbe9ef] bg-[#f9fcfd] p-3">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7a909d]">Additional Contacts</p>
+                  <p className="mt-1 text-sm text-[#5c7483]">Edit or remove non-primary contacts here.</p>
+                </div>
+                {editingContactId ? (
+                  <button type="button" onClick={resetSecondaryContactDraft} className="rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm font-semibold text-[#24404d] transition hover:border-[#14b8a6] hover:text-[#0f766e]">
+                    Cancel Edit
+                  </button>
+                ) : null}
+              </div>
+
+              <div className="mt-3 space-y-2.5">
+                {contacts.filter((contact) => !contact.isPrimary).map((contact) => (
+                  <div key={contact.id} className="rounded-xl border border-[#dbe9ef] bg-white px-3 py-2.5">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-[#173543]">{contact.name || "Unnamed contact"}</p>
+                        <p className="mt-1 text-sm text-[#4a6575]">{contact.title || "No title"}</p>
+                        <p className="mt-1 text-sm text-[#4a6575]">{contact.email || "No email"}{contact.phone ? ` • ${contact.phone}` : ""}</p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => startEditingContact(contact)}
+                          disabled={contactBusy}
+                          className="rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm font-semibold text-[#24404d] transition hover:border-[#14b8a6] hover:text-[#0f766e] disabled:opacity-60"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void removeSecondaryContact(String(contact.id || ""))}
+                          disabled={contactBusy}
+                          className="rounded-full border border-[#f1d1d1] bg-white px-3 py-1.5 text-sm font-semibold text-[#9f2a2a] transition hover:border-[#dc2626] hover:text-[#b91c1c] disabled:opacity-60"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {contacts.filter((contact) => !contact.isPrimary).length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-[#d3e1e8] bg-white px-3 py-4 text-sm text-[#5d7685]">No additional contacts yet.</div>
+                ) : null}
+              </div>
+
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <label className="grid gap-1 text-sm text-[#4a6575]">
+                  <span>Name</span>
+                  <input value={secondaryContactName} onChange={(e) => setSecondaryContactName(e.target.value)} disabled={contactBusy} className={inputClass} />
+                </label>
+                <label className="grid gap-1 text-sm text-[#4a6575]">
+                  <span>Title</span>
+                  <input value={secondaryContactTitle} onChange={(e) => setSecondaryContactTitle(e.target.value)} disabled={contactBusy} className={inputClass} />
+                </label>
+                <label className="grid gap-1 text-sm text-[#4a6575]">
+                  <span>Email</span>
+                  <input value={secondaryContactEmail} onChange={(e) => setSecondaryContactEmail(e.target.value)} disabled={contactBusy} className={inputClass} />
+                </label>
+                <label className="grid gap-1 text-sm text-[#4a6575]">
+                  <span>Phone</span>
+                  <input value={secondaryContactPhone} onChange={(e) => setSecondaryContactPhone(e.target.value)} disabled={contactBusy} className={inputClass} />
+                </label>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button type="button" onClick={() => void saveSecondaryContact()} disabled={contactBusy} className="rounded-full bg-[#173543] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+                  {contactBusy ? "Saving..." : editingContactId ? "Save Contact" : "Add Contact"}
+                </button>
+              </div>
+            </div>
           </div>
         </section>
       </div>
@@ -1219,10 +1334,10 @@ function ActionButton({
   helper?: string;
 }) {
   const className = [
-    "flex min-h-12 items-center justify-center rounded-[18px] border px-3 py-3 text-center text-sm font-semibold transition",
+    "flex min-h-10 items-center justify-center rounded-full border px-3 py-2 text-center text-sm font-semibold transition",
     disabled || (!href && !onClick)
       ? "cursor-not-allowed border-white/10 bg-white/10 text-[#9db8c2]"
-      : "border-[#7fd0c7] bg-[#effcf9] text-[#173543] hover:border-white hover:bg-white",
+      : "border-white/10 bg-white/12 text-white hover:border-[#8de0d6] hover:bg-[#effcf9] hover:text-[#173543]",
   ].join(" ");
 
   if (href && !disabled) {

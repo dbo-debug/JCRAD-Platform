@@ -190,10 +190,11 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
           routeRepOptions={salesOptions}
           territoryOptions={territoryOptions}
           primaryContact={primaryContact}
+          contacts={detail.contacts}
         />
 
-        <Panel title="Activity Timeline" id="customer-activity-timeline">
-          <div className="space-y-2.5">
+        <Panel title="Recent Activity" id="customer-activity-timeline">
+          <div className="max-h-[540px] space-y-2.5 overflow-y-auto pr-1">
             {detail.activity.map((item) => (
               <ActivityCard key={item.id} item={item} />
             ))}
@@ -202,27 +203,7 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
         </Panel>
       </section>
 
-      <section className="grid gap-3 xl:grid-cols-[1.15fr_0.95fr]">
-        <Panel title="Contacts">
-          <div className="space-y-2.5">
-            {detail.contacts.map((contact) => (
-              <div key={contact.id} className="rounded-xl border border-[#dbe9ef] bg-[#f9fcfd] px-3 py-2.5">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="font-semibold text-[#173543]">{contact.name}</p>
-                  {contact.isPrimary ? (
-                    <span className="rounded-full border border-[#bde8e4] bg-[#e9fbf9] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#0f766e]">
-                      Primary
-                    </span>
-                  ) : null}
-                </div>
-                <p className="mt-1 text-sm text-[#4a6575]">{contact.title || "No title"}</p>
-                <p className="text-sm text-[#4a6575]">{contact.email || "No email"}{contact.phone ? ` • ${contact.phone}` : ""}</p>
-              </div>
-            ))}
-            {detail.contacts.length === 0 ? <EmptyState label="No contacts found." /> : null}
-          </div>
-        </Panel>
-
+      <section className="grid gap-3 xl:grid-cols-1">
         <Panel title="Customer Users">
           <div className="space-y-2.5">
             {detail.users.map((user) => (
