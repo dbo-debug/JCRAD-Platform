@@ -326,7 +326,7 @@ export default function CustomerSelectionMap({
       marker.setIcon({
         path: googleMaps.SymbolPath.CIRCLE,
         scale: isFocused ? 16 : isSelected ? 14 : 12,
-        fillColor: isFocused ? "#173543" : isSelected ? "#0f766e" : "#14b8a6",
+        fillColor: isFocused ? "#173543" : isSelected ? "#38bdf8" : "#14b8a6",
         fillOpacity: 1,
         strokeColor: "#ffffff",
         strokeWeight: 2,
