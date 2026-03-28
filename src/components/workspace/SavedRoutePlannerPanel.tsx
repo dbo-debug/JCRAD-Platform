@@ -68,18 +68,13 @@ type PlannedRoute = {
   warning: string | null;
 };
 
-type RouteReadinessItem = {
-  queueId: string;
-  customer: CustomerSummary;
-  status: "included" | "route_ready" | "excluded";
-  reason:
-    | "missing_coordinates"
-    | "missing_address"
-    | "invalid_coordinates"
-    | "geocode_needs_attention"
-    | "not_eligible_for_current_planning_set"
-    | "not_in_finalized_preview"
-    | null;
+type SavedRouteEditDraft = {
+  routeId: string;
+  assignedUserId: string;
+  routeDate: string;
+  plannedStartTime: string;
+  maxStops: string;
+  notes: string;
 };
 
 function parseJsonSafe(res: Response): Promise<Record<string, unknown>> {
@@ -150,7 +145,16 @@ function routeStatusTone(args: { fitsWithinShift: boolean; previewNeedsRefresh: 
   };
 }
 
-function readinessReasonLabel(reason: RouteReadinessItem["reason"]) {
+function readinessReasonLabel(
+  reason:
+    | "missing_coordinates"
+    | "missing_address"
+    | "invalid_coordinates"
+    | "geocode_needs_attention"
+    | "not_eligible_for_current_planning_set"
+    | "not_in_finalized_preview"
+    | null
+) {
   if (reason === "missing_address") return "Needs address";
   if (reason === "missing_coordinates") return "Needs coordinates";
   if (reason === "invalid_coordinates") return "Needs coordinates review";
@@ -191,7 +195,9 @@ export default function SavedRoutePlannerPanel({
   const [overtimeApproved, setOvertimeApproved] = useState(false);
   const [previewNeedsRefresh, setPreviewNeedsRefresh] = useState(false);
   const [savedRoutesState, setSavedRoutesState] = useState(savedRoutes);
-  const [routeActionById, setRouteActionById] = useState<Record<string, "assign" | null>>({});
+  const [routeActionById, setRouteActionById] = useState<Record<string, "edit" | null>>({});
+  const [editingRouteId, setEditingRouteId] = useState<string | null>(null);
+  const [editingRouteDraft, setEditingRouteDraft] = useState<SavedRouteEditDraft | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState<"generate_pending" | "generate_territory" | "save" | "queue" | "reoptimize" | "delete_route" | null>(null);
 
@@ -207,49 +213,6 @@ export default function SavedRoutePlannerPanel({
   const suggestedTrimStops = (draftPlan?.suggestedTrimStopIds || [])
     .map((customerId) => draftPlan?.orderedStops.find((stop) => stop.customerId === customerId))
     .filter((stop): stop is DraftStop => Boolean(stop));
-  const previewIncludedIds = new Set((draftPlan?.orderedStops || []).map((stop) => stop.customerId));
-  const pendingRouteReadyStops = pendingStops.filter((stop) => isRouteEligibleCustomer(stop.customer));
-  const pendingEligibleIds = new Set(pendingRouteReadyStops.slice(0, normalizedMaxStops).map((stop) => stop.customerId));
-  const readinessItems = pendingStops.map((stop) => {
-    const reason = getRouteEligibilityReason(stop.customer);
-    if (reason) {
-      return {
-        queueId: stop.id,
-        customer: stop.customer,
-        status: "excluded",
-        reason,
-      } satisfies RouteReadinessItem;
-    }
-    if (!pendingEligibleIds.has(stop.customerId)) {
-      return {
-        queueId: stop.id,
-        customer: stop.customer,
-        status: "excluded",
-        reason: "not_eligible_for_current_planning_set",
-      } satisfies RouteReadinessItem;
-    }
-    if (draftPlan && !previewIncludedIds.has(stop.customerId)) {
-      return {
-        queueId: stop.id,
-        customer: stop.customer,
-        status: "excluded",
-        reason: "not_in_finalized_preview",
-      } satisfies RouteReadinessItem;
-    }
-    return {
-      queueId: stop.id,
-      customer: stop.customer,
-      status: draftPlan && previewIncludedIds.has(stop.customerId) ? "included" : "route_ready",
-      reason: null,
-    } satisfies RouteReadinessItem;
-  });
-  const readinessCounts = {
-    queued: readinessItems.length,
-    routeReady: readinessItems.filter((item) => item.status === "route_ready" || item.status === "included").length,
-    excluded: readinessItems.filter((item) => item.status === "excluded").length,
-    included: readinessItems.filter((item) => item.status === "included").length,
-  };
-  const readinessExcludedItems = readinessItems.filter((item) => item.status === "excluded");
   const selectedPreviewStop = draftStops.find((stop) => stop.customerId === selectedPreviewStopId) || draftStops[0] || null;
   const saveBlockedByOvertime = Boolean(draftPlan && !draftPlan.fitsWithinShift && !overtimeApproved);
   const saveBlocked = saveBlockedByOvertime || previewNeedsRefresh;
@@ -602,6 +565,7 @@ export default function SavedRoutePlannerPanel({
           status: "assigned",
           plannedStartTime: startTime,
           maxStops: normalizedMaxStops,
+          notes: notes || null,
           lunchMinutes: draftPlan.lunchMinutes,
           estimatedTotalMinutes: draftPlan.estimatedTotalMinutes,
           estimatedReturnTime: draftPlan.estimatedReturnTime,
@@ -657,42 +621,74 @@ export default function SavedRoutePlannerPanel({
     }
   }
 
-  async function updateSavedRouteAssignment(routeId: string, assignedUserId: string) {
-    if (!routeId || !assignedUserId) return;
+  function startEditingRoute(route: SavedRouteSummary) {
+    setEditingRouteId(route.id);
+    setEditingRouteDraft({
+      routeId: route.id,
+      assignedUserId: route.assignedUserId || "",
+      routeDate: route.routeDate || "",
+      plannedStartTime: route.plannedStartTime || "",
+      maxStops: route.maxStops === null ? String(plannerDefaults.route_planner_default_max_stops || 12) : String(route.maxStops),
+      notes: route.notes || "",
+    });
+    setStatusMessage(null);
+  }
 
-    setRouteActionById((current) => ({ ...current, [routeId]: "assign" }));
+  function cancelEditingRoute() {
+    setEditingRouteId(null);
+    setEditingRouteDraft(null);
+  }
+
+  async function saveEditedRoute() {
+    if (!editingRouteDraft) return;
+    if (!editingRouteDraft.assignedUserId || !editingRouteDraft.routeDate || !editingRouteDraft.plannedStartTime) {
+      setStatusMessage("Assigned rep, route date, and start time are required.");
+      return;
+    }
+
+    setRouteActionById((current) => ({ ...current, [editingRouteDraft.routeId]: "edit" }));
     setStatusMessage(null);
 
     try {
+      const normalizedMaxStops = Math.max(1, Math.min(40, Number(editingRouteDraft.maxStops) || 12));
       const res = await fetch("/api/workspace/routes", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          route_id: routeId,
-          assigned_user_id: assignedUserId,
+          route_id: editingRouteDraft.routeId,
+          assigned_user_id: editingRouteDraft.assignedUserId,
+          route_date: editingRouteDraft.routeDate,
+          planned_start_time: editingRouteDraft.plannedStartTime,
+          max_stops: normalizedMaxStops,
+          notes: editingRouteDraft.notes || null,
         }),
       });
       const json = await parseJsonSafe(res);
-      if (!res.ok) throw new Error(String(json.error || `Assignment failed (${res.status})`));
+      if (!res.ok) throw new Error(String(json.error || `Route update failed (${res.status})`));
 
-      const assignedUserLabel = routeRepOptions.find((option) => option.userId === assignedUserId)?.label || assignedUserId;
+      const assignedUserLabel = routeRepOptions.find((option) => option.userId === editingRouteDraft.assignedUserId)?.label || editingRouteDraft.assignedUserId;
       setSavedRoutesState((current) =>
         current.map((route) =>
-          route.id === routeId
+          route.id === editingRouteDraft.routeId
             ? {
                 ...route,
-                assignedUserId,
+                assignedUserId: editingRouteDraft.assignedUserId,
                 assignedUserLabel,
+                routeDate: editingRouteDraft.routeDate,
+                plannedStartTime: editingRouteDraft.plannedStartTime,
+                maxStops: normalizedMaxStops,
+                notes: editingRouteDraft.notes || null,
               }
             : route
         )
       );
-      setStatusMessage("Route assignment updated.");
+      setStatusMessage("Saved route changes.");
+      cancelEditingRoute();
       router.refresh();
     } catch (error) {
-      setStatusMessage(error instanceof Error ? error.message : "Assignment failed");
+      setStatusMessage(error instanceof Error ? error.message : "Route update failed");
     } finally {
-      setRouteActionById((current) => ({ ...current, [routeId]: null }));
+      setRouteActionById((current) => ({ ...current, [editingRouteDraft.routeId]: null }));
     }
   }
 
@@ -880,97 +876,6 @@ export default function SavedRoutePlannerPanel({
         </section>
       </div>
 
-      <section className="mt-5 rounded-[24px] border border-[#dbe8ef] bg-white p-4 shadow-sm">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Planning Set</p>
-            <h3 className="mt-1 text-lg font-semibold text-[#173543]">Planner works from the route-available subset</h3>
-            <p className="mt-1 text-sm text-[#5c7483]">
-              Queued stops stay in the CRM queue. This panel keeps the route-available set visible here and pushes geocode prep back to Customers where it belongs.
-            </p>
-          </div>
-          <div className="grid gap-2 rounded-2xl border border-[#dbe8ef] bg-[#fbfdfe] p-4 text-sm text-[#506877] sm:min-w-[240px]">
-            <MetricLine label="Queued Stops" value={String(readinessCounts.queued)} />
-            <MetricLine label="Route-Available" value={String(readinessCounts.routeReady)} />
-            <MetricLine label="Needs Prep" value={String(readinessCounts.excluded)} />
-            {draftPlan ? <MetricLine label="In Preview" value={String(readinessCounts.included)} /> : null}
-          </div>
-        </div>
-
-        <div className="mt-4 flex flex-wrap gap-2 text-sm">
-          <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-[#4f6877]">Max stops in current planning set: {normalizedMaxStops}</span>
-          <span className="rounded-full border border-[#cfe8e4] bg-[#effaf7] px-3 py-1.5 text-[#0f766e]">Available now: {readinessItems.filter((item) => item.status === "route_ready").length}</span>
-          {draftPlan ? (
-            <span className="rounded-full border border-[#d6ebea] bg-white px-3 py-1.5 text-[#355966]">Included in preview: {readinessCounts.included}</span>
-          ) : null}
-          {readinessExcludedItems.length > 0 ? (
-            <span className="rounded-full border border-[#f2ddb0] bg-[#fff9ea] px-3 py-1.5 text-[#9a640a]">Prep remaining queued stops in Customers as needed</span>
-          ) : null}
-        </div>
-
-        <div className="mt-4 grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
-          <div className="rounded-[22px] border border-[#dbe8ef] bg-[#fbfdfe] p-4">
-            <div className="flex items-center justify-between gap-3">
-              <h4 className="text-sm font-semibold uppercase tracking-[0.12em] text-[#6f8897]">Current Planning Set</h4>
-              <span className="rounded-full border border-[#d7e6ed] bg-white px-2.5 py-1 text-xs font-semibold text-[#4f6877]">
-                {readinessItems.filter((item) => item.status !== "excluded").length}
-              </span>
-            </div>
-            <div className="mt-3 space-y-2">
-              {readinessItems
-                .filter((item) => item.status !== "excluded")
-                .map((item) => (
-                  <div key={item.queueId} className="rounded-xl border border-[#e1ebf1] bg-white px-3 py-2">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="font-semibold text-[#173543]">{item.customer.name}</p>
-                      <span
-                        className={[
-                          "rounded-full border px-2.5 py-1 text-xs font-semibold",
-                          item.status === "included" ? "border-[#cfe8e4] bg-[#effaf7] text-[#0f766e]" : "border-[#d7e6ed] bg-[#f8fbfc] text-[#4f6877]",
-                        ].join(" ")}
-                      >
-                        {item.status === "included" ? "Included in preview" : "Route-available"}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-sm text-[#5c7483]">
-                      {item.customer.territoryCode || "Territory open"} • {item.customer.address1 || item.customer.city || "Address on file"}
-                    </p>
-                  </div>
-                ))}
-              {readinessItems.filter((item) => item.status !== "excluded").length === 0 ? (
-                <p className="text-sm text-[#5d7685]">No queued stops are route-available yet.</p>
-              ) : null}
-            </div>
-          </div>
-
-          <div className="rounded-[22px] border border-[#ece2c9] bg-[#fffdf8] p-4">
-            <div className="flex items-center justify-between gap-3">
-              <h4 className="text-sm font-semibold uppercase tracking-[0.12em] text-[#7d6b44]">Needs Prep In Customers</h4>
-              <span className="rounded-full border border-[#f2ddb0] bg-[#fff9ea] px-2.5 py-1 text-xs font-semibold text-[#9a640a]">
-                {readinessExcludedItems.length}
-              </span>
-            </div>
-            <p className="mt-2 text-sm text-[#7d6b44]">These queued stops stay intact here, but they should be geocoded or corrected in Customers before route planning.</p>
-            <div className="mt-3 space-y-2">
-              {readinessExcludedItems.map((item) => (
-                <div key={item.queueId} className="rounded-xl border border-[#f0dfba] bg-white px-3 py-2">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="font-semibold text-[#173543]">{item.customer.name}</p>
-                    <span className="rounded-full border border-[#f2ddb0] bg-[#fff9ea] px-2.5 py-1 text-xs font-semibold text-[#9a640a]">
-                      {readinessReasonLabel(item.reason)}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-sm text-[#5c7483]">
-                    {item.customer.address1 || item.customer.city || "No usable address"} • {item.customer.territoryCode || "Territory open"}
-                  </p>
-                </div>
-              ))}
-              {readinessExcludedItems.length === 0 ? <p className="text-sm text-[#5d7685]">All queued stops are route-available for the current planning set.</p> : null}
-            </div>
-          </div>
-        </div>
-      </section>
-
       <div className="mt-5 grid gap-5 2xl:grid-cols-[minmax(0,1.35fr)_minmax(380px,0.95fr)]">
         <section className="space-y-5">
           {draftMapCustomers.length > 0 && draftPlan ? (
@@ -1155,8 +1060,8 @@ export default function SavedRoutePlannerPanel({
             <div className="mt-5 rounded-[22px] border border-[#dbe8ef] bg-[#fbfdfe] p-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Recent Saved Routes</p>
-                <h4 className="mt-1 text-lg font-semibold text-[#173543]">Saved route runner handoff</h4>
-                <p className="mt-1 text-sm text-[#5c7483]">This same itinerary structure becomes the next runner foundation. Saved routes stay available here for quick handoff.</p>
+                <h4 className="mt-1 text-lg font-semibold text-[#173543]">Saved routes</h4>
+                <p className="mt-1 text-sm text-[#5c7483]">Open the runner, reassign, or edit route metadata without rebuilding the route.</p>
               </div>
 
               <div className="mt-4 space-y-3">
@@ -1170,30 +1075,25 @@ export default function SavedRoutePlannerPanel({
                       <p className="text-sm text-[#5c7483]">
                         {route.routeDate || "No date"} • {route.assignedUserLabel || "Unassigned rep"} • {route.stopCount} stops
                       </p>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <label className="text-sm text-[#5c7483]">
-                          <span className="sr-only">Assign route</span>
-                          <select
-                            value={route.assignedUserId || ""}
-                            onChange={(event) => void updateSavedRouteAssignment(route.id, event.target.value)}
-                            disabled={staffRole !== "admin" || busy !== null || routeActionById[route.id] === "assign"}
-                            className="rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm text-[#24404d] outline-none transition focus:border-[#14b8a6] disabled:opacity-60"
-                          >
-                            <option value="" disabled>
-                              Assign rep
-                            </option>
-                            {routeRepOptions.map((option) => (
-                              <option key={option.userId} value={option.userId}>
-                                {option.label}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
+                      <div className="flex flex-wrap gap-2 text-xs text-[#6f8897]">
+                        {route.plannedStartTime ? <span>Start {route.plannedStartTime}</span> : null}
+                        {route.maxStops ? <span>Cap {route.maxStops}</span> : null}
+                        {route.notes ? <span title={route.notes}>Notes saved</span> : null}
                       </div>
                       <div className="flex flex-wrap gap-2">
                         <Link href={`/workspace/routes/run?routeId=${route.id}`} className="rounded-full bg-[#173543] px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-[#0f2a35]">
                           Open Runner
                         </Link>
+                        {staffRole === "admin" ? (
+                          <button
+                            type="button"
+                            onClick={() => startEditingRoute(route)}
+                            disabled={busy !== null || routeActionById[route.id] === "edit"}
+                            className="rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm font-semibold text-[#24404d] transition hover:border-[#14b8a6] hover:text-[#0f766e] disabled:opacity-60"
+                          >
+                            Edit Route
+                          </button>
+                        ) : null}
                         {staffRole === "admin" ? (
                           <button
                             type="button"
@@ -1205,6 +1105,65 @@ export default function SavedRoutePlannerPanel({
                           </button>
                         ) : null}
                       </div>
+                      {staffRole === "admin" && editingRouteId === route.id && editingRouteDraft ? (
+                        <div className="mt-3 rounded-2xl border border-[#dbe8ef] bg-[#fbfdfe] p-3">
+                          <div className="grid gap-3 md:grid-cols-2">
+                            <PlannerSelect
+                              label="Assigned Rep"
+                              value={editingRouteDraft.assignedUserId}
+                              onChange={(value) => setEditingRouteDraft((current) => (current ? { ...current, assignedUserId: value } : current))}
+                              options={routeRepOptions.map((option) => ({ value: option.userId, label: option.label }))}
+                            />
+                            <PlannerInput
+                              label="Route Date"
+                              type="date"
+                              value={editingRouteDraft.routeDate}
+                              onChange={(value) => setEditingRouteDraft((current) => (current ? { ...current, routeDate: value } : current))}
+                            />
+                            <PlannerInput
+                              label="Start Time"
+                              type="time"
+                              value={editingRouteDraft.plannedStartTime}
+                              onChange={(value) => setEditingRouteDraft((current) => (current ? { ...current, plannedStartTime: value } : current))}
+                            />
+                            <PlannerInput
+                              label="Max Stops"
+                              type="number"
+                              value={editingRouteDraft.maxStops}
+                              onChange={(value) => setEditingRouteDraft((current) => (current ? { ...current, maxStops: value } : current))}
+                              min="1"
+                              max="40"
+                            />
+                          </div>
+                          <label className="mt-3 grid gap-1 text-sm text-[#4b6676]">
+                            <span className="font-medium">Notes</span>
+                            <textarea
+                              value={editingRouteDraft.notes}
+                              onChange={(event) => setEditingRouteDraft((current) => (current ? { ...current, notes: event.target.value } : current))}
+                              rows={3}
+                              className="rounded-2xl border border-[#cedde6] bg-white px-4 py-3 text-sm text-[#173543] outline-none transition focus:border-[#14b8a6]"
+                            />
+                          </label>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => void saveEditedRoute()}
+                              disabled={routeActionById[route.id] === "edit"}
+                              className="rounded-full bg-[#173543] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#0f2a35] disabled:opacity-60"
+                            >
+                              {routeActionById[route.id] === "edit" ? "Saving..." : "Save Changes"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={cancelEditingRoute}
+                              disabled={routeActionById[route.id] === "edit"}
+                              className="rounded-full border border-[#d0dde5] bg-white px-4 py-2 text-sm font-semibold text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543] disabled:opacity-60"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 ))}

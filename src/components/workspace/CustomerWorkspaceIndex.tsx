@@ -56,7 +56,7 @@ type BulkActionState = {
   value: string;
 };
 
-type SavedViewKey = "all" | "pipeline" | "unassigned" | "missing_primary" | "with_orders" | "hall_of_flowers" | "archived";
+type SavedViewKey = "all" | "pipeline" | "unassigned" | "missing_primary" | "with_orders" | "hall_of_flowers" | "needs_coordinates" | "archived";
 type SortKey = "activity_desc" | "name_asc" | "name_desc" | "orders_desc" | "owner_asc";
 type ContactCoverageFilter = "all" | "has_contacts" | "missing_primary" | "no_contacts";
 type RouteReadinessFilter = "all" | "route_ready" | "no_territory" | "no_route_rep" | "no_coords" | "address_ready";
@@ -140,6 +140,22 @@ function normalizeTelHref(value: string | null | undefined) {
   return `tel:${normalized}`;
 }
 
+function buildGoogleMapsSearchHref(customer: Pick<CustomerSummary, "geocodedAddress" | "address1" | "city" | "state" | "postalCode" | "latitude" | "longitude">) {
+  const addressQuery = String(
+    customer.geocodedAddress ||
+      [customer.address1, customer.city, customer.state, customer.postalCode]
+        .filter(Boolean)
+        .join(", ")
+  ).trim();
+  if (addressQuery) {
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addressQuery)}`;
+  }
+  if (customer.latitude !== null && customer.longitude !== null) {
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${customer.latitude},${customer.longitude}`)}`;
+  }
+  return null;
+}
+
 function statusChipClass(status: string) {
   switch (normalizeText(status)) {
     case "active":
@@ -188,7 +204,6 @@ function getCustomerSearchText(customer: CustomerSummary) {
     customer.assignedSalesEmail,
     customer.areaZone,
     customer.territoryCode,
-    customer.routeDay,
     customer.visitStatus,
     customer.website,
     customer.mainPhone,
@@ -218,7 +233,7 @@ function followUpChipClass(customer: CustomerSummary) {
   return "border-[#bde8e4] bg-[#e9fbf9] text-[#0f766e]";
 }
 
-type WorkspacePresetKey = "all" | "hall_of_flowers" | "hot_leads" | "no_task" | "overdue" | "archived";
+type WorkspacePresetKey = "all" | "hall_of_flowers" | "hot_leads" | "no_task" | "overdue" | "needs_coordinates" | "archived";
 
 function denseButtonClass(tone: "primary" | "secondary" = "secondary") {
   return tone === "primary"
@@ -265,6 +280,7 @@ export default function CustomerWorkspaceIndex({
     initialFilters.savedView === "missing_primary" ||
       initialFilters.savedView === "with_orders" ||
       initialFilters.savedView === "hall_of_flowers" ||
+      initialFilters.savedView === "needs_coordinates" ||
       initialFilters.savedView === "archived"
       ? initialFilters.savedView
       : "all"
@@ -431,6 +447,7 @@ export default function CustomerWorkspaceIndex({
     if (savedView === "missing_primary" && customer.primaryContacts.length > 0) return false;
     if (savedView === "with_orders" && customer.counts.orders === 0) return false;
     if (savedView === "hall_of_flowers" && !customer.isHallOfFlowersLead) return false;
+    if (savedView === "needs_coordinates" && getCoordinateCoverageState(customer) === "has_coords") return false;
 
     return true;
   });
@@ -477,6 +494,7 @@ export default function CustomerWorkspaceIndex({
     hotLeads: activeCustomers.filter((customer) => customer.isHotLead).length,
     noTask: activeCustomers.filter((customer) => !customer.hasOpenTask).length,
     overdue: activeCustomers.filter((customer) => customer.overdueTaskCount > 0).length,
+    needsCoordinates: activeCustomers.filter((customer) => getCoordinateCoverageState(customer) !== "has_coords").length,
     archived: archivedCustomers.length,
   };
   const advancedFilterCount = [
@@ -755,6 +773,10 @@ export default function CustomerWorkspaceIndex({
         setTaskStateFilter("overdue_task");
         return;
       }
+      if (preset === "needs_coordinates") {
+        setSavedView("needs_coordinates");
+        return;
+      }
       if (preset === "archived") {
         setSavedView("archived");
       }
@@ -955,6 +977,7 @@ export default function CustomerWorkspaceIndex({
     { key: "hot_leads" as const, label: "Hot Leads", count: navCounts.hotLeads },
     { key: "no_task" as const, label: "No Task", count: navCounts.noTask },
     { key: "overdue" as const, label: "Overdue", count: navCounts.overdue },
+    { key: "needs_coordinates" as const, label: "Needs Coordinates", count: navCounts.needsCoordinates },
     { key: "archived" as const, label: "Archived", count: navCounts.archived },
   ];
 
@@ -976,6 +999,7 @@ export default function CustomerWorkspaceIndex({
                 (item.key === "hot_leads" && hotLeadFilter === "hot") ||
                 (item.key === "no_task" && taskStateFilter === "no_open_task") ||
                 (item.key === "overdue" && taskStateFilter === "overdue_task") ||
+                (item.key === "needs_coordinates" && savedView === "needs_coordinates") ||
                 (item.key === "archived" && savedView === "archived");
 
               return (
@@ -1332,11 +1356,15 @@ function CustomerCard({
   const primaryEmailHref = normalizeMailtoHref(primaryContact?.email || customer.primaryContactEmail);
   const phoneHref = normalizeTelHref(primaryContact?.phone || customer.mainPhone);
   const websiteHref = normalizeWebsiteHref(customer.website);
+  const mapsHref = buildGoogleMapsSearchHref(customer);
   const routeReadiness = getRouteReadiness(customer);
   const followUpState = getFollowUpState(customer);
+  const needsCoordinates = getCoordinateCoverageState(customer) !== "has_coords";
   const bestNextAction =
     customer.overdueTaskCount > 0
       ? "Handle overdue follow-up"
+      : needsCoordinates
+        ? "Review address and save coordinates"
       : !primaryContact
         ? "Add contact details"
         : !customer.hasOpenTask
@@ -1429,9 +1457,15 @@ function CustomerCard({
       <p className="mt-3 truncate text-sm text-[#5c7483]">{metadataLine || "No recent metadata yet."}</p>
 
       <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-[#e6eef3] pt-3">
+        {needsCoordinates ? <QuickAction href={mapsHref} label="Open Maps" external /> : null}
         <QuickAction href={phoneHref} label="Call" />
         <QuickAction href={primaryEmailHref} label="Email" />
         <QuickAction href={websiteHref} label="Site" external />
+        {needsCoordinates ? (
+          <Link href={`/workspace/customers/${customer.id}#customer-route-field-ops`} className={denseButtonClass()}>
+            Manual Coords
+          </Link>
+        ) : null}
         <Link href={`/workspace/customers/${customer.id}`} className={denseButtonClass("primary")}>
           Open Account
         </Link>

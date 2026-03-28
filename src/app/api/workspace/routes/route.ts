@@ -139,21 +139,41 @@ export async function PATCH(req: Request) {
   const routeId = asText(body.route_id);
   const assignedUserId = asText(body.assigned_user_id);
   const status = asText(body.status);
+  const routeDate = asText(body.route_date);
+  const plannedStartTime = asText(body.planned_start_time);
+  const notes = "notes" in body ? asText(body.notes) : undefined;
+  const maxStops = "max_stops" in body ? asNullableNumber(body.max_stops) : undefined;
 
   if (!routeId) {
     return NextResponse.json({ error: "route_id is required" }, { status: 400 });
   }
-  if (!assignedUserId && !status) {
+  if (
+    !assignedUserId &&
+    !status &&
+    routeDate === null &&
+    plannedStartTime === null &&
+    notes === undefined &&
+    maxStops === undefined
+  ) {
     return NextResponse.json({ error: "Provide a route update field" }, { status: 400 });
   }
   if (status && !["draft", "assigned", "in_progress", "completed", "archived"].includes(status)) {
     return NextResponse.json({ error: "Invalid route status" }, { status: 400 });
   }
+  if ("planned_start_time" in body && !plannedStartTime) {
+    return NextResponse.json({ error: "planned_start_time is required" }, { status: 400 });
+  }
+  if ("route_date" in body && !routeDate) {
+    return NextResponse.json({ error: "route_date is required" }, { status: 400 });
+  }
+  if ("max_stops" in body && (!Number.isInteger(maxStops) || (maxStops || 0) <= 0 || (maxStops || 0) > 40)) {
+    return NextResponse.json({ error: "max_stops must be an integer between 1 and 40" }, { status: 400 });
+  }
   if (staff.role === "sales" && assignedUserId && assignedUserId !== staff.userId) {
     return NextResponse.json({ error: "Sales staff can only assign routes to themselves" }, { status: 403 });
   }
 
-  const payload: Record<string, string> = {
+  const payload: Record<string, string | number | null> = {
     updated_at: new Date().toISOString(),
   };
   if ("assigned_user_id" in body) {
@@ -164,6 +184,18 @@ export async function PATCH(req: Request) {
   }
   if ("status" in body && status) {
     payload.status = status;
+  }
+  if ("route_date" in body) {
+    payload.route_date = routeDate;
+  }
+  if ("planned_start_time" in body) {
+    payload.planned_start_time = plannedStartTime;
+  }
+  if ("notes" in body) {
+    payload.notes = notes ?? null;
+  }
+  if ("max_stops" in body) {
+    payload.max_stops = maxStops ?? null;
   }
 
   const supabase = createAdminClient();
@@ -192,7 +224,16 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: error.message || "Failed to update route" }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, route_id: routeId, status: payload.status || null, assigned_user_id: payload.assigned_user_id || null });
+  return NextResponse.json({
+    ok: true,
+    route_id: routeId,
+    status: payload.status || null,
+    assigned_user_id: payload.assigned_user_id || null,
+    route_date: payload.route_date || null,
+    planned_start_time: payload.planned_start_time || null,
+    notes: "notes" in payload ? payload.notes : null,
+    max_stops: "max_stops" in payload ? payload.max_stops : null,
+  });
 }
 
 export async function DELETE(req: Request) {

@@ -36,6 +36,7 @@ export type SavedRouteSummary = {
   status: string;
   plannedStartTime: string | null;
   maxStops: number | null;
+  notes: string | null;
   lunchMinutes: number | null;
   estimatedTotalMinutes: number | null;
   estimatedReturnTime: string | null;
@@ -157,7 +158,7 @@ export async function loadSavedRoutes(staff?: StaffContext): Promise<SavedRouteS
   const supabase = createAdminClient();
   let routesQuery = supabase
     .from("routes")
-    .select("id, name, territory_code, origin_name, origin_address, assigned_user_id, route_date, status, planned_start_time, max_stops, lunch_minutes, estimated_total_minutes, estimated_return_time, created_by, created_at, updated_at")
+    .select("id, name, territory_code, origin_name, origin_address, assigned_user_id, route_date, status, planned_start_time, max_stops, notes, lunch_minutes, estimated_total_minutes, estimated_return_time, created_by, created_at, updated_at")
     .order("route_date", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(40);
@@ -207,6 +208,7 @@ export async function loadSavedRoutes(staff?: StaffContext): Promise<SavedRouteS
         status: asText(row.status) || "draft",
         plannedStartTime: asText(row.planned_start_time),
         maxStops: asNumber(row.max_stops),
+        notes: asText(row.notes),
         lunchMinutes: asNumber(row.lunch_minutes),
         estimatedTotalMinutes: asNumber(row.estimated_total_minutes),
         estimatedReturnTime: asText(row.estimated_return_time),
