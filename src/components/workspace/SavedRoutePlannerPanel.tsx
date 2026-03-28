@@ -11,6 +11,7 @@ import PlannedRoutePreviewMap from "@/components/workspace/PlannedRoutePreviewMa
 import { formatBusinessDateTime, formatBusinessDateTimeLong } from "@/lib/businessTime";
 import { JC_RAD_HQ } from "@/lib/routePlanning";
 import { getRouteEligibilityReason, isRouteEligibleCustomer } from "@/lib/routeEligibility";
+import { syncGeneratedRouteName } from "@/lib/routeNames";
 
 type SavedRoutePlannerPanelProps = {
   customers: CustomerSummary[];
@@ -672,6 +673,14 @@ export default function SavedRoutePlannerPanel({
           route.id === editingRouteDraft.routeId
             ? {
                 ...route,
+                name:
+                  (route.routeDate !== editingRouteDraft.routeDate
+                    ? syncGeneratedRouteName({
+                        name: route.name,
+                        territoryCode: route.territoryCode,
+                        routeDate: editingRouteDraft.routeDate,
+                      })
+                    : route.name) || route.name,
                 assignedUserId: editingRouteDraft.assignedUserId,
                 assignedUserLabel,
                 routeDate: editingRouteDraft.routeDate,

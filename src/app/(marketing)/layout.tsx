@@ -17,7 +17,7 @@ export const metadata: Metadata = {
 export default async function MarketingLayout({ children }: { children: ReactNode }) {
   const { user, profile } = await getUserAndProfile();
   const role = String((profile as Record<string, unknown> | null)?.role || "customer").toLowerCase();
-  const dashboardHref = role === "admin" ? "/admin" : role === "sales" ? "/workspace/customers" : "/dashboard";
+  const dashboardHref = role === "admin" || role === "sales" ? "/admin" : "/dashboard";
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,#f3fbff_0%,#f7fbfd_35%,#ffffff_80%)] text-[#173543]">

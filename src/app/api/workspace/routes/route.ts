@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStaffContext } from "@/lib/getStaffContext";
+import { syncGeneratedRouteName } from "@/lib/routeNames";
 
 function asText(value: unknown): string | null {
   const text = String(value || "").trim();
@@ -201,7 +202,7 @@ export async function PATCH(req: Request) {
   const supabase = createAdminClient();
   const { data: existingRoute, error: existingRouteError } = await supabase
     .from("routes")
-    .select("id, assigned_user_id, created_by")
+    .select("id, name, territory_code, assigned_user_id, created_by")
     .eq("id", routeId)
     .maybeSingle();
 
@@ -218,6 +219,13 @@ export async function PATCH(req: Request) {
   ) {
     return NextResponse.json({ error: "Sales staff can only update their own routes" }, { status: 403 });
   }
+  if ("route_date" in body && routeDate) {
+    payload.name = syncGeneratedRouteName({
+      name: asText(existingRoute.name),
+      territoryCode: asText(existingRoute.territory_code),
+      routeDate,
+    });
+  }
 
   const { error } = await supabase.from("routes").update(payload).eq("id", routeId);
   if (error) {
@@ -230,6 +238,7 @@ export async function PATCH(req: Request) {
     status: payload.status || null,
     assigned_user_id: payload.assigned_user_id || null,
     route_date: payload.route_date || null,
+    name: typeof payload.name === "string" ? payload.name : null,
     planned_start_time: payload.planned_start_time || null,
     notes: "notes" in payload ? payload.notes : null,
     max_stops: "max_stops" in payload ? payload.max_stops : null,
