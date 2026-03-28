@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import type { SavedRouteDetail, SavedRouteStop } from "@/lib/routeWorkspace";
+import { syncGeneratedRouteName } from "@/lib/routeNames";
+import { parseBusinessDateTime } from "@/lib/businessTime";
 import {
   formatDateTime,
   normalizeMailtoHref,
@@ -45,17 +47,37 @@ function routeProgressTone(deltaMinutes: number) {
   return deltaMinutes > 0 ? "text-[#9a3d3d]" : "text-[#285ea8]";
 }
 
+function getScheduledStartMs(route: SavedRouteDetail) {
+  if (!route.routeDate || !route.plannedStartTime) return null;
+  const scheduledStart = parseBusinessDateTime({
+    routeDate: route.routeDate,
+    time: route.plannedStartTime,
+  });
+  const scheduledStartMs = scheduledStart.getTime();
+  return Number.isFinite(scheduledStartMs) ? scheduledStartMs : null;
+}
+
+function getPlannedReturnMs(route: SavedRouteDetail, scheduledStartMs: number | null) {
+  if (scheduledStartMs !== null && Number.isFinite(route.estimatedTotalMinutes || NaN)) {
+    return scheduledStartMs + Math.max(0, route.estimatedTotalMinutes || 0) * 60 * 1000;
+  }
+  return toMs(route.estimatedReturnTime);
+}
+
 function buildRouteProgress(route: SavedRouteDetail) {
   const visitedStops = route.stops.filter((stop) => stop.stopStatus === "visited");
   const now = Date.now();
+  const status = String(route.status || "").toLowerCase();
+  const routeNotStarted = status === "draft" || status === "assigned";
   const nextPendingStop = route.stops.find((stop) => stop.stopStatus !== "visited" && stop.stopStatus !== "skipped") || null;
   const lastCompletedAt =
     visitedStops
       .map((stop) => toMs(stop.customer.lastVisitAt))
       .filter((value): value is number => value !== null)
       .sort((left, right) => right - left)[0] || null;
+  const scheduledStartMs = getScheduledStartMs(route);
 
-  const baselineMs = lastCompletedAt || now;
+  const baselineMs = lastCompletedAt || (routeNotStarted && scheduledStartMs !== null ? scheduledStartMs : now);
   const remainingStops = route.stops.filter((stop) => stop.stopStatus !== "visited" && stop.stopStatus !== "skipped");
   const remainingVisitMinutes = remainingStops.reduce((sum, stop) => sum + (stop.estimatedVisitMinutes || 0), 0);
   const routeStopDriveMinutes = route.stops.reduce((sum, stop) => sum + (stop.estimatedDriveMinutesFromPrevious || 0), 0);
@@ -63,13 +85,19 @@ function buildRouteProgress(route: SavedRouteDetail) {
   const remainingDriveMinutes = remainingStops.reduce((sum, stop) => sum + (stop.estimatedDriveMinutesFromPrevious || 0), 0);
   const projectedFinishMs = baselineMs + (remainingVisitMinutes + remainingDriveMinutes) * 60 * 1000;
   const projectedReturnMs = projectedFinishMs + returnDriveMinutes * 60 * 1000;
-  const plannedReturnMs = toMs(route.estimatedReturnTime);
-  const progressDeltaMinutes = plannedReturnMs ? Math.round((projectedReturnMs - plannedReturnMs) / 60000) : 0;
+  const plannedReturnMs = getPlannedReturnMs(route, scheduledStartMs);
+  const progressDeltaMinutes =
+    plannedReturnMs && routeNotStarted && scheduledStartMs !== null && now < scheduledStartMs
+      ? 0
+      : plannedReturnMs
+        ? Math.round((projectedReturnMs - plannedReturnMs) / 60000)
+        : 0;
   const nextStopDeltaMinutes = nextPendingStop?.plannedArrivalTime ? Math.round((now - Date.parse(nextPendingStop.plannedArrivalTime)) / 60000) : 0;
 
   return {
     visitedCount: visitedStops.length,
     remainingCount: remainingStops.length,
+    plannedReturnTime: plannedReturnMs ? new Date(plannedReturnMs).toISOString() : null,
     projectedFinishTime: new Date(projectedFinishMs).toISOString(),
     projectedReturnTime: new Date(projectedReturnMs).toISOString(),
     progressDeltaMinutes,
@@ -80,6 +108,13 @@ function buildRouteProgress(route: SavedRouteDetail) {
 export default function SavedRouteRunner({ route }: SavedRouteRunnerProps) {
   const router = useRouter();
   const progress = useMemo(() => buildRouteProgress(route), [route]);
+  const routeTitle = route.routeDate
+    ? syncGeneratedRouteName({
+        name: route.name,
+        territoryCode: route.territoryCode,
+        routeDate: route.routeDate,
+      }) || route.name
+    : route.name;
   const [routeStatus, setRouteStatus] = useState(route.status || "draft");
   const [routeBusy, setRouteBusy] = useState<"start" | "complete" | null>(null);
   const [routeMessage, setRouteMessage] = useState<string | null>(null);
@@ -115,7 +150,7 @@ export default function SavedRouteRunner({ route }: SavedRouteRunnerProps) {
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div className="max-w-[760px]">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6c8797]">Saved Route Runner</p>
-            <h2 className="mt-2 text-2xl font-semibold text-[#173543]">{route.name}</h2>
+            <h2 className="mt-2 text-2xl font-semibold text-[#173543]">{routeTitle}</h2>
             <p className="mt-2 text-sm text-[#5c7483]">
               {route.routeDate || "No date"} • {route.assignedUserLabel || "Unassigned rep"} • {route.stops.length} stops • {routeStatus}
             </p>
@@ -152,7 +187,7 @@ export default function SavedRouteRunner({ route }: SavedRouteRunnerProps) {
             <MetricLine label="Drive Minutes" value={String(route.estimatedDriveMinutes || 0)} />
             <MetricLine label="Visit Minutes" value={String(route.estimatedVisitMinutes || 0)} />
             <MetricLine label="Lunch Minutes" value={String(route.lunchMinutes || 0)} />
-            <MetricLine label="Planned Return" value={route.estimatedReturnTime ? formatDateTime(route.estimatedReturnTime) : "Not set"} />
+            <MetricLine label="Planned Return" value={progress.plannedReturnTime ? formatDateTime(progress.plannedReturnTime) : "Not set"} />
             <MetricLine label="Projected Finish" value={formatDateTime(progress.projectedFinishTime)} />
             <MetricLine label="Projected Return" value={formatDateTime(progress.projectedReturnTime)} />
             <MetricLine label="Visited / Remaining" value={`${progress.visitedCount} / ${progress.remainingCount}`} />

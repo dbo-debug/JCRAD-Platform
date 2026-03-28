@@ -206,6 +206,7 @@ function buildLiveInfusionSources(args: {
 export default async function MenuPage() {
   const supabase = createAdminClient();
   let isAdmin = false;
+  let isSales = false;
   let isAuthenticated = false;
 
   try {
@@ -219,10 +220,13 @@ export default async function MenuPage() {
         .select("role")
         .eq("id", userId)
         .maybeSingle();
-      isAdmin = String((profile as any)?.role || "").toLowerCase() === "admin";
+      const role = String((profile as any)?.role || "").toLowerCase();
+      isAdmin = role === "admin";
+      isSales = role === "sales";
     }
   } catch {
     isAdmin = false;
+    isSales = false;
   }
 
   const { data: catalogRowsData, error: catalogErr } = await supabase
@@ -611,7 +615,7 @@ export default async function MenuPage() {
 
   return (
     <>
-      <Header isAuthenticated={isAuthenticated} dashboardHref={isAdmin ? "/admin" : "/dashboard"} />
+      <Header isAuthenticated={isAuthenticated} dashboardHref={isAdmin || isSales ? "/admin" : "/dashboard"} />
       {process.env.NODE_ENV !== "production" && shouldShowDraftHeavyWarning ? (
         <div
           style={{

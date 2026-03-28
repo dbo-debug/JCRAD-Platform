@@ -668,19 +668,25 @@ export default function SavedRoutePlannerPanel({
       if (!res.ok) throw new Error(String(json.error || `Route update failed (${res.status})`));
 
       const assignedUserLabel = routeRepOptions.find((option) => option.userId === editingRouteDraft.assignedUserId)?.label || editingRouteDraft.assignedUserId;
+      const syncedRouteName =
+        typeof json.name === "string" && json.name.trim()
+          ? json.name.trim()
+          : undefined;
       setSavedRoutesState((current) =>
         current.map((route) =>
           route.id === editingRouteDraft.routeId
             ? {
                 ...route,
                 name:
+                  syncedRouteName ||
                   (route.routeDate !== editingRouteDraft.routeDate
                     ? syncGeneratedRouteName({
                         name: route.name,
                         territoryCode: route.territoryCode,
                         routeDate: editingRouteDraft.routeDate,
                       })
-                    : route.name) || route.name,
+                    : route.name) ||
+                  route.name,
                 assignedUserId: editingRouteDraft.assignedUserId,
                 assignedUserLabel,
                 routeDate: editingRouteDraft.routeDate,
