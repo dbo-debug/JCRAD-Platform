@@ -28,16 +28,29 @@ export default async function WorkspaceCustomersPage({
     <div className="mx-auto w-full max-w-[1520px] space-y-6">
       <AdminPageHeader
         title="Customers"
-        description="CRM workspace for account ownership, contact coverage, pipeline management, and sales follow-up. Google Sheets imports feed this system, but CRM records are now the source of truth."
+        description="Workflow-first customer workspace for daily follow-up, segmentation, and route prep. Google Sheets imports feed this system, but CRM records are now the source of truth."
         action={<HeaderActions isAdmin={staff.role === "admin"} />}
       />
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <MetricCard label="Total Customers" value={metrics.totalCustomers} />
-        <MetricCard label="Total Contacts" value={metrics.totalContacts} />
-        <MetricCard label="With Contacts" value={metrics.customersWithContacts} />
-        <MetricCard label="Missing Primary Contact" value={metrics.missingPrimaryContact} />
-        <MetricCard label="Without Contacts" value={metrics.customersWithoutContacts} />
+      <section className="grid gap-4 lg:grid-cols-3">
+        <ModeCard
+          label="Work Queue"
+          title="Follow-up and movement"
+          detail={`${metrics.totalCustomers} total accounts • ${pendingStops.length} pending stops in play`}
+          href="/workspace/customers?taskState=overdue_task&sort=activity_desc"
+        />
+        <ModeCard
+          label="Segment Builder"
+          title="Target and organize"
+          detail={`${metrics.totalContacts} contacts • ${metrics.customersWithContacts} accounts with contact coverage`}
+          href="/workspace/customers?savedView=pipeline&organizeBy=stage&sort=activity_desc"
+        />
+        <ModeCard
+          label="Route Prep"
+          title="Prep the field queue"
+          detail={`${metrics.missingPrimaryContact} missing primary contacts • use route readiness and coordinate cleanup`}
+          href="/workspace/customers?savedView=needs_coordinates&sort=activity_desc"
+        />
       </section>
       <CustomerWorkspaceIndex
         customers={customers}
@@ -68,12 +81,14 @@ export default async function WorkspaceCustomersPage({
   );
 }
 
-function MetricCard({ label, value }: { label: string; value: number }) {
+function ModeCard({ label, title, detail, href }: { label: string; title: string; detail: string; href: string }) {
   return (
-    <div className="rounded-[24px] border border-[#d7e6ed] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbfd_100%)] p-5 shadow-[0_12px_30px_rgba(16,42,67,0.06)]">
+    <Link href={href} className="rounded-[24px] border border-[#d7e6ed] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbfd_100%)] p-5 shadow-[0_12px_30px_rgba(16,42,67,0.06)] transition hover:border-[#14b8a6] hover:bg-white">
       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#617d8c]">{label}</p>
-      <p className="mt-2 text-3xl font-semibold text-[#173543]">{value}</p>
-    </div>
+      <p className="mt-2 text-xl font-semibold text-[#173543]">{title}</p>
+      <p className="mt-2 text-sm text-[#5c7483]">{detail}</p>
+      <p className="mt-3 text-xs font-semibold uppercase tracking-[0.08em] text-[#0f766e]">Open mode</p>
+    </Link>
   );
 }
 

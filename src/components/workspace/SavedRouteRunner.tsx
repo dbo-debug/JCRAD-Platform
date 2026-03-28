@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import type { SavedRouteDetail, SavedRouteStop } from "@/lib/routeWorkspace";
 import { syncGeneratedRouteName } from "@/lib/routeNames";
 import { parseBusinessDateTime } from "@/lib/businessTime";
@@ -96,13 +97,29 @@ function buildRouteProgress(route: SavedRouteDetail) {
 
   return {
     visitedCount: visitedStops.length,
+    skippedCount: route.stops.filter((stop) => stop.stopStatus === "skipped").length,
     remainingCount: remainingStops.length,
+    nextPendingStop,
     plannedReturnTime: plannedReturnMs ? new Date(plannedReturnMs).toISOString() : null,
     projectedFinishTime: new Date(projectedFinishMs).toISOString(),
     projectedReturnTime: new Date(projectedReturnMs).toISOString(),
     progressDeltaMinutes,
     nextStopDeltaMinutes,
   };
+}
+
+function getStopStage(stop: SavedRouteStop, nextPendingStopId: string | null): "next" | "upcoming" | "completed" | "skipped" {
+  if (stop.stopStatus === "visited") return "completed";
+  if (stop.stopStatus === "skipped") return "skipped";
+  if (stop.id === nextPendingStopId) return "next";
+  return "upcoming";
+}
+
+function stageSectionLabel(stage: "next" | "upcoming" | "completed" | "skipped") {
+  if (stage === "next") return "Next Stop";
+  if (stage === "upcoming") return "Upcoming Stops";
+  if (stage === "completed") return "Completed Stops";
+  return "Skipped Stops";
 }
 
 export default function SavedRouteRunner({ route }: SavedRouteRunnerProps) {
@@ -118,6 +135,12 @@ export default function SavedRouteRunner({ route }: SavedRouteRunnerProps) {
   const [routeStatus, setRouteStatus] = useState(route.status || "draft");
   const [routeBusy, setRouteBusy] = useState<"start" | "complete" | null>(null);
   const [routeMessage, setRouteMessage] = useState<string | null>(null);
+  const nextPendingStopId = progress.nextPendingStop?.id || null;
+  const nextStop = progress.nextPendingStop || null;
+  const nextStops = route.stops.filter((stop) => getStopStage(stop, nextPendingStopId) === "next");
+  const upcomingStops = route.stops.filter((stop) => getStopStage(stop, nextPendingStopId) === "upcoming");
+  const completedStops = route.stops.filter((stop) => getStopStage(stop, nextPendingStopId) === "completed");
+  const skippedStops = route.stops.filter((stop) => getStopStage(stop, nextPendingStopId) === "skipped");
 
   async function updateRouteStatus(nextStatus: "in_progress" | "completed") {
     setRouteBusy(nextStatus === "in_progress" ? "start" : "complete");
@@ -149,13 +172,16 @@ export default function SavedRouteRunner({ route }: SavedRouteRunnerProps) {
       <section className="rounded-[28px] border border-[#d8e6ee] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbfd_100%)] p-5 shadow-[0_24px_60px_rgba(16,42,67,0.08)] lg:px-6">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div className="max-w-[760px]">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6c8797]">Saved Route Runner</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6c8797]">Field Execution Cockpit</p>
             <h2 className="mt-2 text-2xl font-semibold text-[#173543]">{routeTitle}</h2>
             <p className="mt-2 text-sm text-[#5c7483]">
-              {route.routeDate || "No date"} • {route.assignedUserLabel || "Unassigned rep"} • {route.stops.length} stops • {routeStatus}
+              {route.routeDate || "No date"} • {route.assignedUserLabel || "Unassigned rep"} • {route.stops.length} stops • {titleCase(routeStatus)}
             </p>
             <p className="mt-1 text-sm text-[#5c7483]">
               Origin {route.originName} • {route.originAddress}
+            </p>
+            <p className="mt-2 max-w-3xl text-sm text-[#5c7483]">
+              Run the route in order: work the next stop, capture the outcome, create follow-up if needed, then continue down the line.
             </p>
             {route.notes ? <p className="mt-2 text-sm text-[#5c7483]">{route.notes}</p> : null}
             <div className="mt-3 flex flex-wrap gap-2">
@@ -191,6 +217,7 @@ export default function SavedRouteRunner({ route }: SavedRouteRunnerProps) {
             <MetricLine label="Projected Finish" value={formatDateTime(progress.projectedFinishTime)} />
             <MetricLine label="Projected Return" value={formatDateTime(progress.projectedReturnTime)} />
             <MetricLine label="Visited / Remaining" value={`${progress.visitedCount} / ${progress.remainingCount}`} />
+            <MetricLine label="Skipped" value={String(progress.skippedCount)} />
             <div className={["text-sm font-semibold", routeProgressTone(progress.progressDeltaMinutes)].join(" ")}>
               Route status: {formatDelta(progress.progressDeltaMinutes)}
             </div>
@@ -198,16 +225,100 @@ export default function SavedRouteRunner({ route }: SavedRouteRunnerProps) {
         </div>
       </section>
 
-      <section className="space-y-4">
-        {route.stops.map((stop) => (
-          <SavedRouteStopCard key={stop.id} stop={stop} />
-        ))}
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.7fr)]">
+        <div className="rounded-[28px] border border-[#cfe5e8] bg-[linear-gradient(180deg,#173543_0%,#1d4658_100%)] p-5 text-white shadow-[0_16px_40px_rgba(16,42,67,0.16)]">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#9fd9d2]">What To Work Next</p>
+          {nextStop ? (
+            <>
+              <h3 className="mt-2 text-xl font-semibold">{nextStop.stopOrder}. {nextStop.customer.name}</h3>
+              <p className="mt-1 text-sm text-[#d3e6eb]">
+                {nextStop.plannedArrivalTime ? `Planned arrival ${formatDateTime(nextStop.plannedArrivalTime)}` : "Arrival time not set"} • {nextStop.customer.territoryCode || "Unassigned territory"} • {nextStop.customer.assignedRouteRepName || route.assignedUserLabel || "Unassigned rep"}
+              </p>
+              <p className="mt-2 text-sm text-[#d3e6eb]">
+                {progress.nextStopDeltaMinutes > 5
+                  ? `This stop is ${progress.nextStopDeltaMinutes} minutes behind plan.`
+                  : progress.nextStopDeltaMinutes < -5
+                    ? `This stop is ${Math.abs(progress.nextStopDeltaMinutes)} minutes ahead of plan.`
+                    : "This stop is on time relative to the route plan."}
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <span className="rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#eefbfc]">
+                  {nextStop.customer.visitStatus ? titleCase(nextStop.customer.visitStatus) : "No visit status"}
+                </span>
+                <span className="rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#eefbfc]">
+                  {nextStop.customer.primaryContacts[0]?.name || "No primary contact"}
+                </span>
+                <span className="rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#eefbfc]">
+                  {nextStop.customer.nextVisitDueAt ? `Due ${formatDateTime(nextStop.customer.nextVisitDueAt)}` : "No next visit due"}
+                </span>
+              </div>
+            </>
+          ) : (
+            <>
+              <h3 className="mt-2 text-xl font-semibold">Route execution is clear</h3>
+              <p className="mt-2 text-sm text-[#d3e6eb]">There is no pending stop left in this route. Review completed or skipped stops and close out the route when ready.</p>
+            </>
+          )}
+        </div>
+
+        <div className="grid gap-3">
+          <ProgressCard label="Stops In Play" value={String(route.stops.length)} detail={`${progress.remainingCount} remaining to work`} />
+          <ProgressCard label="Completed" value={String(progress.visitedCount)} detail="Visited stops already captured" tone="ok" />
+          <ProgressCard label="Remaining" value={String(progress.remainingCount)} detail={nextStop ? `Next is stop ${nextStop.stopOrder}` : "No pending stop remaining"} tone="warn" />
+          <ProgressCard label="Skipped / Problem" value={String(progress.skippedCount)} detail={progress.skippedCount > 0 ? "Review skipped stops before route closeout" : "No skipped stops recorded"} />
+        </div>
+      </section>
+
+      <section className="space-y-5">
+        {nextStops.length > 0 ? (
+          <RouteStageSection
+            title={stageSectionLabel("next")}
+            description="This is the primary stop to work now. Capture the visit outcome here before moving to upcoming stops."
+          >
+            {nextStops.map((stop) => (
+              <SavedRouteStopCard key={stop.id} stop={stop} stage="next" />
+            ))}
+          </RouteStageSection>
+        ) : null}
+
+        {upcomingStops.length > 0 ? (
+          <RouteStageSection
+            title={stageSectionLabel("upcoming")}
+            description="These stops are still ahead in the route. Keep them visible, but treat them as secondary until the next stop is resolved."
+          >
+            {upcomingStops.map((stop) => (
+              <SavedRouteStopCard key={stop.id} stop={stop} stage="upcoming" />
+            ))}
+          </RouteStageSection>
+        ) : null}
+
+        {completedStops.length > 0 ? (
+          <RouteStageSection
+            title={stageSectionLabel("completed")}
+            description="Completed stops become route history. Review them here if you need to confirm what happened."
+          >
+            {completedStops.map((stop) => (
+              <SavedRouteStopCard key={stop.id} stop={stop} stage="completed" />
+            ))}
+          </RouteStageSection>
+        ) : null}
+
+        {skippedStops.length > 0 ? (
+          <RouteStageSection
+            title={stageSectionLabel("skipped")}
+            description="Skipped stops need explicit review before the route is fully closed out."
+          >
+            {skippedStops.map((stop) => (
+              <SavedRouteStopCard key={stop.id} stop={stop} stage="skipped" />
+            ))}
+          </RouteStageSection>
+        ) : null}
       </section>
     </div>
   );
 }
 
-function SavedRouteStopCard({ stop }: { stop: SavedRouteStop }) {
+function SavedRouteStopCard({ stop, stage }: { stop: SavedRouteStop; stage: "next" | "upcoming" | "completed" | "skipped" }) {
   const router = useRouter();
   const [busyAction, setBusyAction] = useState<"visit" | "log" | "task" | "outcome" | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -226,6 +337,13 @@ function SavedRouteStopCard({ stop }: { stop: SavedRouteStop }) {
   const actualVisitMs = toMs(customer.lastVisitAt);
   const plannedArrivalMs = toMs(stop.plannedArrivalTime);
   const stopDeltaMinutes = actualVisitMs !== null && plannedArrivalMs !== null ? Math.round((actualVisitMs - plannedArrivalMs) / 60000) : null;
+  const isNextStop = stage === "next";
+  const isSecondaryStop = stage === "upcoming";
+  const articleClass = isNextStop
+    ? "rounded-[28px] border border-[#b8dfda] bg-[linear-gradient(180deg,#ffffff_0%,#f2fbf8_100%)] p-5 shadow-[0_18px_48px_rgba(16,42,67,0.08)]"
+    : isSecondaryStop
+      ? "rounded-[24px] border border-[#d9e7ee] bg-white p-4 shadow-[0_14px_40px_rgba(16,42,67,0.05)] lg:p-5"
+      : "rounded-[24px] border border-[#e2ebf0] bg-[#fbfdfe] p-4 shadow-[0_10px_28px_rgba(16,42,67,0.04)] lg:p-5";
 
   async function updateRouteStop(stopStatus: "visited" | "skipped" | "ready") {
     const res = await fetch(`/api/workspace/routes/stops/${stop.id}`, {
@@ -382,10 +500,11 @@ function SavedRouteStopCard({ stop }: { stop: SavedRouteStop }) {
   }
 
   return (
-    <article className="rounded-[24px] border border-[#d9e7ee] bg-white p-4 shadow-[0_14px_40px_rgba(16,42,67,0.05)] lg:p-5">
+    <article className={articleClass}>
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
+            {isNextStop ? <span className="rounded-full border border-[#bde8e4] bg-[#e9fbf9] px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#0f766e]">Work now</span> : null}
             <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-2.5 py-1 text-xs font-semibold text-[#496574]">Stop {stop.stopOrder}</span>
             <Link href={`/workspace/customers/${customer.id}`} className="text-lg font-semibold text-[#173543] transition hover:text-[#0f766e]">
               {customer.name}
@@ -449,7 +568,12 @@ function SavedRouteStopCard({ stop }: { stop: SavedRouteStop }) {
 
       <div className="mt-4 grid gap-4 xl:grid-cols-[1.2fr_0.9fr]">
         <section className="rounded-2xl border border-[#e1ebf1] bg-[#fbfdfe] p-4">
-          <h3 className="text-sm font-semibold text-[#173543]">Visit Actions</h3>
+          <h3 className="text-sm font-semibold text-[#173543]">{isNextStop ? "Record Stop Outcome" : "Stop Outcome"}</h3>
+          <p className="mt-1 text-sm text-[#5c7483]">
+            {isNextStop
+              ? "Choose what happened at this stop, capture notes, and decide whether follow-up is needed before moving on."
+              : "Capture what happened here and keep the route history accurate."}
+          </p>
           <div className="mt-3 flex flex-wrap gap-2">
             {VISIT_OUTCOMES.map((outcome) => (
               <button
@@ -512,7 +636,8 @@ function SavedRouteStopCard({ stop }: { stop: SavedRouteStop }) {
         </section>
 
         <section className="rounded-2xl border border-[#e1ebf1] bg-[#fbfdfe] p-4">
-          <h3 className="text-sm font-semibold text-[#173543]">Follow-Up Task</h3>
+          <h3 className="text-sm font-semibold text-[#173543]">{isNextStop ? "Next Follow-Up" : "Follow-Up Task"}</h3>
+          <p className="mt-1 text-sm text-[#5c7483]">Create the next explicit action for this account if the stop needs more work after today.</p>
           <label className="mt-3 inline-flex items-center gap-2 text-sm text-[#4b6676]">
             <input type="checkbox" checked={autoCreateTask} onChange={(event) => setAutoCreateTask(event.target.checked)} className="h-4 w-4 accent-[#14b8a6]" />
             Auto-create a task after outcome
@@ -543,6 +668,45 @@ function SavedRouteStopCard({ stop }: { stop: SavedRouteStop }) {
         </section>
       </div>
     </article>
+  );
+}
+
+function RouteStageSection({ title, description, children }: { title: string; description: string; children: ReactNode }) {
+  return (
+    <section className="space-y-4">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">{title}</p>
+        <p className="mt-1 text-sm text-[#5c7483]">{description}</p>
+      </div>
+      <div className="space-y-4">{children}</div>
+    </section>
+  );
+}
+
+function ProgressCard({
+  label,
+  value,
+  detail,
+  tone = "neutral",
+}: {
+  label: string;
+  value: string;
+  detail: string;
+  tone?: "neutral" | "ok" | "warn";
+}) {
+  const toneClass =
+    tone === "ok"
+      ? "border-[#bde8e4] bg-[#effcf9]"
+      : tone === "warn"
+        ? "border-[#f1ddad] bg-[#fffaf0]"
+        : "border-[#dbe8ef] bg-white";
+
+  return (
+    <div className={["rounded-2xl border p-4 shadow-sm", toneClass].join(" ")}>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7d95a3]">{label}</p>
+      <p className="mt-1 text-2xl font-semibold text-[#173543]">{value}</p>
+      <p className="mt-1 text-sm text-[#5c7483]">{detail}</p>
+    </div>
   );
 }
 

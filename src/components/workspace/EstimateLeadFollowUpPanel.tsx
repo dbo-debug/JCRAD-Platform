@@ -40,9 +40,15 @@ function formatMoney(value: number | null): string {
   });
 }
 
+function statusTone(value: string, packagingPending: boolean): string {
+  if (packagingPending) return "border-[#f1ddad] bg-[#fff9eb] text-[#9a6b00]";
+  if (value === "converted") return "border-[#bde8e4] bg-[#e9fbf9] text-[#0f766e]";
+  return "border-[#d7e6ed] bg-[#f8fbfc] text-[#4f6877]";
+}
+
 export default async function EstimateLeadFollowUpPanel({
-  title = "Recent Estimates",
-  description = "Latest estimate activity with direct account and lead follow-up.",
+  title = "Estimate Follow-Up Queue",
+  description = "Latest estimate activity with direct account handoff and blocker visibility for packaging-related progression work.",
   limit = 6,
 }: EstimateLeadFollowUpPanelProps) {
   const supabase = createAdminClient();
@@ -79,7 +85,7 @@ export default async function EstimateLeadFollowUpPanel({
           href="/estimate"
           className="rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm text-[#42606f] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
         >
-          Open Estimator
+          Open Estimate Workspace
         </Link>
       </div>
 
@@ -93,9 +99,12 @@ export default async function EstimateLeadFollowUpPanel({
             return (
               <div
                 key={row.id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#dbe9ef] bg-[#fbfdfe] px-3 py-2 text-sm"
+                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#dbe9ef] bg-[#fbfdfe] px-3 py-3 text-sm"
               >
                 <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7891a0]">
+                    {row.packaging_review_pending ? "Estimate Blocked By Packaging" : "Estimate Needs Follow-Up"}
+                  </p>
                   <p className="font-semibold text-[#173543]">
                     {String(row.customer_name || row.customer_email || "Estimate")} • #{row.id.slice(0, 8)}
                   </p>
@@ -104,19 +113,30 @@ export default async function EstimateLeadFollowUpPanel({
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-[#f2f7fa] px-2 py-0.5 text-xs font-semibold text-[#4f6877]">
+                  <span className={["rounded-full border px-2 py-0.5 text-xs font-semibold", statusTone(status, Boolean(row.packaging_review_pending))].join(" ")}>
                     {status}
                   </span>
                   {row.packaging_review_pending ? (
-                    <span className="rounded-full bg-[#fff3dd] px-2 py-0.5 text-xs font-semibold text-[#8a5a08]">
-                      packaging pending
-                    </span>
+                    <Link
+                      href="/admin/packaging/submissions"
+                      className="rounded-full border border-[#f1ddad] bg-[#fff9eb] px-2 py-0.5 text-xs font-semibold text-[#8a5a08] transition hover:border-[#d4b366]"
+                    >
+                      Packaging blocker
+                    </Link>
+                  ) : null}
+                  {hasResolvedCustomer ? (
+                    <Link
+                      href={`/workspace/customers/${encodeURIComponent(row.resolvedCustomer!.customerId)}`}
+                      className="rounded-full border border-[#cfdce4] px-2 py-1 text-xs font-semibold text-[#294452] hover:border-[#14b8a6] hover:text-[#0f766e]"
+                    >
+                      Open account
+                    </Link>
                   ) : null}
                   <Link
                     href={`/estimate/${encodeURIComponent(row.id)}/print`}
                     className="rounded-full border border-[#cfdce4] px-2 py-1 text-xs font-semibold text-[#294452] hover:border-[#14b8a6] hover:text-[#0f766e]"
                   >
-                    View
+                    Open estimate
                   </Link>
                   <form action="/api/workspace/estimates/follow-up" method="POST">
                     <input type="hidden" name="estimate_id" value={row.id} />
@@ -124,7 +144,7 @@ export default async function EstimateLeadFollowUpPanel({
                       type="submit"
                       className="rounded-full border border-[#c7ddd7] bg-[#effcf9] px-2 py-1 text-xs font-semibold text-[#0f766e] hover:border-[#14b8a6]"
                     >
-                      {hasResolvedCustomer ? "Open Account" : "Create Lead"}
+                      {hasResolvedCustomer ? "Refresh account follow-up" : "Create lead and follow-up"}
                     </button>
                   </form>
                 </div>

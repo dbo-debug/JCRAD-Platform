@@ -64,6 +64,7 @@ type OrderStateFilter = "all" | "has_orders" | "no_orders";
 type HotLeadFilter = "all" | "hot" | "not_hot";
 type TaskStateFilter = "all" | "has_open_task" | "no_open_task" | "overdue_task";
 type OrganizeBy = "none" | "territory" | "owner" | "route_day" | "stage";
+type WorkflowMode = "work_queue" | "segment_builder" | "route_prep";
 
 const ROUTE_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const WORKSPACE_STICKY_TOP_CLASS = "top-[calc(var(--workspace-header-offset,5rem)+1rem)]";
@@ -77,6 +78,35 @@ const BULK_ACTIONS: Array<{ key: BulkActionKind; label: string }> = [
   { key: "archive_customers", label: "Archive Customers" },
   { key: "restore_customers", label: "Restore Customers" },
 ];
+
+const WORKFLOW_MODE_COPY: Record<
+  WorkflowMode,
+  {
+    label: string;
+    title: string;
+    description: string;
+    helper: string;
+  }
+> = {
+  work_queue: {
+    label: "Work Queue",
+    title: "Work Queue",
+    description: "Follow-up, hot leads, overdue work, and account movement that needs action now.",
+    helper: "Use this mode to move today’s customer work instead of browsing the full CRM.",
+  },
+  segment_builder: {
+    label: "Segment Builder",
+    title: "Segment Builder",
+    description: "Target broader account sets for sourcing, outreach prep, and operational selection.",
+    helper: "Use this mode when you need filtering depth, grouping, and saved segment behavior.",
+  },
+  route_prep: {
+    label: "Route Prep",
+    title: "Route Prep",
+    description: "Route-ready accounts, coordinate cleanup, pending stop candidates, and territory planning.",
+    helper: "Use this mode to prep field work before you jump into routes or the route runner.",
+  },
+};
 
 function sameIds(left: string[], right: string[]) {
   return left.length === right.length && left.every((value, index) => value === right[index]);
@@ -260,6 +290,125 @@ function compareGroupLabels(left: string, right: string) {
   return left.localeCompare(right);
 }
 
+function getWorkflowMode(args: {
+  savedView: SavedViewKey;
+  hotLeadFilter: HotLeadFilter;
+  taskStateFilter: TaskStateFilter;
+  routeReadiness: RouteReadinessFilter;
+  orderState: OrderStateFilter;
+  organizeBy: OrganizeBy;
+  sourceFilter: string;
+  importSourceFilter: string;
+  statusFilter: string;
+  stageFilter: string;
+  contactCoverage: ContactCoverageFilter;
+  territoryFilter: string;
+}) {
+  if (
+    args.savedView === "needs_coordinates" ||
+    args.routeReadiness !== "all" ||
+    args.organizeBy === "territory" ||
+    args.organizeBy === "route_day" ||
+    args.territoryFilter !== "all"
+  ) {
+    return "route_prep" satisfies WorkflowMode;
+  }
+
+  if (
+    args.hotLeadFilter !== "all" ||
+    args.taskStateFilter !== "all" ||
+    args.orderState !== "all"
+  ) {
+    return "work_queue" satisfies WorkflowMode;
+  }
+
+  if (
+    args.savedView === "pipeline" ||
+    args.savedView === "hall_of_flowers" ||
+    args.savedView === "unassigned" ||
+    args.savedView === "with_orders" ||
+    args.sourceFilter !== "all" ||
+    args.importSourceFilter !== "all" ||
+    args.statusFilter !== "all" ||
+    args.stageFilter !== "all" ||
+    args.contactCoverage !== "all"
+  ) {
+    return "segment_builder" satisfies WorkflowMode;
+  }
+
+  return "work_queue" satisfies WorkflowMode;
+}
+
+function getWorkflowSummary(args: {
+  mode: WorkflowMode;
+  savedView: SavedViewKey;
+  hotLeadFilter: HotLeadFilter;
+  taskStateFilter: TaskStateFilter;
+  routeReadiness: RouteReadinessFilter;
+  orderState: OrderStateFilter;
+  visibleCount: number;
+  visibleWithOrders: number;
+  routeReadyCount: number;
+  hotLeadCount: number;
+  overdueCount: number;
+}) {
+  if (args.savedView === "needs_coordinates" || args.routeReadiness === "no_coords") {
+    return {
+      eyebrow: "Focused Handoff",
+      title: "Route cleanup queue",
+      description: `${args.visibleCount} accounts need coordinate or address work before they can move into route planning.`,
+    };
+  }
+  if (args.taskStateFilter === "overdue_task") {
+    return {
+      eyebrow: "Focused Handoff",
+      title: "Overdue follow-up queue",
+      description: `${args.overdueCount} accounts are carrying overdue follow-up and should be worked first.`,
+    };
+  }
+  if (args.hotLeadFilter === "hot") {
+    return {
+      eyebrow: "Focused Handoff",
+      title: "Hot lead watchlist",
+      description: `${args.hotLeadCount} hot accounts are surfaced here because they need near-term attention.`,
+    };
+  }
+  if (args.savedView === "pipeline") {
+    return {
+      eyebrow: "Focused Handoff",
+      title: "Pipeline watchlist",
+      description: `${args.visibleCount} accounts are in the current pipeline-focused segment.`,
+    };
+  }
+  if (args.orderState === "has_orders") {
+    return {
+      eyebrow: "Focused Handoff",
+      title: "Order activity watch",
+      description: `${args.visibleWithOrders} accounts have order activity and may need follow-up or progression.`,
+    };
+  }
+
+  if (args.mode === "route_prep") {
+    return {
+      eyebrow: "Workflow Mode",
+      title: "Route Prep",
+      description: `${args.routeReadyCount} visible accounts are route-ready. Use this surface to clean, group, and queue field work.`,
+    };
+  }
+  if (args.mode === "segment_builder") {
+    return {
+      eyebrow: "Workflow Mode",
+      title: "Segment Builder",
+      description: `${args.visibleCount} accounts are in your current targeting set. Refine the segment, then act on the selected set.`,
+    };
+  }
+  return {
+    eyebrow: "Workflow Mode",
+    title: "Work Queue",
+    description: `${args.visibleCount} accounts are in the active work queue. Prioritize follow-up, heat, and recent movement first.`,
+  };
+}
+
 export default function CustomerWorkspaceIndex({
   customers,
   initialPendingStops,
@@ -365,6 +514,7 @@ export default function CustomerWorkspaceIndex({
   const stages = Array.from(new Set(customers.map((customer) => customer.stage).filter((value): value is string => Boolean(value)))).sort((a, b) => a.localeCompare(b));
   const owners = Array.from(new Set(customers.map((customer) => customer.assignedSalesName).filter((value): value is string => Boolean(value)))).sort((a, b) => a.localeCompare(b));
   const sources = Array.from(new Set(customers.map((customer) => customer.source).filter((value): value is string => Boolean(value)))).sort((a, b) => a.localeCompare(b));
+  const importSources = Array.from(new Set(customers.map((customer) => customer.importSource).filter((value): value is string => Boolean(value)))).sort((a, b) => a.localeCompare(b));
   const territoryLabelMap = new Map(territoryOptions.map((option) => [option.value, option.label]));
 
   useEffect(() => {
@@ -478,14 +628,16 @@ export default function CustomerWorkspaceIndex({
   const selectedVisibleCustomerIds = selectedCustomerIds.filter((id) => visibleCustomerIdSet.has(id));
   const selectedVisibleCustomers = visibleCustomers.filter((customer) => selectedVisibleCustomerIds.includes(customer.id));
   const selectedSegmentCustomers = customers.filter((customer) => selectedCustomerIdSet.has(customer.id));
+  const selectedVisiblePendingCount = selectedVisibleCustomers.filter((customer) => pendingCustomerIdSet.has(customer.id)).length;
+  const canAddSelectedToPending = selectedVisibleCustomers.some((customer) => !pendingCustomerIdSet.has(customer.id));
+  const canRemoveSelectedFromPending = selectedVisiblePendingCount > 0;
   const mapCustomers = mapSurfaceMode === "segment" ? selectedSegmentCustomers : visibleCustomers;
   const mapScopedSelectedCustomerIds = mapCustomers.filter((customer) => selectedCustomerIdSet.has(customer.id)).map((customer) => customer.id);
   const allVisibleSelected = visibleCustomers.length > 0 && selectedVisibleCustomerIds.length === visibleCustomers.length;
 
-  const visibleWithContacts = visibleCustomers.filter((customer) => customer.contactCount > 0).length;
   const visibleWithOwners = visibleCustomers.filter((customer) => customer.assignedSalesName).length;
-  const hallOfFlowersCount = visibleCustomers.filter((customer) => customer.isHallOfFlowersLead).length;
   const hotLeadCount = visibleCustomers.filter((customer) => customer.isHotLead).length;
+  const overdueVisibleCount = visibleCustomers.filter((customer) => customer.overdueTaskCount > 0).length;
   const routeReadyCount = visibleCustomers.filter((customer) => getRouteReadiness(customer) === "route_ready").length;
   const visibleWithOrders = visibleCustomers.filter((customer) => customer.counts.orders > 0).length;
   const navCounts = {
@@ -499,12 +651,42 @@ export default function CustomerWorkspaceIndex({
   };
   const advancedFilterCount = [
     territoryFilter !== "all",
-    ownerFilter !== "all",
     statusFilter !== "all",
     stageFilter !== "all",
+    sourceFilter !== "all",
+    importSourceFilter !== "all",
+    contactCoverage !== "all",
     routeReadiness !== "all",
     orderState !== "all",
+    organizeBy !== "none",
   ].filter(Boolean).length;
+  const workflowMode = getWorkflowMode({
+    savedView,
+    hotLeadFilter,
+    taskStateFilter,
+    routeReadiness,
+    orderState,
+    organizeBy,
+    sourceFilter,
+    importSourceFilter,
+    statusFilter,
+    stageFilter,
+    contactCoverage,
+    territoryFilter,
+  });
+  const workflowSummary = getWorkflowSummary({
+    mode: workflowMode,
+    savedView,
+    hotLeadFilter,
+    taskStateFilter,
+    routeReadiness,
+    orderState,
+    visibleCount: visibleCustomers.length,
+    visibleWithOrders,
+    routeReadyCount,
+    hotLeadCount,
+    overdueCount: overdueVisibleCount,
+  });
   const territoryStats = buildTerritoryStats(visibleCustomers, referenceNow);
 
   const sections =
@@ -732,6 +914,23 @@ export default function CustomerWorkspaceIndex({
     setBulkStatusMessage(`${nextIds.length} account${nextIds.length === 1 ? "" : "s"} added to your pending route.`);
   }
 
+  async function removeCustomersFromPendingRoute(customerIdsToRemove: string[]) {
+    const nextIds = Array.from(new Set(customerIdsToRemove.map((value) => String(value || "").trim()).filter(Boolean)));
+    if (nextIds.length === 0) return;
+    setBulkStatusMessage(null);
+    await syncPendingStops({
+      method: "DELETE",
+      body: { customer_ids: nextIds },
+    });
+    setBulkStatusMessage(`${nextIds.length} account${nextIds.length === 1 ? "" : "s"} removed from pending route.`);
+  }
+
+  function openSelectedRoutePrep() {
+    setShowFilteredMap(true);
+    setMapSurfaceMode("segment");
+    setBulkStatusMessage("Route prep opened on the selected segment.");
+  }
+
   function handleClearSearch() {
     startTransition(() => {
       setDraftSearch("");
@@ -780,6 +979,41 @@ export default function CustomerWorkspaceIndex({
       if (preset === "archived") {
         setSavedView("archived");
       }
+    });
+  }
+
+  function applyWorkflowMode(mode: WorkflowMode) {
+    startTransition(() => {
+      setDraftSearch("");
+      setSearchQuery("");
+      setSavedView("all");
+      setSourceFilter("all");
+      setImportSourceFilter("all");
+      setHotLeadFilter("all");
+      setTaskStateFilter("all");
+      setTerritoryFilter("all");
+      setOwnerFilter("all");
+      setStatusFilter("all");
+      setStageFilter("all");
+      setContactCoverage("all");
+      setRouteReadiness("all");
+      setOrderState("all");
+      setOrganizeBy("none");
+      setSortKey("activity_desc");
+
+      if (mode === "work_queue") {
+        setTaskStateFilter(staffRole === "sales" ? "overdue_task" : "has_open_task");
+        return;
+      }
+
+      if (mode === "segment_builder") {
+        setSavedView("pipeline");
+        setOrganizeBy("stage");
+        return;
+      }
+
+      setRouteReadiness("route_ready");
+      setOrganizeBy("territory");
     });
   }
 
@@ -985,7 +1219,7 @@ export default function CustomerWorkspaceIndex({
     <div className="grid min-w-0 gap-5 xl:grid-cols-[260px_minmax(0,1fr)] 2xl:grid-cols-[280px_minmax(0,1fr)]">
       <aside className="min-w-0 xl:sticky xl:self-start xl:top-[calc(var(--workspace-header-offset,5rem)+1rem)]">
         <section className="rounded-[24px] border border-[#d8e6ee] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbfd_100%)] p-4 shadow-[0_10px_22px_rgba(16,42,67,0.06)]">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6c8797]">Customer Views</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6c8797]">Queue Shortcuts</p>
           <div className="mt-3 space-y-2">
             {viewNavItems.map((item) => {
               const active =
@@ -1022,8 +1256,9 @@ export default function CustomerWorkspaceIndex({
           <div className="mt-4 grid gap-2 rounded-[20px] border border-[#dbe8ef] bg-white/90 p-3">
             <MetricLine label="Visible" value={String(visibleCustomers.length)} />
             <MetricLine label="Assigned" value={String(visibleWithOwners)} />
-            <MetricLine label="Contacts" value={String(visibleWithContacts)} />
-            <MetricLine label="Route Available" value={String(routeReadyCount)} />
+            <MetricLine label="Hot" value={String(hotLeadCount)} />
+            <MetricLine label="Overdue" value={String(overdueVisibleCount)} />
+            <MetricLine label="Route Ready" value={String(routeReadyCount)} />
             <MetricLine label="Orders" value={String(visibleWithOrders)} />
           </div>
         </section>
@@ -1031,18 +1266,93 @@ export default function CustomerWorkspaceIndex({
 
       <div className="min-w-0 space-y-4">
         <section className="rounded-[28px] border border-[#d8e6ee] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbfd_100%)] p-5 shadow-[0_12px_28px_rgba(16,42,67,0.07)]">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-            <div className="max-w-[760px]">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6c8797]">Customer Workspace</p>
-              <h2 className="mt-1 text-xl font-semibold text-[#173543]">Operational account queue for follow-up, ownership, and route prep</h2>
-              <p className="mt-1 text-sm text-[#5c7483]">
-                Work the segment here, then open the account page for deeper edits, history, and operational detail.
-              </p>
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+              <div className="max-w-[820px]">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6c8797]">{workflowSummary.eyebrow}</p>
+                <h2 className="mt-1 text-xl font-semibold text-[#173543]">{workflowSummary.title}</h2>
+                <p className="mt-1 text-sm text-[#5c7483]">{workflowSummary.description}</p>
+                <p className="mt-2 text-sm text-[#6b8290]">{WORKFLOW_MODE_COPY[workflowMode].helper}</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full border border-[#d7e6ed] bg-white px-3 py-1.5 text-sm text-[#4f6877]">{visibleCustomers.length} visible</span>
+                <span className="rounded-full border border-[#ffd3cf] bg-[#fff2f0] px-3 py-1.5 text-sm text-[#b44b40]">{hotLeadCount} hot</span>
+                <span className="rounded-full border border-[#f1ddad] bg-[#fff9eb] px-3 py-1.5 text-sm text-[#8a5b00]">{overdueVisibleCount} overdue</span>
+                <span className="rounded-full border border-[#d7e6ed] bg-white px-3 py-1.5 text-sm text-[#4f6877]">{routeReadyCount} route ready</span>
+              </div>
             </div>
+
+            <div className="grid gap-3 lg:grid-cols-3">
+              {(Object.keys(WORKFLOW_MODE_COPY) as WorkflowMode[]).map((mode) => {
+                const active = workflowMode === mode;
+                const copy = WORKFLOW_MODE_COPY[mode];
+                return (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => applyWorkflowMode(mode)}
+                    className={[
+                      "rounded-[22px] border px-4 py-4 text-left transition",
+                      active ? "border-[#14b8a6] bg-[#effcf9]" : "border-[#dbe8ef] bg-white hover:border-[#97c7c1] hover:bg-[#f8fbfc]",
+                    ].join(" ")}
+                  >
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#6c8797]">{copy.label}</p>
+                    <p className="mt-2 text-base font-semibold text-[#173543]">{copy.title}</p>
+                    <p className="mt-1 text-sm text-[#5c7483]">{copy.description}</p>
+                  </button>
+                );
+              })}
+            </div>
+
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full border border-[#d7e6ed] bg-white px-3 py-1.5 text-sm text-[#4f6877]">{visibleCustomers.length} visible</span>
-              <span className="rounded-full border border-[#f1ddad] bg-[#fff9eb] px-3 py-1.5 text-sm text-[#8a5b00]">{hallOfFlowersCount} Hall of Flowers</span>
-              <span className="rounded-full border border-[#ffd3cf] bg-[#fff2f0] px-3 py-1.5 text-sm text-[#b44b40]">{hotLeadCount} hot</span>
+              {workflowMode === "work_queue" ? (
+                <>
+                  <button type="button" onClick={() => applyWorkspacePreset("overdue")} className={denseButtonClass()}>
+                    Overdue Follow-Up
+                  </button>
+                  <button type="button" onClick={() => applyWorkspacePreset("hot_leads")} className={denseButtonClass()}>
+                    Hot Leads
+                  </button>
+                  <button type="button" onClick={() => setOrderState("has_orders")} className={denseButtonClass()}>
+                    Order Watch
+                  </button>
+                  <button type="button" onClick={() => applyWorkspacePreset("no_task")} className={denseButtonClass()}>
+                    No Open Task
+                  </button>
+                </>
+              ) : null}
+              {workflowMode === "segment_builder" ? (
+                <>
+                  <button type="button" onClick={() => applyWorkflowMode("segment_builder")} className={denseButtonClass()}>
+                    Pipeline Set
+                  </button>
+                  <button type="button" onClick={() => applyWorkspacePreset("hall_of_flowers")} className={denseButtonClass()}>
+                    Hall of Flowers
+                  </button>
+                  <button type="button" onClick={() => startTransition(() => setSavedView("unassigned"))} className={denseButtonClass()}>
+                    Unassigned Accounts
+                  </button>
+                  <button type="button" onClick={() => startTransition(() => setSavedView("with_orders"))} className={denseButtonClass()}>
+                    With Orders
+                  </button>
+                </>
+              ) : null}
+              {workflowMode === "route_prep" ? (
+                <>
+                  <button type="button" onClick={() => applyWorkflowMode("route_prep")} className={denseButtonClass()}>
+                    Route Ready
+                  </button>
+                  <button type="button" onClick={() => applyWorkspacePreset("needs_coordinates")} className={denseButtonClass()}>
+                    Needs Coordinates
+                  </button>
+                  <button type="button" onClick={() => startTransition(() => setRouteReadiness("address_ready"))} className={denseButtonClass()}>
+                    Address Ready
+                  </button>
+                  <button type="button" onClick={() => startTransition(() => setOrganizeBy("territory"))} className={denseButtonClass()}>
+                    Group by Territory
+                  </button>
+                </>
+              ) : null}
               <button
                 type="button"
                 onClick={() => setShowFilteredMap((current) => !current)}
@@ -1051,7 +1361,7 @@ export default function CustomerWorkspaceIndex({
                   showFilteredMap ? "border-[#14b8a6] bg-[#effcf9] text-[#0f766e]" : "border-[#d7e6ed] bg-white text-[#4f6877] hover:border-[#14b8a6]",
                 ].join(" ")}
               >
-                {showFilteredMap ? "Hide Map" : "Map Filtered Accounts"}
+                {showFilteredMap ? "Hide Map" : "Open Map Surface"}
               </button>
               {showFilteredMap ? (
                 <div className="flex flex-wrap items-center gap-2">
@@ -1083,7 +1393,25 @@ export default function CustomerWorkspaceIndex({
         </section>
 
         <section className={["sticky z-30 space-y-3 rounded-[24px] border border-[#dbe8ef] bg-white/95 p-3 shadow-[0_10px_22px_rgba(16,42,67,0.08)] backdrop-blur supports-[backdrop-filter]:bg-white/90 xl:px-4 xl:py-4", WORKSPACE_STICKY_TOP_CLASS].join(" ")}>
-          <div className="grid gap-2 xl:grid-cols-2 2xl:grid-cols-[minmax(260px,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] xl:items-center">
+          <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">{WORKFLOW_MODE_COPY[workflowMode].label}</p>
+              <p className="mt-1 text-sm text-[#4f6877]">Common filters stay upfront. Broader targeting controls live under advanced filters.</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button type="button" onClick={handleClearSearch} className={denseButtonClass()}>
+                Clear Search
+              </button>
+              <button type="button" onClick={resetFilters} className={denseButtonClass()}>
+                Reset Filters
+              </button>
+              <button type="button" onClick={() => setShowAdvancedFilters((current) => !current)} className={denseButtonClass()}>
+                Advanced Filters{advancedFilterCount > 0 ? ` (${advancedFilterCount})` : ""}
+              </button>
+            </div>
+          </div>
+
+          <div className="grid gap-2 xl:grid-cols-2 2xl:grid-cols-[minmax(260px,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] xl:items-center">
             <input
               value={draftSearch}
               onChange={(event) => setDraftSearch(event.target.value)}
@@ -1091,14 +1419,6 @@ export default function CustomerWorkspaceIndex({
               placeholder="Search accounts, contacts, city, phone"
               className="h-10 rounded-full border border-[#cedde6] bg-[#fbfdfe] px-4 text-sm text-[#173543] outline-none transition focus:border-[#14b8a6] focus:bg-white"
             />
-            <select value={sourceFilter} onChange={(event) => startTransition(() => setSourceFilter(event.target.value))} aria-label="Source" className={toolbarSelectClass()}>
-              <option value="all">All Sources</option>
-              {sources.map((source) => (
-                <option key={source} value={source}>
-                  {formatSourceLabel(source)}
-                </option>
-              ))}
-            </select>
             <select value={hotLeadFilter} onChange={(event) => startTransition(() => setHotLeadFilter(event.target.value as HotLeadFilter))} aria-label="Hot lead" className={toolbarSelectClass()}>
               <option value="all">All Leads</option>
               <option value="hot">Hot Lead</option>
@@ -1110,6 +1430,30 @@ export default function CustomerWorkspaceIndex({
               <option value="no_open_task">No Task</option>
               <option value="overdue_task">Overdue</option>
             </select>
+            <select value={ownerFilter} onChange={(event) => startTransition(() => setOwnerFilter(event.target.value))} aria-label="Owner" className={toolbarSelectClass()}>
+              <option value="all">All Owners</option>
+              {owners.map((owner) => (
+                <option key={owner} value={owner}>
+                  {owner}
+                </option>
+              ))}
+            </select>
+            <select value={territoryFilter} onChange={(event) => startTransition(() => setTerritoryFilter(event.target.value))} aria-label="Territory" className={toolbarSelectClass()}>
+              <option value="all">All Territories</option>
+              {territoryOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <select value={routeReadiness} onChange={(event) => startTransition(() => setRouteReadiness(event.target.value as RouteReadinessFilter))} aria-label="Route readiness" className={toolbarSelectClass()}>
+              <option value="all">All Route States</option>
+              <option value="route_ready">Route Ready</option>
+              <option value="no_territory">No Territory</option>
+              <option value="no_route_rep">No Route Rep</option>
+              <option value="no_coords">Needs Coordinates</option>
+              <option value="address_ready">Address Ready</option>
+            </select>
             <select value={sortKey} onChange={(event) => startTransition(() => setSortKey(event.target.value as SortKey))} aria-label="Sort" className={toolbarSelectClass()}>
               <option value="activity_desc">Recent</option>
               <option value="name_asc">Name A-Z</option>
@@ -1117,44 +1461,20 @@ export default function CustomerWorkspaceIndex({
               <option value="orders_desc">Most Orders</option>
               <option value="owner_asc">Owner A-Z</option>
             </select>
-            <button type="button" onClick={() => setShowAdvancedFilters((current) => !current)} className={denseButtonClass()}>
-              More Filters{advancedFilterCount > 0 ? ` (${advancedFilterCount})` : ""}
-            </button>
+            <select value={orderState} onChange={(event) => startTransition(() => setOrderState(event.target.value as OrderStateFilter))} aria-label="Order state" className={toolbarSelectClass()}>
+              <option value="all">All Order States</option>
+              <option value="has_orders">Has Orders</option>
+              <option value="no_orders">No Orders</option>
+            </select>
           </div>
 
           {showAdvancedFilters ? (
             <section className="rounded-[20px] border border-[#dbe8ef] bg-[#f8fbfc] p-3 shadow-[0_8px_18px_rgba(16,42,67,0.05)]">
               <div className="grid gap-3 xl:grid-cols-[repeat(4,minmax(0,1fr))] 2xl:grid-cols-[repeat(6,minmax(0,1fr))]">
-                <FilterSelect
-                  label="Territory"
-                  value={territoryFilter}
-                  onChange={setTerritoryFilter}
-                  options={territoryOptions.map((option) => ({ value: option.value, label: option.label }))}
-                />
-                <FilterSelect label="Owner" value={ownerFilter} onChange={setOwnerFilter} options={owners.map((owner) => ({ value: owner, label: owner }))} />
+                <FilterSelect label="Source" value={sourceFilter} onChange={setSourceFilter} options={sources.map((source) => ({ value: source, label: formatSourceLabel(source) }))} />
+                <FilterSelect label="Import Source" value={importSourceFilter} onChange={setImportSourceFilter} options={importSources.map((source) => ({ value: source, label: formatSourceLabel(source) }))} />
                 <FilterSelect label="Status" value={statusFilter} onChange={setStatusFilter} options={statuses.map((status) => ({ value: status, label: titleCase(status) }))} />
                 <FilterSelect label="Stage" value={stageFilter} onChange={setStageFilter} options={stages.map((stage) => ({ value: stage, label: titleCase(stage) }))} />
-                <FilterSelect
-                  label="Route Readiness"
-                  value={routeReadiness}
-                  onChange={(value) => setRouteReadiness(value as RouteReadinessFilter)}
-                  options={[
-                    { value: "route_ready", label: "Route Available" },
-                    { value: "no_territory", label: "No Territory" },
-                    { value: "no_route_rep", label: "No Route Rep" },
-                    { value: "no_coords", label: "Needs Coordinates" },
-                    { value: "address_ready", label: "Address Ready" },
-                  ]}
-                />
-                <FilterSelect
-                  label="Has Orders"
-                  value={orderState}
-                  onChange={(value) => setOrderState(value as OrderStateFilter)}
-                  options={[
-                    { value: "has_orders", label: "Has Orders" },
-                    { value: "no_orders", label: "No Orders" },
-                  ]}
-                />
                 <FilterSelect
                   label="Contact Coverage"
                   value={contactCoverage}
@@ -1178,12 +1498,6 @@ export default function CustomerWorkspaceIndex({
                 />
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-2">
-                <button type="button" onClick={handleClearSearch} className={denseButtonClass()}>
-                  Clear search
-                </button>
-                <button type="button" onClick={resetFilters} className={denseButtonClass()}>
-                  Reset filters
-                </button>
                 <button type="button" onClick={selectAllVisible} disabled={visibleCustomers.length === 0} className={denseButtonClass()}>
                   {allVisibleSelected ? "All selected" : `Select ${visibleCustomers.length}`}
                 </button>
@@ -1224,19 +1538,16 @@ export default function CustomerWorkspaceIndex({
 
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4f6877]">
-              Selected visible {selectedVisibleCustomerIds.length} of {visibleCustomers.length}
+              Workflow {WORKFLOW_MODE_COPY[workflowMode].label}
             </span>
             <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4f6877]">
-              Segment {selectedCustomerIds.length}
+              Visible {visibleCustomers.length}
             </span>
             <span className="rounded-full border border-[#bfe8e2] bg-[#f5fffd] px-3 py-1.5 text-sm font-medium text-[#0f766e]">
+              Segment {selectedCustomerIds.length}
+            </span>
+            <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4f6877]">
               Pending Stops {pendingStops.length}
-            </span>
-            <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4f6877]">
-              Sort {titleCase(sortKey.replace("_", " "))}
-            </span>
-            <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4f6877]">
-              URL state synced
             </span>
             <button type="button" onClick={clearSelection} disabled={selectedCustomerIds.length === 0} className={denseButtonClass()}>
               Clear Segment
@@ -1254,8 +1565,13 @@ export default function CustomerWorkspaceIndex({
             salesRepOptions={salesRepOptions}
             territoryOptions={territoryOptions}
             statusMessage={bulkStatusMessage}
+            canAddToPending={canAddSelectedToPending}
+            canRemoveFromPending={canRemoveSelectedFromPending}
             onActionChange={setBulkAction}
             onApply={() => void applyBulkAction()}
+            onAddToPending={() => void addCustomersToPendingRoute(selectedVisibleCustomerIds)}
+            onRemoveFromPending={() => void removeCustomersFromPendingRoute(selectedVisibleCustomerIds)}
+            onOpenRoutePrep={openSelectedRoutePrep}
             onClear={clearSelection}
           />
         ) : null}
@@ -1485,7 +1801,7 @@ function RouteActionButton({
 }) {
   const [busy, setBusy] = useState(false);
   const routeHref = pendingSelected
-    ? `/workspace/routes?pending=1&customerId=${encodeURIComponent(customer.id)}`
+    ? `/workspace/routes/run?customerId=${encodeURIComponent(customer.id)}&scope=all&view=list`
     : null;
 
   async function handlePendingToggle() {
@@ -1531,8 +1847,13 @@ function BulkActionBar({
   salesRepOptions,
   territoryOptions,
   statusMessage,
+  canAddToPending,
+  canRemoveFromPending,
   onActionChange,
   onApply,
+  onAddToPending,
+  onRemoveFromPending,
+  onOpenRoutePrep,
   onClear,
 }: {
   action: BulkActionState;
@@ -1542,8 +1863,13 @@ function BulkActionBar({
   salesRepOptions: RouteRepOption[];
   territoryOptions: TerritoryOption[];
   statusMessage: string | null;
+  canAddToPending: boolean;
+  canRemoveFromPending: boolean;
   onActionChange: (action: BulkActionState) => void;
   onApply: () => void;
+  onAddToPending: () => void;
+  onRemoveFromPending: () => void;
+  onOpenRoutePrep: () => void;
   onClear: () => void;
 }) {
   const availableActions = BULK_ACTIONS.filter((item) =>
@@ -1565,18 +1891,81 @@ function BulkActionBar({
 
   return (
     <section className="rounded-[24px] border border-[#bfe8e2] bg-[linear-gradient(180deg,#f5fffd_0%,#ffffff_100%)] p-4 shadow-[0_14px_30px_rgba(16,42,67,0.08)]">
-      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+      <div className="flex flex-col gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#0f766e]">Bulk Actions</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#0f766e]">Selected Accounts</p>
           <p className="mt-1 text-sm text-[#35505d]">
-            {selectedCount} selected account{selectedCount === 1 ? "" : "s"}
+            {selectedCount} selected account{selectedCount === 1 ? "" : "s"} ready for the next workflow step
           </p>
           {statusMessage ? <p className="mt-1 text-xs text-[#4f6877]">{statusMessage}</p> : null}
         </div>
 
-        <div className="flex flex-col gap-2 xl:flex-row xl:items-end">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={onAddToPending}
+            disabled={busy || !canAddToPending}
+            className="h-10 rounded-full bg-[#173543] px-4 text-sm font-semibold text-white transition hover:bg-[#0f2a35] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Add to Pending Stops
+          </button>
+          <button
+            type="button"
+            onClick={onOpenRoutePrep}
+            disabled={busy}
+            className="h-10 rounded-full border border-[#14b8a6] bg-white px-4 text-sm font-semibold text-[#0f766e] transition hover:bg-[#effcf9] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Open Route Prep
+          </button>
+          {staffRole === "admin" ? (
+            <button
+              type="button"
+              onClick={() => onActionChange({ kind: "assign_sales_rep", value: "" })}
+              disabled={busy}
+              className="h-10 rounded-full border border-[#d0dde5] bg-white px-4 text-sm font-semibold text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Assign Rep
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => onActionChange({ kind: "assign_territory", value: "" })}
+            disabled={busy}
+            className="h-10 rounded-full border border-[#d0dde5] bg-white px-4 text-sm font-semibold text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Assign Territory
+          </button>
+          <button
+            type="button"
+            onClick={() => onActionChange({ kind: "assign_route_day", value: "" })}
+            disabled={busy}
+            className="h-10 rounded-full border border-[#d0dde5] bg-white px-4 text-sm font-semibold text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Assign Route Day
+          </button>
+          {canRemoveFromPending ? (
+            <button
+              type="button"
+              onClick={onRemoveFromPending}
+              disabled={busy}
+              className="h-10 rounded-full border border-[#d0dde5] bg-white px-4 text-sm font-semibold text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Remove from Pending
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={onClear}
+            disabled={busy}
+            className="h-10 rounded-full border border-[#d0dde5] bg-white px-4 text-sm font-semibold text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Clear Segment
+          </button>
+        </div>
+
+        <div className="grid gap-3 xl:grid-cols-[minmax(240px,1.2fr)_minmax(260px,1fr)_auto] xl:items-end">
           <label className="grid gap-1 text-sm text-[#4b6676]">
-            <span className="font-medium">Action</span>
+            <span className="font-medium">More action</span>
             <select
               value={action.kind}
               onChange={(event) => onActionChange({ ...action, kind: event.target.value as BulkActionKind, value: "" })}
@@ -1623,12 +2012,14 @@ function BulkActionBar({
           ) : (
             <div className="rounded-2xl border border-[#d7e6ed] bg-white px-4 py-3 text-sm text-[#4f6877]">
               {action.kind === "convert_to_source"
-                ? "Creates source records from the selected customer accounts and soft-removes those accounts from the active Customers workspace."
+                ? "Creates source records from the selected customer accounts and soft-removes those accounts from the active workspace."
                 : action.kind === "archive_customers"
-                  ? "Hides the selected customers from the active Customers workspace without deleting their history."
+                  ? "Hides the selected customers from the active workspace without deleting their history."
                   : action.kind === "restore_customers"
-                    ? "Restores archived customers back into the active Customers workspace."
-                : "Queues or removes the current filtered selection for route generation."}
+                    ? "Restores archived customers back into the active workspace."
+                    : action.kind === "add_to_pending_stops"
+                      ? "Queues the selected accounts for route planning."
+                      : "Removes the selected accounts from pending route planning."}
             </div>
           )}
 
@@ -1638,15 +2029,7 @@ function BulkActionBar({
             disabled={busy}
             className="h-10 rounded-full bg-[#173543] px-4 text-sm font-semibold text-white transition hover:bg-[#0f2a35] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {busy ? "Applying..." : "Apply"}
-          </button>
-          <button
-            type="button"
-            onClick={onClear}
-            disabled={busy}
-            className="h-10 rounded-full border border-[#d0dde5] bg-white px-4 text-sm font-semibold text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543] disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            Clear
+            {busy ? "Applying..." : "Apply More Action"}
           </button>
         </div>
       </div>

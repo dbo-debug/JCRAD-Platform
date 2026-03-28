@@ -10,6 +10,7 @@ type InternalSidebarProps = {
 
 type NavItem = {
   label: string;
+  salesLabel?: string;
   href: string;
   adminOnly?: boolean;
 };
@@ -23,7 +24,7 @@ const NAV_SECTIONS: NavSection[] = [
   {
     label: "Command",
     items: [
-      { label: "Command Center", href: "/admin" },
+      { label: "Command Center", salesLabel: "My Day", href: "/admin" },
       { label: "Customers", href: "/workspace/customers" },
       { label: "Sources", href: "/workspace/sources" },
       { label: "Quick Add Lead", href: "/workspace/events/quick-add" },
@@ -82,6 +83,7 @@ export default function InternalSidebar({ role }: InternalSidebarProps) {
             <nav className="space-y-1">
               {section.items.map((item) => {
                 const active = isActive(pathname, item.href);
+                const label = role === "sales" && item.salesLabel ? item.salesLabel : item.label;
                 return (
                   <Link
                     key={item.href}
@@ -91,7 +93,7 @@ export default function InternalSidebar({ role }: InternalSidebarProps) {
                       active ? "bg-[#e9fbf9] text-[#0f766e]" : "text-[#4a6575] hover:bg-[#f4f9fc] hover:text-[#173543]",
                     ].join(" ")}
                   >
-                    {item.label}
+                    {label}
                   </Link>
                 );
               })}

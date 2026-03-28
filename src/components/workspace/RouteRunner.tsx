@@ -165,16 +165,22 @@ export default function RouteRunner({ customers, routeRepOptions, territoryOptio
       <section className="rounded-[28px] border border-[#d8e6ee] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbfd_100%)] p-5 shadow-[0_24px_60px_rgba(16,42,67,0.08)] lg:px-6">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div className="max-w-[780px]">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6c8797]">Route Runner</p>
-            <h2 className="mt-2 text-2xl font-semibold text-[#173543]">Compact stop cards for calls, visits, notes, and next-step capture in the field</h2>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6c8797]">Field Queue Mode</p>
+            <h2 className="mt-2 text-2xl font-semibold text-[#173543]">
+              {focusCustomerId ? "Focused stop execution" : "Route-scoped stop execution for the field"}
+            </h2>
             <p className="mt-2 max-w-3xl text-sm text-[#5c7483]">
-              Default scope is your assigned route work for today. Each stop supports fast visit marking, visit logging, and follow-up task creation without leaving the runner.
+              {focusCustomerId
+                ? "You are focused on one account inside the runner. Capture the visit outcome, create follow-up if needed, and continue back to the broader route flow."
+                : "This is the broad route-scoped field queue, not a saved route in progress. Use it to work rep-assigned stops, capture outcomes, and clean up follow-up when you are not running a specific saved route."}
             </p>
           </div>
           <div className="rounded-2xl border border-[#dbe8ef] bg-white/85 p-4 text-sm text-[#506877] shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7d95a3]">Scoped Rep</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7d95a3]">Execution Scope</p>
             <p className="mt-1 text-lg font-semibold text-[#173543]">{currentRepLabel}</p>
             <div className="mt-3 grid gap-2">
+              <MetricLine label="Mode" value={focusCustomerId ? "Focused Stop" : "Field Queue"} />
+              <MetricLine label="Stops In Scope" value={String(visibleCustomers.length)} />
               <MetricLine label="Due Today" value={String(stats.dueToday)} />
               <MetricLine label="Visited Today" value={String(stats.visitedToday)} />
               <MetricLine label="Follow-Up Needed" value={String(stats.followUpNeeded)} />
@@ -186,6 +192,15 @@ export default function RouteRunner({ customers, routeRepOptions, territoryOptio
       </section>
 
       <section className="rounded-[28px] border border-[#dbe8ef] bg-white p-5 shadow-[0_12px_32px_rgba(16,42,67,0.06)] lg:px-6">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Execution Controls</p>
+            <p className="mt-1 text-sm text-[#5c7483]">Tune the field queue by rep, day, territory, and stop readiness before opening a stop card.</p>
+          </div>
+          <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4f6877]">
+            {viewMode === "map" ? "Map view active" : "List view active"}
+          </span>
+        </div>
         <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-[minmax(0,1.4fr)_repeat(4,minmax(0,0.9fr))]">
           <label className="grid gap-1 text-sm text-[#4b6676]">
             <span className="font-medium">Search stops</span>
@@ -288,6 +303,11 @@ export default function RouteRunner({ customers, routeRepOptions, territoryOptio
       ) : null}
 
       <section className={viewMode === "map" ? "hidden" : "space-y-4"}>
+        <div className="rounded-2xl border border-[#dbe8ef] bg-white p-4 shadow-[0_12px_32px_rgba(16,42,67,0.05)]">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Runner Flow</p>
+          <p className="mt-1 text-sm text-[#5c7483]">Work territory sections in order, open the next stop card, capture the outcome, then move to the next account in sequence.</p>
+        </div>
+
         {territorySections.length > 0 ? (
           <nav className="rounded-[24px] border border-[#dbe8ef] bg-white p-4 shadow-[0_12px_32px_rgba(16,42,67,0.05)]">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">

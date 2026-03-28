@@ -1,7 +1,20 @@
 import { NextResponse } from "next/server";
+import { resolveEstimateCustomerFromFields } from "@/lib/estimate/customer";
 import { requireAdmin } from "@/lib/requireAdmin";
 import { getEstimatePackagingReviewState } from "@/lib/packaging/reviewStatus";
 import { createAdminClient } from "@/lib/supabase/admin";
+
+type PackagingSubmissionUpdateRow = {
+  id: string;
+  estimate_id: string | null;
+  customer_email: string | null;
+  status: string | null;
+  review_notes: string | null;
+};
+
+type EstimateIdRow = {
+  id: string;
+};
 
 export async function GET(req: Request) {
   await requireAdmin();
@@ -22,7 +35,23 @@ export async function GET(req: Request) {
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  return NextResponse.json({ submissions: data ?? [] });
+  const submissions = await Promise.all(
+    ((data || []) as Array<Record<string, unknown>>).map(async (row) => {
+      const estimateId = String(row.estimate_id || "").trim() || null;
+      const resolvedCustomer = await resolveEstimateCustomerFromFields(supabase, {
+        customerEmail: String(row.customer_email || "").trim() || null,
+        customerName: String(row.customer_name || "").trim() || null,
+      }).catch(() => null);
+
+      return {
+        ...row,
+        estimate_href: estimateId ? `/estimate/${encodeURIComponent(estimateId)}/print` : null,
+        account_href: resolvedCustomer?.customerId ? `/workspace/customers/${encodeURIComponent(resolvedCustomer.customerId)}` : null,
+      };
+    })
+  );
+
+  return NextResponse.json({ submissions });
 }
 
 export async function POST(req: Request) {
@@ -46,9 +75,10 @@ export async function POST(req: Request) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  const submission = data as PackagingSubmissionUpdateRow;
 
-  const estimateId = String((data as any)?.estimate_id || "").trim();
-  const customerEmail = String((data as any)?.customer_email || "").trim().toLowerCase();
+  const estimateId = String(submission.estimate_id || "").trim();
+  const customerEmail = String(submission.customer_email || "").trim().toLowerCase();
   if (estimateId) {
     const packagingState = await getEstimatePackagingReviewState(supabase, estimateId);
     const { error: estimateErr } = await supabase
@@ -64,8 +94,8 @@ export async function POST(req: Request) {
       .eq("customer_email", customerEmail);
     if (estimateLoadErr) return NextResponse.json({ error: estimateLoadErr.message }, { status: 500 });
 
-    for (const row of estimateRows || []) {
-      const id = String((row as any)?.id || "").trim();
+    for (const row of ((estimateRows || []) as EstimateIdRow[])) {
+      const id = String(row.id || "").trim();
       if (!id || id === estimateId) continue;
       const packagingState = await getEstimatePackagingReviewState(supabase, id);
       const { error: estimateErr } = await supabase

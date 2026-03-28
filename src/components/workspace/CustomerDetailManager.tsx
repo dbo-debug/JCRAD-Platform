@@ -30,16 +30,25 @@ type CustomerDetailManagerProps = {
   companyName: string;
   status: string;
   stage: string | null;
+  isHotLead: boolean;
+  isHallOfFlowersLead: boolean;
   primaryContactEmail: string | null;
   mainPhone: string | null;
   assignedSalesUserId: string | null;
+  assignedSalesLabel: string | null;
   territoryCode: string | null;
   routeDay: string | null;
   assignedRouteRepUserId: string | null;
+  assignedRouteRepLabel: string | null;
   routePriority: number | null;
   visitStatus: string | null;
   lastVisitAt: string | null;
   nextVisitDueAt: string | null;
+  hasOpenTask: boolean;
+  openTaskCount: number;
+  overdueTaskCount: number;
+  nextTaskDueAt: string | null;
+  lastActivityAt: string | null;
   latitude: number | null;
   longitude: number | null;
   address1: string | null;
@@ -196,6 +205,44 @@ function SectionHeader({ title, description, action }: { title: string; descript
   );
 }
 
+function FocusCard({
+  eyebrow,
+  title,
+  detail,
+  actionLabel,
+  onAction,
+  tone = "neutral",
+}: {
+  eyebrow: string;
+  title: string;
+  detail: string;
+  actionLabel: string;
+  onAction: () => void;
+  tone?: "neutral" | "warn" | "ok";
+}) {
+  const toneClass =
+    tone === "ok"
+      ? "border-[#bde8e4] bg-[#effcf9]"
+      : tone === "warn"
+        ? "border-[#f1ddad] bg-[#fffaf0]"
+        : "border-[#dbe9ef] bg-[#f9fcfd]";
+
+  return (
+    <div className={["rounded-2xl border p-3", toneClass].join(" ")}>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7a909d]">{eyebrow}</p>
+      <p className="mt-1 text-sm font-semibold text-[#173543]">{title}</p>
+      <p className="mt-1 text-sm text-[#4a6575]">{detail}</p>
+      <button
+        type="button"
+        onClick={onAction}
+        className="mt-3 inline-flex rounded-full border border-[#cfdde6] bg-white px-3 py-1.5 text-sm font-semibold text-[#21424d] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
+      >
+        {actionLabel}
+      </button>
+    </div>
+  );
+}
+
 export default function CustomerDetailManager(props: CustomerDetailManagerProps) {
   const router = useRouter();
   const [accountBusy, setAccountBusy] = useState(false);
@@ -299,6 +346,35 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
       latitude ||
       longitude
   );
+  const hasPrimaryContact = Boolean(contactName.trim() || contactEmail.trim() || contactPhone.trim());
+  const activeFollowUpLabel =
+    props.overdueTaskCount > 0
+      ? `${props.overdueTaskCount} overdue follow-up task${props.overdueTaskCount === 1 ? "" : "s"}`
+      : props.hasOpenTask
+        ? props.nextTaskDueAt
+          ? `Follow-up due ${formatShortDateTime(props.nextTaskDueAt)}`
+          : `${props.openTaskCount} open follow-up task${props.openTaskCount === 1 ? "" : "s"}`
+        : "No open follow-up task";
+  const routeReadinessLabel = missingRouteStates.length > 0 ? `Blocked: ${missingRouteStates.join(" • ")}` : "Route ready for field work";
+  const accountPrioritySummary = props.overdueTaskCount > 0
+    ? "This account has overdue follow-up. Clear the queue or log the outcome before more work drifts."
+    : props.isHotLead
+      ? "This account is marked hot. Prioritize contact, capture the latest signal, and set the next step."
+      : !hasPrimaryContact
+        ? "The account is missing a primary contact. Capture buyer info before the next handoff."
+        : missingRouteStates.length > 0
+          ? "Route prep is partially blocked. Clean up missing territory or coordinates before staging stops."
+          : "The account is operational. Use quick actions to continue follow-up, routing, or activity capture.";
+  const nextActionSummary =
+    props.overdueTaskCount > 0
+      ? "Review the overdue follow-up and log the latest interaction."
+      : props.hasOpenTask
+        ? "Work the active follow-up queue and confirm the next due date."
+        : props.isHotLead
+          ? "Create the next follow-up task before this lead cools off."
+          : !hasPrimaryContact
+            ? "Add the primary contact so the next outreach has a clear owner."
+            : "Update routing or log the latest account touchpoint.";
 
   useEffect(() => {
     setContacts(props.contacts);
@@ -747,12 +823,71 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
       {error ? <p className="rounded-xl border border-[#f1d1d1] bg-[#fff5f5] px-3 py-2 text-sm text-[#991b1b]">{error}</p> : null}
       {success ? <p className="rounded-xl border border-[#bfe8df] bg-[#effcf8] px-3 py-2 text-sm text-[#0f766e]">{success}</p> : null}
 
+      <section className="rounded-[28px] border border-[#dbe9ef] bg-[linear-gradient(180deg,#fbfefe_0%,#f3f9fb_100%)] p-4 shadow-sm">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6a8796]">Account Operating Summary</p>
+            <h2 className="mt-1 text-lg font-semibold text-[#173543]">What matters now on this account</h2>
+            <p className="mt-1 max-w-3xl text-sm text-[#4a6575]">{accountPrioritySummary}</p>
+          </div>
+          <div className="max-w-full rounded-full border border-[#d7e6ed] bg-white px-3 py-1.5 text-xs font-medium text-[#4f6877]">
+            {props.assignedSalesLabel || "No assigned sales rep"} • {visitStatus ? titleCase(visitStatus) : "No visit status"} • {props.lastActivityAt ? `Last activity ${formatShortDateTime(props.lastActivityAt)}` : "No recent activity"}
+          </div>
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          {props.isHallOfFlowersLead ? <StatusPill label="Hall of Flowers" tone="warn" /> : null}
+          {props.isHotLead ? <StatusPill label="Hot Lead" tone="warn" /> : null}
+          <StatusPill label={activeFollowUpLabel} tone={props.overdueTaskCount > 0 ? "warn" : props.hasOpenTask ? "ok" : "neutral"} />
+          <StatusPill label={routeReadinessLabel} tone={missingRouteStates.length > 0 ? "warn" : "ok"} />
+          <StatusPill label={hasPrimaryContact ? "Primary contact ready" : "Primary contact missing"} tone={hasPrimaryContact ? "ok" : "warn"} />
+          {nextVisitDueAt ? <StatusPill label={`Next visit ${formatShortDateTime(nextVisitDueAt)}`} tone="neutral" /> : null}
+        </div>
+
+        <div className="mt-4 grid gap-3 lg:grid-cols-3">
+          <FocusCard
+            eyebrow="Follow-Up"
+            title={activeFollowUpLabel}
+            detail={nextActionSummary}
+            actionLabel={props.hasOpenTask ? "Review Task Queue" : "Create Follow-Up"}
+            onAction={() => jumpToSection(props.hasOpenTask ? "customer-linked-task-list" : "customer-create-task", props.hasOpenTask ? null : taskTitleInputRef.current)}
+            tone={props.overdueTaskCount > 0 ? "warn" : props.hasOpenTask ? "ok" : "neutral"}
+          />
+          <FocusCard
+            eyebrow="Field Ops"
+            title={routeReadinessLabel}
+            detail={
+              missingRouteStates.length > 0
+                ? "Fix route coverage gaps before staging this account into the pending stop queue."
+                : routeDay
+                  ? `Route plan is staged for ${routeDay}.`
+                  : "Routing details are ready for staging and handoff."
+            }
+            actionLabel="Open Route & Field Ops"
+            onAction={() => jumpToSection("customer-route-field-ops")}
+            tone={missingRouteStates.length > 0 ? "warn" : "ok"}
+          />
+          <FocusCard
+            eyebrow="Contact Coverage"
+            title={hasPrimaryContact ? "Buyer contact is on file" : "Primary contact needs cleanup"}
+            detail={
+              hasPrimaryContact
+                ? "Keep the buyer current so follow-up, notes, and route handoffs stay grounded."
+                : "Capture the primary buyer before the next outreach or handoff."
+            }
+            actionLabel="Open Contacts"
+            onAction={() => jumpToSection("customer-primary-contact")}
+            tone={hasPrimaryContact ? "ok" : "warn"}
+          />
+        </div>
+      </section>
+
       <section className="rounded-[28px] border border-[#cfe5e8] bg-[linear-gradient(180deg,#173543_0%,#1d4658_100%)] p-4 text-white shadow-[0_16px_40px_rgba(16,42,67,0.16)]">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#9fd9d2]">Quick Actions</p>
-            <h2 className="mt-1 text-lg font-semibold">Work the account without hunting through the page</h2>
-            <p className="mt-1 text-sm text-[#d3e6eb]">Calls and email fire immediately. The rest jump into the existing account, task, route, and recent-history sections.</p>
+            <h2 className="mt-1 text-lg font-semibold">Continue the account workflow without hunting</h2>
+            <p className="mt-1 text-sm text-[#d3e6eb]">Calls and email fire immediately. The rest jump to the existing follow-up, routing, account, and timeline surfaces below.</p>
           </div>
           <div className="max-w-full rounded-full border border-white/15 bg-black/10 px-3 py-1.5 text-xs font-medium text-[#d7edf0]">
             {territoryCode || "No territory"} • {visitStatus ? titleCase(visitStatus) : "No visit status"} • {hasCoords ? "Map ready" : "Needs coords"}
@@ -767,6 +902,66 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
           <ActionButton label="Account" onClick={() => jumpToSection("customer-account-management", accountCompanyInputRef.current)} />
           <ActionButton label={routeQueueBusy ? "Adding..." : "Add to Route"} onClick={() => void addToRoute()} disabled={routeQueueBusy} />
           <ActionButton label="Recent Activity" onClick={() => jumpToSection("customer-activity-timeline")} />
+        </div>
+      </section>
+
+      <section className={sectionClass}>
+        <SectionHeader
+          title="Next Steps"
+          description="Use the account state above to decide what happens next. These shortcuts enter the exact section that advances the account."
+        />
+        <div className="mt-3 grid gap-3 lg:grid-cols-2 xl:grid-cols-4">
+          <FocusCard
+            eyebrow="Do Now"
+            title={props.overdueTaskCount > 0 ? "Clear overdue follow-up" : props.hasOpenTask ? "Work active follow-up" : "Start the next follow-up"}
+            detail={
+              props.overdueTaskCount > 0
+                ? "There is overdue task work on this account. Review the queue and set the next customer touch."
+                : props.hasOpenTask
+                  ? "There is already active follow-up. Review the current account task list before creating more."
+                  : "No follow-up is open right now. Create the next task to keep ownership explicit."
+            }
+            actionLabel={props.hasOpenTask ? "Review Account Tasks" : "Create Follow-Up Task"}
+            onAction={() => jumpToSection(props.hasOpenTask ? "customer-linked-task-list" : "customer-create-task", props.hasOpenTask ? null : taskTitleInputRef.current)}
+            tone={props.overdueTaskCount > 0 ? "warn" : props.hasOpenTask ? "ok" : "neutral"}
+          />
+          <FocusCard
+            eyebrow="Log Signal"
+            title="Capture the latest account touch"
+            detail={
+              props.lastActivityAt
+                ? `Last activity was ${formatShortDateTime(props.lastActivityAt)}. Log the next call, email, or meeting here.`
+                : "No recent activity is on file. Log the latest customer signal so the timeline stays current."
+            }
+            actionLabel="Log Activity"
+            onAction={() => jumpToSection("customer-log-activity", activitySummaryInputRef.current)}
+          />
+          <FocusCard
+            eyebrow="Route Prep"
+            title={missingRouteStates.length > 0 ? "Unblock route setup" : "Stage into route work"}
+            detail={
+              missingRouteStates.length > 0
+                ? `Routing is blocked by ${missingRouteStates.join(" and ")}. Clean that up before adding stops.`
+                : "Routing fields are workable. Update field ops or stage the account into the pending stop queue."
+            }
+            actionLabel={missingRouteStates.length > 0 ? "Fix Route Readiness" : "Open Route Prep"}
+            onAction={() => jumpToSection("customer-route-field-ops")}
+            tone={missingRouteStates.length > 0 ? "warn" : "ok"}
+          />
+          <FocusCard
+            eyebrow="Account Coverage"
+            title={!hasPrimaryContact ? "Add the buyer contact" : "Keep account coverage current"}
+            detail={
+              !hasPrimaryContact
+                ? "This account needs a primary contact before the next outreach or handoff."
+                : props.assignedRouteRepLabel
+                  ? `Route rep ${props.assignedRouteRepLabel} is set. Keep contacts and ownership aligned.`
+                  : "Verify ownership, contact info, and routing coverage before the next handoff."
+            }
+            actionLabel={!hasPrimaryContact ? "Add Primary Contact" : "Review Account Setup"}
+            onAction={() => jumpToSection(!hasPrimaryContact ? "customer-primary-contact" : "customer-account-management", !hasPrimaryContact ? null : accountCompanyInputRef.current)}
+            tone={!hasPrimaryContact ? "warn" : "neutral"}
+          />
         </div>
       </section>
 
@@ -1037,7 +1232,10 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
 
       <div className="grid gap-3 xl:grid-cols-2">
         <section id="customer-account-management" className={[sectionClass, "scroll-mt-28"].join(" ")}>
-          <SectionHeader title="Account Management" />
+          <SectionHeader
+            title="Account Setup"
+            description="Keep ownership, lifecycle, and location details accurate so follow-up and route handoffs stay clean."
+          />
           <div className="mt-3 grid gap-3 md:grid-cols-2">
             <label className="grid gap-1 text-sm text-[#4a6575]">
               <span>Company Name</span>
@@ -1116,7 +1314,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
         </section>
 
         <section id="customer-primary-contact" className={[sectionClass, "scroll-mt-28"].join(" ")}>
-          <SectionHeader title="Contact Management" description="Keep the primary buyer current and maintain additional contacts from one place." />
+          <SectionHeader title="Contacts" description="Keep the primary buyer current and maintain the wider account contact bench from one place." />
 
           <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
             <div className="rounded-2xl border border-[#dbe9ef] bg-[#f9fcfd] p-3">
@@ -1222,98 +1420,107 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
         </section>
       </div>
 
-      <div className="grid gap-3 xl:grid-cols-2">
-        <section className={[sectionClass, "scroll-mt-28"].join(" ")}>
-          <SectionHeader title="Add Internal Note" />
-          <textarea
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            rows={3}
-            disabled={noteBusy}
-            className="mt-3 w-full rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a]"
-            placeholder="Add relationship context, follow-up notes, or handoff details."
-          />
-          <div className="mt-3">
-            <button type="button" onClick={() => void createNote()} disabled={noteBusy} className="rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
-              {noteBusy ? "Saving..." : "Add Note"}
-            </button>
+      <section className={sectionClass}>
+        <SectionHeader
+          title="Log And Create Follow-Up"
+          description="Capture the latest account context, assign the next task, and leave clean internal handoff notes from one place."
+        />
+        <div className="mt-3 grid gap-3 xl:grid-cols-3">
+          <div id="customer-log-activity" className="scroll-mt-28 rounded-2xl border border-[#dbe9ef] bg-[#f9fcfd] p-3">
+            <p className="text-sm font-semibold text-[#173543]">Log Activity</p>
+            <p className="mt-1 text-sm text-[#5c7483]">Capture the call, email, meeting, or task update that moved the account.</p>
+            <div className="mt-3 grid gap-3">
+              <label className="grid gap-1 text-sm text-[#4a6575]">
+                <span>Activity Type</span>
+                <select value={activityType} onChange={(e) => setActivityType(e.target.value)} disabled={activityBusy} className={inputClass}>
+                  {["note", "call", "email", "meeting", "task_update"].map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="grid gap-1 text-sm text-[#4a6575]">
+                <span>Summary</span>
+                <input ref={activitySummaryInputRef} value={activitySummary} onChange={(e) => setActivitySummary(e.target.value)} disabled={activityBusy} className={inputClass} placeholder="Called buyer to confirm next steps." />
+              </label>
+              <label className="grid gap-1 text-sm text-[#4a6575]">
+                <span>Details</span>
+                <textarea
+                  value={activityDetails}
+                  onChange={(e) => setActivityDetails(e.target.value)}
+                  rows={3}
+                  disabled={activityBusy}
+                  className="rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a]"
+                  placeholder="Optional context for the timeline entry."
+                />
+              </label>
+            </div>
+            <div className="mt-3">
+              <button type="button" onClick={() => void createActivity()} disabled={activityBusy} className="rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+                {activityBusy ? "Saving..." : "Log Activity"}
+              </button>
+            </div>
           </div>
-        </section>
 
-        <section id="customer-create-task" className={[sectionClass, "scroll-mt-28"].join(" ")}>
-          <SectionHeader title="Create Task" />
-          <div className="mt-3 grid gap-3 md:grid-cols-2">
-            <label className="grid gap-1 text-sm text-[#4a6575] md:col-span-2">
-              <span>Title</span>
-              <input ref={taskTitleInputRef} value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} disabled={taskBusy} className={inputClass} placeholder="Send updated pricing sheet." />
-            </label>
-            <label className="grid gap-1 text-sm text-[#4a6575]">
-              <span>Due Date</span>
-              <input type="date" value={taskDueDate} onChange={(e) => setTaskDueDate(e.target.value)} disabled={taskBusy} className={inputClass} />
-            </label>
-            <label className="grid gap-1 text-sm text-[#4a6575]">
-              <span>Priority</span>
-              <select value={taskPriority} onChange={(e) => setTaskPriority(e.target.value)} disabled={taskBusy} className={inputClass}>
-                <option value="1">1</option>
-                <option value="2">2</option>
-                <option value="3">3</option>
-                <option value="4">4</option>
-                <option value="5">5</option>
-              </select>
-            </label>
-            <label className="grid gap-1 text-sm text-[#4a6575] md:col-span-2">
-              <span>Assigned To</span>
-              <select value={taskAssignedUserId} onChange={(e) => setTaskAssignedUserId(e.target.value)} disabled={taskBusy} className={inputClass}>
-                <option value="">Unassigned</option>
-                {props.salesOptions.map((option) => (
-                  <option key={option.userId} value={option.userId}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+          <div id="customer-create-task" className="scroll-mt-28 rounded-2xl border border-[#dbe9ef] bg-[#f9fcfd] p-3">
+            <p className="text-sm font-semibold text-[#173543]">Create Follow-Up Task</p>
+            <p className="mt-1 text-sm text-[#5c7483]">Assign the next explicit owner, due date, and priority for this account.</p>
+            <div className="mt-3 grid gap-3">
+              <label className="grid gap-1 text-sm text-[#4a6575]">
+                <span>Title</span>
+                <input ref={taskTitleInputRef} value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} disabled={taskBusy} className={inputClass} placeholder="Send updated pricing sheet." />
+              </label>
+              <label className="grid gap-1 text-sm text-[#4a6575]">
+                <span>Due Date</span>
+                <input type="date" value={taskDueDate} onChange={(e) => setTaskDueDate(e.target.value)} disabled={taskBusy} className={inputClass} />
+              </label>
+              <label className="grid gap-1 text-sm text-[#4a6575]">
+                <span>Priority</span>
+                <select value={taskPriority} onChange={(e) => setTaskPriority(e.target.value)} disabled={taskBusy} className={inputClass}>
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="4">4</option>
+                  <option value="5">5</option>
+                </select>
+              </label>
+              <label className="grid gap-1 text-sm text-[#4a6575]">
+                <span>Assigned To</span>
+                <select value={taskAssignedUserId} onChange={(e) => setTaskAssignedUserId(e.target.value)} disabled={taskBusy} className={inputClass}>
+                  <option value="">Unassigned</option>
+                  {props.salesOptions.map((option) => (
+                    <option key={option.userId} value={option.userId}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div className="mt-3">
+              <button type="button" onClick={() => void createTask()} disabled={taskBusy} className="rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+                {taskBusy ? "Saving..." : "Create Task"}
+              </button>
+            </div>
           </div>
-          <div className="mt-3">
-            <button type="button" onClick={() => void createTask()} disabled={taskBusy} className="rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
-              {taskBusy ? "Saving..." : "Create Task"}
-            </button>
-          </div>
-        </section>
-      </div>
 
-      <section id="customer-log-activity" className={[sectionClass, "scroll-mt-28"].join(" ")}>
-        <SectionHeader title="Log Activity" />
-        <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-[0.8fr_1.2fr]">
-          <label className="grid gap-1 text-sm text-[#4a6575]">
-            <span>Activity Type</span>
-            <select value={activityType} onChange={(e) => setActivityType(e.target.value)} disabled={activityBusy} className={inputClass}>
-              {["note", "call", "email", "meeting", "task_update"].map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="grid gap-1 text-sm text-[#4a6575]">
-            <span>Summary</span>
-            <input ref={activitySummaryInputRef} value={activitySummary} onChange={(e) => setActivitySummary(e.target.value)} disabled={activityBusy} className={inputClass} placeholder="Called buyer to confirm next steps." />
-          </label>
-          <label className="grid gap-1 text-sm text-[#4a6575] md:col-span-2">
-            <span>Details</span>
+          <div className="rounded-2xl border border-[#dbe9ef] bg-[#f9fcfd] p-3">
+            <p className="text-sm font-semibold text-[#173543]">Add Internal Note</p>
+            <p className="mt-1 text-sm text-[#5c7483]">Leave relationship context, handoff notes, or operational detail that should stay internal.</p>
             <textarea
-              value={activityDetails}
-              onChange={(e) => setActivityDetails(e.target.value)}
-              rows={3}
-              disabled={activityBusy}
-              className="rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a]"
-              placeholder="Optional context for the timeline entry."
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={8}
+              disabled={noteBusy}
+              className="mt-3 w-full rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a]"
+              placeholder="Add relationship context, follow-up notes, or handoff details."
             />
-          </label>
-        </div>
-        <div className="mt-3">
-          <button type="button" onClick={() => void createActivity()} disabled={activityBusy} className="rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
-            {activityBusy ? "Saving..." : "Log Activity"}
-          </button>
+            <div className="mt-3">
+              <button type="button" onClick={() => void createNote()} disabled={noteBusy} className="rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+                {noteBusy ? "Saving..." : "Add Note"}
+              </button>
+            </div>
+          </div>
         </div>
       </section>
     </div>

@@ -27,7 +27,7 @@ export default async function WorkspaceRouteRunnerPage({
     <div className="mx-auto w-full max-w-[1440px] space-y-6 2xl:max-w-[1500px]">
       <AdminPageHeader
         title="Route Runner"
-        description="Rep-focused stop runner for executing today’s route, capturing visit outcomes, and creating follow-up tasks from the field."
+        description="Field execution cockpit for running today’s stops, capturing visit outcomes, and creating follow-up from the route."
       />
       {savedRoute ? (
         <SavedRouteRunner route={savedRoute} />

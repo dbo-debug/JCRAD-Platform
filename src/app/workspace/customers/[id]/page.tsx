@@ -101,7 +101,7 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
     <div className="space-y-4">
       <AdminPageHeader
         title={detail.customer.name}
-        description="Operational customer account workspace for staff. Relationship fields are editable here while estimates, orders, files, and submissions remain read-only."
+        description="Canonical account operating page for staff. Work the account, capture the next step, and hand off cleanly into follow-up, routing, and recent account context."
         action={
           <Link
             href="/workspace/customers"
@@ -112,88 +112,91 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
         }
       />
 
-      <div className="flex flex-wrap gap-2">
-        {detail.customer.isHallOfFlowersLead ? <HeaderBadge tone="event" label="Hall of Flowers" /> : null}
-        {detail.customer.isHotLead ? <HeaderBadge tone="hot" label="Hot Lead" /> : null}
-        {detail.customer.source ? <HeaderBadge label={`Source ${formatSourceLabel(detail.customer.source)}`} /> : null}
-        {detail.customer.importSource ? <HeaderBadge label={`Import ${formatSourceLabel(detail.customer.importSource)}`} /> : null}
-        <HeaderBadge
-          tone={detail.customer.hasOpenTask ? (detail.customer.overdueTaskCount > 0 ? "warn" : "ok") : "neutral"}
-          label={
-            detail.customer.hasOpenTask
-              ? detail.customer.overdueTaskCount > 0
-                ? `${detail.customer.overdueTaskCount} overdue task${detail.customer.overdueTaskCount === 1 ? "" : "s"}`
-                : detail.customer.nextTaskDueAt
-                  ? `Follow-up due ${formatDate(detail.customer.nextTaskDueAt)}`
-                  : `${detail.customer.openTaskCount} open task${detail.customer.openTaskCount === 1 ? "" : "s"}`
-              : "No open follow-up task"
-          }
-        />
-      </div>
+      <section className="rounded-2xl border border-[#dbe9ef] bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#6b8593]">Account Snapshot</p>
+            <h2 className="mt-1 text-lg font-semibold text-[#173543]">Identity, ownership, and current account pressure</h2>
+            <p className="mt-1 max-w-3xl text-sm text-[#4a6575]">
+              This account page is the workflow center for follow-up, route prep, and customer operating context.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {detail.customer.isHallOfFlowersLead ? <HeaderBadge tone="event" label="Hall of Flowers" /> : null}
+            {detail.customer.isHotLead ? <HeaderBadge tone="hot" label="Hot Lead" /> : null}
+            {detail.customer.source ? <HeaderBadge label={`Source ${formatSourceLabel(detail.customer.source)}`} /> : null}
+            {detail.customer.importSource ? <HeaderBadge label={`Import ${formatSourceLabel(detail.customer.importSource)}`} /> : null}
+            <HeaderBadge
+              tone={detail.customer.hasOpenTask ? (detail.customer.overdueTaskCount > 0 ? "warn" : "ok") : "neutral"}
+              label={
+                detail.customer.hasOpenTask
+                  ? detail.customer.overdueTaskCount > 0
+                    ? `${detail.customer.overdueTaskCount} overdue task${detail.customer.overdueTaskCount === 1 ? "" : "s"}`
+                    : detail.customer.nextTaskDueAt
+                      ? `Follow-up due ${formatDate(detail.customer.nextTaskDueAt)}`
+                      : `${detail.customer.openTaskCount} open task${detail.customer.openTaskCount === 1 ? "" : "s"}`
+                  : "No open follow-up task"
+              }
+            />
+          </div>
+        </div>
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-        <SummaryCard label="Status" value={detail.customer.status} />
-        <SummaryCard label="Stage" value={detail.customer.stage || "Not set"} />
-        <SummaryCard label="Assigned Sales" value={detail.customer.assignedSalesName || "Unassigned"} helper={detail.customer.assignedSalesEmail || undefined} />
-        <SummaryCard label="City" value={detail.customer.city || "Not set"} />
-        <SummaryCard label="Source" value={formatSourceLabel(detail.customer.source)} helper={detail.customer.importSource ? `Import ${formatSourceLabel(detail.customer.importSource)}` : undefined} />
-        <SummaryCard label="Primary Email" value={detail.customer.primaryContactEmail || "Not set"} />
-        <SummaryCard label="Last Activity" value={formatDate(detail.customer.lastActivityAt)} />
-      </section>
-
-      <section className="rounded-2xl border border-[#dbe9ef] bg-white p-3 shadow-sm">
-        <div className="flex flex-wrap gap-2">
-          {["Overview", "Activity", "Tasks", "Routing", "Notes"].map((tab, index) => (
-            <span
-              key={tab}
-              className={[
-                "inline-flex h-9 items-center rounded-full border px-3.5 text-sm font-medium",
-                index === 0 ? "border-[#14b8a6] bg-[#effcf9] text-[#0f766e]" : "border-[#d7e6ed] bg-[#f8fbfc] text-[#4f6877]",
-              ].join(" ")}
-            >
-              {tab}
-            </span>
-          ))}
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+          <SummaryCard label="Status" value={detail.customer.status} />
+          <SummaryCard label="Stage" value={detail.customer.stage || "Not set"} />
+          <SummaryCard label="Assigned Sales" value={detail.customer.assignedSalesName || "Unassigned"} helper={detail.customer.assignedSalesEmail || undefined} />
+          <SummaryCard label="Route Rep" value={detail.customer.assignedRouteRepName || "Unassigned"} helper={detail.customer.assignedRouteRepEmail || undefined} />
+          <SummaryCard label="City" value={detail.customer.city || "Not set"} />
+          <SummaryCard label="Last Activity" value={formatDate(detail.customer.lastActivityAt)} />
         </div>
       </section>
 
-      <section className="grid gap-3 2xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.9fr)]">
-        <CustomerDetailManager
-          customerId={detail.customer.id}
-          companyName={detail.customer.name}
-          status={detail.customer.status}
-          stage={detail.customer.stage}
-          primaryContactEmail={detail.customer.primaryContactEmail}
-          mainPhone={detail.customer.mainPhone}
-          assignedSalesUserId={detail.customer.assignedSalesUserId}
-          territoryCode={detail.customer.territoryCode}
-          routeDay={detail.customer.routeDay}
-          assignedRouteRepUserId={detail.customer.assignedRouteRepUserId}
-          routePriority={detail.customer.routePriority}
-          visitStatus={detail.customer.visitStatus}
-          lastVisitAt={detail.customer.lastVisitAt}
-          nextVisitDueAt={detail.customer.nextVisitDueAt}
-          latitude={detail.customer.latitude}
-          longitude={detail.customer.longitude}
-          address1={detail.customer.address1}
-          address2={detail.customer.address2}
-          city={detail.customer.city}
-          state={detail.customer.state}
-          postalCode={detail.customer.postalCode}
-          geocodeStatus={detail.customer.geocodeStatus}
-          geocodedAddress={detail.customer.geocodedAddress}
-          lastGeocodedAt={detail.customer.lastGeocodedAt}
-          geocodeProvider={detail.customer.geocodeProvider}
-          address={address}
-          staffRole={staff.role}
-          salesOptions={salesOptions}
-          routeRepOptions={salesOptions}
-          territoryOptions={territoryOptions}
-          primaryContact={primaryContact}
-          contacts={detail.contacts}
-        />
+      <CustomerDetailManager
+        customerId={detail.customer.id}
+        companyName={detail.customer.name}
+        status={detail.customer.status}
+        stage={detail.customer.stage}
+        isHotLead={detail.customer.isHotLead}
+        isHallOfFlowersLead={detail.customer.isHallOfFlowersLead}
+        primaryContactEmail={detail.customer.primaryContactEmail}
+        mainPhone={detail.customer.mainPhone}
+        assignedSalesUserId={detail.customer.assignedSalesUserId}
+        assignedSalesLabel={detail.customer.assignedSalesName}
+        territoryCode={detail.customer.territoryCode}
+        routeDay={detail.customer.routeDay}
+        assignedRouteRepUserId={detail.customer.assignedRouteRepUserId}
+        assignedRouteRepLabel={detail.customer.assignedRouteRepName}
+        routePriority={detail.customer.routePriority}
+        visitStatus={detail.customer.visitStatus}
+        lastVisitAt={detail.customer.lastVisitAt}
+        nextVisitDueAt={detail.customer.nextVisitDueAt}
+        hasOpenTask={detail.customer.hasOpenTask}
+        openTaskCount={detail.customer.openTaskCount}
+        overdueTaskCount={detail.customer.overdueTaskCount}
+        nextTaskDueAt={detail.customer.nextTaskDueAt}
+        lastActivityAt={detail.customer.lastActivityAt}
+        latitude={detail.customer.latitude}
+        longitude={detail.customer.longitude}
+        address1={detail.customer.address1}
+        address2={detail.customer.address2}
+        city={detail.customer.city}
+        state={detail.customer.state}
+        postalCode={detail.customer.postalCode}
+        geocodeStatus={detail.customer.geocodeStatus}
+        geocodedAddress={detail.customer.geocodedAddress}
+        lastGeocodedAt={detail.customer.lastGeocodedAt}
+        geocodeProvider={detail.customer.geocodeProvider}
+        address={address}
+        staffRole={staff.role}
+        salesOptions={salesOptions}
+        routeRepOptions={salesOptions}
+        territoryOptions={territoryOptions}
+        primaryContact={primaryContact}
+        contacts={detail.contacts}
+      />
 
-        <Panel title="Recent Activity" id="customer-activity-timeline">
+      <section className="grid gap-3 2xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.9fr)]">
+        <Panel title="Recent Timeline" id="customer-activity-timeline">
           <div className="max-h-[540px] space-y-2.5 overflow-y-auto pr-1">
             {detail.activity.map((item) => (
               <ActivityCard key={item.id} item={item} />
@@ -201,9 +204,7 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
             {detail.activity.length === 0 ? <EmptyState label="No customer activity yet." /> : null}
           </div>
         </Panel>
-      </section>
 
-      <section className="grid gap-3 xl:grid-cols-1">
         <Panel title="Customer Users">
           <div className="space-y-2.5">
             {detail.users.map((user) => (
@@ -223,6 +224,37 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
               </div>
             ))}
             {detail.users.length === 0 ? <EmptyState label="No mapped users found." /> : null}
+          </div>
+        </Panel>
+      </section>
+
+      <section className="grid gap-3 xl:grid-cols-1">
+        <Panel title="Account Task History" id="customer-linked-task-list">
+          <div className="space-y-2.5">
+            {detail.tasks.map((task) => (
+              <div key={task.id} className="rounded-xl border border-[#dbe9ef] bg-[#f9fcfd] px-3 py-2.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-semibold text-[#173543]">{task.title}</p>
+                  <span className="rounded-full border border-[#d7e6ed] bg-white px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#4f6877]">
+                    {task.status}
+                  </span>
+                  {task.priority !== null ? (
+                    <span className="rounded-full border border-[#f1ddad] bg-[#fff9eb] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#9a6b00]">
+                      Priority {task.priority}
+                    </span>
+                  ) : null}
+                </div>
+                <p className="mt-1 text-sm text-[#4a6575]">
+                  {task.assignedUserName || "Unassigned"}
+                  {task.dueDate ? ` • Due ${formatDate(task.dueDate)}` : " • No due date"}
+                </p>
+                <p className="mt-1 text-xs text-[#5d7685]">
+                  Created {formatDate(task.createdAt)}
+                  {task.completedAt ? ` • Completed ${formatDate(task.completedAt)}` : ""}
+                </p>
+              </div>
+            ))}
+            {detail.tasks.length === 0 ? <EmptyState label="No customer tasks yet." /> : null}
           </div>
         </Panel>
       </section>
@@ -268,35 +300,6 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
       </section>
 
       <section className="grid gap-3 2xl:grid-cols-3">
-        <Panel title="Task List">
-          <div className="space-y-2.5">
-            {detail.tasks.map((task) => (
-              <div key={task.id} className="rounded-xl border border-[#dbe9ef] bg-[#f9fcfd] px-3 py-2.5">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="font-semibold text-[#173543]">{task.title}</p>
-                  <span className="rounded-full border border-[#d7e6ed] bg-white px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#4f6877]">
-                    {task.status}
-                  </span>
-                  {task.priority !== null ? (
-                    <span className="rounded-full border border-[#f1ddad] bg-[#fff9eb] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#9a6b00]">
-                      Priority {task.priority}
-                    </span>
-                  ) : null}
-                </div>
-                <p className="mt-1 text-sm text-[#4a6575]">
-                  {task.assignedUserName || "Unassigned"}
-                  {task.dueDate ? ` • Due ${formatDate(task.dueDate)}` : " • No due date"}
-                </p>
-                <p className="mt-1 text-xs text-[#5d7685]">
-                  Created {formatDate(task.createdAt)}
-                  {task.completedAt ? ` • Completed ${formatDate(task.completedAt)}` : ""}
-                </p>
-              </div>
-            ))}
-            {detail.tasks.length === 0 ? <EmptyState label="No customer tasks yet." /> : null}
-          </div>
-        </Panel>
-
         <div id="customer-documents" className="scroll-mt-24">
           <Panel title="Customer Documents">
             <div className="space-y-2.5">

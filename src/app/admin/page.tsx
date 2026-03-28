@@ -1,161 +1,32 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
+import {
+  DashboardPanel,
+  PlatformActivityList,
+  QueueActionRow,
+  QueueSnapshotCard,
+  ShortcutRail,
+  StatusPill,
+  SummaryBox,
+  WorkflowCard,
+} from "@/components/admin/dashboard/DashboardPrimitives";
 import EstimateLeadFollowUpPanel from "@/components/workspace/EstimateLeadFollowUpPanel";
 import { loadCustomerApprovalQueue, summarizeCustomerApprovalQueue } from "@/lib/customerApprovals";
 import { loadCustomerWorkspaceIndex } from "@/lib/customerWorkspace";
-import { getRouteEligibilityReason, isRouteEligibleCustomer } from "@/lib/routeEligibility";
-import { loadSavedRoutes } from "@/lib/routeWorkspace";
+import {
+  buildAdminDashboardViewModel,
+  type CustomerTaskRow,
+  type EstimateRow,
+  type OrderRow,
+  type PackagingSubmissionRow,
+  type PlatformEventRow,
+} from "@/lib/adminDashboard";
 import { requireStaff } from "@/lib/requireStaff";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { loadSavedRoutes } from "@/lib/routeWorkspace";
 import { loadScopedCustomerTasks } from "@/lib/taskWorkspace";
-import { normalizePackagingCategory, type PackagingCategory } from "@/lib/packaging/category";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
-
-type EstimateRow = {
-  id: string;
-  status: string | null;
-  total: number | null;
-  customer_name: string | null;
-  customer_email: string | null;
-  packaging_review_pending: boolean | null;
-  created_at: string | null;
-  updated_at: string | null;
-};
-
-type OrderRow = {
-  id: string;
-  status: string | null;
-  total: number | null;
-  customer_name: string | null;
-  customer_email: string | null;
-  created_at: string | null;
-};
-
-type PackagingSubmissionRow = {
-  id: string;
-  estimate_id: string | null;
-  category: string | null;
-  status: string | null;
-  customer_name: string | null;
-  customer_email: string | null;
-  created_at: string | null;
-};
-
-type PlatformEventRow = {
-  id: string;
-  event_type: string | null;
-  user_email: string | null;
-  metadata: Record<string, unknown> | null;
-  created_at: string | null;
-};
-
-type CustomerTaskRow = {
-  id: string;
-  customer_id: string | null;
-  title: string | null;
-  due_date: string | null;
-  status: string | null;
-  assigned_user_id: string | null;
-};
-
-const CLOSED_ORDER_STATUSES = new Set(["fulfilled", "completed", "cancelled", "rejected", "closed"]);
-const CLOSED_TASK_STATUSES = new Set(["completed", "closed", "cancelled"]);
-
-const MODULE_CARDS = [
-  {
-    title: "Customers",
-    description: "CRM records, segment builder, geocode cleanup, and pending-stop staging.",
-    href: "/workspace/customers",
-  },
-  {
-    title: "Routes",
-    description: "Route command center, itinerary controls, and route runner handoff.",
-    href: "/workspace/routes",
-  },
-  {
-    title: "Tasks",
-    description: "Follow-up workload across customers and field execution.",
-    href: "/workspace/tasks",
-  },
-  {
-    title: "Orders",
-    description: "Order progression and approval tracking.",
-    href: "/admin/orders",
-  },
-  {
-    title: "Menu",
-    description: "Live commercial menu and estimate entry path.",
-    href: "/menu",
-  },
-  {
-    title: "Packaging",
-    description: "Packaging operations, reviews, and catalog maintenance.",
-    href: "/admin/packaging",
-    adminOnly: true,
-  },
-] as const;
-
-const SALES_VISIBLE_MODULE_CARDS = MODULE_CARDS.filter(
-  (card) => !("adminOnly" in card) || card.adminOnly !== true
-);
-
-function normalizeStatus(value: unknown): string {
-  return String(value || "").trim().toLowerCase();
-}
-
-function formatDate(value: string | null): string {
-  if (!value) return "Unknown date";
-  const parsed = Date.parse(value);
-  if (!Number.isFinite(parsed)) return "Unknown date";
-  return new Date(parsed).toLocaleDateString();
-}
-
-function formatRelativeTime(value: string | null): string {
-  if (!value) return "unknown time";
-  const ms = Date.parse(value);
-  if (!Number.isFinite(ms)) return "unknown time";
-  const diffMs = Date.now() - ms;
-  const diffMin = Math.max(0, Math.floor(diffMs / 60000));
-  if (diffMin < 1) return "just now";
-  if (diffMin < 60) return `${diffMin}m ago`;
-  const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return `${diffHr}h ago`;
-  const diffDay = Math.floor(diffHr / 24);
-  return `${diffDay}d ago`;
-}
-
-function getPendingOrderCount(rows: OrderRow[]): number {
-  return rows.reduce((count, row) => {
-    const status = normalizeStatus(row.status) || "pending";
-    return CLOSED_ORDER_STATUSES.has(status) ? count : count + 1;
-  }, 0);
-}
-
-function eventLabel(eventTypeRaw: string | null): string {
-  const eventType = normalizeStatus(eventTypeRaw);
-  if (eventType === "user_signup") return "User signup";
-  if (eventType === "user_login") return "User login";
-  if (eventType === "estimate_created") return "Estimate created";
-  if (eventType === "estimate_line_added") return "Estimate line added";
-  if (eventType === "estimate_add_line_failed") return "Estimate add-line failed";
-  if (eventType === "order_requested") return "Order requested";
-  return eventType || "Platform event";
-}
-
-function metadataSummary(metadata: Record<string, unknown> | null): string {
-  if (!metadata || typeof metadata !== "object") return "";
-  const preferredKeys = ["estimate_id", "order_id", "offer_id", "mode", "line_count", "error"];
-  const parts: string[] = [];
-  for (const key of preferredKeys) {
-    const value = metadata[key];
-    if (value == null || value === "") continue;
-    const display = String(value);
-    parts.push(`${key}: ${display.length > 120 ? `${display.slice(0, 119)}…` : display}`);
-  }
-  return parts.join(" • ");
-}
 
 export default async function AdminDashboardPage() {
   const staff = await requireStaff();
@@ -163,7 +34,17 @@ export default async function AdminDashboardPage() {
   const supabase = createAdminClient();
   const referenceNow = Date.parse(new Date().toISOString());
 
-  const [estimateRes, orderRes, submissionRes, eventRes, routeStopQueueRes, taskRows, customerIndex, savedRoutes, approvalQueue] = await Promise.all([
+  const [
+    estimateRes,
+    orderRes,
+    submissionRes,
+    eventRes,
+    routeStopQueueRes,
+    taskRows,
+    customerIndex,
+    savedRoutes,
+    approvalQueue,
+  ] = await Promise.all([
     supabase
       .from("estimates")
       .select("id, status, total, customer_name, customer_email, packaging_review_pending, created_at, updated_at")
@@ -187,95 +68,29 @@ export default async function AdminDashboardPage() {
     supabase.from("route_stop_queue").select("id"),
     loadScopedCustomerTasks({ staff, limit: 2000 }),
     loadCustomerWorkspaceIndex(),
-    loadSavedRoutes(),
+    loadSavedRoutes(staff),
     isAdmin ? loadCustomerApprovalQueue() : Promise.resolve([]),
   ]);
 
-  const estimates = (estimateRes.data || []) as EstimateRow[];
-  const orders = (orderRes.data || []) as OrderRow[];
-  const submissions = (submissionRes.data || []) as PackagingSubmissionRow[];
-  const platformEvents = (eventRes.data || []) as PlatformEventRow[];
-  const customerTasks = taskRows as CustomerTaskRow[];
-  const customers = customerIndex.customers;
-
-  const routeReadyAccounts = customers.filter((customer) => isRouteEligibleCustomer(customer));
-  const blockedByGeocode = customers.filter((customer) => getRouteEligibilityReason(customer) !== null);
-  const pendingStopsCount = (routeStopQueueRes.data || []).length;
-  const activeRoutes = savedRoutes.filter((route) => ["assigned", "in_progress"].includes(normalizeStatus(route.status)));
-  const openTasks = customerTasks.filter((task) => !CLOSED_TASK_STATUSES.has(normalizeStatus(task.status)));
-  const customersNeedingFollowUp = new Set(openTasks.map((task) => String(task.customer_id || "").trim()).filter(Boolean)).size;
-  const overdueTaskCount = openTasks.filter((task) => {
-    const due = Date.parse(String(task.due_date || ""));
-    return Number.isFinite(due) && due < referenceNow;
-  }).length;
-
-  const draftEstimates = estimates.filter((row) => {
-    const status = normalizeStatus(row.status);
-    return !status || status === "draft";
-  });
-  const pendingOrdersCount = getPendingOrderCount(orders);
   const approvalStatusCounts = summarizeCustomerApprovalQueue(approvalQueue);
-  const approvalDocsLinkedCount = approvalQueue.filter((item) => item.readyState === "docs_linked").length;
-  const packagingPending = submissions.filter((row) => {
-    const status = normalizeStatus(row.status);
-    return !status || status === "pending";
+  const dashboard = buildAdminDashboardViewModel({
+    staff,
+    referenceNow,
+    estimates: (estimateRes.data || []) as EstimateRow[],
+    orders: (orderRes.data || []) as OrderRow[],
+    submissions: (submissionRes.data || []) as PackagingSubmissionRow[],
+    platformEvents: (eventRes.data || []) as PlatformEventRow[],
+    pendingStopsCount: (routeStopQueueRes.data || []).length,
+    customerTasks: taskRows as CustomerTaskRow[],
+    customers: customerIndex.customers,
+    savedRoutes,
+    approvalQueue,
+    approvalStatusCounts: {
+      pending: approvalStatusCounts.pending,
+      docsLinked: approvalQueue.filter((item) => item.readyState === "docs_linked").length,
+      followUp: approvalStatusCounts.followUp,
+    },
   });
-  const packagingApproved = submissions.filter((row) => normalizeStatus(row.status) === "approved");
-  const packagingRejected = submissions.filter((row) => normalizeStatus(row.status) === "rejected");
-  const recentPackagingSubmissions = submissions.slice(0, 6);
-
-  const packagingByCategory = new Map<PackagingCategory, number>();
-  for (const category of ["flower", "pre_roll", "vape", "concentrate"] as PackagingCategory[]) {
-    packagingByCategory.set(category, 0);
-  }
-  for (const row of packagingPending) {
-    const category = normalizePackagingCategory(row.category);
-    if (!category) continue;
-    packagingByCategory.set(category, Number(packagingByCategory.get(category) || 0) + 1);
-  }
-
-  const actionItems = [
-    {
-      label: "Pending route stops",
-      count: pendingStopsCount,
-      href: "/workspace/routes",
-      tone: "neutral",
-    },
-    {
-      label: "Accounts blocked by geocode",
-      count: blockedByGeocode.length,
-      href: "/workspace/routes?coordStatus=needs_coords&territoryFocus=cleanup",
-      tone: "warn",
-    },
-    {
-      label: "Orders pending progression",
-      count: pendingOrdersCount,
-      href: "/admin/orders",
-      tone: "neutral",
-    },
-    {
-      label: "Customers needing follow-up tasks",
-      count: customersNeedingFollowUp,
-      href: "/workspace/tasks",
-      tone: "neutral",
-    },
-    ...(isAdmin
-      ? [
-        {
-          label: "Packaging submissions need review",
-          count: packagingPending.length,
-          href: "/admin/packaging/submissions",
-          tone: "warn" as const,
-        },
-        {
-          label: "Pending customer approvals",
-          count: approvalQueue.length,
-          href: "/workspace/customers/approvals",
-          tone: "warn" as const,
-        },
-      ]
-      : []),
-  ] as const;
 
   const hasEstimateError = Boolean(estimateRes.error);
   const hasOrderError = Boolean(orderRes.error);
@@ -287,73 +102,13 @@ export default async function AdminDashboardPage() {
   return (
     <div className="space-y-6">
       <AdminPageHeader
-        title="Command Center"
-        description={isAdmin
-          ? "Unified admin and operations dashboard for customers, routes, tasks, orders, menu, packaging, and route execution."
-          : "Internal sales command center for CRM follow-up, estimates, routes, and task execution."}
+        title={isAdmin ? "Command Center" : "My Day"}
+        description={
+          isAdmin
+            ? "Intervene, unblock, monitor team load, then drop into the right tool."
+            : "Do the next follow-up, then route work, then watch account movement."
+        }
       />
-
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-8">
-        <MetricCard
-          label="Route-Ready Accounts"
-          value={routeReadyAccounts.length}
-          href="/workspace/customers"
-          helper="Same eligibility rules as the planner"
-        />
-        <MetricCard
-          label="Blocked By Geocode"
-          value={blockedByGeocode.length}
-          href="/workspace/routes?coordStatus=needs_coords&territoryFocus=cleanup"
-          helper="Address, coord, or geocode issue"
-        />
-        <MetricCard
-          label="Pending Stops"
-          value={pendingStopsCount}
-          href="/workspace/routes"
-          helper="Queued for route planning"
-        />
-        <MetricCard
-          label="Saved Routes"
-          value={savedRoutes.length}
-          href="/workspace/routes"
-          helper={`${activeRoutes.length} active`}
-        />
-        <MetricCard
-          label="Open Tasks"
-          value={openTasks.length}
-          href="/workspace/tasks?view=open"
-          helper={`${overdueTaskCount} overdue`}
-          helperHref={overdueTaskCount > 0 ? "/workspace/tasks?view=overdue" : undefined}
-        />
-        <MetricCard
-          label="Draft Estimates"
-          value={draftEstimates.length}
-          href="/admin"
-          helper="Status: draft or unset"
-        />
-        <MetricCard
-          label="Pending Orders"
-          value={pendingOrdersCount}
-          href="/admin/orders"
-          helper="Open order progression"
-        />
-        {isAdmin ? (
-          <MetricCard
-            label="Pending Customer Approvals"
-            value={approvalQueue.length}
-            href="/workspace/customers/approvals"
-            helper={`${approvalDocsLinkedCount} with docs`}
-          />
-        ) : null}
-        {isAdmin ? (
-          <MetricCard
-            label="Packaging Review Queue"
-            value={packagingPending.length}
-            href="/admin/packaging/submissions"
-            helper={`${packagingApproved.length} approved • ${packagingRejected.length} rejected`}
-          />
-        ) : null}
-      </section>
 
       {(hasEstimateError || hasOrderError || hasSubmissionError || hasEventError || hasTaskError || hasRouteQueueError) ? (
         <div className="rounded-xl border border-[#f3d2d2] bg-[#fff4f4] px-4 py-3 text-sm text-[#991b1b]">
@@ -361,315 +116,270 @@ export default async function AdminDashboardPage() {
         </div>
       ) : null}
 
-      <section className="grid gap-4 xl:grid-cols-5">
-        <div className="space-y-4 xl:col-span-3">
-          <Panel
-            title="Unified Modules"
-            description="Major platform modules now sit under one internal shell."
-          >
-            <div className="grid gap-3 md:grid-cols-2">
-              {(isAdmin ? MODULE_CARDS : SALES_VISIBLE_MODULE_CARDS).map((card) => (
-                <Link
-                  key={card.href}
-                  href={card.href}
-                  className="rounded-lg border border-[#dbe9ef] bg-white px-4 py-3 transition hover:border-[#14b8a6] hover:bg-[#f6fbfd]"
-                >
-                  <p className="font-semibold text-[#173543]">{card.title}</p>
-                  <p className="mt-1 text-sm text-[#5b7382]">{card.description}</p>
-                </Link>
-              ))}
+      {isAdmin && dashboard.admin ? (
+        <>
+          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+            {dashboard.admin.workflowCards.map((card) => (
+              <WorkflowCard key={card.title} {...card} />
+            ))}
+          </section>
+
+          <section className="grid gap-4 xl:grid-cols-5">
+            <div className="space-y-4 xl:col-span-3">
+              <DashboardPanel
+                title="Intervene here first"
+                description="These are the queues where one admin decision can unblock a lot of downstream work."
+              >
+                <div className="space-y-2">
+                  {dashboard.admin.actionItems.map((item) => (
+                    <QueueActionRow key={item.title} item={item} />
+                  ))}
+                </div>
+              </DashboardPanel>
+
+              <DashboardPanel
+                title="Unblock blocked work"
+                description="Route-adjacent accounts that cannot move until cleanup happens."
+                href={dashboard.admin.hrefs.blockedCleanup}
+                hrefLabel="Open blocked accounts"
+              >
+                <div className="grid gap-2 md:grid-cols-2">
+                  {dashboard.blockedCustomers.map((customer) => (
+                    <Link
+                      key={customer.id}
+                      href={customer.href}
+                      className="rounded-lg border border-[#dbe9ef] bg-white px-3 py-2 text-sm transition hover:border-[#14b8a6] hover:bg-[#f6fbfd]"
+                    >
+                      <p className="font-semibold text-[#173543]">{customer.name}</p>
+                      <p className="text-xs text-[#5b7382]">{customer.detail}</p>
+                      <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#0f766e]">{customer.ctaLabel}</p>
+                    </Link>
+                  ))}
+                  {dashboard.blockedCustomers.length === 0 ? <p className="text-sm text-[#5b7382]">No blocked route accounts right now.</p> : null}
+                </div>
+              </DashboardPanel>
+
+              <DashboardPanel
+                title="Monitor team load"
+                description="Use this view to decide where routes and follow-up pressure need intervention next."
+                href={dashboard.admin.hrefs.teamWorkload}
+                hrefLabel="Open team workload"
+              >
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <SummaryBox
+                    label="Routes this week"
+                    value={`${dashboard.counts.routesThisWeek} scheduled`}
+                    detail={`${dashboard.counts.activeRoutes} active • ${dashboard.counts.unassignedRoutes} still unassigned`}
+                  />
+                  <SummaryBox
+                    label="Follow-up pressure"
+                    value={`${dashboard.counts.openTasks} open tasks`}
+                    detail={`${dashboard.counts.overdueTasks} overdue • ${dashboard.counts.customersNeedingFollowUp} customers affected`}
+                  />
+                </div>
+                <div className="mt-3 space-y-2">
+                  {dashboard.activeRoutes.map((route) => (
+                    <Link
+                      key={route.id}
+                      href={route.href}
+                      className="flex items-center justify-between rounded-lg border border-[#dbe9ef] bg-white px-3 py-2 text-sm transition hover:border-[#14b8a6] hover:bg-[#f6fbfd]"
+                    >
+                      <div>
+                        <p className="font-semibold text-[#173543]">{route.name}</p>
+                        <p className="text-xs text-[#5b7382]">{route.detail}</p>
+                        <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#0f766e]">{route.ctaLabel}</p>
+                      </div>
+                      <span className="rounded-full bg-[#eef7f6] px-2 py-0.5 text-xs font-semibold text-[#0f766e]">{route.status}</span>
+                    </Link>
+                  ))}
+                  {dashboard.activeRoutes.length === 0 ? <p className="text-sm text-[#5b7382]">No active routes right now.</p> : null}
+                </div>
+              </DashboardPanel>
+
+              <EstimateLeadFollowUpPanel description="Latest estimate activity feeding the next follow-up and funnel pressure." />
             </div>
-          </Panel>
 
-          <Panel
-            title="Action Items"
-            description="Queues that need attention now."
-            href="/workspace/routes"
-            hrefLabel="Open operations"
-          >
-            <div className="space-y-2">
-              {actionItems.map((item) => (
-                <Link
-                  key={item.label}
-                  href={item.href}
-                  className="flex items-center justify-between rounded-lg border border-[#dbe9ef] bg-white px-3 py-2 text-sm transition hover:border-[#14b8a6] hover:bg-[#f6fbfd]"
-                >
-                  <span className="text-[#2a4655]">{item.label}</span>
-                  <span
-                    className={[
-                      "rounded-full px-2.5 py-0.5 text-xs font-semibold",
-                      item.tone === "warn" ? "bg-[#fff3dd] text-[#8a5a08]" : "bg-[#eef7f6] text-[#0f766e]",
-                    ].join(" ")}
-                  >
-                    {item.count}
-                  </span>
-                </Link>
-              ))}
+            <div className="space-y-4 xl:col-span-2">
+              <DashboardPanel
+                title="Clear bottlenecks next"
+                description="Business queues waiting on admin review or decision."
+              >
+                <div className="space-y-3">
+                  {dashboard.admin.bottleneckSnapshots.map((item) => (
+                    <QueueSnapshotCard key={item.title} item={item} />
+                  ))}
+                </div>
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  <StatusPill label="Pending" value={dashboard.counts.packagingPending} tone="warn" />
+                  <StatusPill label="Docs Linked" value={dashboard.counts.approvalDocsLinked} tone="ok" />
+                  <StatusPill label="Follow-up" value={approvalStatusCounts.followUp} tone="bad" />
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2 text-xs text-[#5b7382]">
+                  <span>Flower: {dashboard.packagingByCategory.get("flower") || 0}</span>
+                  <span>Pre-roll: {dashboard.packagingByCategory.get("pre_roll") || 0}</span>
+                  <span>Vape: {dashboard.packagingByCategory.get("vape") || 0}</span>
+                  <span>Concentrate: {dashboard.packagingByCategory.get("concentrate") || 0}</span>
+                </div>
+              </DashboardPanel>
+
+              <DashboardPanel
+                title="Tools after triage"
+                description="Shortcuts stay available, but only after the operational queues."
+              >
+                <ShortcutRail cards={dashboard.shortcuts} />
+              </DashboardPanel>
             </div>
-          </Panel>
+          </section>
 
-          <Panel
-            title="Field Operations Summary"
-            description="Current route planning and execution readiness."
-            href="/workspace/routes"
-            hrefLabel="Open routes"
+          <DashboardPanel
+            title="Platform activity"
+            description="Recent platform events remain visible, but below the operational workflows."
           >
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-lg border border-[#dbe9ef] bg-white px-3 py-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#5d7685]">Route pipeline</p>
-                <p className="mt-2 text-sm text-[#173543]">
-                  {routeReadyAccounts.length} route-ready accounts • {pendingStopsCount} pending stops • {savedRoutes.length} saved routes
-                </p>
-              </div>
-              <div className="rounded-lg border border-[#dbe9ef] bg-white px-3 py-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#5d7685]">Active execution</p>
-                <p className="mt-2 text-sm text-[#173543]">
-                  {activeRoutes.length} active routes • {customersNeedingFollowUp} customers with open follow-up tasks
-                </p>
-              </div>
-            </div>
-            <div className="mt-3 space-y-2">
-              {activeRoutes.slice(0, 4).map((route) => (
-                <Link
-                  key={route.id}
-                  href={`/workspace/routes/run?routeId=${route.id}`}
-                  className="flex items-center justify-between rounded-lg border border-[#dbe9ef] bg-white px-3 py-2 text-sm transition hover:border-[#14b8a6] hover:bg-[#f6fbfd]"
-                >
-                  <div>
-                    <p className="font-semibold text-[#173543]">{route.name}</p>
-                    <p className="text-xs text-[#5b7382]">
-                      {route.routeDate || "No date"} • {route.assignedUserLabel || "Unassigned rep"} • {route.stopCount} stops
-                    </p>
-                  </div>
-                  <span className="rounded-full bg-[#eef7f6] px-2 py-0.5 text-xs font-semibold text-[#0f766e]">{route.status}</span>
-                </Link>
-              ))}
-              {activeRoutes.length === 0 ? <p className="text-sm text-[#5b7382]">No active routes right now.</p> : null}
-            </div>
-          </Panel>
-
-          <EstimateLeadFollowUpPanel description="Latest estimate activity with direct account and lead follow-up." />
-        </div>
-
-        <div className="space-y-4 xl:col-span-2">
-          {isAdmin ? (
-            <Panel
-              title="Packaging Review Visibility"
-              description="Customer packaging submissions by status and category."
-              href="/admin/packaging/submissions"
-              hrefLabel="Manage submissions"
-            >
-              <div className="grid grid-cols-3 gap-2">
-                <StatusPill label="Pending" value={packagingPending.length} tone="warn" />
-                <StatusPill label="Approved" value={packagingApproved.length} tone="ok" />
-                <StatusPill label="Rejected" value={packagingRejected.length} tone="bad" />
-              </div>
-              <div className="mt-3 flex flex-wrap gap-2 text-xs text-[#5b7382]">
-                <span>Flower: {packagingByCategory.get("flower") || 0}</span>
-                <span>Pre-roll: {packagingByCategory.get("pre_roll") || 0}</span>
-                <span>Vape: {packagingByCategory.get("vape") || 0}</span>
-                <span>Concentrate: {packagingByCategory.get("concentrate") || 0}</span>
-              </div>
-              <div className="mt-3 space-y-2">
-                {recentPackagingSubmissions.slice(0, 4).map((row) => (
-                  <div key={row.id} className="rounded-lg border border-[#dbe9ef] bg-white px-3 py-2 text-sm">
-                    <p className="font-semibold text-[#173543]">{row.customer_name || row.customer_email || "Submission"}</p>
-                    <p className="text-xs text-[#5b7382]">
-                      {normalizePackagingCategory(row.category) || "unknown"} • {normalizeStatus(row.status) || "pending"} • {formatDate(row.created_at)}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </Panel>
-          ) : null}
-
-          {isAdmin ? (
-            <Panel
-              title="Customer Approval Visibility"
-              description="Onboarding/compliance status using production-safe customer/profile linkage."
-              href="/workspace/customers/approvals"
-              hrefLabel="Open approvals"
-            >
-              <div className="grid grid-cols-3 gap-2">
-                <StatusPill label="Pending" value={approvalStatusCounts.pending} tone="warn" />
-                <StatusPill label="With Docs" value={approvalDocsLinkedCount} tone="ok" />
-                <StatusPill label="Follow-up" value={approvalStatusCounts.followUp} tone="bad" />
-              </div>
-              <div className="mt-3 space-y-2">
-                {approvalQueue.slice(0, 4).map((item) => (
-                  <Link
-                    key={item.customerId}
-                    href={item.reviewHref}
-                    className="block rounded-lg border border-[#dbe9ef] bg-white px-3 py-2 text-sm transition hover:border-[#14b8a6] hover:bg-[#f6fbfd]"
-                  >
-                    <p className="font-semibold text-[#173543]">{item.companyName}</p>
-                    <p className="text-xs text-[#5b7382]">
-                      {item.contactName || item.contactEmail || "No contact mapped"} • {item.approvalStatus}
-                    </p>
-                  </Link>
-                ))}
-                {approvalQueue.length === 0 ? (
-                  <p className="text-sm text-[#5b7382]">No pending customer approvals.</p>
-                ) : null}
-              </div>
-            </Panel>
-          ) : null}
-
-          <Panel
-            title="Task Follow-Up Visibility"
-            description="Open follow-up workload across customer accounts."
-            href="/workspace/tasks?view=open"
-            hrefLabel="Open tasks"
-          >
-            <div className="grid grid-cols-3 gap-2">
-              <StatusPill label="Open" value={openTasks.length} tone="warn" />
-              <Link href="/workspace/tasks?view=overdue" className="block">
-                <StatusPill label="Overdue" value={overdueTaskCount} tone="bad" />
-              </Link>
-              <StatusPill label="Customers" value={customersNeedingFollowUp} tone="ok" />
-            </div>
-            <div className="mt-3 space-y-2">
-              {openTasks.slice(0, 4).map((task) => (
-                <Link key={task.id} href={isTaskOverdue(task, referenceNow) ? "/workspace/tasks?view=overdue" : "/workspace/tasks?view=open"} className="block rounded-lg border border-[#dbe9ef] bg-white px-3 py-2 text-sm transition hover:border-[#14b8a6] hover:bg-[#f6fbfd]">
-                  <p className="font-semibold text-[#173543]">{task.title || "Untitled task"}</p>
-                  <p className="text-xs text-[#5b7382]">
-                    {normalizeStatus(task.status) || "open"} • due {formatDate(task.due_date)}
-                  </p>
-                </Link>
-              ))}
-              {openTasks.length === 0 ? <p className="text-sm text-[#5b7382]">No open customer tasks.</p> : null}
-            </div>
-          </Panel>
-
-          <Panel
-            title="Platform Activity"
-            description="Recent tester activity and key flow events."
-          >
-            {platformEvents.length === 0 ? (
-              <p className="text-sm text-[#5b7382]">No activity logged yet.</p>
-            ) : (
-              <div className="space-y-2">
-                {platformEvents.map((row) => (
-                  <div key={row.id} className="rounded-lg border border-[#dbe9ef] bg-white px-3 py-2 text-sm">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="font-semibold text-[#173543]">{eventLabel(row.event_type)}</p>
-                      <span className="text-xs text-[#6d8593]">{formatRelativeTime(row.created_at)}</span>
-                    </div>
-                    <p className="mt-0.5 text-xs text-[#5b7382]">
-                      {(row.user_email || "Unknown user")} • {formatDate(row.created_at)}
-                    </p>
-                    {metadataSummary(row.metadata) ? (
-                      <p className="mt-1 text-xs text-[#4f6877]">{metadataSummary(row.metadata)}</p>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-            )}
-          </Panel>
-        </div>
-      </section>
-    </div>
-  );
-}
-
-function MetricCard({
-  label,
-  value,
-  href,
-  helper,
-  helperHref,
-}: {
-  label: string;
-  value: number;
-  href: string;
-  helper?: string;
-  helperHref?: string;
-}) {
-  return (
-    <div className="rounded-xl border border-[#dbe9ef] bg-white p-4 shadow-sm">
-      <Link
-        href={href}
-        className="block transition hover:-translate-y-0.5 hover:text-[#0f766e]"
-      >
-        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#5d7685]">{label}</p>
-        <p className="mt-2 text-3xl font-semibold text-[#173543]">{value}</p>
-      </Link>
-      {helper ? (
-        helperHref ? (
-          <Link
-            href={helperHref}
-            className="mt-2 inline-flex rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-2.5 py-1 text-xs font-semibold text-[#4f6877] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
-          >
-            {helper}
-          </Link>
-        ) : (
-          <p className="mt-1 text-xs text-[#6d8593]">{helper}</p>
-        )
+            <PlatformActivityList events={dashboard.platformActivityItems} />
+          </DashboardPanel>
+        </>
       ) : null}
-    </div>
-  );
-}
 
-function isTaskOverdue(task: Pick<CustomerTaskRow, "due_date" | "status">, referenceNow: number) {
-  if (CLOSED_TASK_STATUSES.has(normalizeStatus(task.status))) return false;
-  const due = Date.parse(String(task.due_date || ""));
-  return Number.isFinite(due) && due < referenceNow;
-}
+      {!isAdmin && dashboard.sales ? (
+        <>
+          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {dashboard.sales.workflowCards.map((card) => (
+              <WorkflowCard key={card.title} {...card} />
+            ))}
+          </section>
 
-function Panel({
-  title,
-  description,
-  href,
-  hrefLabel,
-  children,
-}: {
-  title: string;
-  description?: string;
-  href?: string;
-  hrefLabel?: string;
-  children: ReactNode;
-}) {
-  return (
-    <section className="rounded-xl border border-[#dbe9ef] bg-[#f9fcfd] p-4 shadow-sm">
-      <div className="mb-3 flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-base font-semibold text-[#173543]">{title}</h2>
-          {description ? <p className="mt-1 text-sm text-[#5b7382]">{description}</p> : null}
-        </div>
-        {href && hrefLabel ? (
-          <Link
-            href={href}
-            className="rounded-full border border-[#cfdce4] px-3 py-1 text-xs font-semibold text-[#2a4655] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
-          >
-            {hrefLabel}
-          </Link>
-        ) : null}
-      </div>
-      {children}
-    </section>
-  );
-}
+          <section className="grid gap-4 xl:grid-cols-5">
+            <div className="space-y-4 xl:col-span-3">
+              <DashboardPanel
+                title="Do this now"
+                description="Work the day in order: overdue follow-up first, then assigned follow-up, then route work."
+              >
+                <div className="space-y-2">
+                  {dashboard.sales.actionItems.map((item) => (
+                    <QueueActionRow key={item.title} item={item} />
+                  ))}
+                </div>
+              </DashboardPanel>
 
-function StatusPill({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: number;
-  tone: "warn" | "ok" | "bad";
-}) {
-  const toneClass =
-    tone === "ok"
-      ? "border-[#cde9e6] bg-[#eefaf8] text-[#0f766e]"
-      : tone === "bad"
-        ? "border-[#f3d2d2] bg-[#fff4f4] text-[#991b1b]"
-        : "border-[#f2ddba] bg-[#fff9ed] text-[#8a5a08]";
+              <DashboardPanel
+                title="Assigned follow-up queue"
+                description="The follow-up work already assigned to you and the accounts it is affecting."
+                href={dashboard.sales.hrefs.assignedTasks}
+                hrefLabel="Open assigned tasks"
+              >
+                <div className="grid grid-cols-3 gap-2">
+                  <StatusPill label="Assigned" value={dashboard.counts.openTasks} tone="warn" />
+                  <Link href={dashboard.sales.hrefs.overdueTasks} className="block">
+                    <StatusPill label="Overdue" value={dashboard.counts.overdueTasks} tone="bad" />
+                  </Link>
+                  <StatusPill label="Accounts" value={dashboard.counts.customersNeedingFollowUp} tone="ok" />
+                </div>
+                <div className="mt-3 space-y-2">
+                  {dashboard.openTaskItems.map((task) => (
+                    <Link
+                      key={task.id}
+                      href={task.href}
+                      className="block rounded-lg border border-[#dbe9ef] bg-white px-3 py-2 text-sm transition hover:border-[#14b8a6] hover:bg-[#f6fbfd]"
+                    >
+                      <p className="font-semibold text-[#173543]">{task.title}</p>
+                      <p className="text-xs text-[#5b7382]">{task.detail}</p>
+                      <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#0f766e]">{task.ctaLabel}</p>
+                    </Link>
+                  ))}
+                  {dashboard.openTaskItems.length === 0 ? <p className="text-sm text-[#5b7382]">No assigned tasks right now.</p> : null}
+                </div>
+              </DashboardPanel>
 
-  return (
-    <div className={["rounded-lg border px-2 py-2 text-center", toneClass].join(" ")}>
-      <p className="text-[11px] font-semibold uppercase tracking-wide">{label}</p>
-      <p className="mt-1 text-lg font-semibold">{value}</p>
+              <EstimateLeadFollowUpPanel description="Estimate movement that is most likely to create your next follow-up calls." />
+            </div>
+
+            <div className="space-y-4 xl:col-span-2">
+              <DashboardPanel
+                title="Then work your route"
+                description="Route execution sits behind follow-up, but should be ready when you get there."
+                href={dashboard.sales.hrefs.routeQueue}
+                hrefLabel="Open route handoff"
+              >
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <SummaryBox
+                    label="In your scope"
+                    value={`${dashboard.counts.activeRoutes} active`}
+                    detail={`${dashboard.counts.pendingStops} pending stops • route handoff stays focused on the next route`}
+                  />
+                  <SummaryBox
+                    label="Next route handoff"
+                    value={dashboard.counts.activeRoutes > 0 ? "Route runner ready" : "Routes workspace"}
+                    detail={dashboard.counts.activeRoutes > 0 ? "Launch directly into execution when a route is ready." : "Use the routes workspace when there is no next route yet."}
+                  />
+                </div>
+                <div className="mt-3 space-y-2">
+                  {dashboard.activeRoutes.map((route) => (
+                    <Link
+                      key={route.id}
+                      href={route.href}
+                      className="flex items-center justify-between rounded-lg border border-[#dbe9ef] bg-white px-3 py-2 text-sm transition hover:border-[#14b8a6] hover:bg-[#f6fbfd]"
+                    >
+                      <div>
+                        <p className="font-semibold text-[#173543]">{route.name}</p>
+                        <p className="text-xs text-[#5b7382]">{route.detail}</p>
+                        <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#0f766e]">{route.ctaLabel}</p>
+                      </div>
+                      <span className="rounded-full bg-[#eef7f6] px-2 py-0.5 text-xs font-semibold text-[#0f766e]">{route.status}</span>
+                    </Link>
+                  ))}
+                  {dashboard.activeRoutes.length === 0 ? <p className="text-sm text-[#5b7382]">No routes are currently in your scope.</p> : null}
+                </div>
+              </DashboardPanel>
+
+              <DashboardPanel
+                title="Then watch account movement"
+                description="After follow-up and route work, this is the watchlist that can create the next action."
+                href={dashboard.sales.hrefs.customerWatchlist}
+                hrefLabel="Open account watchlist"
+              >
+                <div className="space-y-2">
+                  {dashboard.accountActivityItems.map((customer) => (
+                    <Link
+                      key={customer.id}
+                      href={customer.href}
+                      className="block rounded-lg border border-[#dbe9ef] bg-white px-3 py-2 text-sm transition hover:border-[#14b8a6] hover:bg-[#f6fbfd]"
+                    >
+                      <p className="font-semibold text-[#173543]">{customer.name}</p>
+                      <p className="text-xs text-[#5b7382]">{customer.detail}</p>
+                      <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#0f766e]">{customer.ctaLabel}</p>
+                    </Link>
+                  ))}
+                  {dashboard.accountActivityItems.length === 0 ? <p className="text-sm text-[#5b7382]">No assigned account activity right now.</p> : null}
+                </div>
+                <div className="mt-4 border-t border-[#dbe9ef] pt-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#5d7685]">Order watch</p>
+                  <div className="mt-2 space-y-2">
+                    {dashboard.recentPendingOrders.map((order) => (
+                      <Link
+                        key={order.id}
+                        href={order.href}
+                        className="block rounded-lg border border-[#dbe9ef] bg-white px-3 py-2 text-sm transition hover:border-[#14b8a6] hover:bg-[#f6fbfd]"
+                      >
+                        <p className="font-semibold text-[#173543]">{order.name}</p>
+                        <p className="text-xs text-[#5b7382]">{order.detail}</p>
+                        <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#0f766e]">{order.ctaLabel}</p>
+                      </Link>
+                    ))}
+                    {dashboard.recentPendingOrders.length === 0 ? <p className="text-sm text-[#5b7382]">No open order activity right now.</p> : null}
+                  </div>
+                </div>
+              </DashboardPanel>
+
+              <DashboardPanel
+                title="Quick actions"
+                description="Keep the tools close, but after the work queues."
+              >
+                <ShortcutRail cards={dashboard.shortcuts} />
+              </DashboardPanel>
+            </div>
+          </section>
+        </>
+      ) : null}
     </div>
   );
 }

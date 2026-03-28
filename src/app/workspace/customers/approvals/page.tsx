@@ -1,5 +1,6 @@
 import Link from "next/link";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
+import { QueueMetaCard, QueueMetricCard, QueuePurposePanel, QueueStatusChip } from "@/components/admin/ops/QueuePrimitives";
 import CustomerApprovalActions from "@/components/workspace/CustomerApprovalActions";
 import { loadCustomerApprovalQueue, type CustomerApprovalQueueItem } from "@/lib/customerApprovals";
 import { isFollowUpCustomerApprovalStatus, normalizeCustomerApprovalStatus } from "@/lib/customerApproval";
@@ -28,39 +29,13 @@ function statusTone(value: string): "warn" | "bad" | "neutral" {
   return "warn";
 }
 
-function StatusChip({
-  label,
-  tone,
-}: {
-  label: string;
-  tone: "warn" | "bad" | "neutral" | "ok";
-}) {
-  const toneClass =
-    tone === "ok"
-      ? "border-[#bde8e4] bg-[#e9fbf9] text-[#0f766e]"
-      : tone === "bad"
-        ? "border-[#f3d2d2] bg-[#fff4f4] text-[#991b1b]"
-        : tone === "warn"
-          ? "border-[#f1ddad] bg-[#fff9eb] text-[#9a6b00]"
-          : "border-[#d7e6ed] bg-[#f8fbfc] text-[#4f6877]";
-  return <span className={["rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em]", toneClass].join(" ")}>{label}</span>;
-}
-
-function QueueMetric({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-2xl border border-[#dbe9ef] bg-white p-4 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#5d7685]">{label}</p>
-      <p className="mt-1.5 text-2xl font-semibold text-[#173543]">{value}</p>
-    </div>
-  );
-}
-
 function ApprovalCard({ item }: { item: CustomerApprovalQueueItem }) {
   return (
     <article className="rounded-2xl border border-[#dbe9ef] bg-white p-4 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-2">
           <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7891a0]">Approval Blocker</p>
             <h2 className="text-lg font-semibold text-[#173543]">{item.companyName}</h2>
             <p className="text-sm text-[#4a6575]">
               {item.contactName || "No contact mapped"}
@@ -68,8 +43,8 @@ function ApprovalCard({ item }: { item: CustomerApprovalQueueItem }) {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <StatusChip label={formatStatusLabel(item.approvalStatus)} tone={statusTone(item.approvalStatus)} />
-            <StatusChip label={item.readyLabel} tone={item.readyState === "docs_linked" ? "ok" : "neutral"} />
+            <QueueStatusChip label={formatStatusLabel(item.approvalStatus)} tone={statusTone(item.approvalStatus)} />
+            <QueueStatusChip label={item.readyLabel} tone={item.readyState === "docs_linked" ? "ok" : "neutral"} />
           </div>
         </div>
 
@@ -79,7 +54,7 @@ function ApprovalCard({ item }: { item: CustomerApprovalQueueItem }) {
             href={item.reviewHref}
             className="inline-flex rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95"
           >
-            Review Onboarding Docs
+            Review Approval Blockers
           </Link>
           <Link
             href={item.accountHref}
@@ -90,11 +65,22 @@ function ApprovalCard({ item }: { item: CustomerApprovalQueueItem }) {
         </div>
       </div>
 
+      <div className="mt-4 rounded-xl border border-[#e2edf2] bg-[#f9fcfd] px-3 py-3">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#6a8290]">Why It Is Here</p>
+        <p className="mt-1 text-sm text-[#2f4a59]">
+          {item.readyState === "missing_docs"
+            ? "This account is still blocked on linked onboarding documents before approval can move forward."
+            : isFollowUpCustomerApprovalStatus(item.approvalStatus)
+              ? "This account needs admin follow-up before approval can be cleared and handed back to the account workflow."
+              : "This account has approval materials linked and is waiting on the admin decision that unblocks progression."}
+        </p>
+      </div>
+
       <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <QueueMeta label="Approval Status" value={formatStatusLabel(item.approvalStatus)} />
-        <QueueMeta label="Submitted" value={formatDate(item.submittedAt)} />
-        <QueueMeta label="Owner" value={item.ownerName || "Unassigned"} helper={item.ownerEmail || undefined} />
-        <QueueMeta label="Assigned Rep" value={item.assignedRepName || "Unassigned"} helper={item.assignedRepEmail || undefined} />
+        <QueueMetaCard label="Approval Status" value={formatStatusLabel(item.approvalStatus)} />
+        <QueueMetaCard label="Submitted" value={formatDate(item.submittedAt)} />
+        <QueueMetaCard label="Owner" value={item.ownerName || "Unassigned"} helper={item.ownerEmail || undefined} />
+        <QueueMetaCard label="Assigned Rep" value={item.assignedRepName || "Unassigned"} helper={item.assignedRepEmail || undefined} />
       </div>
 
       <div className="mt-4 rounded-xl border border-[#e2edf2] bg-[#f9fcfd] px-3 py-3">
@@ -130,16 +116,6 @@ function ApprovalCard({ item }: { item: CustomerApprovalQueueItem }) {
   );
 }
 
-function QueueMeta({ label, value, helper }: { label: string; value: string; helper?: string }) {
-  return (
-    <div className="rounded-xl border border-[#e2edf2] bg-[#f9fcfd] px-3 py-2.5">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#6a8290]">{label}</p>
-      <p className="mt-1 text-sm font-semibold text-[#173543]">{value}</p>
-      {helper ? <p className="mt-1 text-xs text-[#5b7382]">{helper}</p> : null}
-    </div>
-  );
-}
-
 export default async function WorkspaceCustomerApprovalsPage() {
   await requireAdmin();
   const queue = await loadCustomerApprovalQueue();
@@ -149,8 +125,8 @@ export default async function WorkspaceCustomerApprovalsPage() {
   return (
     <div className="mx-auto w-full max-w-[1520px] space-y-6">
       <AdminPageHeader
-        title="Customer Approvals"
-        description="Dedicated onboarding approval queue using customer approval status and linked account documents."
+        title="Customer Approval Queue"
+        description="Operational onboarding review queue for accounts that are waiting on admin approval, missing documents, or follow-up before they can progress."
         action={
           <Link
             href="/admin"
@@ -161,10 +137,16 @@ export default async function WorkspaceCustomerApprovalsPage() {
         }
       />
 
+      <QueuePurposePanel>
+        <p>
+          Use this queue to clear onboarding blockers, confirm linked documents, and hand the account back into the operating workflow once approval is ready.
+        </p>
+      </QueuePurposePanel>
+
       <section className="grid gap-4 sm:grid-cols-3">
-        <QueueMetric label="Pending Customer Approvals" value={queue.length} />
-        <QueueMetric label="With Linked Docs" value={docsLinkedCount} />
-        <QueueMetric label="Needs Follow-Up" value={followUpCount} />
+        <QueueMetricCard label="Pending Customer Approvals" value={queue.length} />
+        <QueueMetricCard label="With Linked Docs" value={docsLinkedCount} />
+        <QueueMetricCard label="Needs Follow-Up" value={followUpCount} />
       </section>
 
       <section className="space-y-3">
