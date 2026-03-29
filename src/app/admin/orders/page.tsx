@@ -8,11 +8,17 @@ type OrderQueueRow = {
   id: string;
   estimate_id: string | null;
   customer_account_id: string | null;
+  customer_id: string | null;
   customer_name: string | null;
   customer_email: string | null;
   status: string | null;
   total: number | null;
   created_at: string | null;
+};
+
+type OrderQueryResult = {
+  rows: OrderQueueRow[];
+  warning: string | null;
 };
 
 function normalizeStatus(value: string | null | undefined): string {
@@ -48,20 +54,65 @@ function statusTone(status: string): "warn" | "ok" | "neutral" {
   return "neutral";
 }
 
-export default async function AdminOrdersPage() {
-  await requireAdmin();
-  const supabase = createAdminClient();
-  const { data, error } = await supabase
-    .from("orders")
-    .select("id, estimate_id, customer_account_id, customer_name, customer_email, status, total, created_at")
-    .order("created_at", { ascending: false })
-    .limit(100);
+function readText(row: Record<string, unknown>, key: string): string | null {
+  const text = String(row[key] || "").trim();
+  return text || null;
+}
 
-  if (error) {
-    throw new Error(error.message);
+function readNumber(row: Record<string, unknown>, key: string): number | null {
+  const value = Number(row[key]);
+  return Number.isFinite(value) ? value : null;
+}
+
+function normalizeOrderRow(row: Record<string, unknown>): OrderQueueRow {
+  return {
+    id: String(row.id || ""),
+    estimate_id: readText(row, "estimate_id"),
+    customer_account_id: readText(row, "customer_account_id"),
+    customer_id: readText(row, "customer_id"),
+    customer_name: readText(row, "customer_name"),
+    customer_email: readText(row, "customer_email"),
+    status: readText(row, "status"),
+    total: readNumber(row, "total"),
+    created_at: readText(row, "created_at"),
+  };
+}
+
+async function loadOrderQueue(): Promise<OrderQueryResult> {
+  const supabase = createAdminClient();
+  const attempts = [
+    "id, estimate_id, customer_account_id, customer_id, customer_name, customer_email, status, total, created_at",
+    "id, estimate_id, customer_account_id, customer_name, customer_email, status, total, created_at",
+    "id, estimate_id, customer_id, customer_name, customer_email, status, total, created_at",
+    "id, estimate_id, customer_name, customer_email, status, total, created_at",
+  ];
+
+  let lastError: string | null = null;
+
+  for (let index = 0; index < attempts.length; index += 1) {
+    const select = attempts[index];
+    const { data, error } = await supabase.from("orders").select(select).order("created_at", { ascending: false }).limit(100);
+    if (error) {
+      lastError = error.message;
+      continue;
+    }
+
+    const rows = ((data || []) as Array<Record<string, unknown>>).map(normalizeOrderRow);
+    return {
+      rows,
+      warning: index === 0 ? null : "Showing orders with a schema-tolerant fallback because the live orders table does not expose the newest linkage shape everywhere yet.",
+    };
   }
 
-  const rows = (data || []) as OrderQueueRow[];
+  return {
+    rows: [],
+    warning: lastError ? `Orders could not be loaded with the current live schema shape. ${lastError}` : "Orders could not be loaded with the current live schema shape.",
+  };
+}
+
+export default async function AdminOrdersPage() {
+  await requireAdmin();
+  const { rows, warning } = await loadOrderQueue();
   const openOrders = rows.filter((row) => {
     const status = normalizeStatus(row.status);
     return status !== "approved" && status !== "production" && status !== "completed";
@@ -84,6 +135,12 @@ export default async function AdminOrdersPage() {
         </p>
       </QueuePurposePanel>
 
+      {warning ? (
+        <div className="rounded-xl border border-[#f1ddad] bg-[#fff9eb] px-4 py-3 text-sm text-[#8a5a08]">
+          {warning}
+        </div>
+      ) : null}
+
       <section className="grid gap-4 sm:grid-cols-3">
         <QueueMetricCard label="Open Order Requests" value={openOrders.length} />
         <QueueMetricCard label="Ready For Ops" value={readyForOps.length} />
@@ -92,7 +149,8 @@ export default async function AdminOrdersPage() {
 
       <section className="space-y-3">
         {rows.map((row) => {
-          const accountHref = row.customer_account_id ? `/workspace/customers/${encodeURIComponent(row.customer_account_id)}` : null;
+          const linkedCustomerId = row.customer_account_id || row.customer_id;
+          const accountHref = linkedCustomerId ? `/workspace/customers/${encodeURIComponent(linkedCustomerId)}` : null;
           const estimateHref = row.estimate_id ? `/estimate/${encodeURIComponent(row.estimate_id)}/print` : null;
           const isOpen = openOrders.some((entry) => entry.id === row.id);
 
