@@ -658,6 +658,9 @@ export default function CustomerWorkspaceIndex({
   const hotLeadCount = visibleCustomers.filter((customer) => customer.isHotLead).length;
   const overdueVisibleCount = visibleCustomers.filter((customer) => customer.overdueTaskCount > 0).length;
   const routeReadyCount = visibleCustomers.filter((customer) => getRouteReadiness(customer) === "route_ready").length;
+  const visibleMappedCount = visibleCustomers.filter((customer) => getCoordinateCoverageState(customer) === "has_coords").length;
+  const selectedSegmentMappedCount = selectedSegmentCustomers.filter((customer) => getCoordinateCoverageState(customer) === "has_coords").length;
+  const selectedSegmentRouteReadyCount = selectedSegmentCustomers.filter((customer) => getRouteReadiness(customer) === "route_ready").length;
   const visibleWithOrders = visibleCustomers.filter((customer) => customer.counts.orders > 0).length;
   const navCounts = {
     all: activeCustomers.length,
@@ -707,6 +710,24 @@ export default function CustomerWorkspaceIndex({
     overdueCount: overdueVisibleCount,
   });
   const territoryStats = buildTerritoryStats(visibleCustomers, referenceNow);
+  const routePrepMetricRows =
+    workflowMode === "route_prep"
+      ? [
+          { label: "Visible", value: String(visibleCustomers.length) },
+          { label: "Segment", value: String(selectedSegmentCustomers.length) },
+          { label: "Mapped", value: String(visibleMappedCount) },
+          { label: "Segment Mapped", value: String(selectedSegmentMappedCount) },
+          { label: "Segment Route Ready", value: String(selectedSegmentRouteReadyCount) },
+          { label: "Visible Route Ready", value: String(routeReadyCount) },
+        ]
+      : [
+          { label: "Visible", value: String(visibleCustomers.length) },
+          { label: "Assigned", value: String(visibleWithOwners) },
+          { label: "Hot", value: String(hotLeadCount) },
+          { label: "Overdue", value: String(overdueVisibleCount) },
+          { label: "Route Ready", value: String(routeReadyCount) },
+          { label: "Orders", value: String(visibleWithOrders) },
+        ];
 
   const sections =
     organizeBy === "territory"
@@ -1269,12 +1290,9 @@ export default function CustomerWorkspaceIndex({
           </div>
 
           <div className="mt-4 grid gap-2 rounded-[20px] border border-[#dbe8ef] bg-white/90 p-3">
-            <MetricLine label="Visible" value={String(visibleCustomers.length)} />
-            <MetricLine label="Assigned" value={String(visibleWithOwners)} />
-            <MetricLine label="Hot" value={String(hotLeadCount)} />
-            <MetricLine label="Overdue" value={String(overdueVisibleCount)} />
-            <MetricLine label="Route Ready" value={String(routeReadyCount)} />
-            <MetricLine label="Orders" value={String(visibleWithOrders)} />
+            {routePrepMetricRows.map((metric) => (
+              <MetricLine key={metric.label} label={metric.label} value={metric.value} />
+            ))}
           </div>
         </section>
       </aside>
