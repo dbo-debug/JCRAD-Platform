@@ -129,6 +129,15 @@ function buildFocusOptions(customers: CustomerSummary[]): FocusOption[] {
   return [{ key: "all", label: "Fit All Results", center: { lat: 36.9, lng: -119.5 }, zoom: 6 }, ...toOptions("city", "City:", cityGroups), ...toOptions("territory", "Territory:", territoryGroups)];
 }
 
+function buildCoordinateSignature(
+  customers: Array<Pick<CustomerSummary, "id" | "latitude" | "longitude">>
+) {
+  return customers
+    .map((customer) => `${customer.id}:${customer.latitude ?? "null"}:${customer.longitude ?? "null"}`)
+    .sort()
+    .join("|");
+}
+
 export default function CustomerSelectionMap({
   customers,
   title,
@@ -146,9 +155,14 @@ export default function CustomerSelectionMap({
     () => customers.filter((customer) => customer.latitude !== null && customer.longitude !== null),
     [customers]
   );
+  const coordinateSignature = useMemo(() => buildCoordinateSignature(withCoords), [withCoords]);
   const projectedCustomers = useMemo(
     () => customers.map(projectCustomer).filter((customer): customer is ProjectedCustomer => Boolean(customer)),
     [customers]
+  );
+  const projectedCoordinateSignature = useMemo(
+    () => buildCoordinateSignature(projectedCustomers.map(({ customer }) => customer)),
+    [projectedCustomers]
   );
   const withoutCoords = useMemo(
     () => customers.filter((customer) => customer.latitude === null || customer.longitude === null),
@@ -204,6 +218,8 @@ export default function CustomerSelectionMap({
   const mapInstanceRef = useRef<GoogleMapInstance | null>(null);
   const markerRefs = useRef<Array<{ customerId: string; marker: GoogleMarkerInstance }>>([]);
   const toggleCustomerSelectionRef = useRef(onToggleCustomerSelection);
+  const previousViewportSignatureRef = useRef<string | null>(null);
+  const previousFocusKeyRef = useRef<string | null>(null);
   const effectiveFocusedCustomerId =
     focusedCustomerId && withCoords.some((customer) => customer.id === focusedCustomerId)
       ? focusedCustomerId
@@ -293,6 +309,14 @@ export default function CustomerSelectionMap({
 
     const googleMaps = (window as WindowWithGoogleMaps).google!.maps;
     const map = mapInstanceRef.current;
+    const datasetChanged = previousViewportSignatureRef.current !== coordinateSignature;
+    const focusChanged = previousFocusKeyRef.current !== focusKey;
+
+    previousViewportSignatureRef.current = coordinateSignature;
+    previousFocusKeyRef.current = focusKey;
+
+    if (!datasetChanged && !focusChanged) return;
+
     const bounds = new googleMaps.LatLngBounds();
 
     withCoords.forEach((customer) => {
@@ -311,7 +335,7 @@ export default function CustomerSelectionMap({
       map.panTo(nextFocus.center);
       map.setZoom(nextFocus.zoom);
     }
-  }, [focusKey, focusOptions, googleMapStatus, withCoords]);
+  }, [coordinateSignature, focusKey, focusOptions, googleMapStatus, withCoords]);
 
   useEffect(() => {
     const googleMaps = (window as WindowWithGoogleMaps).google?.maps;
@@ -395,6 +419,7 @@ export default function CustomerSelectionMap({
             ) : (
               <ProjectedCustomerMap
                 customers={projectedCustomers}
+                coordinateSignature={projectedCoordinateSignature}
                 selectedCustomerIdSet={selectedCustomerIdSet}
                 focusedCustomerId={effectiveFocusedCustomerId}
                 focusOptions={projectedFocusOptions}
@@ -558,6 +583,7 @@ function MapMetric({ label, value }: { label: string; value: string }) {
 
 function ProjectedCustomerMap(args: {
   customers: ProjectedCustomer[];
+  coordinateSignature: string;
   selectedCustomerIdSet: Set<string>;
   focusedCustomerId: string;
   focusOptions: ProjectedFocusOption[];
@@ -568,6 +594,8 @@ function ProjectedCustomerMap(args: {
   const [panX, setPanX] = useState(0);
   const [panY, setPanY] = useState(0);
   const [focusKey, setFocusKey] = useState("all");
+  const previousViewportSignatureRef = useRef<string | null>(null);
+  const previousFocusKeyRef = useRef<string | null>(null);
 
   function fitBounds(bounds: ProjectedBounds) {
     const frame = frameRef.current;
@@ -595,13 +623,21 @@ function ProjectedCustomerMap(args: {
   }
 
   useEffect(() => {
+    const datasetChanged = previousViewportSignatureRef.current !== args.coordinateSignature;
+    const focusChanged = previousFocusKeyRef.current !== focusKey;
+
+    previousViewportSignatureRef.current = args.coordinateSignature;
+    previousFocusKeyRef.current = focusKey;
+
+    if (!datasetChanged && !focusChanged) return;
+
     const nextFocus = args.focusOptions.find((option) => option.key === focusKey) || args.focusOptions[0];
     if (!nextFocus) return;
     const frameId = window.requestAnimationFrame(() => {
       fitBounds(nextFocus.bounds);
     });
     return () => window.cancelAnimationFrame(frameId);
-  }, [args.customers, args.focusOptions, focusKey]);
+  }, [args.coordinateSignature, args.focusOptions, focusKey]);
 
   return (
     <div className="relative overflow-hidden rounded-[24px] border border-[#dbe8ef] bg-[linear-gradient(180deg,#f6fbfd_0%,#ecf7fa_100%)] shadow-sm">
