@@ -70,6 +70,16 @@ function addDaysDateValue(days: number) {
   return date.toISOString().slice(0, 10);
 }
 
+function buildEstimateMenuHref(args: {
+  customerId: string;
+}) {
+  const params = new URLSearchParams({
+    from: "route_runner",
+    customerId: args.customerId,
+  });
+  return `/menu?${params.toString()}`;
+}
+
 export default function RouteRunner({ customers, routeRepOptions, territoryOptions, currentUserId, staffRole, focusCustomerId, initialFilters }: RouteRunnerProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -143,6 +153,7 @@ export default function RouteRunner({ customers, routeRepOptions, territoryOptio
       if (territoryFocus === "cleanup") return territory.noCoords > 0 || territory.unassignedRep > 0 || territory.noRouteDay > 0;
       return true;
     });
+  const focusedCustomer = focusCustomerId ? visibleCustomers.find((customer) => customer.id === focusCustomerId) || null : null;
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -187,6 +198,16 @@ export default function RouteRunner({ customers, routeRepOptions, territoryOptio
               <MetricLine label="No Territory" value={String(stats.noTerritory)} />
               <MetricLine label="No Coords" value={String(stats.noCoords)} />
             </div>
+            {focusedCustomer ? (
+              <div className="mt-4">
+                <Link
+                  href={buildEstimateMenuHref({ customerId: focusedCustomer.id })}
+                  className="inline-flex rounded-full bg-[#173543] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#0f2a35]"
+                >
+                  Build Estimate
+                </Link>
+              </div>
+            ) : null}
           </div>
         </div>
       </section>
@@ -629,6 +650,12 @@ function RouteStopCard({ customer }: { customer: CustomerSummary }) {
         </div>
 
         <div className="flex flex-wrap gap-2 lg:w-[240px] lg:flex-none lg:justify-end">
+          <Link
+            href={buildEstimateMenuHref({ customerId: customer.id })}
+            className="rounded-full bg-[#173543] px-3 py-1.5 text-sm font-medium text-white transition hover:bg-[#0f2a35]"
+          >
+            Build Estimate
+          </Link>
           <Link href={`/workspace/customers/${customer.id}`} className="rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm font-medium text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543]">
             Open account
           </Link>

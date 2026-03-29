@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import EstimateCartPanel from "@/components/menu/EstimateCartPanel";
 import FilterChipBar from "@/components/menu/FilterChipBar";
 import MenuLayout from "@/components/menu/MenuLayout";
@@ -475,6 +475,8 @@ type EstimateSummary = {
   lines: EstimateCartLine[];
   total: number;
   packagingReviewPending: boolean;
+  attachedCustomerId: string;
+  attachedCustomerLabel: string;
 };
 
 function mapEstimateLine(line: any): EstimateCartLine {
@@ -559,6 +561,7 @@ export default function MenuClient({
   canShowDraft?: boolean;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [search, setSearch] = useState("");
   const [menuMode, setMenuMode] = useState<MenuMode>("bulk");
   const [selectedCategory, setSelectedCategory] = useState<MenuCategory>("flower");
@@ -577,20 +580,21 @@ export default function MenuClient({
     lines: [],
     total: 0,
     packagingReviewPending: false,
+    attachedCustomerId: "",
+    attachedCustomerLabel: "",
   });
+  const [routeRunnerEstimateMessage, setRouteRunnerEstimateMessage] = useState<string | null>(null);
   const [cardStateByOfferId, setCardStateByOfferId] = useState<Record<string, OfferCardState>>({});
   const [packagingSkus, setPackagingSkus] = useState<PackagingSku[]>([]);
   const [complianceComplete] = useState(false);
+  const processedRouteRunnerHandoffRef = useRef<string | null>(null);
   const yieldSettings = initialYields;
 
-  async function ensureEstimateId() {
-    const existing = getEstimateId();
-    if (existing) return existing;
-
+  async function createEstimate(customerId?: string) {
     const res = await fetch("/api/estimate/create", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
+      body: JSON.stringify(customerId ? { customer_account_id: customerId } : {}),
     });
     const json = await parseJsonSafe(res);
     if (!res.ok) throw new Error(String(json?.error || `Estimate create failed (${res.status})`));
@@ -601,22 +605,44 @@ export default function MenuClient({
     return estimateId;
   }
 
+  async function ensureEstimateId() {
+    const existing = getEstimateId();
+    if (existing) return existing;
+    return createEstimate();
+  }
+
+  async function updateEstimateCustomerLink(estimateId: string, customerId: string) {
+    const res = await fetch("/api/estimate/customer", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ estimate_id: estimateId, customer_id: customerId }),
+    });
+    const json = await parseJsonSafe(res);
+    if (!res.ok) throw new Error(String(json?.error || `Customer update failed (${res.status})`));
+    return json;
+  }
+
   async function loadEstimateSummary(id: string) {
     if (!id) return;
 
     const res = await fetch(`/api/estimate/get?id=${encodeURIComponent(id)}`);
     const json = await parseJsonSafe(res);
-    if (!res.ok) return;
+    if (!res.ok) return null;
 
     const linesRaw = Array.isArray((json as any)?.lines) ? (json as any).lines : [];
     const lines = linesRaw.map(mapEstimateLine);
     const total = Number((json as any)?.estimate?.total || 0);
     const packagingReviewPending = Boolean((json as any)?.estimate?.packaging_review_pending);
-    setEstimateSummary({
+    const attachedCustomer = ((json as any)?.estimate?.attached_customer || null) as Record<string, unknown> | null;
+    const nextSummary = {
       lines,
       total: Number.isFinite(total) ? total : 0,
       packagingReviewPending,
-    });
+      attachedCustomerId: String(attachedCustomer?.id || ""),
+      attachedCustomerLabel: String(attachedCustomer?.company_name || attachedCustomer?.contact_name || "").trim(),
+    } satisfies EstimateSummary;
+    setEstimateSummary(nextSummary);
+    return nextSummary;
   }
 
   async function removeEstimateLine(lineId: string) {
@@ -640,12 +666,22 @@ export default function MenuClient({
     }
   }
 
+  const routeRunnerHandoff = useMemo(() => {
+    const from = String(searchParams.get("from") || "").trim();
+    const customerId = String(searchParams.get("customerId") || "").trim();
+    const routeId = String(searchParams.get("routeId") || "").trim();
+    const stopId = String(searchParams.get("stopId") || "").trim();
+    if (from !== "route_runner" || !customerId) return null;
+    return { customerId, routeId, stopId };
+  }, [searchParams]);
+
   useEffect(() => {
+    if (routeRunnerHandoff) return;
     const id = getEstimateId();
     if (id) {
       void loadEstimateSummary(id);
     }
-  }, []);
+  }, [routeRunnerHandoff]);
 
   useEffect(() => {
     let ignore = false;
@@ -665,6 +701,70 @@ export default function MenuClient({
       ignore = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!routeRunnerHandoff) return;
+    const handoff = routeRunnerHandoff;
+
+    const handoffKey = `${handoff.customerId}:${handoff.routeId}:${handoff.stopId}`;
+    if (processedRouteRunnerHandoffRef.current === handoffKey) return;
+    processedRouteRunnerHandoffRef.current = handoffKey;
+
+    let cancelled = false;
+
+    async function applyRouteRunnerHandoff() {
+      try {
+        const existingEstimateId = String(getEstimateId() || "").trim();
+        const routeContextLabel = "the route runner";
+
+        if (!existingEstimateId) {
+          const estimateId = await createEstimate(handoff.customerId);
+          if (cancelled) return;
+          await loadEstimateSummary(estimateId);
+          if (cancelled) return;
+          setRouteRunnerEstimateMessage(`Estimate ready for this customer from ${routeContextLabel}.`);
+          return;
+        }
+
+        const existingSummary = await loadEstimateSummary(existingEstimateId);
+        if (cancelled) return;
+
+        if (!existingSummary?.attachedCustomerId) {
+          await updateEstimateCustomerLink(existingEstimateId, handoff.customerId);
+          if (cancelled) return;
+          await loadEstimateSummary(existingEstimateId);
+          if (cancelled) return;
+          setRouteRunnerEstimateMessage(`Attached the current estimate to this route customer.`);
+          return;
+        }
+
+        if (existingSummary.attachedCustomerId === handoff.customerId) {
+          setRouteRunnerEstimateMessage(`Continuing the current estimate for this route customer.`);
+          return;
+        }
+
+        const replacedCustomerLabel = existingSummary.attachedCustomerLabel || "another customer";
+        const estimateId = await createEstimate(handoff.customerId);
+        if (cancelled) return;
+        await loadEstimateSummary(estimateId);
+        if (cancelled) return;
+        setRouteRunnerEstimateMessage(`Started a new estimate for this customer because the active estimate was already attached to ${replacedCustomerLabel}.`);
+      } catch (error: unknown) {
+        if (cancelled) return;
+        setRouteRunnerEstimateMessage(error instanceof Error ? error.message : "Unable to prepare an estimate for this route customer.");
+      } finally {
+        if (!cancelled) {
+          router.replace("/menu", { scroll: false });
+        }
+      }
+    }
+
+    void applyRouteRunnerHandoff();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [routeRunnerHandoff, router]);
 
   const publishedOffers = useMemo(
     () => initialOffers.filter((offer) => normalizedLower(offer.status || "published") === "published"),
@@ -1648,6 +1748,11 @@ export default function MenuClient({
               </Link>
             </div>
           </div>
+          {routeRunnerEstimateMessage ? (
+            <div className="rounded-2xl border border-[#dce6eb] bg-[#fbfdfe] px-3 py-2 text-sm text-[#4f6877] shadow-[0_14px_24px_-24px_rgba(16,24,40,0.55)]">
+              {routeRunnerEstimateMessage}
+            </div>
+          ) : null}
           <FilterChipBar groups={filterGroups} onClear={clearActiveFilters} />
           <ProductGrid items={offerCards} onAdd={onAdd} emptyMessage={emptyMessage} />
         </div>

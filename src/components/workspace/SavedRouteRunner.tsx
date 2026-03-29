@@ -122,6 +122,20 @@ function stageSectionLabel(stage: "next" | "upcoming" | "completed" | "skipped")
   return "Skipped Stops";
 }
 
+function buildEstimateMenuHref(args: {
+  customerId: string;
+  routeId: string;
+  stopId?: string | null;
+}) {
+  const params = new URLSearchParams({
+    from: "route_runner",
+    customerId: args.customerId,
+    routeId: args.routeId,
+  });
+  if (args.stopId) params.set("stopId", args.stopId);
+  return `/menu?${params.toString()}`;
+}
+
 export default function SavedRouteRunner({ route }: SavedRouteRunnerProps) {
   const router = useRouter();
   const progress = useMemo(() => buildRouteProgress(route), [route]);
@@ -185,6 +199,18 @@ export default function SavedRouteRunner({ route }: SavedRouteRunnerProps) {
             </p>
             {route.notes ? <p className="mt-2 text-sm text-[#5c7483]">{route.notes}</p> : null}
             <div className="mt-3 flex flex-wrap gap-2">
+              {nextStop ? (
+                <Link
+                  href={buildEstimateMenuHref({
+                    customerId: nextStop.customer.id,
+                    routeId: route.id,
+                    stopId: nextStop.id,
+                  })}
+                  className="rounded-full bg-[#173543] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#0f2a35]"
+                >
+                  Build Estimate
+                </Link>
+              ) : null}
               {routeStatus !== "in_progress" && routeStatus !== "completed" ? (
                 <button
                   type="button"
@@ -242,6 +268,16 @@ export default function SavedRouteRunner({ route }: SavedRouteRunnerProps) {
                     : "This stop is on time relative to the route plan."}
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
+                <Link
+                  href={buildEstimateMenuHref({
+                    customerId: nextStop.customer.id,
+                    routeId: route.id,
+                    stopId: nextStop.id,
+                  })}
+                  className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-[#173543] transition hover:bg-[#eef7f6]"
+                >
+                  Build Estimate
+                </Link>
                 <span className="rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#eefbfc]">
                   {nextStop.customer.visitStatus ? titleCase(nextStop.customer.visitStatus) : "No visit status"}
                 </span>
@@ -550,6 +586,16 @@ function SavedRouteStopCard({ stop, stage }: { stop: SavedRouteStop; stage: "nex
         </div>
 
         <div className="flex flex-wrap gap-2 lg:w-[240px] lg:flex-none lg:justify-end">
+          <Link
+            href={buildEstimateMenuHref({
+              customerId: customer.id,
+              routeId: stop.routeId,
+              stopId: stop.id,
+            })}
+            className="rounded-full bg-[#173543] px-3 py-1.5 text-sm font-medium text-white transition hover:bg-[#0f2a35]"
+          >
+            Build Estimate
+          </Link>
           <Link href={`/workspace/customers/${customer.id}`} className="rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm font-medium text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543]">
             Open account
           </Link>
