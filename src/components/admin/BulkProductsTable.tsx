@@ -32,6 +32,13 @@ type ActivityTab = "Active" | "Inactive" | "All";
 const CATEGORY_TABS = ["All", "Flower", "Concentrate", "Vape", "Pre-Roll"] as const;
 const ACTIVITY_TABS: ActivityTab[] = ["Active", "Inactive", "All"];
 
+function isDeprecatedHalfGramVape(product: ProductRow): boolean {
+  const category = String(product.category || "").trim().toLowerCase();
+  if (category !== "vape") return false;
+  const name = String(product.name || "").trim().toLowerCase();
+  return /\b0(?:\.|\s)?5\s*g\b/.test(name) || name.includes("half gram");
+}
+
 function isActiveProduct(product: ProductRow): boolean {
   if (typeof product.active === "boolean") return product.active;
   if (typeof product.is_active === "boolean") return product.is_active;
@@ -87,11 +94,7 @@ export default function BulkProductsTable() {
     setLoading(true);
     setError(null);
 
-    const params = new URLSearchParams();
-    if (selectedActivity === "Active") params.set("active", "true");
-    if (selectedActivity === "Inactive") params.set("active", "false");
-    const query = params.toString();
-    const response = await fetch(`/api/admin/products${query ? `?${query}` : ""}`, { cache: "no-store" });
+    const response = await fetch("/api/admin/products", { cache: "no-store" });
     const json = await response.json().catch(() => ({}));
 
     if (!response.ok) {
@@ -103,7 +106,7 @@ export default function BulkProductsTable() {
 
     setProducts((json?.products || []) as ProductRow[]);
     setLoading(false);
-  }, [selectedActivity]);
+  }, []);
 
   useEffect(() => {
     void loadProducts();
@@ -147,8 +150,8 @@ export default function BulkProductsTable() {
         )
       );
       setPendingAction(null);
-    } catch (err: any) {
-      setModalError(String(err?.message || "Failed to update item"));
+    } catch (err: unknown) {
+      setModalError(err instanceof Error ? err.message : "Failed to update item");
     } finally {
       setMutatingId(null);
     }
@@ -159,7 +162,9 @@ export default function BulkProductsTable() {
       selectedActivity === "All"
         ? products
         : products.filter((product) =>
-          selectedActivity === "Active" ? isActiveProduct(product) : !isActiveProduct(product)
+          selectedActivity === "Active"
+            ? isActiveProduct(product) && !isDeprecatedHalfGramVape(product)
+            : !isActiveProduct(product) || isDeprecatedHalfGramVape(product)
         );
 
     return selectedCategory === "All"

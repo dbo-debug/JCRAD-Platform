@@ -9,7 +9,7 @@ import {
   skuSupportsPackagingCompatibilityContext,
 } from "@/lib/packaging/compatibility";
 
-type PackagingFilter = "All" | "Flower" | "Concentrate" | "Vape" | "Pre-Roll";
+type PackagingFilter = "All" | "Flower" | "Concentrate" | "Vape" | "Pre-Roll" | "Inactive";
 type AppliesTo = "flower" | "concentrate" | "vape" | "pre_roll";
 
 type PackagingSkuRow = {
@@ -29,10 +29,10 @@ type PackagingSkuRow = {
 
 type ActionType = "deactivate" | "restore";
 
-const FILTER_TABS: PackagingFilter[] = ["All", "Flower", "Concentrate", "Vape", "Pre-Roll"];
+const FILTER_TABS: PackagingFilter[] = ["All", "Flower", "Concentrate", "Vape", "Pre-Roll", "Inactive"];
 
 function filterToAppliesTo(tab: PackagingFilter): AppliesTo | null {
-  if (tab === "All") return null;
+  if (tab === "All" || tab === "Inactive") return null;
   if (tab === "Pre-Roll") return "pre_roll";
   return tab.toLowerCase() as Exclude<AppliesTo, "pre_roll">;
 }
@@ -127,17 +127,22 @@ export default function PackagingSkusTable() {
       if (!res.ok) throw new Error(String(json?.error || "Failed to update packaging SKU"));
       await loadRows();
       setPendingAction(null);
-    } catch (err: any) {
-      setModalError(String(err?.message || "Failed to update packaging SKU"));
+    } catch (err: unknown) {
+      setModalError(err instanceof Error ? err.message : "Failed to update packaging SKU");
     } finally {
       setMutatingId(null);
     }
   }
 
   const filteredRows = useMemo(() => {
+    if (selectedFilter === "Inactive") {
+      return rows.filter((row) => !row.active);
+    }
+
     const filterValue = filterToAppliesTo(selectedFilter);
-    if (!filterValue) return rows;
-    return rows.filter((row) => skuSupportsPackagingCompatibilityContext(row, filterValue));
+    const activeRows = rows.filter((row) => row.active);
+    if (!filterValue) return activeRows;
+    return activeRows.filter((row) => skuSupportsPackagingCompatibilityContext(row, filterValue));
   }, [rows, selectedFilter]);
 
   const hasRows = filteredRows.length > 0;

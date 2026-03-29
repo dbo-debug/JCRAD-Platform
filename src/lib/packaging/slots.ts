@@ -83,9 +83,18 @@ function toPositiveNumber(value: unknown): number | null {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
+function isFlowerPackagingType(packagingType: string): boolean {
+  return packagingType === "flower_in_bag" || packagingType === "flower_in_jar";
+}
+
 export function packagingTypeRequiresPrimaryCapacity(value: unknown): boolean {
   const packagingType = normalizedPackagingType(value);
-  return packagingType === "concentrate_jar" || packagingType === "vape_510_cart" || packagingType === "vape_all_in_one";
+  return (
+    isFlowerPackagingType(packagingType)
+    || packagingType === "concentrate_jar"
+    || packagingType === "vape_510_cart"
+    || packagingType === "vape_all_in_one"
+  );
 }
 
 function primaryPackagingCapacityGrams(row: SlotSource): number | null {
@@ -113,7 +122,7 @@ export function derivePackagingEstimatorSlots(row: SlotSource): PackagingEstimat
 
   if (
     primaryFamily === "flower" &&
-    (packagingType === "flower_in_bag" || packagingType === "flower_in_jar") &&
+    isFlowerPackagingType(packagingType) &&
     hasContext(compatibilityContexts, "flower")
   ) {
     slots.add("flower_primary");
@@ -135,10 +144,10 @@ export function derivePackagingEstimatorSlots(row: SlotSource): PackagingEstimat
     slots.add(packQty === 1 ? "pre_roll_single_primary" : "pre_roll_multi_primary");
   }
 
-  const is35Mylar = packagingType === "flower_in_bag" && sizeGrams != null && Math.abs(sizeGrams - 3.5) < 1e-9;
-  if (is35Mylar && hasContext(compatibilityContexts, "concentrate")) slots.add("concentrate_secondary_bag");
-  if (is35Mylar && hasContext(compatibilityContexts, "vape")) slots.add("vape_secondary_bag");
-  if (is35Mylar && hasContext(compatibilityContexts, "pre_roll")) slots.add("pre_roll_multi_secondary_bag");
+  const isFlowerBag = packagingType === "flower_in_bag" && sizeGrams != null;
+  if (isFlowerBag && hasContext(compatibilityContexts, "concentrate")) slots.add("concentrate_secondary_bag");
+  if (isFlowerBag && hasContext(compatibilityContexts, "vape")) slots.add("vape_secondary_bag");
+  if (isFlowerBag && hasContext(compatibilityContexts, "pre_roll")) slots.add("pre_roll_multi_secondary_bag");
 
   return Array.from(slots);
 }
@@ -209,11 +218,17 @@ export function skuMatchesEstimatePrimaryCapacity(
     unitSizeGrams: number;
   }
 ): boolean {
-  if (args.isPreRoll) return true;
-  if (args.category !== "concentrate" && args.category !== "vape") return true;
-
   const packagingType = normalizedPackagingType(row.packaging_type);
+  if (args.isPreRoll) return true;
   if (!packagingTypeRequiresPrimaryCapacity(packagingType)) return true;
+
+  if (isFlowerPackagingType(packagingType)) {
+    const sizeGrams = toPositiveNumber(row.size_grams);
+    if (sizeGrams == null) return false;
+    return Math.abs(sizeGrams - args.unitSizeGrams) < 1e-9;
+  }
+
+  if (args.category !== "concentrate" && args.category !== "vape") return true;
 
   const capacityGrams = primaryPackagingCapacityGrams(row);
   if (capacityGrams == null) return false;

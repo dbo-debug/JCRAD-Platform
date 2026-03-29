@@ -55,6 +55,26 @@ function normalizePackagingType(value: unknown): PackagingType | null {
   return ALLOWED_PACKAGING_TYPES.includes(raw) ? raw : null;
 }
 
+function sizeToken(value: number | null): string {
+  if (value == null || !Number.isFinite(value) || value <= 0) return "";
+  return `${Number(value).toString()}g`;
+}
+
+function normalizeSizedPackagingName(args: {
+  name: string;
+  packagingType: PackagingType;
+  appliesTo: AppliesTo;
+  sizeGrams: number | null;
+}) {
+  const baseName = args.name.trim().replace(/\s+/g, " ");
+  const token = sizeToken(args.sizeGrams);
+  if (!baseName || !token) return baseName;
+  if (args.appliesTo === "vape") return baseName;
+  if (!packagingTypeRequiresPrimaryCapacity(args.packagingType)) return baseName;
+  const prefixPattern = new RegExp(`^${token.replace(".", "\\.")}\\s+`, "i");
+  return prefixPattern.test(baseName) ? baseName.replace(prefixPattern, `${token} `) : `${token} ${baseName}`;
+}
+
 function isMissingColumnError(error: any): boolean {
   const message = String(error?.message || "").toLowerCase();
   const code = String(error?.code || "").toUpperCase();
@@ -181,7 +201,7 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
 
   const id = body?.id ? String(body.id) : null;
-  const name = String(body?.name || "").trim();
+  const rawName = String(body?.name || "").trim();
   const applies_to = normalizeAppliesTo(body?.applies_to);
   const applies_to_contexts = normalizePackagingCompatibilityContexts(body?.applies_to_contexts);
   const category = applies_to;
@@ -202,7 +222,7 @@ export async function POST(req: Request) {
   const thumbnail_object_path =
     body?.thumbnail_object_path == null ? null : String(body.thumbnail_object_path).trim() || null;
 
-  if (!name) return NextResponse.json({ error: "name required" }, { status: 400 });
+  if (!rawName) return NextResponse.json({ error: "name required" }, { status: 400 });
   if (!applies_to || !category) {
     return NextResponse.json({ error: "applies_to must be flower, concentrate, vape, or pre_roll" }, { status: 400 });
   }
@@ -274,8 +294,15 @@ export async function POST(req: Request) {
   }
 
   if (packagingTypeRequiresPrimaryCapacity(packaging_type) && applies_to !== "vape" && (size_grams == null || size_grams <= 0)) {
-    return NextResponse.json({ error: "size_grams must be provided for fill-capacity packaging" }, { status: 400 });
+    return NextResponse.json({ error: "size_grams must be provided for this packaging type" }, { status: 400 });
   }
+
+  const name = normalizeSizedPackagingName({
+    name: rawName,
+    packagingType: packaging_type,
+    appliesTo: applies_to,
+    sizeGrams: size_grams,
+  });
 
   if (applies_to !== "vape") {
     vape_fill_grams = null;

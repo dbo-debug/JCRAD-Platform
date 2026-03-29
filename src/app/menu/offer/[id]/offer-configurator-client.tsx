@@ -35,6 +35,30 @@ function isVapeVesselSku(sku: { packaging_type?: unknown } | null | undefined): 
   return packagingType === "vape_510_cart" || packagingType === "vape_all_in_one";
 }
 
+function isValidSecondaryPackagingSku(
+  sku: Record<string, unknown> | null | undefined,
+  args: {
+    category: "flower" | "concentrate" | "vape";
+    isPreRoll: boolean;
+    preRollPackQty: number;
+    unitSizeGrams: number;
+  }
+): boolean {
+  if (!sku || sku.active !== true) return false;
+  const secondarySlot = secondaryPackagingSlotForEstimate({
+    category: args.category,
+    isPreRoll: args.isPreRoll,
+    preRollPackQty: args.preRollPackQty,
+  });
+  if (!secondarySlot) return false;
+  if (!skuSupportsPackagingEstimatorSlot(sku, secondarySlot)) return false;
+  return skuMatchesEstimatePrimaryCapacity(sku, {
+    category: args.category,
+    isPreRoll: args.isPreRoll,
+    unitSizeGrams: args.unitSizeGrams,
+  });
+}
+
 export default function OfferConfiguratorClient({
   offer,
   packagingSkus,
@@ -122,16 +146,16 @@ export default function OfferConfiguratorClient({
   }, [packagingSkus, estimatorCategory, isPreRollMode, unitSize, preRollPackQty]);
 
   const secondaryBagOptions = useMemo(() => {
+    const unitSizeNumber = Number(unitSize.replace("g", ""));
     return packagingSkus.filter((s) => {
-      const secondarySlot = secondaryPackagingSlotForEstimate({
+      return isValidSecondaryPackagingSku(s, {
         category: estimatorCategory,
         isPreRoll: false,
         preRollPackQty,
+        unitSizeGrams: unitSizeNumber,
       });
-      if (!secondarySlot) return false;
-      return (s as any).active === true && skuSupportsPackagingEstimatorSlot(s, secondarySlot);
     });
-  }, [packagingSkus, estimatorCategory, preRollPackQty]);
+  }, [packagingSkus, estimatorCategory, preRollPackQty, unitSize]);
 
   useEffect(() => {
     if (!unitSizeOptions.includes(unitSize)) {
@@ -195,11 +219,7 @@ export default function OfferConfiguratorClient({
         throw new Error(category === "vape" ? "Select a vape vessel SKU (510 cart or AIO)." : "Select a packaging SKU.");
       }
       if (requiresSecondaryBag && !secondaryBagSkuId) {
-        throw new Error(
-          category === "vape"
-            ? "Select a 3.5g mylar bag SKU."
-            : "Secondary bag (required) must be selected for concentrate JC RAD packaging."
-        );
+        throw new Error("Secondary bag (required) must be selected.");
       }
 
       const estimateId = await ensureEstimate();

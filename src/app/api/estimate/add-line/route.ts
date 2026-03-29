@@ -331,7 +331,11 @@ function resolveAutoPackagingSku(args: {
         unitSizeGrams: args.unitSizeGrams,
       });
     }
-    return true;
+    return skuMatchesEstimatePrimaryCapacity(row, {
+      category: args.category,
+      isPreRoll: false,
+      unitSizeGrams: args.unitSizeGrams,
+    });
   });
 
   if (filtered.length === 0) return null;
@@ -1723,6 +1727,9 @@ export async function POST(req: Request) {
             : productCategory === "vape"
               ? "vape_primary_hardware"
               : primaryPackagingSlot(productCategory, isPreRoll, pre_roll_pack_qty);
+        const estimatorPackagingCategory = (
+          productCategory === "concentrate" || productCategory === "vape" ? productCategory : "flower"
+        ) as "flower" | "concentrate" | "vape";
         let activePackagingSkus: PackagingSkuLookupRow[] | null = null;
         const loadActivePackagingSkus = async () => {
           if (activePackagingSkus) return activePackagingSkus;
@@ -1815,14 +1822,14 @@ export async function POST(req: Request) {
           return respond({ error: "Selected packaging SKU does not match the estimator packaging slot" }, { status: 400 });
         }
         if (
-          productCategory === "vape"
+          !isPreRoll
           && !skuMatchesEstimatePrimaryCapacity(sku as Record<string, unknown>, {
-            category: "vape",
+            category: estimatorPackagingCategory,
             isPreRoll,
             unitSizeGrams: requestedUnitSizeGrams,
           })
         ) {
-          return respond({ error: "Selected packaging SKU does not match the required fill size" }, { status: 400 });
+          return respond({ error: "Selected packaging SKU does not match the required unit size" }, { status: 400 });
         }
         if (isPreRoll) {
           if (skuCategory && skuCategory !== "pre_roll") {
@@ -1936,13 +1943,18 @@ export async function POST(req: Request) {
           const secondaryContextOk =
             requiredSecondarySlot != null
               && skuSupportsPackagingEstimatorSlot(secondarySku as Record<string, unknown>, requiredSecondarySlot);
+          const secondarySizeOk = skuMatchesEstimatePrimaryCapacity(secondarySku as Record<string, unknown>, {
+            category: estimatorPackagingCategory,
+            isPreRoll: false,
+            unitSizeGrams: requestedUnitSizeGrams,
+          });
 
-          if (!secondaryContextOk) {
+          if (!secondaryContextOk || !secondarySizeOk) {
             return respond(
               {
                 error: productCategory === "vape"
-                  ? "Secondary bag must be an active 3.5g flower_in_bag SKU for vape hardware jobs."
-                  : "Secondary bag must be an active 3.5g flower_in_bag SKU valid for concentrate context.",
+                  ? "Secondary bag must be an active flower bag SKU valid for vape and this unit size."
+                  : "Secondary bag must be an active flower bag SKU valid for concentrate and this unit size.",
               },
               { status: 400 }
             );
@@ -1958,7 +1970,7 @@ export async function POST(req: Request) {
           const packagingSecondarySellPerUnit = money(packagingSecondaryResolution.sellPrice ?? 0);
           packaging_secondary_label = String((secondarySku as any).name || "").trim() || packaging_secondary_label;
           if (isVapeHardwarePackaging) {
-            packaging_secondary_label = String((secondarySku as any).name || "3.5g mylar bag");
+            packaging_secondary_label = String((secondarySku as any).name || "Secondary bag");
           }
           if (productCategory === "concentrate" && isDev) {
             console.log(`[add-line:${requestId}] concentrate-secondary-selection`, {

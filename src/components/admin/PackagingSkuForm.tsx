@@ -103,6 +103,15 @@ function getDefaultPackagingType(appliesTo: AppliesTo, packQty: number): Packagi
   return getPreRollPackagingType(packQty);
 }
 
+function sizeToken(value: number | null): string {
+  if (value == null || !Number.isFinite(value)) return "";
+  return `${Number(value).toString()}g`;
+}
+
+function requiresOperationalSize(packagingType: PackagingType, appliesTo: AppliesTo): boolean {
+  return appliesTo !== "vape" && packagingTypeRequiresPrimaryCapacity(packagingType);
+}
+
 export default function PackagingSkuForm({
   mode,
   initialValues,
@@ -292,7 +301,7 @@ export default function PackagingSkuForm({
     const packagingType =
       allowedPackagingTypes.find((x) => x === form.packaging_type) ||
       getDefaultPackagingType(form.applies_to, Math.max(1, Number(packQty || 1)));
-    const requiresPrimaryCapacity = packagingTypeRequiresPrimaryCapacity(packagingType);
+    const requiresPrimaryCapacity = requiresOperationalSize(packagingType, form.applies_to);
 
     const vapeFillGrams =
       form.applies_to === "vape" ? (form.vape_fill_grams === "0.5" ? 0.5 : form.vape_fill_grams === "1" ? 1 : null) : null;
@@ -332,8 +341,8 @@ export default function PackagingSkuForm({
       setBusy(false);
       return;
     }
-    if (form.applies_to !== "vape" && requiresPrimaryCapacity && (sizeGrams == null || sizeGrams <= 0)) {
-      setError("Size grams is required for fill-capacity packaging.");
+    if (requiresPrimaryCapacity && (sizeGrams == null || sizeGrams <= 0)) {
+      setError("Size grams is required for this packaging type.");
       setBusy(false);
       return;
     }
@@ -470,7 +479,7 @@ export default function PackagingSkuForm({
         {form.applies_to !== "vape" ? (
           <label className="grid gap-1">
             <span className="text-sm text-[#4f6877]">
-              {packagingTypeRequiresPrimaryCapacity(form.packaging_type) ? "Size Grams" : "Size Grams (optional)"}
+              {requiresOperationalSize(form.packaging_type, form.applies_to) ? "Size Grams" : "Size Grams (optional)"}
             </span>
             <input
               type="number"
@@ -479,8 +488,13 @@ export default function PackagingSkuForm({
               className="rounded border border-[#cfdde5] bg-white px-3 py-2 text-sm text-[#173543]"
               value={form.size_grams}
               onChange={(e) => setForm((prev) => ({ ...prev, size_grams: e.target.value }))}
-              required={packagingTypeRequiresPrimaryCapacity(form.packaging_type)}
+              required={requiresOperationalSize(form.packaging_type, form.applies_to)}
             />
+            {requiresOperationalSize(form.packaging_type, form.applies_to) ? (
+              <span className="text-xs text-[#5b7382]">
+                Saved name will be normalized to {sizeToken(toOptionalNumber(form.size_grams)) || "<size>g"} {form.name.trim() || "<base name>"}.
+              </span>
+            ) : null}
           </label>
         ) : null}
 

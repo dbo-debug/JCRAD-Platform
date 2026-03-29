@@ -251,11 +251,28 @@ function isVapeVesselSku(sku: PackagingSku | null | undefined): boolean {
   return t === "vape_510_cart" || t === "vape_all_in_one";
 }
 
-function isMylar35Sku(sku: PackagingSku): boolean {
-  const t = normalizedLower(sku.packaging_type);
-  const size = Number(sku.size_grams || 0);
-  const active = sku.active === true;
-  return active && t === "flower_in_bag" && Math.abs(size - 3.5) < 1e-9;
+function isValidSecondaryPackagingSku(
+  sku: PackagingSku | null | undefined,
+  args: {
+    category: "flower" | "concentrate" | "vape";
+    isPreRoll: boolean;
+    preRollPackQty: number;
+    unitSizeGrams: number;
+  }
+): boolean {
+  if (!sku || sku.active !== true) return false;
+  const secondarySlot = secondaryPackagingSlotForEstimate({
+    category: args.category,
+    isPreRoll: args.isPreRoll,
+    preRollPackQty: args.preRollPackQty,
+  });
+  if (!secondarySlot) return false;
+  if (!skuSupportsPackagingEstimatorSlot(sku, secondarySlot)) return false;
+  return skuMatchesEstimatePrimaryCapacity(sku, {
+    category: args.category,
+    isPreRoll: args.isPreRoll,
+    unitSizeGrams: args.unitSizeGrams,
+  });
 }
 
 function defaultCardState(offer: Offer, selectedCategory: MenuCategory, menuMode: MenuMode): OfferCardState {
@@ -1118,19 +1135,18 @@ export default function MenuClient({
           }
           return true;
         });
+        const requestSize = Number(String(cardState.unitSize).replace("g", ""));
         const vapeVesselOptions = category === "vape"
           ? filteredSkus.filter((sku) => isVapeVesselSku(sku))
           : [];
         const secondaryBagOptions = packagingSkus.filter((sku) => {
-          const secondarySlot = secondaryPackagingSlotForEstimate({
+          return isValidSecondaryPackagingSku(sku, {
             category: estimatorCategory,
             isPreRoll,
             preRollPackQty: cardState.preRollPackQty,
+            unitSizeGrams: requestSize,
           });
-          if (!secondarySlot) return false;
-          return sku.active === true && skuSupportsPackagingEstimatorSlot(sku, secondarySlot);
         });
-        const vapeMylarBagOptions = packagingSkus.filter((sku) => sku.active === true && skuSupportsPackagingEstimatorSlot(sku, "vape_secondary_bag"));
         const selectedVapePackagingSku = category === "vape"
           ? packagingSkus.find((sku) => String(sku.id) === String(cardState.packagingSkuId))
           : null;
@@ -1207,9 +1223,9 @@ export default function MenuClient({
           backFileName: cardState.backFile?.name || "",
           requiresSecondaryBag,
           unitSizeOptions,
-          secondaryPackagingLabel: category === "vape" ? "3.5g mylar bag" : "Secondary bag",
+          secondaryPackagingLabel: "Secondary bag",
           packagingOptions: (category === "vape" ? vapeVesselOptions : filteredSkus).map((sku) => ({ id: String(sku.id), name: String(sku.name || "SKU") })),
-          secondaryBagOptions: (category === "vape" ? vapeMylarBagOptions : secondaryBagOptions).map((sku) => ({ id: String(sku.id), name: String(sku.name || "SKU") })),
+          secondaryBagOptions: secondaryBagOptions.map((sku) => ({ id: String(sku.id), name: String(sku.name || "SKU") })),
           onExpandedChange: (next) => updateCardState(offer, (prev) => ({ ...prev, expanded: next })),
           onModeChange: (next) => {
             updateCardState(offer, (prev) => ({
@@ -1458,7 +1474,7 @@ export default function MenuClient({
       throw new Error("Starting grams must be > 0.");
     }
     if (requiresSecondaryBag && !cardState.secondaryPackagingSkuId) {
-      throw new Error(category === "vape" ? "Select a 3.5g mylar bag SKU." : "Select a secondary bag for concentrate copack.");
+      throw new Error("Select a secondary bag SKU.");
     }
     if (apiMode === "copack" && packagingMode === "jcrad" && category === "vape" && cardState.packagingSkuId) {
       const vesselSku = packagingSkus.find((sku) => String(sku.id) === String(cardState.packagingSkuId));
@@ -1467,8 +1483,13 @@ export default function MenuClient({
       }
       if (isVapeVesselSku(vesselSku) && cardState.secondaryPackagingSkuId) {
         const bagSku = packagingSkus.find((sku) => String(sku.id) === String(cardState.secondaryPackagingSkuId));
-        if (!bagSku || !isMylar35Sku(bagSku)) {
-          throw new Error("Select a 3.5g mylar bag SKU.");
+        if (!isValidSecondaryPackagingSku(bagSku, {
+          category: "vape",
+          isPreRoll: false,
+          preRollPackQty: cardState.preRollPackQty,
+          unitSizeGrams: Number(String(cardState.unitSize).replace("g", "")),
+        })) {
+          throw new Error("Select a valid secondary bag SKU for this unit size.");
         }
       }
     }

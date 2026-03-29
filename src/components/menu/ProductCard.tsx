@@ -1,6 +1,6 @@
 "use client";
 
-import { type SyntheticEvent, useEffect, useRef, useState } from "react";
+import { type KeyboardEvent, type PointerEvent, type SyntheticEvent, useEffect, useRef, useState } from "react";
 import { type ProductCardItem } from "@/components/menu/types";
 import { gramsFromLiters, litersFromGrams } from "@/lib/pricing";
 
@@ -16,7 +16,9 @@ export default function ProductCard({ item, onAdd }: ProductCardProps) {
   const hasVideo = !!videoSrc;
   const isBrandAsset = imageSrc.startsWith("/brand/");
   const [preferContain, setPreferContain] = useState(false);
-  const [canHoverPreview, setCanHoverPreview] = useState(false);
+  const [canHoverPreview, setCanHoverPreview] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(hover: hover) and (pointer: fine)").matches
+  );
   const [showVideoPreview, setShowVideoPreview] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const availabilityText = item.availabilityLabel?.replace(/^available:\s*/i, "").trim() || "";
@@ -43,16 +45,40 @@ export default function ProductCard({ item, onAdd }: ProductCardProps) {
   );
   useEffect(() => {
     if (typeof window === "undefined") return;
-    setCanHoverPreview(window.matchMedia("(hover: hover) and (pointer: fine)").matches);
+    const mediaQuery = window.matchMedia("(hover: hover) and (pointer: fine)");
+    function updateCanHoverPreview(event?: MediaQueryListEvent) {
+      setCanHoverPreview(event ? event.matches : mediaQuery.matches);
+    }
+    updateCanHoverPreview();
+    mediaQuery.addEventListener("change", updateCanHoverPreview);
+    return () => {
+      mediaQuery.removeEventListener("change", updateCanHoverPreview);
+    };
   }, []);
 
   useEffect(() => {
-    setShowVideoPreview(false);
     const video = videoRef.current;
     if (!video) return;
     video.pause();
     video.currentTime = 0;
   }, [videoSrc]);
+
+  function startVideoPreview() {
+    if (!hasVideo) return;
+    setShowVideoPreview(true);
+    const video = videoRef.current;
+    if (!video) return;
+    video.currentTime = 0;
+    void video.play().catch(() => {});
+  }
+
+  function stopVideoPreview() {
+    setShowVideoPreview(false);
+    const video = videoRef.current;
+    if (!video) return;
+    video.pause();
+    video.currentTime = 0;
+  }
 
   function handleImageLoad(event: SyntheticEvent<HTMLImageElement>) {
     if (isBrandAsset) return;
@@ -63,20 +89,44 @@ export default function ProductCard({ item, onAdd }: ProductCardProps) {
 
   function handleMediaMouseEnter() {
     if (!hasVideo || !canHoverPreview) return;
-    setShowVideoPreview(true);
-    const video = videoRef.current;
-    if (!video) return;
-    video.currentTime = 0;
-    void video.play().catch(() => {});
+    startVideoPreview();
   }
 
   function handleMediaMouseLeave() {
     if (!showVideoPreview) return;
-    setShowVideoPreview(false);
-    const video = videoRef.current;
-    if (!video) return;
-    video.pause();
-    video.currentTime = 0;
+    stopVideoPreview();
+  }
+
+  function handleMediaPointerDown(event: PointerEvent<HTMLDivElement>) {
+    if (!hasVideo || canHoverPreview || event.pointerType === "mouse") return;
+    event.preventDefault();
+    if (showVideoPreview) {
+      stopVideoPreview();
+      return;
+    }
+    event.currentTarget.focus();
+    startVideoPreview();
+  }
+
+  function handleMediaFocus() {
+    if (!hasVideo) return;
+    startVideoPreview();
+  }
+
+  function handleMediaBlur() {
+    if (!showVideoPreview) return;
+    stopVideoPreview();
+  }
+
+  function handleMediaKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (!hasVideo) return;
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    if (showVideoPreview) {
+      stopVideoPreview();
+      return;
+    }
+    startVideoPreview();
   }
 
   return (
@@ -88,6 +138,11 @@ export default function ProductCard({ item, onAdd }: ProductCardProps) {
         className="relative mb-3 aspect-[4/3] overflow-hidden rounded-[14px] border border-[#d9e4ea] bg-gradient-to-br from-[#f7fafc] to-[#edf3f6]"
         onMouseEnter={handleMediaMouseEnter}
         onMouseLeave={handleMediaMouseLeave}
+        onPointerDown={handleMediaPointerDown}
+        onFocus={handleMediaFocus}
+        onBlur={handleMediaBlur}
+        onKeyDown={handleMediaKeyDown}
+        tabIndex={hasVideo ? 0 : -1}
       >
         {hasImage ? (
           <img

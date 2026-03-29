@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { INFUSION_ELIGIBILITY, LIQUID_INFUSION_MEDIA } from "@/lib/infusion-config";
@@ -69,6 +70,21 @@ type LiveInfusionSourceRow = {
   name: string;
   category: "concentrate" | "vape";
 };
+
+function MenuClientFallback() {
+  return (
+    <div style={{ padding: 24 }}>
+      <div style={{ fontSize: 14, color: "#5b7382" }}>Loading menu...</div>
+    </div>
+  );
+}
+
+function isDeprecatedHalfGramVapeCatalogRow(row: CatalogItemRow): boolean {
+  const category = String(row.category || row.products?.category || "").trim().toLowerCase();
+  if (category !== "vape") return false;
+  const name = String(row.name || row.products?.name || "").trim().toLowerCase();
+  return /\b0(?:\.|\s)?5\s*g\b/.test(name) || name.includes("half gram");
+}
 
 function parseYieldPct(valueJson: unknown, fallback: number): number {
   const obj = (valueJson && typeof valueJson === "object" ? valueJson : {}) as Record<string, unknown>;
@@ -246,17 +262,19 @@ export default async function MenuPage() {
     );
   }
 
-  const catalogRows = (catalogRowsData || []) as unknown as CatalogItemRow[];
+  const catalogRows = ((catalogRowsData || []) as unknown as CatalogItemRow[]).filter(
+    (row) => !isDeprecatedHalfGramVapeCatalogRow(row)
+  );
   const productIds = Array.from(new Set(catalogRows.map((row) => String(row.product_id || "")).filter(Boolean)));
   const catalogRowsMissingProductId = catalogRows.filter((row) => !String(row.product_id || "").trim()).length;
   const activeCatalogItems = catalogRows.length;
   const activeCatalogWithProductId = Math.max(0, activeCatalogItems - catalogRowsMissingProductId);
 
-  let offerByProductId = new Map<string, OfferRow>();
+  const offerByProductId = new Map<string, OfferRow>();
   let activeCatalogNoOfferCount = 0;
-  let publishedByProductId = new Map<string, OfferRow>();
-  let draftByProductId = new Map<string, OfferRow>();
-  let offersByStatus = { published: 0, draft: 0 };
+  const publishedByProductId = new Map<string, OfferRow>();
+  const draftByProductId = new Map<string, OfferRow>();
+  const offersByStatus = { published: 0, draft: 0 };
   let categoryBreakdown: Record<string, { activeRows: number; withPublishedOffer: number; withDraftOffer: number; missingOffer: number }> = {};
   let shouldShowDraftHeavyWarning = false;
   const { data: yieldRows } = await supabase
@@ -632,41 +650,43 @@ export default async function MenuPage() {
           Most catalog items are draft-only. Publish offers or enable Show Draft Offers as admin.
         </div>
       ) : null}
-      <MenuClient
-        canShowDraft={isAdmin}
-        initialYields={initialYields}
-        initialInfusionSettings={initialInfusionSettings}
-        internalInfusionProducts={internalInfusionProducts}
-        externalLiquidProducts={externalLiquidProducts}
-        externalDryProducts={externalDryProducts}
-        initialOffers={await Promise.all(offers.map(async (o: any, index: number) => {
-          const productId = String(o.product_id || o.products?.id || "");
-          const catalogItem = catalogItemByProductId.get(productId);
-          const thumbnailRaw = String(catalogItem?.thumbnail_url || "").trim() || null;
-          const thumbnailResolved = await resolveMaybeStorageUrl(supabase, thumbnailRaw, "catalog-public");
-          const mediaFallback = mediaByProduct[productId] || null;
-          const imageUrl = thumbnailResolved || mediaFallback || "/brand/BLACK.png";
-          const videoRaw = String(catalogItem?.video_url || "").trim() || null;
-          const videoResolved = await resolveMaybeStorageUrl(supabase, videoRaw, "catalog-public");
+      <Suspense fallback={<MenuClientFallback />}>
+        <MenuClient
+          canShowDraft={isAdmin}
+          initialYields={initialYields}
+          initialInfusionSettings={initialInfusionSettings}
+          internalInfusionProducts={internalInfusionProducts}
+          externalLiquidProducts={externalLiquidProducts}
+          externalDryProducts={externalDryProducts}
+          initialOffers={await Promise.all(offers.map(async (o: any, index: number) => {
+            const productId = String(o.product_id || o.products?.id || "");
+            const catalogItem = catalogItemByProductId.get(productId);
+            const thumbnailRaw = String(catalogItem?.thumbnail_url || "").trim() || null;
+            const thumbnailResolved = await resolveMaybeStorageUrl(supabase, thumbnailRaw, "catalog-public");
+            const mediaFallback = mediaByProduct[productId] || null;
+            const imageUrl = thumbnailResolved || mediaFallback || "/brand/BLACK.png";
+            const videoRaw = String(catalogItem?.video_url || "").trim() || null;
+            const videoResolved = await resolveMaybeStorageUrl(supabase, videoRaw, "catalog-public");
 
-          if (process.env.NODE_ENV !== "production" && index < 10) {
-            console.log("[menu:image-map]", {
-              productId,
-              thumbnail_raw: thumbnailRaw,
-              thumbnail_resolved: thumbnailResolved,
-              media_fallback: mediaFallback,
-              final_image_url: imageUrl,
-              video_raw: videoRaw,
-              video_resolved: videoResolved,
-            });
-          }
-          return {
-            ...o,
-            image_url: imageUrl,
-            video_url: videoResolved,
-          };
-        }))}
-      />
+            if (process.env.NODE_ENV !== "production" && index < 10) {
+              console.log("[menu:image-map]", {
+                productId,
+                thumbnail_raw: thumbnailRaw,
+                thumbnail_resolved: thumbnailResolved,
+                media_fallback: mediaFallback,
+                final_image_url: imageUrl,
+                video_raw: videoRaw,
+                video_resolved: videoResolved,
+              });
+            }
+            return {
+              ...o,
+              image_url: imageUrl,
+              video_url: videoResolved,
+            };
+          }))}
+        />
+      </Suspense>
     </>
   );
 }
