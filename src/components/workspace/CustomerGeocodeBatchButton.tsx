@@ -9,6 +9,27 @@ async function parseJsonSafe(res: Response): Promise<Record<string, unknown>> {
   return res.json().catch(() => ({}));
 }
 
+function buildBatchStatusMessage(json: Record<string, unknown>, mode: "default" | "retry_failed") {
+  const reasonCounts = (json.reason_counts && typeof json.reason_counts === "object" ? json.reason_counts : {}) as Record<string, unknown>;
+  const sampleErrors = Array.isArray(json.sample_errors) ? json.sample_errors.map((item) => String(item || "").trim()).filter(Boolean).slice(0, 3) : [];
+  const detailBits = [
+    Number(json.needs_review || 0) > 0 ? `needs review ${Number(json.needs_review || 0)}` : null,
+    Number(reasonCounts.unsupported_provider || 0) > 0 ? `unsupported provider ${Number(reasonCounts.unsupported_provider || 0)}` : null,
+    Number(reasonCounts.transport_failed || 0) > 0 ? `transport ${Number(reasonCounts.transport_failed || 0)}` : null,
+    Number(reasonCounts.no_match || 0) > 0 ? `no match ${Number(reasonCounts.no_match || 0)}` : null,
+    Number(reasonCounts.multiple_matches || 0) > 0 ? `multiple matches ${Number(reasonCounts.multiple_matches || 0)}` : null,
+    Number(reasonCounts.invalid_coordinates || 0) > 0 ? `invalid coords ${Number(reasonCounts.invalid_coordinates || 0)}` : null,
+  ].filter(Boolean);
+
+  return `${
+    mode === "retry_failed" ? "Retried failed records" : "Processed next unprocessed records"
+  }: attempted ${Number(json.attempted || 0)} • geocoded ${Number(json.geocoded || 0)} • needs review ${Number(json.needs_review || 0)} • failed ${Number(
+    json.failed || 0
+  )} • missing ${Number(json.missing_address || 0)}${
+    detailBits.length > 0 ? ` • ${detailBits.join(" • ")}` : ""
+  }${sampleErrors.length > 0 ? ` • sample: ${sampleErrors.join(" | ")}` : ""}`;
+}
+
 export default function CustomerGeocodeBatchButton() {
   const router = useRouter();
   const [busyMode, setBusyMode] = useState<"default" | "retry_failed" | null>(null);
@@ -27,13 +48,7 @@ export default function CustomerGeocodeBatchButton() {
       const json = await parseJsonSafe(res);
       if (!res.ok) throw new Error(String(json.error || `Batch geocode failed (${res.status})`));
 
-      setStatus(
-        `${
-          mode === "retry_failed" ? "Retried failed records" : "Processed next unprocessed records"
-        }: attempted ${Number(json.attempted || 0)} • geocoded ${Number(json.geocoded || 0)} • failed ${Number(json.failed || 0)} • missing ${Number(
-          json.missing_address || 0
-        )}`
-      );
+      setStatus(buildBatchStatusMessage(json, mode));
       router.refresh();
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Batch geocode failed");

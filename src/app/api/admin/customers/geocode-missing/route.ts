@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { geocodeCustomerRow } from "@/lib/customerGeocode";
-import { hasSufficientAddress } from "@/lib/geocode";
+import { classifyGeocodeFailure, hasSufficientAddress, type GeocodeFailureReason, type GeocodeStatus } from "@/lib/geocode";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 
@@ -84,6 +84,29 @@ export async function POST(req: Request) {
   let geocoded = 0;
   let failed = 0;
   let missingAddress = 0;
+  let needsReview = 0;
+  const statusCounts: Record<GeocodeStatus, number> = {
+    geocoded: 0,
+    missing_address: 0,
+    failed: 0,
+    needs_review: 0,
+  };
+  const reasonCounts: Record<GeocodeFailureReason | "update_failed", number> = {
+    unsupported_provider: 0,
+    transport_failed: 0,
+    no_match: 0,
+    multiple_matches: 0,
+    invalid_coordinates: 0,
+    unknown: 0,
+    update_failed: 0,
+  };
+  const sampleErrors: string[] = [];
+
+  function pushSampleError(message: string) {
+    const normalized = message.trim();
+    if (!normalized || sampleErrors.includes(normalized) || sampleErrors.length >= 5) return;
+    sampleErrors.push(normalized);
+  }
 
   for (const row of candidates) {
     attempted += 1;
@@ -110,12 +133,29 @@ export async function POST(req: Request) {
     const { error: updateError } = await admin.from("customers").update(payload).eq("id", String(row.id || ""));
     if (updateError) {
       failed += 1;
+      statusCounts.failed += 1;
+      reasonCounts.update_failed += 1;
+      pushSampleError(`Customer update failed: ${updateError.message}`);
       continue;
     }
 
-    if (geocode.status === "geocoded") geocoded += 1;
-    else if (geocode.status === "missing_address") missingAddress += 1;
-    else failed += 1;
+    statusCounts[geocode.status] += 1;
+
+    if (geocode.status === "geocoded") {
+      geocoded += 1;
+    } else if (geocode.status === "missing_address") {
+      missingAddress += 1;
+    } else if (geocode.status === "needs_review") {
+      needsReview += 1;
+      const reason = classifyGeocodeFailure(geocode);
+      if (reason) reasonCounts[reason] += 1;
+      pushSampleError(geocode.errorMessage || "Geocode needs review");
+    } else {
+      failed += 1;
+      const reason = classifyGeocodeFailure(geocode);
+      if (reason) reasonCounts[reason] += 1;
+      pushSampleError(geocode.errorMessage || "Geocode failed");
+    }
   }
 
   return NextResponse.json({
@@ -124,6 +164,10 @@ export async function POST(req: Request) {
     attempted,
     geocoded,
     failed,
+    needs_review: needsReview,
     missing_address: missingAddress,
+    status_counts: statusCounts,
+    reason_counts: reasonCounts,
+    sample_errors: sampleErrors,
   });
 }

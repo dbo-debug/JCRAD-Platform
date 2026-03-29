@@ -142,6 +142,25 @@ async function parseJsonSafe(res: Response): Promise<Record<string, unknown>> {
   return res.json().catch(() => ({}));
 }
 
+function buildGeocodeBatchStatusMessage(json: Record<string, unknown>) {
+  const reasonCounts = (json.reason_counts && typeof json.reason_counts === "object" ? json.reason_counts : {}) as Record<string, unknown>;
+  const sampleErrors = Array.isArray(json.sample_errors) ? json.sample_errors.map((item) => String(item || "").trim()).filter(Boolean).slice(0, 3) : [];
+  const detailBits = [
+    Number(json.needs_review || 0) > 0 ? `needs review ${Number(json.needs_review || 0)}` : null,
+    Number(reasonCounts.unsupported_provider || 0) > 0 ? `unsupported provider ${Number(reasonCounts.unsupported_provider || 0)}` : null,
+    Number(reasonCounts.transport_failed || 0) > 0 ? `transport ${Number(reasonCounts.transport_failed || 0)}` : null,
+    Number(reasonCounts.no_match || 0) > 0 ? `no match ${Number(reasonCounts.no_match || 0)}` : null,
+    Number(reasonCounts.multiple_matches || 0) > 0 ? `multiple matches ${Number(reasonCounts.multiple_matches || 0)}` : null,
+    Number(reasonCounts.invalid_coordinates || 0) > 0 ? `invalid coords ${Number(reasonCounts.invalid_coordinates || 0)}` : null,
+  ].filter(Boolean);
+
+  return `Geocode prep complete: attempted ${Number(json.attempted || 0)} • geocoded ${Number(json.geocoded || 0)} • needs review ${Number(
+    json.needs_review || 0
+  )} • failed ${Number(json.failed || 0)} • missing ${Number(json.missing_address || 0)}${
+    detailBits.length > 0 ? ` • ${detailBits.join(" • ")}` : ""
+  }${sampleErrors.length > 0 ? ` • sample: ${sampleErrors.join(" | ")}` : ""}`;
+}
+
 function normalizeText(value: string | null | undefined) {
   return String(value || "").trim().toLowerCase();
 }
@@ -1061,11 +1080,7 @@ export default function CustomerWorkspaceIndex({
       const json = await parseJsonSafe(res);
       if (!res.ok) throw new Error(String(json.error || `Geocode prep failed (${res.status})`));
 
-      setVisibleGeocodeStatus(
-        `Geocode prep complete: attempted ${Number(json.attempted || 0)} • geocoded ${Number(json.geocoded || 0)} • failed ${Number(json.failed || 0)} • missing ${Number(
-          json.missing_address || 0
-        )}`
-      );
+      setVisibleGeocodeStatus(buildGeocodeBatchStatusMessage(json));
       router.refresh();
     } catch (error) {
       setVisibleGeocodeStatus(error instanceof Error ? error.message : "Geocode prep failed");

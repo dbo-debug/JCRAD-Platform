@@ -1,4 +1,11 @@
 export type GeocodeStatus = "geocoded" | "missing_address" | "failed" | "needs_review";
+export type GeocodeFailureReason =
+  | "unsupported_provider"
+  | "transport_failed"
+  | "no_match"
+  | "multiple_matches"
+  | "invalid_coordinates"
+  | "unknown";
 
 export type GeocodeInput = {
   address1: string | null;
@@ -29,6 +36,18 @@ function asText(value: unknown): string | null {
 
 function collapseWhitespace(value: string) {
   return value.replace(/\s+/g, " ").trim();
+}
+
+export function classifyGeocodeFailure(result: Pick<GeocodeResult, "status" | "errorMessage">): GeocodeFailureReason | null {
+  if (result.status === "geocoded" || result.status === "missing_address") return null;
+
+  const message = String(result.errorMessage || "").trim().toLowerCase();
+  if (message.includes("unsupported geocode provider")) return "unsupported_provider";
+  if (message.includes("multiple geocode matches")) return "multiple_matches";
+  if (message.includes("no geocode match")) return "no_match";
+  if (message.includes("invalid coordinates")) return "invalid_coordinates";
+  if (message.includes("geocoder returned") || message.includes("request failed")) return "transport_failed";
+  return "unknown";
 }
 
 export function buildNormalizedAddress(input: GeocodeInput) {
