@@ -67,6 +67,7 @@ type CustomerDetailManagerProps = {
   territoryOptions: TerritoryOption[];
   primaryContact: PrimaryContact | null;
   contacts: PrimaryContact[];
+  website: string | null;
 };
 
 const ROUTE_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
@@ -159,6 +160,14 @@ function normalizeTelHref(value: string | null | undefined) {
 function normalizeMailtoHref(value: string | null | undefined) {
   const email = String(value || "").trim();
   return email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? `mailto:${email}` : null;
+}
+
+function normalizeWebsiteHref(value: string | null | undefined) {
+  const href = String(value || "").trim();
+  if (!href) return null;
+  if (/^https?:\/\//i.test(href)) return href;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(href)) return null;
+  return `https://${href}`;
 }
 
 function addDaysDateValue(days: number) {
@@ -319,6 +328,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
   const hasAddress = Boolean(address1.trim() || city.trim() || stateCode.trim() || postalCode.trim());
   const callHref = normalizeTelHref(props.primaryContact?.phone || props.mainPhone);
   const emailHref = normalizeMailtoHref(props.primaryContact?.email || primaryContactEmail);
+  const websiteHref = normalizeWebsiteHref(props.website);
   const coordinateCoverageState =
     hasCoords ? "has_coords" : geocodeStatus === "failed" ? "failed" : geocodeStatus === "needs_review" ? "needs_review" : hasAddress ? "address_ready" : "missing_address";
   const coordinateStatusLabel =
@@ -778,7 +788,13 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
       const json = await parseJsonSafe(res);
       if (!res.ok) throw new Error(String(json.error || `Retry failed (${res.status})`));
       syncGeocodeState(json);
-      await refreshWithMessage("Geocode retry completed.");
+      const retryMessage =
+        json.geocode_coordinate_outcome === "updated"
+          ? "Geocode retry succeeded and updated coordinates."
+          : json.geocode_coordinate_outcome === "preserved"
+            ? "Geocode retry did not resolve the address. Existing coordinates were preserved."
+            : "Geocode retry completed.";
+      await refreshWithMessage(retryMessage);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Retry failed");
     } finally {
@@ -899,7 +915,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
           <ActionButton href={emailHref} label="Email" />
           <ActionButton label="Text" disabled helper="Coming soon" />
           <ActionButton label="New Task" onClick={() => jumpToSection("customer-create-task", taskTitleInputRef.current)} />
-          <ActionButton label="Account" onClick={() => jumpToSection("customer-account-management", accountCompanyInputRef.current)} />
+          <ActionButton href={websiteHref} label="SITE" disabled={!websiteHref} />
           <ActionButton label={routeQueueBusy ? "Adding..." : "Add to Route"} onClick={() => void addToRoute()} disabled={routeQueueBusy} />
           <ActionButton label="Recent Activity" onClick={() => jumpToSection("customer-activity-timeline")} />
         </div>

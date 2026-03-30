@@ -193,6 +193,7 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
         territoryOptions={territoryOptions}
         primaryContact={primaryContact}
         contacts={detail.contacts}
+        website={detail.customer.website}
       />
 
       <section className="grid gap-3 2xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.9fr)]">

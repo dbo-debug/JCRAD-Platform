@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { geocodeCustomerRow, getCustomerNormalizedAddress } from "@/lib/customerGeocode";
 import { normalizeCustomerApprovalStatus } from "@/lib/customerApproval";
+import { customerHasValidRouteCoordinates } from "@/lib/routeEligibility";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStaffContext } from "@/lib/getStaffContext";
 
@@ -208,6 +209,8 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
   });
   const normalizedNextAddress = getCustomerNormalizedAddress(nextCustomerRow);
   const shouldAttemptGeocode = forceGeocode || (addressFieldsTouched && normalizedPreviousAddress !== normalizedNextAddress);
+  const hasValidCoordinatesToPreserve = customerHasValidRouteCoordinates(nextCustomerRow);
+  let geocodeCoordinateOutcome: "updated" | "preserved" | "cleared" | null = null;
 
   if (shouldAttemptGeocode) {
     const geocode = await geocodeCustomerRow(nextCustomerRow);
@@ -221,9 +224,15 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
     if (geocode.ok) {
       payload.latitude = geocode.latitude;
       payload.longitude = geocode.longitude;
+      geocodeCoordinateOutcome = "updated";
+    } else if (hasValidCoordinatesToPreserve) {
+      payload.latitude = nextCustomerRow.latitude;
+      payload.longitude = nextCustomerRow.longitude;
+      geocodeCoordinateOutcome = "preserved";
     } else if (geocode.status === "missing_address" || normalizedPreviousAddress !== normalizedNextAddress || forceGeocode) {
       payload.latitude = null;
       payload.longitude = null;
+      geocodeCoordinateOutcome = "cleared";
     }
   }
 
@@ -241,5 +250,6 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
     geocoded_address: payload.geocoded_address ?? asText(currentCustomer.geocoded_address),
     geocode_provider: payload.geocode_provider ?? asText(currentCustomer.geocode_provider || currentCustomer.geocode_source),
     last_geocoded_at: payload.last_geocoded_at ?? asText(currentCustomer.last_geocoded_at || currentCustomer.geocoded_at),
+    geocode_coordinate_outcome: geocodeCoordinateOutcome,
   });
 }
