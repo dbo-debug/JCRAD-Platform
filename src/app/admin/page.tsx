@@ -13,6 +13,7 @@ import {
 import EstimateLeadFollowUpPanel from "@/components/workspace/EstimateLeadFollowUpPanel";
 import { loadCustomerApprovalQueue, summarizeCustomerApprovalQueue } from "@/lib/customerApprovals";
 import { loadCustomerWorkspaceIndex } from "@/lib/customerWorkspace";
+import { loadSourceWorkspaceIndex } from "@/lib/sourceWorkspace";
 import {
   buildAdminDashboardViewModel,
   type CustomerTaskRow,
@@ -42,6 +43,7 @@ export default async function AdminDashboardPage() {
     routeStopQueueRes,
     taskRows,
     customerIndex,
+    sourceIndex,
     savedRoutes,
     approvalQueue,
   ] = await Promise.all([
@@ -68,9 +70,19 @@ export default async function AdminDashboardPage() {
     supabase.from("route_stop_queue").select("id"),
     loadScopedCustomerTasks({ staff, limit: 2000 }),
     loadCustomerWorkspaceIndex(),
+    loadSourceWorkspaceIndex(),
     loadSavedRoutes(staff),
     isAdmin ? loadCustomerApprovalQueue() : Promise.resolve([]),
   ]);
+
+  const sourcePressureQueue = [...sourceIndex.sources]
+    .filter((source) => source.openTaskCount > 0 || source.overdueTaskCount > 0)
+    .sort((left, right) => {
+      if (right.overdueTaskCount !== left.overdueTaskCount) return right.overdueTaskCount - left.overdueTaskCount;
+      if (right.openTaskCount !== left.openTaskCount) return right.openTaskCount - left.openTaskCount;
+      return Date.parse(String(right.lastActivityAt || right.updatedAt || "")) - Date.parse(String(left.lastActivityAt || left.updatedAt || ""));
+    })
+    .slice(0, 4);
 
   const approvalStatusCounts = summarizeCustomerApprovalQueue(approvalQueue);
   const dashboard = buildAdminDashboardViewModel({
@@ -227,6 +239,50 @@ export default async function AdminDashboardPage() {
                 description="Shortcuts stay available, but only after the operational queues."
               >
                 <ShortcutRail cards={dashboard.shortcuts} />
+              </DashboardPanel>
+
+              <DashboardPanel
+                title="Source Follow-Up"
+                description="Keep supplier and sourcing workload visible once Sources starts carrying real operating follow-up."
+                href="/workspace/sources?taskState=has_open_task&sort=activity_desc"
+                hrefLabel="Open source queue"
+              >
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <SummaryBox
+                    label="Open Source Tasks"
+                    value={`${sourceIndex.metrics.openTasks} open`}
+                    detail={`${sourceIndex.metrics.overdueTasks} overdue across supplier accounts`}
+                  />
+                  <SummaryBox
+                    label="Active Sources"
+                    value={`${sourceIndex.metrics.activeSources} active`}
+                    detail={`${sourceIndex.metrics.withContactEmail} with contact email`}
+                  />
+                </div>
+                <div className="mt-3 space-y-2">
+                  {sourcePressureQueue.map((source) => (
+                    <Link
+                      key={source.id}
+                      href={`/workspace/sources/${source.id}`}
+                      className="block rounded-lg border border-[#dbe9ef] bg-white px-3 py-3 transition hover:border-[#14b8a6] hover:bg-[#f6fbfd]"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-semibold text-[#173543]">{source.name}</p>
+                          <p className="mt-1 text-xs text-[#5b7382]">
+                            {source.companyName || "Independent source"} • {source.assignedBuyerName || "Unassigned buyer"}
+                          </p>
+                          <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#0f766e]">Open source account</p>
+                        </div>
+                        <div className="text-right text-xs text-[#5b7382]">
+                          <p>{source.openTaskCount} open</p>
+                          <p>{source.overdueTaskCount} overdue</p>
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                  {sourcePressureQueue.length === 0 ? <p className="text-sm text-[#5b7382]">No source follow-up pressure right now.</p> : null}
+                </div>
               </DashboardPanel>
             </div>
           </section>

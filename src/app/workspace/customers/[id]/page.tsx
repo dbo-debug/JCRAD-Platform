@@ -34,9 +34,11 @@ function getActivityNotes(details: Record<string, unknown> | null): string | nul
   return text || null;
 }
 
-function hasHotLeadFlag(details: Record<string, unknown> | null): boolean {
+function readHotLeadState(details: Record<string, unknown> | null): boolean | null {
   const value = details?.hot_lead;
-  return value === true || value === "true" || value === 1 || value === "1";
+  if (value === true || value === "true" || value === 1 || value === "1") return true;
+  if (value === false || value === "false" || value === 0 || value === "0") return false;
+  return null;
 }
 
 function formatSourceLabel(value: string | null | undefined, fallback = "Unspecified"): string {
@@ -388,13 +390,14 @@ function ActivityCard({
   };
 }) {
   const notes = getActivityNotes(item.details);
-  const hotLead = hasHotLeadFlag(item.details);
+  const hotLeadState = readHotLeadState(item.details);
 
   return (
     <div className="rounded-xl border border-[#dbe9ef] bg-[#f9fcfd] px-3 py-2.5">
       <div className="flex flex-wrap items-center gap-2">
         <p className="font-semibold text-[#173543]">{item.summary}</p>
-        {hotLead ? <HeaderBadge tone="hot" label="Hot Lead" /> : null}
+        {hotLeadState === true ? <HeaderBadge tone="hot" label="Hot Lead" /> : null}
+        {hotLeadState === false ? <HeaderBadge label="Hot Lead Cleared" /> : null}
         {item.activityType === "event_quick_add" ? <HeaderBadge tone="event" label="Hall of Flowers" /> : null}
       </div>
       <p className="mt-1 text-sm text-[#4a6575]">

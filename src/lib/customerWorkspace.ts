@@ -204,10 +204,51 @@ function firstNumber(...values: Array<unknown>): number | null {
   return null;
 }
 
-function hasHotLeadFlag(details: unknown): boolean {
-  if (!details || typeof details !== "object" || Array.isArray(details)) return false;
+function readHotLeadState(details: unknown): boolean | null {
+  if (!details || typeof details !== "object" || Array.isArray(details)) return null;
   const value = (details as Record<string, unknown>).hot_lead;
-  return value === true || value === "true" || value === 1 || value === "1";
+  if (value === true || value === "true" || value === 1 || value === "1") return true;
+  if (value === false || value === "false" || value === 0 || value === "0") return false;
+  return null;
+}
+
+function getRowTimestamp(value: unknown): number {
+  const parsed = Date.parse(String(value || ""));
+  return Number.isFinite(parsed) ? parsed : -1;
+}
+
+function deriveHotLeadState(activityRows: GenericRow[], taskRows: GenericRow[]): boolean {
+  const latestActivitySignal = activityRows.reduce<{ state: boolean; createdAt: number } | null>((latest, row) => {
+    const state = readHotLeadState(row.details);
+    if (state === null) return latest;
+
+    const candidate = {
+      state,
+      createdAt: getRowTimestamp(firstText(row.created_at)),
+    };
+
+    if (!latest || candidate.createdAt > latest.createdAt) return candidate;
+    return latest;
+  }, null);
+
+  const latestOpenHallOfFlowersTask = taskRows.reduce<{ createdAt: number } | null>((latest, row) => {
+    const isOpen =
+      !CLOSED_TASK_STATUSES.has(normalizeText(row.status)) &&
+      !firstText(row.completed_at) &&
+      normalizeText(row.title).includes("hall of flowers lead");
+    if (!isOpen) return latest;
+
+    const candidate = { createdAt: getRowTimestamp(firstText(row.created_at)) };
+    if (!latest || candidate.createdAt > latest.createdAt) return candidate;
+    return latest;
+  }, null);
+
+  if (latestActivitySignal && latestOpenHallOfFlowersTask) {
+    return latestActivitySignal.createdAt >= latestOpenHallOfFlowersTask.createdAt ? latestActivitySignal.state : true;
+  }
+
+  if (latestActivitySignal) return latestActivitySignal.state;
+  return Boolean(latestOpenHallOfFlowersTask);
 }
 
 function formatProfileName(profile: GenericRow | null | undefined): string | null {
@@ -732,9 +773,7 @@ function buildCustomerSummary({
   const source = firstText(customer.source);
   const importSource = firstText(customer.import_source);
   const isHallOfFlowersLead = normalizeText(source) === "hall_of_flowers" || normalizeText(importSource) === "event_quick_add";
-  const isHotLead =
-    activityRows.some((row) => hasHotLeadFlag(row.details)) ||
-    taskRows.some((row) => normalizeText(row.title).includes("hall of flowers lead") && !CLOSED_TASK_STATUSES.has(normalizeText(row.status)));
+  const isHotLead = deriveHotLeadState(activityRows, taskRows);
   const openTasks = taskRows
     .filter((row) => !CLOSED_TASK_STATUSES.has(normalizeText(row.status)) && !firstText(row.completed_at))
     .sort((a, b) => {

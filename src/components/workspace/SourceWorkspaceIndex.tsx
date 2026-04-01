@@ -393,26 +393,38 @@ export default function SourceWorkspaceIndex({ sources, initialFilters }: Source
           const phoneHref = normalizeTelHref(source.contactPhone);
 
           return (
-            <Link
+            <article
               key={source.id}
-              href={`/workspace/sources/${source.id}`}
               className="group rounded-[28px] border border-[#dbe9ef] bg-white p-5 shadow-[0_14px_35px_rgba(16,42,67,0.06)] transition hover:-translate-y-0.5 hover:border-[#b7d6e3] hover:shadow-[0_20px_48px_rgba(16,42,67,0.1)]"
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="text-lg font-semibold text-[#173543]">{source.name}</p>
+                  <Link href={`/workspace/sources/${source.id}`} className="text-lg font-semibold text-[#173543] transition hover:text-[#0f766e]">
+                    {source.name}
+                  </Link>
                   <p className="mt-1 text-sm text-[#4a6575]">
                     {source.companyName || "Independent source"}
                     {source.sourceType ? ` • ${titleCase(source.sourceType)}` : ""}
                   </p>
+                  <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#6c8796]">
+                    Open the account to log sourcing activity, create follow-up, and keep supplier context moving.
+                  </p>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <span className={["rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em]", chipClass(source.status, "status")].join(" ")}>
-                    {titleCase(source.status)}
-                  </span>
-                  <span className={["rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em]", chipClass(source.stage, "stage")].join(" ")}>
-                    {titleCase(source.stage, "No Stage")}
-                  </span>
+                <div className="flex flex-col items-end gap-2">
+                  <Link
+                    href={`/workspace/sources/${source.id}`}
+                    className="inline-flex h-10 items-center justify-center rounded-full bg-[#173543] px-4 text-sm font-semibold text-white transition hover:bg-[#0f2a35]"
+                  >
+                    Open Account
+                  </Link>
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <span className={["rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em]", chipClass(source.status, "status")].join(" ")}>
+                      {titleCase(source.status)}
+                    </span>
+                    <span className={["rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em]", chipClass(source.stage, "stage")].join(" ")}>
+                      {titleCase(source.stage, "No Stage")}
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -457,7 +469,31 @@ export default function SourceWorkspaceIndex({ sources, initialFilters }: Source
                   </span>
                 ))}
               </div>
-            </Link>
+
+              <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-[#e7eff3] pt-4">
+                <div className="text-sm text-[#5c7483]">
+                  {source.openTaskCount > 0
+                    ? `${source.openTaskCount} open follow-up task${source.openTaskCount === 1 ? "" : "s"} on this account.`
+                    : "No follow-up task yet on this account."}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {emailHref ? (
+                    <a
+                      href={emailHref}
+                      className="inline-flex h-9 items-center justify-center rounded-full border border-[#d0dde5] bg-white px-3.5 text-sm font-medium text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543]"
+                    >
+                      Email
+                    </a>
+                  ) : null}
+                  <Link
+                    href={`/workspace/sources/${source.id}`}
+                    className="inline-flex h-9 items-center justify-center rounded-full border border-[#14b8a6] bg-[#effcf9] px-3.5 text-sm font-semibold text-[#0f766e] transition hover:bg-[#dff8f2]"
+                  >
+                    Open Account
+                  </Link>
+                </div>
+              </div>
+            </article>
           );
         })}
       </div>

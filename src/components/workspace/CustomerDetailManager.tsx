@@ -259,6 +259,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
   const [contactBusy, setContactBusy] = useState(false);
   const [noteBusy, setNoteBusy] = useState(false);
   const [activityBusy, setActivityBusy] = useState(false);
+  const [hotLeadBusy, setHotLeadBusy] = useState(false);
   const [taskBusy, setTaskBusy] = useState(false);
   const [routeQueueBusy, setRouteQueueBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -267,6 +268,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
   const [companyName, setCompanyName] = useState(props.companyName);
   const [status, setStatus] = useState(props.status || "active");
   const [stage, setStage] = useState(props.stage || "new");
+  const [isHotLead, setIsHotLead] = useState(props.isHotLead);
   const [primaryContactEmail, setPrimaryContactEmail] = useState(props.primaryContactEmail || "");
   const [assignedSalesUserId, setAssignedSalesUserId] = useState(props.assignedSalesUserId || "");
 
@@ -368,7 +370,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
   const routeReadinessLabel = missingRouteStates.length > 0 ? `Blocked: ${missingRouteStates.join(" • ")}` : "Route ready for field work";
   const accountPrioritySummary = props.overdueTaskCount > 0
     ? "This account has overdue follow-up. Clear the queue or log the outcome before more work drifts."
-    : props.isHotLead
+    : isHotLead
       ? "This account is marked hot. Prioritize contact, capture the latest signal, and set the next step."
       : !hasPrimaryContact
         ? "The account is missing a primary contact. Capture buyer info before the next handoff."
@@ -380,7 +382,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
       ? "Review the overdue follow-up and log the latest interaction."
       : props.hasOpenTask
         ? "Work the active follow-up queue and confirm the next due date."
-        : props.isHotLead
+        : isHotLead
           ? "Create the next follow-up task before this lead cools off."
           : !hasPrimaryContact
             ? "Add the primary contact so the next outreach has a clear owner."
@@ -389,6 +391,10 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
   useEffect(() => {
     setContacts(props.contacts);
   }, [props.contacts]);
+
+  useEffect(() => {
+    setIsHotLead(props.isHotLead);
+  }, [props.isHotLead]);
 
   async function refreshWithMessage(message: string) {
     setSuccess(message);
@@ -626,6 +632,35 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
     }
   }
 
+  async function updateHotLead(nextState: boolean) {
+    setHotLeadBusy(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const res = await fetch(`/api/workspace/customers/${props.customerId}/activity`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          activity_type: "hot_lead_status",
+          summary: nextState ? "Marked account as hot lead" : "Cleared hot lead status",
+          details: {
+            hot_lead: nextState,
+            source: "customer_detail_manual_toggle",
+          },
+        }),
+      });
+      const json = await parseJsonSafe(res);
+      if (!res.ok) throw new Error(String(json.error || `Save failed (${res.status})`));
+      setIsHotLead(nextState);
+      await refreshWithMessage(nextState ? "Hot lead status marked." : "Hot lead status cleared.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setHotLeadBusy(false);
+    }
+  }
+
   async function createTask() {
     if (!taskTitle.trim()) {
       setError("Enter a task title first.");
@@ -853,7 +888,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
 
         <div className="mt-4 flex flex-wrap gap-2">
           {props.isHallOfFlowersLead ? <StatusPill label="Hall of Flowers" tone="warn" /> : null}
-          {props.isHotLead ? <StatusPill label="Hot Lead" tone="warn" /> : null}
+          {isHotLead ? <StatusPill label="Hot Lead" tone="warn" /> : <StatusPill label="Not Hot" tone="neutral" />}
           <StatusPill label={activeFollowUpLabel} tone={props.overdueTaskCount > 0 ? "warn" : props.hasOpenTask ? "ok" : "neutral"} />
           <StatusPill label={routeReadinessLabel} tone={missingRouteStates.length > 0 ? "warn" : "ok"} />
           <StatusPill label={hasPrimaryContact ? "Primary contact ready" : "Primary contact missing"} tone={hasPrimaryContact ? "ok" : "warn"} />
@@ -910,12 +945,18 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
           </div>
         </div>
 
-        <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7">
+        <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-8">
           <ActionButton href={callHref} label="Call" />
           <ActionButton href={emailHref} label="Email" />
           <ActionButton label="Text" disabled helper="Coming soon" />
           <ActionButton label="New Task" onClick={() => jumpToSection("customer-create-task", taskTitleInputRef.current)} />
           <ActionButton href={websiteHref} label="SITE" disabled={!websiteHref} />
+          <ActionButton
+            label={hotLeadBusy ? "Saving..." : isHotLead ? "Clear Hot Lead" : "Mark Hot Lead"}
+            helper={isHotLead ? "current" : "manual"}
+            onClick={() => void updateHotLead(!isHotLead)}
+            disabled={hotLeadBusy}
+          />
           <ActionButton label={routeQueueBusy ? "Adding..." : "Add to Route"} onClick={() => void addToRoute()} disabled={routeQueueBusy} />
           <ActionButton label="Recent Activity" onClick={() => jumpToSection("customer-activity-timeline")} />
         </div>
@@ -926,7 +967,22 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
           title="Next Steps"
           description="Use the account state above to decide what happens next. These shortcuts enter the exact section that advances the account."
         />
-        <div className="mt-3 grid gap-3 lg:grid-cols-2 xl:grid-cols-4">
+        <div className="mt-3 grid gap-3 lg:grid-cols-2 xl:grid-cols-5">
+          <div className="rounded-2xl border border-[#dbe9ef] bg-[#f9fcfd] p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7a909d]">Hot Lead Status</p>
+            <p className="mt-1 text-sm font-semibold text-[#173543]">{isHotLead ? "This account is currently hot." : "This account is not currently hot."}</p>
+            <p className="mt-1 text-sm text-[#4a6575]">
+              Manual mark and clear actions write explicit customer activity, and the newest hot-lead signal decides the visible state.
+            </p>
+            <button
+              type="button"
+              onClick={() => void updateHotLead(!isHotLead)}
+              disabled={hotLeadBusy}
+              className="mt-3 inline-flex rounded-full border border-[#cfdde6] bg-white px-3 py-1.5 text-sm font-semibold text-[#21424d] transition hover:border-[#14b8a6] hover:text-[#0f766e] disabled:opacity-60"
+            >
+              {hotLeadBusy ? "Saving..." : isHotLead ? "Clear Hot Lead" : "Mark Hot Lead"}
+            </button>
+          </div>
           <FocusCard
             eyebrow="Do Now"
             title={props.overdueTaskCount > 0 ? "Clear overdue follow-up" : props.hasOpenTask ? "Work active follow-up" : "Start the next follow-up"}

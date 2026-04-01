@@ -85,6 +85,52 @@ export default async function WorkspaceSourceDetailPage({ params }: { params: Pr
         <SummaryCard label="Last Activity" value={formatDate(detail.source.lastActivityAt)} />
       </section>
 
+      <section className="grid gap-3 xl:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
+        <Panel title="Continue Sourcing Workflow">
+          <div className="grid gap-3 md:grid-cols-3">
+            <WorkflowCue
+              title="Log supplier touchpoint"
+              description="Record calls, meeting notes, cannabinoid leads, and price movement directly on the account."
+              href="#source-log-activity"
+              ctaLabel="Jump to log activity"
+            />
+            <WorkflowCue
+              title="Set the next follow-up"
+              description="Create an explicit sourcing task so supplier momentum does not disappear into notes."
+              href="#source-create-task"
+              ctaLabel="Jump to follow-up"
+            />
+            <WorkflowCue
+              title="Keep the account current"
+              description="Update contact details, stage, and working notes so the next buyer has clean context."
+              href="#source-profile"
+              ctaLabel="Jump to profile"
+            />
+          </div>
+        </Panel>
+
+        <Panel title="Sourcing Snapshot">
+          <div className="space-y-3">
+            <SnapshotRow label="Status" value={titleCase(detail.source.status)} />
+            <SnapshotRow label="Stage" value={titleCase(detail.source.stage, "No Stage")} />
+            <SnapshotRow
+              label="Follow-up pressure"
+              value={
+                detail.source.overdueTaskCount > 0
+                  ? `${detail.source.overdueTaskCount} overdue`
+                  : detail.source.openTaskCount > 0
+                    ? `${detail.source.openTaskCount} open`
+                    : "No open task"
+              }
+            />
+            <SnapshotRow
+              label="Categories"
+              value={detail.source.supplyCategories.length > 0 ? detail.source.supplyCategories.map((category) => titleCase(category)).join(", ") : "Not tagged"}
+            />
+          </div>
+        </Panel>
+      </section>
+
       <section className="grid gap-3 2xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
         <SourceDetailManager
           sourceId={detail.source.id}
@@ -191,6 +237,9 @@ function ActivityCard({
   };
 }) {
   const notes = typeof item.details?.notes === "string" ? item.details.notes.trim() : "";
+  const opportunity = typeof item.details?.opportunity === "string" ? item.details.opportunity.trim() : "";
+  const nextStep = typeof item.details?.next_step === "string" ? item.details.next_step.trim() : "";
+  const followUpOn = typeof item.details?.follow_up_on === "string" ? item.details.follow_up_on.trim() : "";
 
   return (
     <div className="rounded-xl border border-[#dbe9ef] bg-[#f9fcfd] px-3 py-2.5">
@@ -200,6 +249,9 @@ function ActivityCard({
       </p>
       <p className="mt-1 text-xs uppercase tracking-wide text-[#6b8593]">{item.activityType}</p>
       {notes ? <p className="mt-2 whitespace-pre-wrap text-sm text-[#4a6575]">{notes}</p> : null}
+      {opportunity ? <DetailPill label="Opportunity" value={opportunity} /> : null}
+      {nextStep ? <DetailPill label="Next Step" value={nextStep} /> : null}
+      {followUpOn ? <DetailPill label="Follow-Up" value={formatDate(followUpOn)} /> : null}
     </div>
   );
 }
@@ -215,4 +267,42 @@ function Panel({ title, children }: { title: string; children: ReactNode }) {
 
 function EmptyState({ label }: { label: string }) {
   return <div className="rounded-xl border border-dashed border-[#d3e1e8] bg-[#f9fcfd] px-3 py-4 text-sm text-[#5d7685]">{label}</div>;
+}
+
+function WorkflowCue({
+  title,
+  description,
+  href,
+  ctaLabel,
+}: {
+  title: string;
+  description: string;
+  href: string;
+  ctaLabel: string;
+}) {
+  return (
+    <a href={href} className="rounded-xl border border-[#dbe9ef] bg-[#f9fcfd] px-3 py-3 transition hover:border-[#14b8a6] hover:bg-white">
+      <p className="font-semibold text-[#173543]">{title}</p>
+      <p className="mt-1 text-sm text-[#5b7382]">{description}</p>
+      <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#0f766e]">{ctaLabel}</p>
+    </a>
+  );
+}
+
+function SnapshotRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-[#dbe9ef] bg-[#f9fcfd] px-3 py-2.5">
+      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#5d7685]">{label}</p>
+      <p className="mt-1 text-sm font-semibold text-[#173543]">{value}</p>
+    </div>
+  );
+}
+
+function DetailPill({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="mt-2 rounded-lg border border-[#dbe9ef] bg-white px-3 py-2">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#5d7685]">{label}</p>
+      <p className="mt-1 text-sm text-[#4a6575]">{value}</p>
+    </div>
+  );
 }
