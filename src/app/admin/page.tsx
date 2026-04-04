@@ -150,13 +150,13 @@ export default async function AdminDashboardPage() {
               </DashboardPanel>
 
               <DashboardPanel
-                title="Unblock blocked work"
-                description="Route-adjacent accounts that cannot move until cleanup happens."
+                title="Coordinate cleanup queue"
+                description="Accounts that still need address or coordinate cleanup before route prep."
                 href={dashboard.admin.hrefs.blockedCleanup}
-                hrefLabel="Open blocked accounts"
+                hrefLabel="Open coordinate cleanup"
               >
                 <div className="grid gap-2 md:grid-cols-2">
-                  {dashboard.blockedCustomers.map((customer) => (
+                  {dashboard.coordinateCleanupCustomers.map((customer) => (
                     <Link
                       key={customer.id}
                       href={customer.href}
@@ -167,7 +167,7 @@ export default async function AdminDashboardPage() {
                       <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#0f766e]">{customer.ctaLabel}</p>
                     </Link>
                   ))}
-                  {dashboard.blockedCustomers.length === 0 ? <p className="text-sm text-[#5b7382]">No blocked route accounts right now.</p> : null}
+                  {dashboard.coordinateCleanupCustomers.length === 0 ? <p className="text-sm text-[#5b7382]">No accounts need coordinate cleanup right now.</p> : null}
                 </div>
               </DashboardPanel>
 

@@ -1,8 +1,9 @@
 import type { ActionRowItem, ActivityListItem, QueueSnapshotItem, ShortcutRailItem, WorkflowCardProps } from "@/components/admin/dashboard/DashboardPrimitives";
+import { getCoordinateCoverageState } from "@/lib/coordinateCoverage";
 import type { CustomerApprovalQueueItem } from "@/lib/customerApprovals";
 import type { CustomerSummary } from "@/lib/customerWorkspace";
 import { normalizePackagingCategory, type PackagingCategory } from "@/lib/packaging/category";
-import { getRouteEligibilityReason, isRouteEligibleCustomer } from "@/lib/routeEligibility";
+import { isRouteEligibleCustomer } from "@/lib/routeEligibility";
 import type { SavedRouteSummary } from "@/lib/routeWorkspace";
 
 export type EstimateRow = {
@@ -105,7 +106,7 @@ export type AdminDashboardViewModel = {
   role: "admin" | "sales";
   shortcuts: ShortcutRailItem[];
   activeRoutes: DashboardRouteItem[];
-  blockedCustomers: DashboardCustomerItem[];
+  coordinateCleanupCustomers: DashboardCustomerItem[];
   openTaskItems: DashboardTaskItem[];
   accountActivityItems: DashboardCustomerItem[];
   recentPendingOrders: DashboardCustomerItem[];
@@ -113,7 +114,7 @@ export type AdminDashboardViewModel = {
   packagingByCategory: Map<PackagingCategory, number>;
   counts: {
     routeReadyAccounts: number;
-    blockedByGeocode: number;
+    needsCoordinates: number;
     pendingStops: number;
     activeRoutes: number;
     routesThisWeek: number;
@@ -334,10 +335,19 @@ function packagingQueueHref() {
   return "/admin/packaging/submissions";
 }
 
+function coordinateCoverageLabel(customer: CustomerSummary) {
+  const state = getCoordinateCoverageState(customer);
+  if (state === "missing_address") return "Missing address";
+  if (state === "address_ready") return "Address ready";
+  if (state === "failed") return "Geocode failed";
+  if (state === "needs_review") return "Needs geocode review";
+  return "Mapped";
+}
+
 export function buildAdminDashboardViewModel(args: AdminDashboardBuildArgs): AdminDashboardViewModel {
   const isAdmin = args.staff.role === "admin";
   const routeReadyAccounts = args.customers.filter((customer) => isRouteEligibleCustomer(customer));
-  const blockedByGeocode = args.customers.filter((customer) => getRouteEligibilityReason(customer) !== null);
+  const customersNeedingCoordinates = args.customers.filter((customer) => getCoordinateCoverageState(customer) !== "has_coords");
   const activeRoutes = args.savedRoutes.filter((route) => ["assigned", "in_progress"].includes(normalizeStatus(route.status)));
   const routesThisWeek = getRoutesThisWeek(args.savedRoutes, args.referenceNow);
   const unassignedRoutes = args.savedRoutes.filter((route) => !route.assignedUserId);
@@ -424,12 +434,12 @@ export function buildAdminDashboardViewModel(args: AdminDashboardBuildArgs): Adm
     ctaLabel: "Open route runner",
   }));
 
-  const blockedCustomers: DashboardCustomerItem[] = blockedByGeocode.slice(0, 6).map((customer) => ({
+  const coordinateCleanupCustomers: DashboardCustomerItem[] = customersNeedingCoordinates.slice(0, 6).map((customer) => ({
     id: customer.id,
     name: customer.name,
-    detail: `${getRouteEligibilityReason(customer) || "Needs routing cleanup"} • ${customer.city || "Unknown city"}`,
+    detail: `${coordinateCoverageLabel(customer)} • ${customer.city || "Unknown city"}`,
     href: blockedCleanupHref,
-    ctaLabel: "Open cleanup queue",
+    ctaLabel: "Open coordinate cleanup",
   }));
 
   const openTaskItems: DashboardTaskItem[] = openTasks.slice(0, 5).map((task) => ({
@@ -458,7 +468,7 @@ export function buildAdminDashboardViewModel(args: AdminDashboardBuildArgs): Adm
 
   const counts = {
     routeReadyAccounts: routeReadyAccounts.length,
-    blockedByGeocode: blockedByGeocode.length,
+    needsCoordinates: customersNeedingCoordinates.length,
     pendingStops: args.pendingStopsCount,
     activeRoutes: activeRoutes.length,
     routesThisWeek: routesThisWeek.length,
@@ -483,7 +493,7 @@ export function buildAdminDashboardViewModel(args: AdminDashboardBuildArgs): Adm
     role: args.staff.role,
     shortcuts: visibleShortcuts,
     activeRoutes: activeRouteItems,
-    blockedCustomers,
+    coordinateCleanupCustomers,
     openTaskItems,
     accountActivityItems,
     recentPendingOrders: recentPendingOrderItems,
@@ -493,7 +503,7 @@ export function buildAdminDashboardViewModel(args: AdminDashboardBuildArgs): Adm
   };
 
   if (isAdmin) {
-    const driftingWorkCount = blockedByGeocode.length + unassignedTaskCount + unassignedRoutes.length;
+    const driftingWorkCount = customersNeedingCoordinates.length + unassignedTaskCount + unassignedRoutes.length;
     const bottleneckCount = pendingOrdersCount + packagingPending.length + args.approvalQueue.length;
     model.admin = {
       workflowCards: [
@@ -501,16 +511,16 @@ export function buildAdminDashboardViewModel(args: AdminDashboardBuildArgs): Adm
           title: "Intervene on drifting work",
           value: driftingWorkCount,
           href: unassignedTaskCount > 0 ? openTasksHref : routesQueueHref,
-          description: `${unassignedTaskCount} follow-ups and ${unassignedRoutes.length} routes still need ownership.`,
+          description: `${customersNeedingCoordinates.length} accounts need coordinate cleanup, ${unassignedTaskCount} follow-ups need ownership, and ${unassignedRoutes.length} routes are still unassigned.`,
           ctaLabel: unassignedTaskCount > 0 ? "Open task triage" : "Open route queue",
           tone: "warn",
         },
         {
-          title: "Unblock route work",
-          value: blockedByGeocode.length + args.pendingStopsCount,
+          title: "Route prep queues",
+          value: customersNeedingCoordinates.length + args.pendingStopsCount,
           href: blockedCleanupHref,
-          description: `${blockedByGeocode.length} blocked accounts and ${args.pendingStopsCount} pending stops are slowing route execution.`,
-          ctaLabel: "Open route cleanup",
+          description: `${customersNeedingCoordinates.length} accounts still need coordinates and ${args.pendingStopsCount} pending stops are waiting for route planning.`,
+          ctaLabel: "Open coordinate cleanup",
           tone: "warn",
         },
         {
@@ -546,12 +556,12 @@ export function buildAdminDashboardViewModel(args: AdminDashboardBuildArgs): Adm
           ctaLabel: "Open task triage",
         },
         {
-          title: "Rescue blocked route accounts",
-          count: blockedByGeocode.length,
+          title: "Fix coordinate cleanup",
+          count: customersNeedingCoordinates.length,
           href: blockedCleanupHref,
           tone: "warn",
-          detail: "These accounts cannot move into route planning until address or geocode issues are cleared.",
-          ctaLabel: "Open cleanup queue",
+          detail: "These accounts still need usable coordinates before route prep can move cleanly.",
+          ctaLabel: "Open coordinate cleanup",
         },
         {
           title: "Pull pending stops into routes",

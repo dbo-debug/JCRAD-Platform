@@ -91,6 +91,10 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
       label: email ? `${label} (${email})` : label,
     };
   });
+  const currentStaffLabel =
+    salesOptions.find((option) => option.userId === staff.userId)?.label ||
+    String(authEmailById.get(staff.userId) || "").trim() ||
+    staff.userId;
   const primaryContact = detail.contacts.find((contact) => contact.isPrimary) || null;
   const territoryOptions = territories.map((territory) => ({
     code: territory.code,
@@ -190,6 +194,8 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
         geocodeProvider={detail.customer.geocodeProvider}
         address={address}
         staffRole={staff.role}
+        currentStaffUserId={staff.userId}
+        currentStaffLabel={currentStaffLabel}
         salesOptions={salesOptions}
         routeRepOptions={salesOptions}
         territoryOptions={territoryOptions}

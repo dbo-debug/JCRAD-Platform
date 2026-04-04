@@ -62,6 +62,8 @@ type CustomerDetailManagerProps = {
   geocodeProvider: string | null;
   address: string | null;
   staffRole: "admin" | "sales";
+  currentStaffUserId: string;
+  currentStaffLabel: string | null;
   salesOptions: StaffOption[];
   routeRepOptions: StaffOption[];
   territoryOptions: TerritoryOption[];
@@ -254,6 +256,8 @@ function FocusCard({
 
 export default function CustomerDetailManager(props: CustomerDetailManagerProps) {
   const router = useRouter();
+  const defaultTaskAssigneeUserId = props.assignedSalesUserId || props.currentStaffUserId;
+  const defaultTaskAssigneeLabel = props.assignedSalesLabel || props.currentStaffLabel || "You";
   const [accountBusy, setAccountBusy] = useState(false);
   const [routeBusy, setRouteBusy] = useState(false);
   const [contactBusy, setContactBusy] = useState(false);
@@ -307,7 +311,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
   const [activityDetails, setActivityDetails] = useState("");
   const [taskTitle, setTaskTitle] = useState("");
   const [taskDueDate, setTaskDueDate] = useState("");
-  const [taskAssignedUserId, setTaskAssignedUserId] = useState(props.assignedSalesUserId || "");
+  const [taskAssignedUserId, setTaskAssignedUserId] = useState(defaultTaskAssigneeUserId);
   const [taskPriority, setTaskPriority] = useState("2");
   const [routeOutcomeBusy, setRouteOutcomeBusy] = useState<string | null>(null);
   const [routeOutcomeTaskEnabled, setRouteOutcomeTaskEnabled] = useState(false);
@@ -395,6 +399,14 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
   useEffect(() => {
     setIsHotLead(props.isHotLead);
   }, [props.isHotLead]);
+
+  useEffect(() => {
+    setTaskAssignedUserId((current) => current || defaultTaskAssigneeUserId);
+  }, [defaultTaskAssigneeUserId]);
+
+  const selectedTaskAssigneeLabel =
+    props.salesOptions.find((option) => option.userId === taskAssignedUserId)?.label ||
+    (taskAssignedUserId === props.currentStaffUserId ? defaultTaskAssigneeLabel : null);
 
   async function refreshWithMessage(message: string) {
     setSuccess(message);
@@ -678,7 +690,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
         body: JSON.stringify({
           title: taskTitle,
           due_date: taskDueDate || null,
-          assigned_user_id: taskAssignedUserId || null,
+          assigned_user_id: taskAssignedUserId || defaultTaskAssigneeUserId,
           priority: taskPriority ? Number(taskPriority) : null,
         }),
       });
@@ -702,7 +714,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
       body: JSON.stringify({
         title: task.title,
         due_date: task.dueDate || null,
-        assigned_user_id: (task.assignedUserId ?? taskAssignedUserId) || null,
+        assigned_user_id: task.assignedUserId || taskAssignedUserId || defaultTaskAssigneeUserId,
         priority: task.priority ?? (taskPriority ? Number(taskPriority) : null),
       }),
     });
@@ -1560,13 +1572,15 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
               <label className="grid gap-1 text-sm text-[#4a6575]">
                 <span>Assigned To</span>
                 <select value={taskAssignedUserId} onChange={(e) => setTaskAssignedUserId(e.target.value)} disabled={taskBusy} className={inputClass}>
-                  <option value="">Unassigned</option>
                   {props.salesOptions.map((option) => (
                     <option key={option.userId} value={option.userId}>
                       {option.label}
                     </option>
                   ))}
                 </select>
+                <span className="text-xs text-[#6b8593]">
+                  Defaulting to {selectedTaskAssigneeLabel || defaultTaskAssigneeLabel}.
+                </span>
               </label>
             </div>
             <div className="mt-3">

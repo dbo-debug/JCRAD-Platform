@@ -1,6 +1,8 @@
 import type { CustomerSummary } from "@/lib/customerWorkspace";
 import { formatBusinessDate, formatBusinessDateTimeLong } from "@/lib/businessTime";
 
+export { getCoordinateCoverageState } from "@/lib/coordinateCoverage";
+
 export type RouteViewMode = "list" | "map";
 export type CoordinateCoverageFilter = "all" | "has_coords" | "needs_coords" | "address_ready" | "missing_address" | "failed" | "needs_review";
 export type TerritorySortMode = "account_count" | "due_today" | "follow_up_needed";
@@ -132,17 +134,6 @@ export function getRouteSearchText(customer: CustomerSummary) {
     .map((value) => normalizeText(value))
     .filter(Boolean)
     .join(" ");
-}
-
-export function customerHasAddress(customer: CustomerSummary) {
-  return Boolean(customer.address1 || customer.city || customer.state || customer.postalCode);
-}
-
-export function getCoordinateCoverageState(customer: CustomerSummary): Exclude<CoordinateCoverageFilter, "all" | "needs_coords"> {
-  if (customer.latitude !== null && customer.longitude !== null) return "has_coords";
-  if (customer.geocodeStatus === "failed") return "failed";
-  if (customer.geocodeStatus === "needs_review") return "needs_review";
-  return customerHasAddress(customer) ? "address_ready" : "missing_address";
 }
 
 export function sortCustomersForRoute(left: CustomerSummary, right: CustomerSummary) {
