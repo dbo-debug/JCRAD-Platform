@@ -12,8 +12,8 @@ import {
 } from "@/components/admin/dashboard/DashboardPrimitives";
 import EstimateLeadFollowUpPanel from "@/components/workspace/EstimateLeadFollowUpPanel";
 import { loadCustomerApprovalQueue, summarizeCustomerApprovalQueue } from "@/lib/customerApprovals";
-import { loadCustomerWorkspaceIndex } from "@/lib/customerWorkspace";
-import { loadSourceWorkspaceIndex } from "@/lib/sourceWorkspace";
+import { loadCustomerWorkspaceIndex, type CustomerWorkspaceIndexData } from "@/lib/customerWorkspace";
+import { loadSourceWorkspaceIndex, type SourceWorkspaceIndexData } from "@/lib/sourceWorkspace";
 import {
   buildAdminDashboardViewModel,
   type CustomerTaskRow,
@@ -29,6 +29,68 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
+type DashboardLoadFailure = {
+  label: string;
+  message: string;
+};
+
+function getDashboardFailureMessage(error: unknown) {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "object" && error !== null && "message" in error) {
+    return String((error as { message?: unknown }).message || "Unknown error");
+  }
+  return String(error || "Unknown error");
+}
+
+function logDashboardFailure(label: string, error: unknown) {
+  console.error("[admin-dashboard] section load failed", {
+    section: label,
+    message: getDashboardFailureMessage(error),
+    error,
+  });
+}
+
+async function loadDashboardSection<T>(args: {
+  label: string;
+  fallback: T;
+  load: () => Promise<T>;
+}): Promise<{ data: T; failure: DashboardLoadFailure | null }> {
+  try {
+    return { data: await args.load(), failure: null };
+  } catch (error) {
+    logDashboardFailure(args.label, error);
+    return {
+      data: args.fallback,
+      failure: {
+        label: args.label,
+        message: getDashboardFailureMessage(error),
+      },
+    };
+  }
+}
+
+const EMPTY_CUSTOMER_INDEX: CustomerWorkspaceIndexData = {
+  customers: [],
+  metrics: {
+    totalCustomers: 0,
+    totalContacts: 0,
+    customersWithContacts: 0,
+    missingPrimaryContact: 0,
+    customersWithoutContacts: 0,
+  },
+};
+
+const EMPTY_SOURCE_INDEX: SourceWorkspaceIndexData = {
+  sources: [],
+  metrics: {
+    totalSources: 0,
+    activeSources: 0,
+    withContactEmail: 0,
+    openTasks: 0,
+    overdueTasks: 0,
+  },
+};
+
 export default async function AdminDashboardPage() {
   const staff = await requireStaff();
   const isAdmin = staff.role === "admin";
@@ -36,44 +98,128 @@ export default async function AdminDashboardPage() {
   const referenceNow = Date.parse(new Date().toISOString());
 
   const [
-    estimateRes,
-    orderRes,
-    submissionRes,
-    eventRes,
-    routeStopQueueRes,
-    taskRows,
-    customerIndex,
-    sourceIndex,
-    savedRoutes,
-    approvalQueue,
+    estimateResult,
+    orderResult,
+    submissionResult,
+    eventResult,
+    routeStopQueueResult,
+    taskResult,
+    customerIndexResult,
+    sourceIndexResult,
+    savedRoutesResult,
+    approvalQueueResult,
   ] = await Promise.all([
-    supabase
-      .from("estimates")
-      .select("id, status, total, customer_name, customer_email, packaging_review_pending, created_at, updated_at")
-      .order("created_at", { ascending: false })
-      .limit(2000),
-    supabase
-      .from("orders")
-      .select("id, status, total, customer_name, customer_email, created_at")
-      .order("created_at", { ascending: false })
-      .limit(2000),
-    supabase
-      .from("packaging_submissions")
-      .select("id, estimate_id, category, status, customer_name, customer_email, created_at")
-      .order("created_at", { ascending: false })
-      .limit(2000),
-    supabase
-      .from("platform_events")
-      .select("id, event_type, user_email, metadata, created_at")
-      .order("created_at", { ascending: false })
-      .limit(20),
-    supabase.from("route_stop_queue").select("id"),
-    loadScopedCustomerTasks({ staff, limit: 2000 }),
-    loadCustomerWorkspaceIndex(),
-    loadSourceWorkspaceIndex(),
-    loadSavedRoutes(staff),
-    isAdmin ? loadCustomerApprovalQueue() : Promise.resolve([]),
+    loadDashboardSection({
+      label: "Estimates unavailable",
+      fallback: [] as EstimateRow[],
+      load: async () => {
+        const res = await supabase
+          .from("estimates")
+          .select("id, status, total, customer_name, customer_email, packaging_review_pending, created_at, updated_at")
+          .order("created_at", { ascending: false })
+          .limit(2000);
+        if (res.error) throw res.error;
+        return (res.data || []) as EstimateRow[];
+      },
+    }),
+    loadDashboardSection({
+      label: "Orders unavailable",
+      fallback: [] as OrderRow[],
+      load: async () => {
+        const res = await supabase
+          .from("orders")
+          .select("id, status, total, customer_name, customer_email, created_at")
+          .order("created_at", { ascending: false })
+          .limit(2000);
+        if (res.error) throw res.error;
+        return (res.data || []) as OrderRow[];
+      },
+    }),
+    loadDashboardSection({
+      label: "Packaging review queue unavailable",
+      fallback: [] as PackagingSubmissionRow[],
+      load: async () => {
+        const res = await supabase
+          .from("packaging_submissions")
+          .select("id, estimate_id, category, status, customer_name, customer_email, created_at")
+          .order("created_at", { ascending: false })
+          .limit(2000);
+        if (res.error) throw res.error;
+        return (res.data || []) as PackagingSubmissionRow[];
+      },
+    }),
+    loadDashboardSection({
+      label: "Platform activity unavailable",
+      fallback: [] as PlatformEventRow[],
+      load: async () => {
+        const res = await supabase
+          .from("platform_events")
+          .select("id, event_type, user_email, metadata, created_at")
+          .order("created_at", { ascending: false })
+          .limit(20);
+        if (res.error) throw res.error;
+        return (res.data || []) as PlatformEventRow[];
+      },
+    }),
+    loadDashboardSection({
+      label: "Route stop queue unavailable",
+      fallback: 0,
+      load: async () => {
+        const res = await supabase.from("route_stop_queue").select("id");
+        if (res.error) throw res.error;
+        return (res.data || []).length;
+      },
+    }),
+    loadDashboardSection({
+      label: "Task queue unavailable",
+      fallback: [] as CustomerTaskRow[],
+      load: async () => (await loadScopedCustomerTasks({ staff, limit: 2000 })) as CustomerTaskRow[],
+    }),
+    loadDashboardSection({
+      label: "Customer workspace unavailable",
+      fallback: EMPTY_CUSTOMER_INDEX,
+      load: () => loadCustomerWorkspaceIndex(),
+    }),
+    loadDashboardSection({
+      label: "Source follow-up unavailable",
+      fallback: EMPTY_SOURCE_INDEX,
+      load: () => loadSourceWorkspaceIndex(),
+    }),
+    loadDashboardSection({
+      label: "Saved routes unavailable",
+      fallback: [],
+      load: () => loadSavedRoutes(staff),
+    }),
+    loadDashboardSection({
+      label: "Approvals queue unavailable",
+      fallback: [],
+      load: () => (isAdmin ? loadCustomerApprovalQueue() : Promise.resolve([])),
+    }),
   ]);
+
+  const failedSections = [
+    estimateResult.failure,
+    orderResult.failure,
+    submissionResult.failure,
+    eventResult.failure,
+    routeStopQueueResult.failure,
+    taskResult.failure,
+    customerIndexResult.failure,
+    sourceIndexResult.failure,
+    savedRoutesResult.failure,
+    approvalQueueResult.failure,
+  ].filter((failure): failure is DashboardLoadFailure => Boolean(failure));
+
+  const estimates = estimateResult.data;
+  const orders = orderResult.data;
+  const submissions = submissionResult.data;
+  const platformEvents = eventResult.data;
+  const pendingStopsCount = routeStopQueueResult.data;
+  const taskRows = taskResult.data;
+  const customerIndex = customerIndexResult.data;
+  const sourceIndex = sourceIndexResult.data;
+  const savedRoutes = savedRoutesResult.data;
+  const approvalQueue = approvalQueueResult.data;
 
   const sourcePressureQueue = [...sourceIndex.sources]
     .filter((source) => source.openTaskCount > 0 || source.overdueTaskCount > 0)
@@ -88,12 +234,12 @@ export default async function AdminDashboardPage() {
   const dashboard = buildAdminDashboardViewModel({
     staff,
     referenceNow,
-    estimates: (estimateRes.data || []) as EstimateRow[],
-    orders: (orderRes.data || []) as OrderRow[],
-    submissions: (submissionRes.data || []) as PackagingSubmissionRow[],
-    platformEvents: (eventRes.data || []) as PlatformEventRow[],
-    pendingStopsCount: (routeStopQueueRes.data || []).length,
-    customerTasks: taskRows as CustomerTaskRow[],
+    estimates,
+    orders,
+    submissions,
+    platformEvents,
+    pendingStopsCount,
+    customerTasks: taskRows,
     customers: customerIndex.customers,
     savedRoutes,
     approvalQueue,
@@ -103,13 +249,6 @@ export default async function AdminDashboardPage() {
       followUp: approvalStatusCounts.followUp,
     },
   });
-
-  const hasEstimateError = Boolean(estimateRes.error);
-  const hasOrderError = Boolean(orderRes.error);
-  const hasSubmissionError = Boolean(submissionRes.error);
-  const hasEventError = Boolean(eventRes.error);
-  const hasTaskError = false;
-  const hasRouteQueueError = Boolean(routeStopQueueRes.error);
 
   return (
     <div className="space-y-6">
@@ -122,9 +261,10 @@ export default async function AdminDashboardPage() {
         }
       />
 
-      {(hasEstimateError || hasOrderError || hasSubmissionError || hasEventError || hasTaskError || hasRouteQueueError) ? (
+      {failedSections.length > 0 ? (
         <div className="rounded-xl border border-[#f3d2d2] bg-[#fff4f4] px-4 py-3 text-sm text-[#991b1b]">
-          Some dashboard data is unavailable right now. Refresh after backend sync.
+          <p className="font-semibold">Some dashboard data is unavailable right now.</p>
+          <p className="mt-1">Affected sections: {failedSections.map((failure) => failure.label).join(" • ")}</p>
         </div>
       ) : null}
 
