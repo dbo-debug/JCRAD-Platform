@@ -273,6 +273,11 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
   const [status, setStatus] = useState(props.status || "active");
   const [stage, setStage] = useState(props.stage || "new");
   const [isHotLead, setIsHotLead] = useState(props.isHotLead);
+  const [hasOpenTaskState, setHasOpenTaskState] = useState(props.hasOpenTask);
+  const [openTaskCountState, setOpenTaskCountState] = useState(props.openTaskCount);
+  const [overdueTaskCountState, setOverdueTaskCountState] = useState(props.overdueTaskCount);
+  const [nextTaskDueAtState, setNextTaskDueAtState] = useState(props.nextTaskDueAt);
+  const [lastActivityAtState, setLastActivityAtState] = useState(props.lastActivityAt);
   const [primaryContactEmail, setPrimaryContactEmail] = useState(props.primaryContactEmail || "");
   const [assignedSalesUserId, setAssignedSalesUserId] = useState(props.assignedSalesUserId || "");
 
@@ -364,15 +369,15 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
   );
   const hasPrimaryContact = Boolean(contactName.trim() || contactEmail.trim() || contactPhone.trim());
   const activeFollowUpLabel =
-    props.overdueTaskCount > 0
-      ? `${props.overdueTaskCount} overdue follow-up task${props.overdueTaskCount === 1 ? "" : "s"}`
-      : props.hasOpenTask
-        ? props.nextTaskDueAt
-          ? `Follow-up due ${formatShortDateTime(props.nextTaskDueAt)}`
-          : `${props.openTaskCount} open follow-up task${props.openTaskCount === 1 ? "" : "s"}`
+    overdueTaskCountState > 0
+      ? `${overdueTaskCountState} overdue follow-up task${overdueTaskCountState === 1 ? "" : "s"}`
+      : hasOpenTaskState
+        ? nextTaskDueAtState
+          ? `Follow-up due ${formatShortDateTime(nextTaskDueAtState)}`
+          : `${openTaskCountState} open follow-up task${openTaskCountState === 1 ? "" : "s"}`
         : "No open follow-up task";
   const routeReadinessLabel = missingRouteStates.length > 0 ? `Blocked: ${missingRouteStates.join(" • ")}` : "Route ready for field work";
-  const accountPrioritySummary = props.overdueTaskCount > 0
+  const accountPrioritySummary = overdueTaskCountState > 0
     ? "This account has overdue follow-up. Clear the queue or log the outcome before more work drifts."
     : isHotLead
       ? "This account is marked hot. Prioritize contact, capture the latest signal, and set the next step."
@@ -382,9 +387,9 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
           ? "Route prep is partially blocked. Clean up missing territory or coordinates before staging stops."
           : "The account is operational. Use quick actions to continue follow-up, routing, or activity capture.";
   const nextActionSummary =
-    props.overdueTaskCount > 0
+    overdueTaskCountState > 0
       ? "Review the overdue follow-up and log the latest interaction."
-      : props.hasOpenTask
+      : hasOpenTaskState
         ? "Work the active follow-up queue and confirm the next due date."
         : isHotLead
           ? "Create the next follow-up task before this lead cools off."
@@ -401,6 +406,17 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
   }, [props.isHotLead]);
 
   useEffect(() => {
+    setHasOpenTaskState(props.hasOpenTask);
+    setOpenTaskCountState(props.openTaskCount);
+    setOverdueTaskCountState(props.overdueTaskCount);
+    setNextTaskDueAtState(props.nextTaskDueAt);
+  }, [props.hasOpenTask, props.openTaskCount, props.overdueTaskCount, props.nextTaskDueAt]);
+
+  useEffect(() => {
+    setLastActivityAtState(props.lastActivityAt);
+  }, [props.lastActivityAt]);
+
+  useEffect(() => {
     setTaskAssignedUserId((current) => current || defaultTaskAssigneeUserId);
   }, [defaultTaskAssigneeUserId]);
 
@@ -408,10 +424,33 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
     props.salesOptions.find((option) => option.userId === taskAssignedUserId)?.label ||
     (taskAssignedUserId === props.currentStaffUserId ? defaultTaskAssigneeLabel : null);
 
-  async function refreshWithMessage(message: string) {
+  function setSuccessMessage(message: string) {
     setSuccess(message);
     setError(null);
-    router.refresh();
+  }
+
+  function markActivityTouched(timestamp = new Date().toISOString()) {
+    setLastActivityAtState(timestamp);
+  }
+
+  function registerTaskCreated(dueDate: string | null | undefined) {
+    const dueAt = String(dueDate || "").trim() || null;
+    setHasOpenTaskState(true);
+    setOpenTaskCountState((current) => current + 1);
+    if (dueAt) {
+      setNextTaskDueAtState((current) => {
+        if (!current) return dueAt;
+        const currentMs = Date.parse(current);
+        const nextMs = Date.parse(dueAt);
+        if (!Number.isFinite(currentMs)) return dueAt;
+        if (!Number.isFinite(nextMs)) return current;
+        return nextMs < currentMs ? dueAt : current;
+      });
+      const dueMs = Date.parse(dueAt);
+      if (Number.isFinite(dueMs) && dueMs < Date.now()) {
+        setOverdueTaskCountState((current) => current + 1);
+      }
+    }
   }
 
   function syncGeocodeState(payload: Record<string, unknown>) {
@@ -448,7 +487,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
       const json = await parseJsonSafe(res);
       if (!res.ok) throw new Error(String(json.error || `Save failed (${res.status})`));
       syncGeocodeState(json);
-      await refreshWithMessage("Customer account updated.");
+      setSuccessMessage("Customer account updated.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
     } finally {
@@ -480,7 +519,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
       const json = await parseJsonSafe(res);
       if (!res.ok) throw new Error(String(json.error || `Save failed (${res.status})`));
       syncGeocodeState(json);
-      await refreshWithMessage(hasRouteConfig ? "Route settings updated." : "Route settings saved.");
+      setSuccessMessage(hasRouteConfig ? "Route settings updated." : "Route settings saved.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
     } finally {
@@ -506,7 +545,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
       });
       const json = await parseJsonSafe(res);
       if (!res.ok) throw new Error(String(json.error || `Save failed (${res.status})`));
-      await refreshWithMessage("Primary contact updated.");
+      setSuccessMessage("Primary contact updated.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
     } finally {
@@ -550,7 +589,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
       const json = await parseJsonSafe(res);
       if (!res.ok) throw new Error(String(json.error || `Save failed (${res.status})`));
       resetSecondaryContactDraft();
-      await refreshWithMessage(editingContactId ? "Contact updated." : "Contact added.");
+      setSuccessMessage(editingContactId ? "Contact updated." : "Contact added.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
     } finally {
@@ -574,7 +613,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
       if (editingContactId === contactId) {
         resetSecondaryContactDraft();
       }
-      await refreshWithMessage("Contact removed.");
+      setSuccessMessage("Contact removed.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Delete failed");
     } finally {
@@ -601,7 +640,8 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
       const json = await parseJsonSafe(res);
       if (!res.ok) throw new Error(String(json.error || `Save failed (${res.status})`));
       setNote("");
-      await refreshWithMessage("Note added.");
+      markActivityTouched();
+      setSuccessMessage("Note added.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
     } finally {
@@ -636,7 +676,8 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
       if (!res.ok) throw new Error(String(json.error || `Save failed (${res.status})`));
       setActivitySummary("");
       setActivityDetails("");
-      await refreshWithMessage("Activity logged.");
+      markActivityTouched();
+      setSuccessMessage("Activity logged.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
     } finally {
@@ -665,7 +706,8 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
       const json = await parseJsonSafe(res);
       if (!res.ok) throw new Error(String(json.error || `Save failed (${res.status})`));
       setIsHotLead(nextState);
-      await refreshWithMessage(nextState ? "Hot lead status marked." : "Hot lead status cleared.");
+      markActivityTouched();
+      setSuccessMessage(nextState ? "Hot lead status marked." : "Hot lead status cleared.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
     } finally {
@@ -699,7 +741,9 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
       setTaskTitle("");
       setTaskDueDate("");
       setTaskPriority("2");
-      await refreshWithMessage("Task created.");
+      registerTaskCreated(taskDueDate);
+      markActivityTouched();
+      setSuccessMessage("Task created.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
     } finally {
@@ -778,11 +822,14 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
         setRouteOutcomeTaskTitle("");
         setRouteOutcomeTaskDueDate("");
         setRouteOutcomeTaskEnabled(false);
-        await refreshWithMessage(`${outcome.label} recorded and follow-up task created.`);
+        registerTaskCreated(routeOutcomeTaskDueDate || (outcome.nextVisitDays !== null ? addDaysDateValue(outcome.nextVisitDays) : null));
+        markActivityTouched(lastVisit || new Date().toISOString());
+        setSuccessMessage(`${outcome.label} recorded and follow-up task created.`);
         return;
       }
 
-      await refreshWithMessage(`${outcome.label} recorded.`);
+      markActivityTouched(lastVisit || new Date().toISOString());
+      setSuccessMessage(`${outcome.label} recorded.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
     } finally {
@@ -841,7 +888,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
           : json.geocode_coordinate_outcome === "preserved"
             ? "Geocode retry did not resolve the address. Existing coordinates were preserved."
             : "Geocode retry completed.";
-      await refreshWithMessage(retryMessage);
+      setSuccessMessage(retryMessage);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Retry failed");
     } finally {
@@ -894,14 +941,14 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
             <p className="mt-1 max-w-3xl text-sm text-[#4a6575]">{accountPrioritySummary}</p>
           </div>
           <div className="max-w-full rounded-full border border-[#d7e6ed] bg-white px-3 py-1.5 text-xs font-medium text-[#4f6877]">
-            {props.assignedSalesLabel || "No assigned sales rep"} • {visitStatus ? titleCase(visitStatus) : "No visit status"} • {props.lastActivityAt ? `Last activity ${formatShortDateTime(props.lastActivityAt)}` : "No recent activity"}
+            {props.assignedSalesLabel || "No assigned sales rep"} • {visitStatus ? titleCase(visitStatus) : "No visit status"} • {lastActivityAtState ? `Last activity ${formatShortDateTime(lastActivityAtState)}` : "No recent activity"}
           </div>
         </div>
 
         <div className="mt-4 flex flex-wrap gap-2">
           {props.isHallOfFlowersLead ? <StatusPill label="Hall of Flowers" tone="warn" /> : null}
           {isHotLead ? <StatusPill label="Hot Lead" tone="warn" /> : <StatusPill label="Not Hot" tone="neutral" />}
-          <StatusPill label={activeFollowUpLabel} tone={props.overdueTaskCount > 0 ? "warn" : props.hasOpenTask ? "ok" : "neutral"} />
+          <StatusPill label={activeFollowUpLabel} tone={overdueTaskCountState > 0 ? "warn" : hasOpenTaskState ? "ok" : "neutral"} />
           <StatusPill label={routeReadinessLabel} tone={missingRouteStates.length > 0 ? "warn" : "ok"} />
           <StatusPill label={hasPrimaryContact ? "Primary contact ready" : "Primary contact missing"} tone={hasPrimaryContact ? "ok" : "warn"} />
           {nextVisitDueAt ? <StatusPill label={`Next visit ${formatShortDateTime(nextVisitDueAt)}`} tone="neutral" /> : null}
@@ -912,9 +959,9 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
             eyebrow="Follow-Up"
             title={activeFollowUpLabel}
             detail={nextActionSummary}
-            actionLabel={props.hasOpenTask ? "Review Task Queue" : "Create Follow-Up"}
-            onAction={() => jumpToSection(props.hasOpenTask ? "customer-linked-task-list" : "customer-create-task", props.hasOpenTask ? null : taskTitleInputRef.current)}
-            tone={props.overdueTaskCount > 0 ? "warn" : props.hasOpenTask ? "ok" : "neutral"}
+            actionLabel={hasOpenTaskState ? "Review Task Queue" : "Create Follow-Up"}
+            onAction={() => jumpToSection(hasOpenTaskState ? "customer-linked-task-list" : "customer-create-task", hasOpenTaskState ? null : taskTitleInputRef.current)}
+            tone={overdueTaskCountState > 0 ? "warn" : hasOpenTaskState ? "ok" : "neutral"}
           />
           <FocusCard
             eyebrow="Field Ops"
@@ -997,24 +1044,24 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
           </div>
           <FocusCard
             eyebrow="Do Now"
-            title={props.overdueTaskCount > 0 ? "Clear overdue follow-up" : props.hasOpenTask ? "Work active follow-up" : "Start the next follow-up"}
+            title={overdueTaskCountState > 0 ? "Clear overdue follow-up" : hasOpenTaskState ? "Work active follow-up" : "Start the next follow-up"}
             detail={
-              props.overdueTaskCount > 0
+              overdueTaskCountState > 0
                 ? "There is overdue task work on this account. Review the queue and set the next customer touch."
-                : props.hasOpenTask
+                : hasOpenTaskState
                   ? "There is already active follow-up. Review the current account task list before creating more."
                   : "No follow-up is open right now. Create the next task to keep ownership explicit."
             }
-            actionLabel={props.hasOpenTask ? "Review Account Tasks" : "Create Follow-Up Task"}
-            onAction={() => jumpToSection(props.hasOpenTask ? "customer-linked-task-list" : "customer-create-task", props.hasOpenTask ? null : taskTitleInputRef.current)}
-            tone={props.overdueTaskCount > 0 ? "warn" : props.hasOpenTask ? "ok" : "neutral"}
+            actionLabel={hasOpenTaskState ? "Review Account Tasks" : "Create Follow-Up Task"}
+            onAction={() => jumpToSection(hasOpenTaskState ? "customer-linked-task-list" : "customer-create-task", hasOpenTaskState ? null : taskTitleInputRef.current)}
+            tone={overdueTaskCountState > 0 ? "warn" : hasOpenTaskState ? "ok" : "neutral"}
           />
           <FocusCard
             eyebrow="Log Signal"
             title="Capture the latest account touch"
             detail={
-              props.lastActivityAt
-                ? `Last activity was ${formatShortDateTime(props.lastActivityAt)}. Log the next call, email, or meeting here.`
+              lastActivityAtState
+                ? `Last activity was ${formatShortDateTime(lastActivityAtState)}. Log the next call, email, or meeting here.`
                 : "No recent activity is on file. Log the latest customer signal so the timeline stays current."
             }
             actionLabel="Log Activity"
@@ -1223,12 +1270,12 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
 
               <label className="grid min-w-0 gap-1 text-sm text-[#4a6575] xl:col-span-3">
                 <span>Latitude</span>
-                <input type="number" step="0.000001" value={latitude} onChange={(event) => setLatitude(event.target.value)} disabled={routeBusy} className={inputClass} />
+                <input type="text" inputMode="decimal" value={latitude} onChange={(event) => setLatitude(event.target.value)} disabled={routeBusy} className={inputClass} spellCheck={false} autoComplete="off" />
               </label>
 
               <label className="grid min-w-0 gap-1 text-sm text-[#4a6575] xl:col-span-4">
                 <span>Longitude</span>
-                <input type="number" step="0.000001" value={longitude} onChange={(event) => setLongitude(event.target.value)} disabled={routeBusy} className={inputClass} />
+                <input type="text" inputMode="decimal" value={longitude} onChange={(event) => setLongitude(event.target.value)} disabled={routeBusy} className={inputClass} spellCheck={false} autoComplete="off" />
               </label>
             </div>
           </div>

@@ -22,6 +22,7 @@ import {
   type PackagingSubmissionRow,
   type PlatformEventRow,
 } from "@/lib/adminDashboard";
+import { loadOrderQueue } from "@/lib/ordersQueue";
 import { requireStaff } from "@/lib/requireStaff";
 import { loadSavedRoutes } from "@/lib/routeWorkspace";
 import { loadScopedCustomerTasks } from "@/lib/taskWorkspace";
@@ -126,13 +127,16 @@ export default async function AdminDashboardPage() {
       label: "Orders unavailable",
       fallback: [] as OrderRow[],
       load: async () => {
-        const res = await supabase
-          .from("orders")
-          .select("id, status, total, customer_name, customer_email, created_at")
-          .order("created_at", { ascending: false })
-          .limit(2000);
-        if (res.error) throw res.error;
-        return (res.data || []) as OrderRow[];
+        const result = await loadOrderQueue(2000);
+        if (result.warning && result.rows.length === 0) {
+          throw new Error(result.warning);
+        }
+        if (result.warning) {
+          console.warn("[admin-dashboard] orders loaded with schema-tolerant fallback", {
+            warning: result.warning,
+          });
+        }
+        return result.rows as OrderRow[];
       },
     }),
     loadDashboardSection({
@@ -157,7 +161,16 @@ export default async function AdminDashboardPage() {
           .select("id, event_type, user_email, metadata, created_at")
           .order("created_at", { ascending: false })
           .limit(20);
-        if (res.error) throw res.error;
+        if (res.error) {
+          console.error("[admin-dashboard] platform_events query failed", {
+            table: "platform_events",
+            message: res.error.message,
+            code: res.error.code,
+            details: "details" in res.error ? res.error.details : undefined,
+            hint: "hint" in res.error ? res.error.hint : undefined,
+          });
+          throw res.error;
+        }
         return (res.data || []) as PlatformEventRow[];
       },
     }),
