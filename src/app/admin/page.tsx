@@ -43,6 +43,23 @@ function getDashboardFailureMessage(error: unknown) {
   return String(error || "Unknown error");
 }
 
+function isMissingOptionalRelationError(error: {
+  code?: string | null;
+  message?: string | null;
+  details?: string | null;
+} | null | undefined) {
+  const message = String(error?.message || "").toLowerCase();
+  const details = String(error?.details || "").toLowerCase();
+  return (
+    error?.code === "42P01" ||
+    error?.code === "PGRST205" ||
+    (message.includes("relation") && message.includes("does not exist")) ||
+    message.includes("schema cache") ||
+    (details.includes("relation") && details.includes("does not exist")) ||
+    details.includes("schema cache")
+  );
+}
+
 function logDashboardFailure(label: string, error: unknown) {
   console.error("[admin-dashboard] section load failed", {
     section: label,
@@ -162,6 +179,16 @@ export default async function AdminDashboardPage() {
           .order("created_at", { ascending: false })
           .limit(20);
         if (res.error) {
+          if (isMissingOptionalRelationError(res.error)) {
+            console.warn("[admin-dashboard] platform_events unavailable; continuing without platform activity", {
+              table: "platform_events",
+              message: res.error.message,
+              code: res.error.code,
+              details: "details" in res.error ? res.error.details : undefined,
+              hint: "hint" in res.error ? res.error.hint : undefined,
+            });
+            return [];
+          }
           console.error("[admin-dashboard] platform_events query failed", {
             table: "platform_events",
             message: res.error.message,

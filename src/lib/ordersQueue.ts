@@ -48,6 +48,14 @@ export async function loadOrderQueue(limit = 100): Promise<OrderQueueResult> {
     "id, estimate_id, customer_account_id, customer_name, customer_email, status, total, created_at",
     "id, estimate_id, customer_id, customer_name, customer_email, status, total, created_at",
     "id, estimate_id, customer_name, customer_email, status, total, created_at",
+    "id, customer_account_id, customer_id, customer_name, customer_email, status, total, created_at",
+    "id, customer_account_id, customer_name, customer_email, status, total, created_at",
+    "id, customer_id, customer_name, customer_email, status, total, created_at",
+    "id, customer_name, customer_email, status, total, created_at",
+    "id, customer_account_id, customer_id, status, created_at",
+    "id, customer_account_id, status, created_at",
+    "id, customer_id, status, created_at",
+    "id, status, created_at",
   ];
 
   let lastError: string | null = null;
@@ -56,6 +64,11 @@ export async function loadOrderQueue(limit = 100): Promise<OrderQueueResult> {
     const select = attempts[index];
     const { data, error } = await supabase.from("orders").select(select).order("created_at", { ascending: false }).limit(limit);
     if (error) {
+      console.warn("[orders-queue] select fallback failed", {
+        select,
+        message: error.message,
+        code: error.code,
+      });
       lastError = error.message;
       continue;
     }
@@ -63,7 +76,7 @@ export async function loadOrderQueue(limit = 100): Promise<OrderQueueResult> {
     const rows = ((data || []) as Array<Record<string, unknown>>).map(normalizeOrderRow);
     return {
       rows,
-      warning: index === 0 ? null : "Showing orders with a schema-tolerant fallback because the live orders table does not expose the newest linkage shape everywhere yet.",
+      warning: index === 0 ? null : `Showing orders with a schema-tolerant fallback (${select}) because the live orders table does not expose the newest linkage shape everywhere yet.`,
     };
   }
 
