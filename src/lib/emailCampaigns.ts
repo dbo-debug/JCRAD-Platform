@@ -20,6 +20,23 @@ export function normalizeCampaignText(value: unknown) {
   return asText(value);
 }
 
+export function normalizeCampaignCtaPair(label: unknown, url: unknown) {
+  const normalizedLabel = normalizeCampaignText(label);
+  const normalizedUrl = normalizeCampaignText(url);
+
+  if (!normalizedLabel || !normalizedUrl) {
+    return {
+      label: null,
+      url: null,
+    };
+  }
+
+  return {
+    label: normalizedLabel,
+    url: normalizedUrl,
+  };
+}
+
 export function normalizeCampaignStatus(value: unknown) {
   const normalized = asText(value)?.toLowerCase();
   return normalized === "draft" || normalized === "sent" || normalized === "archived" ? normalized : null;

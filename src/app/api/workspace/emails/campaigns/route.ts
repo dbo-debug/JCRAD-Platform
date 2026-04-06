@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStaffContext } from "@/lib/getStaffContext";
-import { normalizeCampaignText } from "@/lib/emailCampaigns";
+import { normalizeCampaignCtaPair, normalizeCampaignText } from "@/lib/emailCampaigns";
 
 export async function POST(request: Request) {
   const staff = await getStaffContext();
@@ -10,8 +10,8 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const name = normalizeCampaignText(body.name) || "New email campaign";
   const subject = normalizeCampaignText(body.subject) || "New email";
-  const primaryCtaLabel = normalizeCampaignText(body.primary_cta_label) || "Setup Meeting";
-  const secondaryCtaLabel = normalizeCampaignText(body.secondary_cta_label) || "Check Out Menu";
+  const primaryCta = normalizeCampaignCtaPair(body.primary_cta_label, body.primary_cta_url);
+  const secondaryCta = normalizeCampaignCtaPair(body.secondary_cta_label, body.secondary_cta_url);
 
   const admin = createAdminClient();
   const { data, error } = await admin
@@ -20,8 +20,10 @@ export async function POST(request: Request) {
       created_by_user_id: staff.userId,
       name,
       subject,
-      primary_cta_label: primaryCtaLabel,
-      secondary_cta_label: secondaryCtaLabel,
+      primary_cta_label: primaryCta.label,
+      primary_cta_url: primaryCta.url,
+      secondary_cta_label: secondaryCta.label,
+      secondary_cta_url: secondaryCta.url,
       status: "draft",
     })
     .select("id")

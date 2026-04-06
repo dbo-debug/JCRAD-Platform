@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStaffContext } from "@/lib/getStaffContext";
-import { loadManagedCampaign, normalizeCampaignStatus, normalizeCampaignText } from "@/lib/emailCampaigns";
+import { loadManagedCampaign, normalizeCampaignCtaPair, normalizeCampaignStatus, normalizeCampaignText } from "@/lib/emailCampaigns";
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   const staff = await getStaffContext();
@@ -31,10 +31,16 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   if ("image_path" in body) payload.image_path = normalizeCampaignText(body.image_path);
   if ("image_url" in body) payload.image_url = normalizeCampaignText(body.image_url);
   if ("image_alt_text" in body) payload.image_alt_text = normalizeCampaignText(body.image_alt_text);
-  if ("primary_cta_label" in body) payload.primary_cta_label = normalizeCampaignText(body.primary_cta_label);
-  if ("primary_cta_url" in body) payload.primary_cta_url = normalizeCampaignText(body.primary_cta_url);
-  if ("secondary_cta_label" in body) payload.secondary_cta_label = normalizeCampaignText(body.secondary_cta_label);
-  if ("secondary_cta_url" in body) payload.secondary_cta_url = normalizeCampaignText(body.secondary_cta_url);
+  if ("primary_cta_label" in body || "primary_cta_url" in body) {
+    const primaryCta = normalizeCampaignCtaPair(body.primary_cta_label, body.primary_cta_url);
+    payload.primary_cta_label = primaryCta.label;
+    payload.primary_cta_url = primaryCta.url;
+  }
+  if ("secondary_cta_label" in body || "secondary_cta_url" in body) {
+    const secondaryCta = normalizeCampaignCtaPair(body.secondary_cta_label, body.secondary_cta_url);
+    payload.secondary_cta_label = secondaryCta.label;
+    payload.secondary_cta_url = secondaryCta.url;
+  }
   if ("batch_label" in body) payload.batch_label = normalizeCampaignText(body.batch_label);
   if ("territory_code" in body) payload.territory_code = normalizeCampaignText(body.territory_code);
   if ("route_day" in body) payload.route_day = normalizeCampaignText(body.route_day);
