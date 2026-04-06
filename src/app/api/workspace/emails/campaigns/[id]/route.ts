@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStaffContext } from "@/lib/getStaffContext";
-import { loadManagedCampaign, normalizeCampaignCtaPair, normalizeCampaignStatus, normalizeCampaignText } from "@/lib/emailCampaigns";
+import { loadManagedCampaign, normalizeCampaignBoolean, normalizeCampaignCtaPair, normalizeCampaignStatus, normalizeCampaignText } from "@/lib/emailCampaigns";
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   const staff = await getStaffContext();
@@ -40,6 +40,9 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const secondaryCta = normalizeCampaignCtaPair(body.secondary_cta_label, body.secondary_cta_url);
     payload.secondary_cta_label = secondaryCta.label;
     payload.secondary_cta_url = secondaryCta.url;
+  }
+  if ("include_vape_compliance_footer" in body) {
+    payload.include_vape_compliance_footer = normalizeCampaignBoolean(body.include_vape_compliance_footer);
   }
   if ("batch_label" in body) payload.batch_label = normalizeCampaignText(body.batch_label);
   if ("territory_code" in body) payload.territory_code = normalizeCampaignText(body.territory_code);

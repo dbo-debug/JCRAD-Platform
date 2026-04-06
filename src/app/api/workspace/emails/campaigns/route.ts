@@ -24,6 +24,7 @@ export async function POST(request: Request) {
       primary_cta_url: primaryCta.url,
       secondary_cta_label: secondaryCta.label,
       secondary_cta_url: secondaryCta.url,
+      include_vape_compliance_footer: false,
       status: "draft",
     })
     .select("id")

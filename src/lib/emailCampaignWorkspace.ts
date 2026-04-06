@@ -55,6 +55,7 @@ export type EmailCampaignDetail = {
   primaryCtaUrl: string | null;
   secondaryCtaLabel: string | null;
   secondaryCtaUrl: string | null;
+  includeVapeComplianceFooter: boolean;
   batchLabel: string | null;
   territoryCode: string | null;
   routeDay: string | null;
@@ -150,6 +151,7 @@ function buildCampaignDetail(row: GenericRow, recipientRows: GenericRow[]): Emai
     primaryCtaUrl: asText(row.primary_cta_url),
     secondaryCtaLabel: asText(row.secondary_cta_label),
     secondaryCtaUrl: asText(row.secondary_cta_url),
+    includeVapeComplianceFooter: row.include_vape_compliance_footer === true,
     batchLabel: asText(row.batch_label),
     territoryCode: asText(row.territory_code),
     routeDay: asText(row.route_day),

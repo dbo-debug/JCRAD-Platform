@@ -8,7 +8,7 @@ type CampaignRenderInput = {
   primaryCtaUrl?: string | null;
   secondaryCtaLabel?: string | null;
   secondaryCtaUrl?: string | null;
-  signatureText?: string | null;
+  includeVapeComplianceFooter?: boolean;
 };
 
 function asText(value: unknown): string | null {
@@ -52,7 +52,20 @@ export function renderCampaignEmail(input: CampaignRenderInput) {
   const primaryUrl = asText(input.primaryCtaUrl);
   const secondaryLabel = asText(input.secondaryCtaLabel);
   const secondaryUrl = asText(input.secondaryCtaUrl);
-  const signatureText = asText(input.signatureText) || "Reply to this email if you want to connect directly.";
+  const signatureLines = [
+    "Doug Boulware",
+    "LA Area Rep | High 90s",
+    "doug@high90s.com",
+    "626-506-9415",
+  ];
+  const resourceLines = [
+    { label: "Book Mtg", url: "https://calendar.app.google/49yMBarT6j85fSxi6" },
+    { label: "Nabis Menu", url: "https://app.nabis.com/?nref=cb6mfmj9" },
+  ];
+  const disclaimerText =
+    "Intended for licensed cannabis retailers and industry buyers only. Not for forwarding to consumers. Audience 21+.";
+  const vapeComplianceText =
+    "Compliance notice for integrated cannabis vaporizers: An empty integrated cannabis vaporizer shall be properly disposed of as hazardous waste at a household hazardous waste collection facility or other approved facility.";
 
   const html = `
     <!doctype html>
@@ -93,8 +106,27 @@ export function renderCampaignEmail(input: CampaignRenderInput) {
                 ${primaryLabel && primaryUrl ? renderButton(primaryLabel, primaryUrl, "primary") : ""}
                 ${secondaryLabel && secondaryUrl ? renderButton(secondaryLabel, secondaryUrl, "secondary") : ""}
                 <tr>
-                  <td style="padding:8px 28px 28px 28px;font-family:Arial,sans-serif;font-size:13px;line-height:1.6;color:#6d8593;text-align:center;">
-                    ${escapeHtml(signatureText)}
+                  <td style="padding:12px 28px 8px 28px;font-family:Arial,sans-serif;font-size:15px;line-height:1.7;color:#173543;text-align:center;">
+                    <div style="font-weight:700;font-style:italic;">${escapeHtml(signatureLines[0])}</div>
+                    <div style="font-weight:700;font-style:italic;">${escapeHtml(signatureLines[1])}</div>
+                    <div style="font-style:italic;">${escapeHtml(signatureLines[2])}</div>
+                    <div style="font-style:italic;">${escapeHtml(signatureLines[3])}</div>
+                    <div style="padding-top:10px;font-style:italic;">
+                      <a href="${escapeHtml(resourceLines[0].url)}" style="color:#0f766e;text-decoration:none;font-weight:700;">${escapeHtml(resourceLines[0].label)}</a>
+                    </div>
+                    <div style="padding-top:4px;font-style:italic;">
+                      <a href="${escapeHtml(resourceLines[1].url)}" style="color:#0f766e;text-decoration:none;font-weight:700;">${escapeHtml(resourceLines[1].label)}</a>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:4px 28px 28px 28px;font-family:Arial,sans-serif;font-size:12px;line-height:1.7;color:#8aa0ac;text-align:center;font-style:italic;">
+                    ${escapeHtml(disclaimerText)}
+                    ${
+                      input.includeVapeComplianceFooter
+                        ? `<div style="padding-top:10px;">${escapeHtml(vapeComplianceText)}</div>`
+                        : ""
+                    }
                   </td>
                 </tr>
               </table>
@@ -110,7 +142,10 @@ export function renderCampaignEmail(input: CampaignRenderInput) {
     input.imageUrl,
     primaryLabel && primaryUrl ? `${primaryLabel}: ${primaryUrl}` : null,
     secondaryLabel && secondaryUrl ? `${secondaryLabel}: ${secondaryUrl}` : null,
-    signatureText,
+    ...signatureLines,
+    ...resourceLines.map((item) => `${item.label}: ${item.url}`),
+    disclaimerText,
+    input.includeVapeComplianceFooter ? vapeComplianceText : null,
   ].filter(Boolean);
 
   return {

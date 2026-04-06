@@ -27,6 +27,7 @@ type CampaignFormState = {
   primaryCtaUrl: string;
   secondaryCtaLabel: string;
   secondaryCtaUrl: string;
+  includeVapeComplianceFooter: boolean;
   batchLabel: string;
   territoryCode: string;
   routeDay: string;
@@ -51,6 +52,7 @@ function campaignToForm(campaign: EmailCampaignDetail | null): CampaignFormState
     primaryCtaUrl: campaign?.primaryCtaUrl || "",
     secondaryCtaLabel: campaign?.secondaryCtaLabel || "Check Out Menu",
     secondaryCtaUrl: campaign?.secondaryCtaUrl || "",
+    includeVapeComplianceFooter: campaign?.includeVapeComplianceFooter || false,
     batchLabel: campaign?.batchLabel || "",
     territoryCode: campaign?.territoryCode || "",
     routeDay: campaign?.routeDay || "",
@@ -315,6 +317,7 @@ export default function EmailsWorkspace(props: EmailsWorkspaceProps) {
         primary_cta_url: form.primaryCtaUrl || null,
         secondary_cta_label: form.secondaryCtaLabel || null,
         secondary_cta_url: form.secondaryCtaUrl || null,
+        include_vape_compliance_footer: form.includeVapeComplianceFooter,
         batch_label: form.batchLabel || null,
         territory_code: form.territoryCode || null,
         route_day: form.routeDay || null,
@@ -481,6 +484,23 @@ export default function EmailsWorkspace(props: EmailsWorkspaceProps) {
                   <Field label="Secondary CTA URL">
                     <input value={form.secondaryCtaUrl} onChange={(event) => setForm((current) => ({ ...current, secondaryCtaUrl: event.target.value }))} className={inputClass} />
                   </Field>
+                </div>
+
+                <div className="rounded-2xl border border-[#dbe8ef] bg-[#f9fcfd] p-4">
+                  <label className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={form.includeVapeComplianceFooter}
+                      onChange={(event) => setForm((current) => ({ ...current, includeVapeComplianceFooter: event.target.checked }))}
+                      className="mt-1 h-4 w-4 rounded border-[#cfdde6] text-[#14b8a6]"
+                    />
+                    <span>
+                      <span className="block font-semibold text-[#173543]">Append vape compliance footer</span>
+                      <span className="mt-1 block text-sm text-[#5c7483]">
+                        Enable this when the campaign includes vape or AIO products so the compliance notice is appended under the standard signature footer.
+                      </span>
+                    </span>
+                  </label>
                 </div>
 
                 <div className="rounded-2xl border border-[#dbe8ef] bg-[#f9fcfd] p-4">

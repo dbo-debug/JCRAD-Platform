@@ -42,6 +42,10 @@ export function normalizeCampaignStatus(value: unknown) {
   return normalized === "draft" || normalized === "sent" || normalized === "archived" ? normalized : null;
 }
 
+export function normalizeCampaignBoolean(value: unknown) {
+  return value === true || value === "true" || value === 1 || value === "1";
+}
+
 export function sanitizeFileName(value: string) {
   return String(value || "")
     .trim()

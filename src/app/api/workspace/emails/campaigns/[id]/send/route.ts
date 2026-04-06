@@ -93,6 +93,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     primaryCtaUrl: asText(campaign.primary_cta_url),
     secondaryCtaLabel: asText(campaign.secondary_cta_label),
     secondaryCtaUrl: asText(campaign.secondary_cta_url),
+    includeVapeComplianceFooter: campaign.include_vape_compliance_footer === true,
   });
 
   if (body.test === true) {
