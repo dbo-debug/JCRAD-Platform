@@ -21,7 +21,9 @@ type CustomerSelectionMapProps = {
   emptyLabel: string;
   secondaryActionLabel?: string;
   secondaryActionHref?: (customerId: string) => string;
+  focusedCustomerId: string | null;
   selectedCustomerIds: string[];
+  onFocusCustomer: (customerId: string) => void;
   onToggleCustomerSelection: (customerId: string) => void;
   onAddSelectedCustomers: () => void;
   addSelectedCustomersLabel: string;
@@ -145,7 +147,9 @@ export default function CustomerSelectionMap({
   emptyLabel,
   secondaryActionLabel,
   secondaryActionHref,
+  focusedCustomerId,
   selectedCustomerIds,
+  onFocusCustomer,
   onToggleCustomerSelection,
   onAddSelectedCustomers,
   addSelectedCustomersLabel,
@@ -205,7 +209,6 @@ export default function CustomerSelectionMap({
     },
     [projectedCustomers]
   );
-  const [focusedCustomerId, setFocusedCustomerId] = useState<string>(selectedCustomerIds[0] || withCoords[0]?.id || "");
   const [googleMapStatus, setGoogleMapStatus] = useState<"idle" | "ready" | "failed">(() =>
     getGoogleMapsApiKey() ? "idle" : "failed"
   );
@@ -217,23 +220,15 @@ export default function CustomerSelectionMap({
   const mapRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<GoogleMapInstance | null>(null);
   const markerRefs = useRef<Array<{ customerId: string; marker: GoogleMarkerInstance }>>([]);
-  const toggleCustomerSelectionRef = useRef(onToggleCustomerSelection);
   const previousViewportSignatureRef = useRef<string | null>(null);
   const previousFocusKeyRef = useRef<string | null>(null);
   const effectiveFocusedCustomerId =
     focusedCustomerId && withCoords.some((customer) => customer.id === focusedCustomerId)
       ? focusedCustomerId
-      : selectedCustomerIds[0] || withCoords[0]?.id || "";
+      : "";
 
   const focusedCustomer =
-    withCoords.find((customer) => customer.id === effectiveFocusedCustomerId) ||
-    selectedMapCustomers[0] ||
-    withCoords[0] ||
-    null;
-
-  useEffect(() => {
-    toggleCustomerSelectionRef.current = onToggleCustomerSelection;
-  }, [onToggleCustomerSelection]);
+    withCoords.find((customer) => customer.id === effectiveFocusedCustomerId) || null;
 
   useEffect(() => {
     if (!googleMapsApiKey) return;
@@ -295,14 +290,13 @@ export default function CustomerSelectionMap({
         zIndex: 500,
       });
       marker.addListener("click", () => {
-        toggleCustomerSelectionRef.current(customer.id);
-        setFocusedCustomerId(customer.id);
+        onFocusCustomer(customer.id);
       });
       return { customerId: customer.id, marker };
     });
 
     return undefined;
-  }, [googleMapStatus, withCoords]);
+  }, [googleMapStatus, onFocusCustomer, withCoords]);
 
   useEffect(() => {
     if (googleMapStatus !== "ready" || !mapInstanceRef.current || !(window as WindowWithGoogleMaps).google?.maps) return;
@@ -350,13 +344,21 @@ export default function CustomerSelectionMap({
       marker.setIcon({
         path: googleMaps.SymbolPath.CIRCLE,
         scale: isFocused ? 16 : isSelected ? 14 : 12,
-        fillColor: isFocused ? "#173543" : isSelected ? "#38bdf8" : "#14b8a6",
+        fillColor: isFocused && isSelected ? "#2563eb" : isFocused ? "#173543" : isSelected ? "#2563eb" : "#8aa0ac",
         fillOpacity: 1,
-        strokeColor: "#ffffff",
-        strokeWeight: 2,
+        strokeColor: isFocused && isSelected ? "#173543" : "#ffffff",
+        strokeWeight: isFocused && isSelected ? 3 : 2,
       });
     });
   }, [effectiveFocusedCustomerId, googleMapStatus, selectedCustomerIdSet, withCoords]);
+
+  useEffect(() => {
+    if (googleMapStatus !== "ready" || !mapInstanceRef.current || !focusedCustomer) return;
+    mapInstanceRef.current.panTo({
+      lat: focusedCustomer.latitude as number,
+      lng: focusedCustomer.longitude as number,
+    });
+  }, [focusedCustomer, googleMapStatus]);
 
   useEffect(() => {
     return () => {
@@ -373,7 +375,8 @@ export default function CustomerSelectionMap({
           <p className="mt-2 max-w-3xl text-sm text-[#5c7483]">{description}</p>
         </div>
         <div className="grid gap-2 rounded-2xl border border-[#dbe8ef] bg-[#fbfdfe] p-4 text-sm text-[#506877] shadow-sm sm:min-w-[220px]">
-          <MapMetric label="Mapped Stops" value={String(withCoords.length)} />
+          <MapMetric label="Visible on Map" value={String(withCoords.length)} />
+          <MapMetric label="Focused" value={focusedCustomer ? "1" : "0"} />
           <MapMetric label="No Coords" value={String(withoutCoords.length)} />
           <MapMetric label="In Group" value={String(selectedMapCustomers.length)} />
           <MapMetric label="Territory Open" value={String(customers.filter((customer) => !customer.territoryCode).length)} />
@@ -400,7 +403,7 @@ export default function CustomerSelectionMap({
                 ))}
               </select>
               <span className="rounded-full border border-[#d7e6ed] bg-white px-3 py-1.5 text-sm text-[#4f6877]">
-                {selectionScopeLabel}
+                {selectionScopeLabel === "Visible results" ? "Visible Accounts" : "Selected Working Group"}
               </span>
               <button
                 type="button"
@@ -423,10 +426,7 @@ export default function CustomerSelectionMap({
                 selectedCustomerIdSet={selectedCustomerIdSet}
                 focusedCustomerId={effectiveFocusedCustomerId}
                 focusOptions={projectedFocusOptions}
-                onSelectCustomer={(customerId) => {
-                  onToggleCustomerSelection(customerId);
-                  setFocusedCustomerId(customerId);
-                }}
+                onFocusCustomer={onFocusCustomer}
               />
             )}
           </div>
@@ -446,14 +446,14 @@ export default function CustomerSelectionMap({
                     <div className="flex flex-wrap items-center gap-2">
                       <h4 className="text-base font-semibold text-[#173543]">Focused Stop</h4>
                       {selectedCustomerIdSet.has(focusedCustomer.id) ? (
-                        <span className="rounded-full border border-[#cfe8e4] bg-[#effaf7] px-2.5 py-1 text-xs font-semibold text-[#0f766e]">
+                        <span className="rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-2.5 py-1 text-xs font-semibold text-[#2563eb]">
                           In Group
                         </span>
                       ) : null}
                     </div>
                     <p className="mt-1 text-sm font-semibold text-[#173543]">{focusedCustomer.name}</p>
                     <p className="mt-1 text-sm text-[#58717f]">
-                      {focusedCustomer.territoryCode || "Unassigned"} • {focusedCustomer.city || "No city"} • Live map preview
+                      {focusedCustomer.territoryCode || "Unassigned"} • {focusedCustomer.city || "No city"} • Focused on map
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -474,15 +474,15 @@ export default function CustomerSelectionMap({
                     Coordinates {(focusedCustomer.latitude as number).toFixed(4)}, {(focusedCustomer.longitude as number).toFixed(4)}
                   </p>
                 </div>
-              <div className="mt-4 flex flex-wrap gap-2">
+                <div className="mt-4 flex flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={() => onToggleCustomerSelection(focusedCustomer.id)}
                     className={[
                       "rounded-full px-4 py-2 text-sm font-semibold transition",
                       selectedCustomerIdSet.has(focusedCustomer.id)
-                        ? "border border-[#bfe8e2] bg-[#f5fffd] text-[#0f766e]"
-                        : "border border-[#cfdde6] bg-white text-[#24404d] hover:border-[#14b8a6] hover:text-[#0f766e]",
+                        ? "border border-[#bfdbfe] bg-[#eff6ff] text-[#2563eb]"
+                        : "border border-[#cfdde6] bg-white text-[#24404d] hover:border-[#2563eb] hover:text-[#2563eb]",
                     ].join(" ")}
                   >
                     {selectedCustomerIdSet.has(focusedCustomer.id) ? "Remove from Group" : "Add to Group"}
@@ -508,11 +508,9 @@ export default function CustomerSelectionMap({
             <div className="rounded-[24px] border border-[#dbe8ef] bg-white p-4 shadow-sm">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                <h4 className="text-sm font-semibold uppercase tracking-[0.12em] text-[#6f8897]">Working Group on Map</h4>
+                  <h4 className="text-sm font-semibold uppercase tracking-[0.12em] text-[#6f8897]">Map States</h4>
                   <p className="mt-1 text-sm text-[#5d7685]">
-                    {selectedMapCustomers.length === 0
-                      ? "Click markers to build the working group by proximity."
-                      : `${selectedMapCustomers.length} account${selectedMapCustomers.length === 1 ? "" : "s"} selected from ${selectionScopeLabel.toLowerCase()}.`}
+                    Visible dots stay neutral, the focused account stays highlighted, and only explicitly checked accounts stay in the working group.
                   </p>
                 </div>
                 <button
@@ -530,8 +528,13 @@ export default function CustomerSelectionMap({
                     <button
                       key={customer.id}
                       type="button"
-                      onClick={() => setFocusedCustomerId(customer.id)}
-                      className="rounded-full border border-[#cfe8e4] bg-[#effaf7] px-3 py-1 text-xs font-semibold text-[#0f766e]"
+                      onClick={() => onFocusCustomer(customer.id)}
+                      className={[
+                        "rounded-full border px-3 py-1 text-xs font-semibold",
+                        customer.id === effectiveFocusedCustomerId
+                          ? "border-[#173543] bg-[#173543] text-white"
+                          : "border-[#bfdbfe] bg-[#eff6ff] text-[#2563eb]",
+                      ].join(" ")}
                     >
                       {customer.name}
                     </button>
@@ -540,7 +543,11 @@ export default function CustomerSelectionMap({
                     <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1 text-xs font-semibold text-[#4f6877]">
                       +{selectedMapCustomers.length - 8} more
                     </span>
-                  ) : null}
+            ) : (
+              <div className="rounded-[24px] border border-dashed border-[#dbe8ef] bg-[#f9fcfd] px-4 py-4 text-sm text-[#5d7685]">
+                Click a visible marker or a mini account card to focus one account without changing the working group.
+              </div>
+            )}
                 </div>
               ) : null}
             </div>
@@ -587,7 +594,7 @@ function ProjectedCustomerMap(args: {
   selectedCustomerIdSet: Set<string>;
   focusedCustomerId: string;
   focusOptions: ProjectedFocusOption[];
-  onSelectCustomer: (customerId: string) => void;
+  onFocusCustomer: (customerId: string) => void;
 }) {
   const frameRef = useRef<HTMLDivElement | null>(null);
   const [zoom, setZoom] = useState(1);
@@ -702,13 +709,19 @@ function ProjectedCustomerMap(args: {
               <button
                 key={customer.customer.id}
                 type="button"
-                onClick={() => args.onSelectCustomer(customer.customer.id)}
+                onClick={() => args.onFocusCustomer(customer.customer.id)}
                 className={[
                   "absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-[0_8px_20px_rgba(16,42,67,0.22)] transition",
-                  isFocused ? "z-20 h-8 w-8 bg-[#173543]" : isSelected ? "z-10 h-7 w-7 bg-[#0f766e]" : "z-10 h-6 w-6 bg-[#14b8a6] hover:scale-110",
+                  isFocused && isSelected
+                    ? "z-20 h-8 w-8 border-[#173543] bg-[#2563eb]"
+                    : isFocused
+                      ? "z-20 h-8 w-8 bg-[#173543]"
+                      : isSelected
+                        ? "z-10 h-7 w-7 bg-[#2563eb]"
+                        : "z-10 h-6 w-6 bg-[#8aa0ac] hover:scale-110",
                 ].join(" ")}
                 style={{ left: `${customer.x}%`, top: `${customer.y}%` }}
-                aria-label={`Select ${customer.customer.name}`}
+                aria-label={`Focus ${customer.customer.name}`}
                 title={customer.customer.name}
               />
             );

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { startTransition, useCallback, useEffect, useMemo, useState } from "react";
+import { startTransition, useCallback, useEffect, useMemo, useState, type KeyboardEvent, type MouseEvent } from "react";
 import type { CustomerSummary } from "@/lib/customerWorkspace";
 import { isRouteEligibleCustomer } from "@/lib/routeEligibility";
 import type { PendingRouteStop } from "@/lib/routeStopQueue";
@@ -264,6 +264,33 @@ function getCustomerSearchText(customer: CustomerSummary) {
     .join(" ");
 }
 
+function getCustomerSearchRank(customer: CustomerSummary, rawQuery: string) {
+  const query = normalizeText(rawQuery);
+  if (!query) return 999;
+
+  const customerName = normalizeText(customer.name);
+  const city = normalizeText(customer.city);
+  const primaryEmail = normalizeText(customer.primaryContactEmail);
+  const mainPhone = normalizeText(customer.mainPhone);
+  const territoryCode = normalizeText(customer.territoryCode);
+  const assignedSalesName = normalizeText(customer.assignedSalesName);
+  const contactFields = customer.primaryContacts.flatMap((contact) => [
+    normalizeText(contact.name),
+    normalizeText(contact.email),
+    normalizeText(contact.phone),
+    normalizeText(contact.title),
+  ]);
+  const fields = [customerName, city, primaryEmail, mainPhone, territoryCode, assignedSalesName, ...contactFields].filter(Boolean);
+
+  if (customerName === query) return 0;
+  if (fields.some((field) => field === query)) return 1;
+  if (customerName.startsWith(query)) return 2;
+  if (fields.some((field) => field.startsWith(query))) return 3;
+  if (customerName.includes(query)) return 4;
+  if (fields.some((field) => field.includes(query))) return 5;
+  return 999;
+}
+
 function formatSourceLabel(value: string | null | undefined, fallback = "Unspecified") {
   const text = String(value || "").trim();
   if (!text) return fallback;
@@ -502,6 +529,7 @@ export default function CustomerWorkspaceIndex({
   );
   const [referenceNow] = useState(() => Date.now());
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
+  const [focusedCustomerId, setFocusedCustomerId] = useState<string>("");
   const [hydratedSegmentKey, setHydratedSegmentKey] = useState<string | null>(null);
   const [bulkAction, setBulkAction] = useState<BulkActionState>({
     kind: staffRole === "admin" ? "assign_sales_rep" : "assign_territory",
@@ -623,6 +651,9 @@ export default function CustomerWorkspaceIndex({
   });
 
   visibleCustomers = [...visibleCustomers].sort((left, right) => {
+    const searchRankDiff = getCustomerSearchRank(left, searchQuery) - getCustomerSearchRank(right, searchQuery);
+    if (searchRankDiff !== 0) return searchRankDiff;
+
     switch (sortKey) {
       case "name_asc":
         return left.name.localeCompare(right.name);
@@ -655,6 +686,8 @@ export default function CustomerWorkspaceIndex({
   const canRemoveSelectedFromPending = selectedSegmentPendingCount > 0;
   const mapCustomers = mapSurfaceMode === "segment" ? selectedSegmentCustomers : visibleCustomers;
   const mapScopedSelectedCustomerIds = mapCustomers.filter((customer) => selectedCustomerIdSet.has(customer.id)).map((customer) => customer.id);
+  const focusedVisibleCustomer = visibleCustomers.find((customer) => customer.id === focusedCustomerId) || null;
+  const focusedMapCustomer = mapCustomers.find((customer) => customer.id === focusedCustomerId) || null;
   const allVisibleSelected = visibleCustomers.length > 0 && selectedVisibleCustomerIds.length === visibleCustomers.length;
 
   const visibleWithOwners = visibleCustomers.filter((customer) => customer.assignedSalesName).length;
@@ -719,8 +752,8 @@ export default function CustomerWorkspaceIndex({
           { label: "Visible", value: String(visibleCustomers.length) },
           { label: "Working Group", value: String(selectedSegmentCustomers.length) },
           { label: "Mapped", value: String(visibleMappedCount) },
-          { label: "Segment Mapped", value: String(selectedSegmentMappedCount) },
-          { label: "Segment Route Ready", value: String(selectedSegmentRouteReadyCount) },
+          { label: "Group Mapped", value: String(selectedSegmentMappedCount) },
+          { label: "Group Route Ready", value: String(selectedSegmentRouteReadyCount) },
           { label: "Visible Route Ready", value: String(routeReadyCount) },
         ]
       : [
@@ -838,6 +871,11 @@ export default function CustomerWorkspaceIndex({
   }, [customerIds, customerIdsKey]);
 
   useEffect(() => {
+    const availableCustomerIds = new Set(customerIds);
+    setFocusedCustomerId((current) => (current && availableCustomerIds.has(current) ? current : ""));
+  }, [customerIds, customerIdsKey]);
+
+  useEffect(() => {
     if (hydratedSegmentKey !== segmentStorageKey) return;
     writeStoredSegmentIds(segmentStorageKey, selectedCustomerIds);
   }, [hydratedSegmentKey, segmentStorageKey, selectedCustomerIds]);
@@ -932,6 +970,11 @@ export default function CustomerWorkspaceIndex({
       persistSelectedSegment(next);
       return next;
     });
+  }
+
+  function focusCustomer(customerId: string) {
+    setFocusedCustomerId(customerId);
+    setBulkStatusMessage(null);
   }
 
   function selectAllVisible() {
@@ -1591,6 +1634,9 @@ export default function CustomerWorkspaceIndex({
             <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4f6877]">
               Visible {visibleCustomers.length}
             </span>
+            <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4f6877]">
+              Focused {focusedVisibleCustomer?.name || focusedMapCustomer?.name || "None"}
+            </span>
             <span className="rounded-full border border-[#bfe8e2] bg-[#f5fffd] px-3 py-1.5 text-sm font-medium text-[#0f766e]">
               Working Group {selectedCustomerIds.length}
             </span>
@@ -1635,11 +1681,13 @@ export default function CustomerWorkspaceIndex({
           <CustomerSelectionMap
             customers={mapCustomers}
             title="Filtered Accounts Map"
-            description="Use the current visible results or your saved working group as a field-sales workbench. Click map points to add or remove stores from the same working group used by list checkboxes and bulk actions."
+            description="Use the current visible results or your saved working group as a field-sales workbench. Visible accounts can stay neutral on the map, one account can be focused for inspection, and only checked accounts join the working group."
             emptyLabel={mapSurfaceMode === "segment" ? "The current working group has no mappable accounts yet." : "No filtered accounts are route-available yet. Geocode the visible set here before moving into route planning."}
             secondaryActionLabel="Open Account"
             secondaryActionHref={(customerId) => `/workspace/customers/${customerId}`}
+            focusedCustomerId={focusedMapCustomer?.id || null}
             selectedCustomerIds={mapScopedSelectedCustomerIds}
+            onFocusCustomer={focusCustomer}
             onToggleCustomerSelection={toggleCustomerSelection}
             onAddSelectedCustomers={() => void addCustomersToPendingRoute(mapScopedSelectedCustomerIds)}
             addSelectedCustomersLabel="Add Selected to Pending Route"
@@ -1687,8 +1735,10 @@ export default function CustomerWorkspaceIndex({
                   <CustomerCard
                     key={customer.id}
                     customer={customer}
+                    focused={focusedCustomerId === customer.id}
                     selected={selectedCustomerIds.includes(customer.id)}
                     pendingSelected={pendingCustomerIdSet.has(customer.id)}
+                    onFocus={focusCustomer}
                     onToggleSelected={toggleCustomerSelection}
                     onTogglePendingSelected={togglePendingStop}
                   />
@@ -1711,14 +1761,18 @@ export default function CustomerWorkspaceIndex({
 
 function CustomerCard({
   customer,
+  focused,
   selected,
   pendingSelected,
+  onFocus,
   onToggleSelected,
   onTogglePendingSelected,
 }: {
   customer: CustomerSummary;
+  focused: boolean;
   selected: boolean;
   pendingSelected: boolean;
+  onFocus: (customerId: string) => void;
   onToggleSelected: (customerId: string) => void;
   onTogglePendingSelected: (customerId: string, nextSelected: boolean) => void;
 }) {
@@ -1749,23 +1803,72 @@ function CustomerCard({
     .filter(Boolean)
     .join(" • ");
 
+  function stopCardEvent(event: MouseEvent<HTMLElement> | KeyboardEvent<HTMLElement>) {
+    event.stopPropagation();
+  }
+
+  function handleCardKeyDown(event: KeyboardEvent<HTMLElement>) {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      onFocus(customer.id);
+    }
+  }
+
   return (
     <article
+      role="button"
+      tabIndex={0}
+      onClick={() => onFocus(customer.id)}
+      onKeyDown={handleCardKeyDown}
       className={[
-        "flex h-full flex-col rounded-[24px] border bg-[linear-gradient(180deg,#ffffff_0%,#fbfdfe_100%)] p-4 shadow-[0_8px_18px_rgba(16,42,67,0.05)] transition hover:border-[#b9d5df] hover:shadow-[0_14px_28px_rgba(16,42,67,0.08)]",
-        selected || pendingSelected ? "border-[#14b8a6] ring-2 ring-[#b8efe7]" : "border-[#d9e7ee]",
+        "flex h-full cursor-pointer flex-col rounded-[24px] border bg-[linear-gradient(180deg,#ffffff_0%,#fbfdfe_100%)] p-4 shadow-[0_8px_18px_rgba(16,42,67,0.05)] transition hover:border-[#b9d5df] hover:shadow-[0_14px_28px_rgba(16,42,67,0.08)] focus:outline-none focus:ring-2 focus:ring-[#173543]/20",
+        focused && selected
+          ? "border-[#2563eb] ring-2 ring-[#173543]/20"
+          : focused
+            ? "border-[#173543] ring-2 ring-[#d9e7ee]"
+            : selected
+              ? "border-[#2563eb] ring-2 ring-[#bfdbfe]"
+              : pendingSelected
+                ? "border-[#14b8a6]"
+                : "border-[#d9e7ee]",
       ].join(" ")}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
           <div className="pt-1">
-            <input type="checkbox" checked={selected} onChange={() => onToggleSelected(customer.id)} className="h-4 w-4 accent-[#14b8a6]" />
+            <input
+              type="checkbox"
+              checked={selected}
+              onClick={stopCardEvent}
+              onChange={() => onToggleSelected(customer.id)}
+              className="h-4 w-4 accent-[#2563eb]"
+            />
           </div>
           <div className="min-w-0 space-y-2">
             <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <Link href={`/workspace/customers/${customer.id}`} className="truncate text-base font-semibold text-[#173543] transition hover:text-[#0f766e]">
+              <button
+                type="button"
+                onClick={(event) => {
+                  stopCardEvent(event);
+                  onFocus(customer.id);
+                }}
+                className={[
+                  "truncate text-left text-base font-semibold transition",
+                  focused ? "text-[#0f766e]" : "text-[#173543] hover:text-[#0f766e]",
+                ].join(" ")}
+              >
                 {customer.name}
-              </Link>
+              </button>
+              {focused ? (
+                <span className="rounded-full border border-[#d7e6ed] bg-[#f4f9fc] px-2 py-0.5 text-[11px] font-semibold text-[#173543]">
+                  Focused
+                </span>
+              ) : null}
+              {selected ? (
+                <span className="rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-2 py-0.5 text-[11px] font-semibold text-[#2563eb]">
+                  In Group
+                </span>
+              ) : null}
               <span className={["rounded-full border px-2 py-0.5 text-[11px] font-semibold", statusChipClass(customer.status)].join(" ")}>
                 {titleCase(customer.status)}
               </span>
@@ -1828,16 +1931,29 @@ function CustomerCard({
       <p className="mt-3 truncate text-sm text-[#5c7483]">{metadataLine || "No recent metadata yet."}</p>
 
       <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-[#e6eef3] pt-3">
+        <button
+          type="button"
+          onClick={(event) => {
+            stopCardEvent(event);
+            onFocus(customer.id);
+          }}
+          className={[
+            "inline-flex h-8 items-center justify-center rounded-full border px-3 text-sm font-medium transition",
+            focused ? "border-[#173543] bg-[#173543] text-white" : "border-[#cddbe4] bg-white text-[#21424d] hover:border-[#173543] hover:text-[#173543]",
+          ].join(" ")}
+        >
+          Focus Account
+        </button>
         {needsCoordinates ? <QuickAction href={mapsHref} label="Open Maps" external /> : null}
         <QuickAction href={phoneHref} label="Call" />
         <QuickAction href={primaryEmailHref} label="Email" />
         <QuickAction href={websiteHref} label="Site" external />
         {needsCoordinates ? (
-          <Link href={`/workspace/customers/${customer.id}#customer-route-field-ops`} className={denseButtonClass()}>
+          <Link href={`/workspace/customers/${customer.id}#customer-route-field-ops`} onClick={stopCardEvent} className={denseButtonClass()}>
             Manual Coords
           </Link>
         ) : null}
-        <Link href={`/workspace/customers/${customer.id}`} className={denseButtonClass("primary")}>
+        <Link href={`/workspace/customers/${customer.id}`} onClick={stopCardEvent} className={denseButtonClass("primary")}>
           Open Account
         </Link>
       </div>
@@ -1871,7 +1987,7 @@ function RouteActionButton({
   }
 
   return (
-    <div className="flex shrink-0 flex-col items-end gap-1 self-start">
+    <div className="flex shrink-0 flex-col items-end gap-1 self-start" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
       <button
         type="button"
         onClick={() => void handlePendingToggle()}
@@ -2160,6 +2276,7 @@ function QuickAction({ href, label, external = false }: { href: string | null; l
   return (
     <a
       href={href}
+      onClick={(event) => event.stopPropagation()}
       target={external ? "_blank" : undefined}
       rel={external ? "noreferrer" : undefined}
       className="inline-flex h-8 items-center justify-center rounded-full border border-[#cddbe4] bg-white px-3 text-sm font-medium text-[#21424d] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
