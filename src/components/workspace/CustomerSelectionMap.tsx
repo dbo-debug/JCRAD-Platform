@@ -375,7 +375,7 @@ export default function CustomerSelectionMap({
         <div className="grid gap-2 rounded-2xl border border-[#dbe8ef] bg-[#fbfdfe] p-4 text-sm text-[#506877] shadow-sm sm:min-w-[220px]">
           <MapMetric label="Mapped Stops" value={String(withCoords.length)} />
           <MapMetric label="No Coords" value={String(withoutCoords.length)} />
-          <MapMetric label="Selected" value={String(selectedMapCustomers.length)} />
+          <MapMetric label="In Group" value={String(selectedMapCustomers.length)} />
           <MapMetric label="Territory Open" value={String(customers.filter((customer) => !customer.territoryCode).length)} />
         </div>
       </div>
@@ -447,7 +447,7 @@ export default function CustomerSelectionMap({
                       <h4 className="text-base font-semibold text-[#173543]">Focused Stop</h4>
                       {selectedCustomerIdSet.has(focusedCustomer.id) ? (
                         <span className="rounded-full border border-[#cfe8e4] bg-[#effaf7] px-2.5 py-1 text-xs font-semibold text-[#0f766e]">
-                          Selected
+                          In Group
                         </span>
                       ) : null}
                     </div>
@@ -485,7 +485,7 @@ export default function CustomerSelectionMap({
                         : "border border-[#cfdde6] bg-white text-[#24404d] hover:border-[#14b8a6] hover:text-[#0f766e]",
                     ].join(" ")}
                   >
-                    {selectedCustomerIdSet.has(focusedCustomer.id) ? "Unselect Marker" : "Select Marker"}
+                    {selectedCustomerIdSet.has(focusedCustomer.id) ? "Remove from Group" : "Add to Group"}
                   </button>
                   <Link href={`/workspace/customers/${focusedCustomer.id}`} className="rounded-full bg-[#173543] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#0f2a35]">
                     Open Account
@@ -508,10 +508,10 @@ export default function CustomerSelectionMap({
             <div className="rounded-[24px] border border-[#dbe8ef] bg-white p-4 shadow-sm">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <h4 className="text-sm font-semibold uppercase tracking-[0.12em] text-[#6f8897]">Map Selection</h4>
+                <h4 className="text-sm font-semibold uppercase tracking-[0.12em] text-[#6f8897]">Working Group on Map</h4>
                   <p className="mt-1 text-sm text-[#5d7685]">
                     {selectedMapCustomers.length === 0
-                      ? "Click markers to build a route draft by proximity."
+                      ? "Click markers to build the working group by proximity."
                       : `${selectedMapCustomers.length} account${selectedMapCustomers.length === 1 ? "" : "s"} selected from ${selectionScopeLabel.toLowerCase()}.`}
                   </p>
                 </div>

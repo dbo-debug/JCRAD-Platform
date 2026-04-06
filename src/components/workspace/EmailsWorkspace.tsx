@@ -39,6 +39,27 @@ type GmailStatus =
   | { loading: false; connected: true; gmailEmail: string; error: null }
   | { loading: false; connected: false; gmailEmail: null; error: string | null };
 
+const EMAIL_CAMPAIGN_WORKING_GROUP_HANDOFF_KEY = "jc-rad:email-campaign-working-group";
+
+function buildWorkingGroupRecipientEmails(recipientOptions: EmailRecipientOption[], customerIds: string[]) {
+  const grouped = new Map<string, EmailRecipientOption[]>();
+
+  recipientOptions.forEach((recipient) => {
+    const existing = grouped.get(recipient.customerId) || [];
+    existing.push(recipient);
+    grouped.set(recipient.customerId, existing);
+  });
+
+  return customerIds
+    .map((customerId) => {
+      const options = grouped.get(customerId) || [];
+      const primary = options.find((option) => option.source === "primary") || options[0] || null;
+      return primary?.email || null;
+    })
+    .filter((email, index, values): email is string => Boolean(email) && values.indexOf(email) === index)
+    .slice(0, 50);
+}
+
 function campaignToForm(campaign: EmailCampaignDetail | null): CampaignFormState {
   return {
     name: campaign?.name || "",
@@ -82,6 +103,8 @@ export default function EmailsWorkspace(props: EmailsWorkspaceProps) {
   const router = useRouter();
   const pathname = usePathname();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const workingGroupRecipientEmailsRef = useRef<string[] | null>(null);
+  const workingGroupHandoffAppliedRef = useRef(false);
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(props.selectedCampaign?.id || props.campaigns[0]?.id || null);
   const [form, setForm] = useState<CampaignFormState>(campaignToForm(props.selectedCampaign));
   const [selectedRecipientEmails, setSelectedRecipientEmails] = useState<string[]>(
@@ -96,8 +119,39 @@ export default function EmailsWorkspace(props: EmailsWorkspaceProps) {
   useEffect(() => {
     setSelectedCampaignId(props.selectedCampaign?.id || props.campaigns[0]?.id || null);
     setForm(campaignToForm(props.selectedCampaign));
-    setSelectedRecipientEmails(props.selectedCampaign?.recipients.map((recipient) => recipient.email) || []);
+    const campaignRecipientEmails = props.selectedCampaign?.recipients.map((recipient) => recipient.email) || [];
+    setSelectedRecipientEmails(campaignRecipientEmails.length > 0 ? campaignRecipientEmails : workingGroupRecipientEmailsRef.current || []);
   }, [props.selectedCampaign, props.campaigns]);
+
+  useEffect(() => {
+    if (workingGroupHandoffAppliedRef.current) return;
+
+    try {
+      const raw = window.sessionStorage.getItem(EMAIL_CAMPAIGN_WORKING_GROUP_HANDOFF_KEY);
+      if (!raw) return;
+
+      const parsed = JSON.parse(raw) as { customerIds?: unknown };
+      const customerIds = Array.isArray(parsed.customerIds)
+        ? parsed.customerIds.map((value) => String(value || "").trim()).filter(Boolean)
+        : [];
+      const workingGroupEmails = buildWorkingGroupRecipientEmails(props.recipientOptions, customerIds);
+
+      window.sessionStorage.removeItem(EMAIL_CAMPAIGN_WORKING_GROUP_HANDOFF_KEY);
+      workingGroupHandoffAppliedRef.current = true;
+
+      if (workingGroupEmails.length === 0) {
+        setMessage("Working group was handed off, but no valid recipient emails were found.");
+        return;
+      }
+
+      workingGroupRecipientEmailsRef.current = workingGroupEmails;
+      setSelectedRecipientEmails(workingGroupEmails);
+      setMessage(`Loaded ${workingGroupEmails.length} recipient${workingGroupEmails.length === 1 ? "" : "s"} from the working group.`);
+    } catch {
+      window.sessionStorage.removeItem(EMAIL_CAMPAIGN_WORKING_GROUP_HANDOFF_KEY);
+      workingGroupHandoffAppliedRef.current = true;
+    }
+  }, [props.recipientOptions]);
 
   useEffect(() => {
     let active = true;
@@ -292,6 +346,7 @@ export default function EmailsWorkspace(props: EmailsWorkspaceProps) {
   }
 
   function toggleRecipient(email: string) {
+    workingGroupRecipientEmailsRef.current = null;
     setSelectedRecipientEmails((current) =>
       current.includes(email) ? current.filter((item) => item !== email) : [...current, email].slice(0, 50)
     );

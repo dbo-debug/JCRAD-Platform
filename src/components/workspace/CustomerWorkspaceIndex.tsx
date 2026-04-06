@@ -69,6 +69,7 @@ type WorkflowMode = "work_queue" | "segment_builder" | "route_prep";
 const ROUTE_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const WORKSPACE_STICKY_TOP_CLASS = "top-[calc(var(--workspace-header-offset,5rem)+1rem)]";
 const CUSTOMER_SEGMENT_STORAGE_KEY_PREFIX = "jc-rad:customer-segment";
+const EMAIL_CAMPAIGN_WORKING_GROUP_HANDOFF_KEY = "jc-rad:email-campaign-working-group";
 const BULK_ACTIONS: Array<{ key: BulkActionKind; label: string }> = [
   { key: "assign_sales_rep", label: "Assign Sales Rep" },
   { key: "assign_territory", label: "Assign Territory" },
@@ -98,7 +99,7 @@ const WORKFLOW_MODE_COPY: Record<
     label: "Segment Builder",
     title: "Segment Builder",
     description: "Target broader account sets for sourcing, outreach prep, and operational selection.",
-    helper: "Use this mode when you need filtering depth, grouping, and saved segment behavior.",
+    helper: "Use this mode when you need filtering depth, grouping, and persistent working-group behavior.",
   },
   route_prep: {
     label: "Route Prep",
@@ -418,7 +419,7 @@ function getWorkflowSummary(args: {
     return {
       eyebrow: "Workflow Mode",
       title: "Segment Builder",
-      description: `${args.visibleCount} accounts are in your current targeting set. Refine the segment, then act on the selected set.`,
+      description: `${args.visibleCount} accounts are in your current targeting set. Refine the filters, build a working group, then act on it.`,
     };
   }
   return {
@@ -647,9 +648,11 @@ export default function CustomerWorkspaceIndex({
   const selectedVisibleCustomerIds = selectedCustomerIds.filter((id) => visibleCustomerIdSet.has(id));
   const selectedVisibleCustomers = visibleCustomers.filter((customer) => selectedVisibleCustomerIds.includes(customer.id));
   const selectedSegmentCustomers = customers.filter((customer) => selectedCustomerIdSet.has(customer.id));
-  const selectedVisiblePendingCount = selectedVisibleCustomers.filter((customer) => pendingCustomerIdSet.has(customer.id)).length;
-  const canAddSelectedToPending = selectedVisibleCustomers.some((customer) => !pendingCustomerIdSet.has(customer.id));
-  const canRemoveSelectedFromPending = selectedVisiblePendingCount > 0;
+  const selectedSegmentVisibleCount = selectedVisibleCustomers.length;
+  const selectedSegmentHiddenCount = Math.max(0, selectedSegmentCustomers.length - selectedSegmentVisibleCount);
+  const selectedSegmentPendingCount = selectedSegmentCustomers.filter((customer) => pendingCustomerIdSet.has(customer.id)).length;
+  const canAddSelectedToPending = selectedSegmentCustomers.some((customer) => !pendingCustomerIdSet.has(customer.id));
+  const canRemoveSelectedFromPending = selectedSegmentPendingCount > 0;
   const mapCustomers = mapSurfaceMode === "segment" ? selectedSegmentCustomers : visibleCustomers;
   const mapScopedSelectedCustomerIds = mapCustomers.filter((customer) => selectedCustomerIdSet.has(customer.id)).map((customer) => customer.id);
   const allVisibleSelected = visibleCustomers.length > 0 && selectedVisibleCustomerIds.length === visibleCustomers.length;
@@ -714,7 +717,7 @@ export default function CustomerWorkspaceIndex({
     workflowMode === "route_prep"
       ? [
           { label: "Visible", value: String(visibleCustomers.length) },
-          { label: "Segment", value: String(selectedSegmentCustomers.length) },
+          { label: "Working Group", value: String(selectedSegmentCustomers.length) },
           { label: "Mapped", value: String(visibleMappedCount) },
           { label: "Segment Mapped", value: String(selectedSegmentMappedCount) },
           { label: "Segment Route Ready", value: String(selectedSegmentRouteReadyCount) },
@@ -968,7 +971,23 @@ export default function CustomerWorkspaceIndex({
   function openSelectedRoutePrep() {
     setShowFilteredMap(true);
     setMapSurfaceMode("segment");
-    setBulkStatusMessage("Route prep opened on the selected segment.");
+    setBulkStatusMessage("Map opened on the current working group.");
+  }
+
+  function handoffWorkingGroupToEmails() {
+    if (selectedSegmentCustomers.length === 0) {
+      setBulkStatusMessage("Build a working group before creating an email campaign.");
+      return;
+    }
+
+    window.sessionStorage.setItem(
+      EMAIL_CAMPAIGN_WORKING_GROUP_HANDOFF_KEY,
+      JSON.stringify({
+        customerIds: selectedSegmentCustomers.map((customer) => customer.id),
+        createdAt: new Date().toISOString(),
+      })
+    );
+    router.push("/workspace/emails?handoff=working-group");
   }
 
   function handleClearSearch() {
@@ -1127,7 +1146,7 @@ export default function CustomerWorkspaceIndex({
   }
 
   async function applyBulkAction() {
-    if (selectedVisibleCustomers.length === 0 || bulkBusy) return;
+    if (selectedSegmentCustomers.length === 0 || bulkBusy) return;
     if (
       bulkAction.kind !== "add_to_pending_stops" &&
       bulkAction.kind !== "remove_from_pending_stops" &&
@@ -1150,14 +1169,13 @@ export default function CustomerWorkspaceIndex({
       if (bulkAction.kind === "add_to_pending_stops" || bulkAction.kind === "remove_from_pending_stops") {
         await syncPendingStops({
           method: bulkAction.kind === "add_to_pending_stops" ? "POST" : "DELETE",
-          body: { customer_ids: selectedVisibleCustomers.map((customer) => customer.id) },
+          body: { customer_ids: selectedSegmentCustomers.map((customer) => customer.id) },
         });
         setBulkStatusMessage(
-          `${bulkAction.kind === "add_to_pending_stops" ? "Added" : "Removed"} ${selectedVisibleCustomers.length} selected account${
-            selectedVisibleCustomers.length === 1 ? "" : "s"
+          `${bulkAction.kind === "add_to_pending_stops" ? "Added" : "Removed"} ${selectedSegmentCustomers.length} working-group account${
+            selectedSegmentCustomers.length === 1 ? "" : "s"
           } ${bulkAction.kind === "add_to_pending_stops" ? "to" : "from"} pending stops.`
         );
-        setSelectedCustomerIds([]);
         router.refresh();
         return;
       }
@@ -1166,7 +1184,7 @@ export default function CustomerWorkspaceIndex({
         const res = await fetch("/api/workspace/customers/convert-to-sources", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ customer_ids: selectedVisibleCustomers.map((customer) => customer.id) }),
+          body: JSON.stringify({ customer_ids: selectedSegmentCustomers.map((customer) => customer.id) }),
         });
         const json = await parseJsonSafe(res);
         const converted = Number(json.converted || 0);
@@ -1174,8 +1192,7 @@ export default function CustomerWorkspaceIndex({
         if (!res.ok || json.ok !== true || converted <= 0 || insertedSourceCount <= 0) {
           throw new Error(String(json.error || `Conversion failed (${res.status})`));
         }
-        setBulkStatusMessage(`Converted ${converted} selected account${converted === 1 ? "" : "s"} into Sources.`);
-        setSelectedCustomerIds([]);
+        setBulkStatusMessage(`Converted ${converted} working-group account${converted === 1 ? "" : "s"} into Sources.`);
         router.refresh();
         return;
       }
@@ -1185,7 +1202,7 @@ export default function CustomerWorkspaceIndex({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            customer_ids: selectedVisibleCustomers.map((customer) => customer.id),
+            customer_ids: selectedSegmentCustomers.map((customer) => customer.id),
             archived: bulkAction.kind === "archive_customers",
           }),
         });
@@ -1195,14 +1212,13 @@ export default function CustomerWorkspaceIndex({
           throw new Error(String(json.error || `Archive update failed (${res.status})`));
         }
         setBulkStatusMessage(
-          `${bulkAction.kind === "archive_customers" ? "Archived" : "Restored"} ${updatedCount} selected account${updatedCount === 1 ? "" : "s"}.`
+          `${bulkAction.kind === "archive_customers" ? "Archived" : "Restored"} ${updatedCount} working-group account${updatedCount === 1 ? "" : "s"}.`
         );
-        setSelectedCustomerIds([]);
         router.refresh();
         return;
       }
 
-      for (const customer of selectedVisibleCustomers) {
+      for (const customer of selectedSegmentCustomers) {
         let payload: Record<string, string | null>;
 
         if (bulkAction.kind === "assign_sales_rep") {
@@ -1230,9 +1246,8 @@ export default function CustomerWorkspaceIndex({
       }
 
       setBulkStatusMessage(
-        `Updated ${successCount} selected account${successCount === 1 ? "" : "s"}${skippedCount ? `, skipped ${skippedCount}` : ""}.`
+        `Updated ${successCount} working-group account${successCount === 1 ? "" : "s"}${skippedCount ? `, skipped ${skippedCount}` : ""}.`
       );
-      setSelectedCustomerIds([]);
       router.refresh();
     } catch (error) {
       setBulkStatusMessage(error instanceof Error ? error.message : "Bulk update failed");
@@ -1417,7 +1432,7 @@ export default function CustomerWorkspaceIndex({
                       mapSurfaceMode === "segment" ? "border-[#173543] bg-[#173543] text-white" : "border-[#d7e6ed] bg-white text-[#4f6877] hover:border-[#173543]",
                     ].join(" ")}
                   >
-                    Map Segment
+                    Map Working Group
                   </button>
                 </div>
               ) : null}
@@ -1532,10 +1547,10 @@ export default function CustomerWorkspaceIndex({
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <button type="button" onClick={selectAllVisible} disabled={visibleCustomers.length === 0} className={denseButtonClass()}>
-                  {allVisibleSelected ? "All selected" : `Select ${visibleCustomers.length}`}
+                  {allVisibleSelected ? "All visible in group" : `Select ${visibleCustomers.length} visible`}
                 </button>
                 <button type="button" onClick={clearSelection} disabled={selectedCustomerIds.length === 0} className={denseButtonClass()}>
-                  Clear Segment
+                  Clear Group
                 </button>
                 {staffRole === "admin" ? (
                   <>
@@ -1577,23 +1592,29 @@ export default function CustomerWorkspaceIndex({
               Visible {visibleCustomers.length}
             </span>
             <span className="rounded-full border border-[#bfe8e2] bg-[#f5fffd] px-3 py-1.5 text-sm font-medium text-[#0f766e]">
-              Segment {selectedCustomerIds.length}
+              Working Group {selectedCustomerIds.length}
             </span>
+            {selectedCustomerIds.length > 0 ? (
+              <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4f6877]">
+                {selectedSegmentVisibleCount} visible in current filters{selectedSegmentHiddenCount > 0 ? ` • ${selectedSegmentHiddenCount} outside current filters` : ""}
+              </span>
+            ) : null}
             <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4f6877]">
               Pending Stops {pendingStops.length}
             </span>
             <button type="button" onClick={clearSelection} disabled={selectedCustomerIds.length === 0} className={denseButtonClass()}>
-              Clear Segment
+              Clear Group
             </button>
             {visibleGeocodeStatus ? <span className="text-sm text-[#4f6877]">{visibleGeocodeStatus}</span> : null}
           </div>
         </section>
 
-        {selectedVisibleCustomerIds.length > 0 ? (
+        {selectedCustomerIds.length > 0 ? (
           <BulkActionBar
             action={bulkAction}
             busy={bulkBusy}
-            selectedCount={selectedVisibleCustomerIds.length}
+            selectedCount={selectedCustomerIds.length}
+            visibleSelectedCount={selectedSegmentVisibleCount}
             staffRole={staffRole}
             salesRepOptions={salesRepOptions}
             territoryOptions={territoryOptions}
@@ -1602,9 +1623,10 @@ export default function CustomerWorkspaceIndex({
             canRemoveFromPending={canRemoveSelectedFromPending}
             onActionChange={setBulkAction}
             onApply={() => void applyBulkAction()}
-            onAddToPending={() => void addCustomersToPendingRoute(selectedVisibleCustomerIds)}
-            onRemoveFromPending={() => void removeCustomersFromPendingRoute(selectedVisibleCustomerIds)}
+            onAddToPending={() => void addCustomersToPendingRoute(selectedCustomerIds)}
+            onRemoveFromPending={() => void removeCustomersFromPendingRoute(selectedCustomerIds)}
             onOpenRoutePrep={openSelectedRoutePrep}
+            onCreateEmailCampaign={handoffWorkingGroupToEmails}
             onClear={clearSelection}
           />
         ) : null}
@@ -1613,15 +1635,15 @@ export default function CustomerWorkspaceIndex({
           <CustomerSelectionMap
             customers={mapCustomers}
             title="Filtered Accounts Map"
-            description="Use the current visible results or your saved segment as a territory-planning workbench. Click map points to build a route draft by proximity, then send the selected accounts straight into the pending route."
-            emptyLabel={mapSurfaceMode === "segment" ? "The current saved segment has no mappable accounts yet." : "No filtered accounts are route-available yet. Geocode the visible set here before moving into route planning."}
+            description="Use the current visible results or your saved working group as a field-sales workbench. Click map points to add or remove stores from the same working group used by list checkboxes and bulk actions."
+            emptyLabel={mapSurfaceMode === "segment" ? "The current working group has no mappable accounts yet." : "No filtered accounts are route-available yet. Geocode the visible set here before moving into route planning."}
             secondaryActionLabel="Open Account"
             secondaryActionHref={(customerId) => `/workspace/customers/${customerId}`}
             selectedCustomerIds={mapScopedSelectedCustomerIds}
             onToggleCustomerSelection={toggleCustomerSelection}
             onAddSelectedCustomers={() => void addCustomersToPendingRoute(mapScopedSelectedCustomerIds)}
             addSelectedCustomersLabel="Add Selected to Pending Route"
-            selectionScopeLabel={mapSurfaceMode === "segment" ? "Saved segment" : "Visible results"}
+            selectionScopeLabel={mapSurfaceMode === "segment" ? "Working group" : "Visible results"}
           />
         ) : null}
 
@@ -1876,6 +1898,7 @@ function BulkActionBar({
   action,
   busy,
   selectedCount,
+  visibleSelectedCount,
   staffRole,
   salesRepOptions,
   territoryOptions,
@@ -1887,11 +1910,13 @@ function BulkActionBar({
   onAddToPending,
   onRemoveFromPending,
   onOpenRoutePrep,
+  onCreateEmailCampaign,
   onClear,
 }: {
   action: BulkActionState;
   busy: boolean;
   selectedCount: number;
+  visibleSelectedCount: number;
   staffRole: "admin" | "sales";
   salesRepOptions: RouteRepOption[];
   territoryOptions: TerritoryOption[];
@@ -1903,6 +1928,7 @@ function BulkActionBar({
   onAddToPending: () => void;
   onRemoveFromPending: () => void;
   onOpenRoutePrep: () => void;
+  onCreateEmailCampaign: () => void;
   onClear: () => void;
 }) {
   const availableActions = BULK_ACTIONS.filter((item) =>
@@ -1926,30 +1952,17 @@ function BulkActionBar({
     <section className="rounded-[24px] border border-[#bfe8e2] bg-[linear-gradient(180deg,#f5fffd_0%,#ffffff_100%)] p-4 shadow-[0_14px_30px_rgba(16,42,67,0.08)]">
       <div className="flex flex-col gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#0f766e]">Selected Accounts</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#0f766e]">Working Group</p>
           <p className="mt-1 text-sm text-[#35505d]">
-            {selectedCount} selected account{selectedCount === 1 ? "" : "s"} ready for the next workflow step
+            {selectedCount} account{selectedCount === 1 ? "" : "s"} in the current working group
+          </p>
+          <p className="mt-1 text-xs text-[#4f6877]">
+            {visibleSelectedCount} visible in current filters{visibleSelectedCount < selectedCount ? ` • ${selectedCount - visibleSelectedCount} outside current filters` : ""}
           </p>
           {statusMessage ? <p className="mt-1 text-xs text-[#4f6877]">{statusMessage}</p> : null}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={onAddToPending}
-            disabled={busy || !canAddToPending}
-            className="h-10 rounded-full bg-[#173543] px-4 text-sm font-semibold text-white transition hover:bg-[#0f2a35] disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            Add to Pending Stops
-          </button>
-          <button
-            type="button"
-            onClick={onOpenRoutePrep}
-            disabled={busy}
-            className="h-10 rounded-full border border-[#14b8a6] bg-white px-4 text-sm font-semibold text-[#0f766e] transition hover:bg-[#effcf9] disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            Open Route Prep
-          </button>
           {staffRole === "admin" ? (
             <button
               type="button"
@@ -1976,6 +1989,22 @@ function BulkActionBar({
           >
             Assign Route Day
           </button>
+          <button
+            type="button"
+            onClick={onAddToPending}
+            disabled={busy || !canAddToPending}
+            className="h-10 rounded-full bg-[#173543] px-4 text-sm font-semibold text-white transition hover:bg-[#0f2a35] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Add to Pending Stops
+          </button>
+          <button
+            type="button"
+            onClick={onOpenRoutePrep}
+            disabled={busy}
+            className="h-10 rounded-full border border-[#14b8a6] bg-white px-4 text-sm font-semibold text-[#0f766e] transition hover:bg-[#effcf9] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Open Map on Group
+          </button>
           {canRemoveFromPending ? (
             <button
               type="button"
@@ -1988,11 +2017,19 @@ function BulkActionBar({
           ) : null}
           <button
             type="button"
+            onClick={onCreateEmailCampaign}
+            disabled={busy}
+            className="h-10 rounded-full border border-[#173543] bg-white px-4 text-sm font-semibold text-[#173543] transition hover:bg-[#173543] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Create Email Campaign
+          </button>
+          <button
+            type="button"
             onClick={onClear}
             disabled={busy}
             className="h-10 rounded-full border border-[#d0dde5] bg-white px-4 text-sm font-semibold text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Clear Segment
+            Clear Group
           </button>
         </div>
 
