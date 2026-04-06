@@ -30,6 +30,7 @@ const NAV_SECTIONS: NavSection[] = [
       { label: "Quick Add Lead", href: "/workspace/events/quick-add" },
       { label: "Quick Add Source", href: "/workspace/sources/quick-add" },
       { label: "Segment Builder", href: "/workspace/segments" },
+      { label: "Emails", href: "/workspace/emails" },
       { label: "Tasks", href: "/workspace/tasks" },
     ],
   },

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { sendGmailMessage } from "@/lib/email/gmail";
 import { getStaffContext } from "@/lib/getStaffContext";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { sendLoggedOutboundEmail } from "@/lib/email/outbound";
 
 type EmailRecipientInput = {
   customer_id?: unknown;
@@ -83,23 +83,6 @@ async function lookupCustomerContactMap(contactIds: string[]) {
   );
 }
 
-async function insertCustomerActivity(args: {
-  customerId: string;
-  actorUserId: string;
-  activityType: "email_sent" | "email_failed";
-  summary: string;
-  details: Record<string, unknown>;
-}) {
-  const admin = createAdminClient();
-  await admin.from("customer_activity").insert({
-    customer_id: args.customerId,
-    activity_type: args.activityType,
-    summary: args.summary,
-    details: args.details,
-    actor_user_id: args.actorUserId,
-  });
-}
-
 export async function POST(request: Request) {
   const staff = await getStaffContext();
   if (!staff) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -135,7 +118,6 @@ export async function POST(request: Request) {
     recipients.map((recipient) => recipient.contactId).filter((value): value is string => Boolean(value))
   );
 
-  const admin = createAdminClient();
   const results: Array<{
     customerId: string;
     contactId: string | null;
@@ -150,74 +132,23 @@ export async function POST(request: Request) {
   for (const recipient of recipients) {
     const effectiveCustomerId = recipient.contactId ? contactToCustomerId.get(recipient.contactId) || recipient.customerId : recipient.customerId;
     const bodyHtml = buildSimpleHtmlBody(bodyText);
-    const { data: outboundRow, error: outboundInsertError } = await admin
-      .from("outbound_emails")
-      .insert({
-        customer_id: effectiveCustomerId,
-        contact_id: recipient.contactId,
-        actor_user_id: staff.userId,
-        gmail_email: "pending",
-        to_email: recipient.email,
-        cc_emails: ccEmails.length > 0 ? ccEmails : null,
-        bcc_emails: bccEmails.length > 0 ? bccEmails : null,
-        subject,
-        body_text: bodyText,
-        body_html: bodyHtml,
-        provider: "gmail",
-        status: "queued",
-      })
-      .select("id")
-      .single();
-
-    if (outboundInsertError || !outboundRow?.id) {
-      return NextResponse.json({ error: outboundInsertError?.message || "Unable to queue outbound email log." }, { status: 500 });
-    }
-
-    const sendResult = await sendGmailMessage({
-      userId: staff.userId,
-      toEmail: recipient.email,
+    const sendResult = await sendLoggedOutboundEmail({
+      gmailUserId: staff.userId,
+      actorUserId: staff.userId,
+      customerId: effectiveCustomerId,
+      contactId: recipient.contactId,
       subject,
       bodyText,
       bodyHtml,
+      toEmail: recipient.email,
       ccEmails,
       bccEmails,
+      batchLabel,
+      area,
+      routeDay,
     });
 
-    if (sendResult.ok) {
-      await admin
-        .from("outbound_emails")
-        .update({
-          gmail_connection_id: sendResult.gmailConnectionId,
-          gmail_email: sendResult.gmailEmail,
-          provider_message_id: sendResult.providerMessageId,
-          provider_thread_id: sendResult.providerThreadId,
-          status: "sent",
-          sent_at: new Date().toISOString(),
-          error_message: null,
-        })
-        .eq("id", outboundRow.id);
-
-      await insertCustomerActivity({
-        customerId: effectiveCustomerId,
-        actorUserId: staff.userId,
-        activityType: "email_sent",
-        summary: "Sent sales route email",
-        details: {
-          to: recipient.email,
-          subject,
-          provider: "gmail",
-          status: "sent",
-          provider_message_id: sendResult.providerMessageId,
-          provider_thread_id: sendResult.providerThreadId,
-          gmail_email: sendResult.gmailEmail,
-          batch_label: batchLabel,
-          area,
-          route_day: routeDay,
-          outbound_email_id: outboundRow.id,
-          contact_id: recipient.contactId,
-        },
-      });
-
+    if (sendResult.status === "sent") {
       results.push({
         customerId: effectiveCustomerId,
         contactId: recipient.contactId,
@@ -230,38 +161,6 @@ export async function POST(request: Request) {
       });
       continue;
     }
-
-    await admin
-      .from("outbound_emails")
-      .update({
-        gmail_connection_id: sendResult.gmailConnectionId,
-        gmail_email: sendResult.gmailEmail || "pending",
-        status: "failed",
-        error_message: sendResult.error,
-      })
-      .eq("id", outboundRow.id);
-
-    await insertCustomerActivity({
-      customerId: effectiveCustomerId,
-      actorUserId: staff.userId,
-      activityType: "email_failed",
-      summary: "Sales route email failed",
-      details: {
-        to: recipient.email,
-        subject,
-        provider: "gmail",
-        status: "failed",
-        provider_message_id: null,
-        provider_thread_id: null,
-        gmail_email: sendResult.gmailEmail,
-        batch_label: batchLabel,
-        area,
-        route_day: routeDay,
-        error: sendResult.error,
-        outbound_email_id: outboundRow.id,
-        contact_id: recipient.contactId,
-      },
-    });
 
     results.push({
       customerId: effectiveCustomerId,
