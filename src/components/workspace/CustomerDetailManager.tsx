@@ -1,8 +1,8 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { VISIT_OUTCOMES } from "@/components/workspace/routeUtils";
 
 type StaffOption = {
@@ -70,6 +70,30 @@ type CustomerDetailManagerProps = {
   primaryContact: PrimaryContact | null;
   contacts: PrimaryContact[];
   website: string | null;
+};
+
+type GmailConnectionState =
+  | { loading: true; connected: false; gmailEmail: null; error: null; oauthStatus: null }
+  | { loading: false; connected: true; gmailEmail: string; error: null; oauthStatus: string | null }
+  | { loading: false; connected: false; gmailEmail: null; error: string | null; oauthStatus: string | null };
+
+type EmailRecipientPreview = {
+  key: string;
+  contactId: string | null;
+  label: string;
+  email: string;
+  kind: "primary" | "contact";
+};
+
+type EmailSendResult = {
+  customerId: string;
+  contactId: string | null;
+  toEmail: string;
+  status: "sent" | "failed";
+  providerMessageId: string | null;
+  providerThreadId: string | null;
+  gmailEmail: string | null;
+  error: string | null;
 };
 
 const ROUTE_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
@@ -172,6 +196,46 @@ function normalizeWebsiteHref(value: string | null | undefined) {
   return `https://${href}`;
 }
 
+function isValidEmail(value: string | null | undefined) {
+  const email = String(value || "").trim();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function buildEmailRecipientPreview(args: { primaryContact: PrimaryContact | null; contacts: PrimaryContact[] }) {
+  const items: EmailRecipientPreview[] = [];
+  const seen = new Set<string>();
+  const pushItem = (item: EmailRecipientPreview | null) => {
+    if (!item) return;
+    const normalizedEmail = item.email.trim().toLowerCase();
+    if (!normalizedEmail || seen.has(normalizedEmail)) return;
+    seen.add(normalizedEmail);
+    items.push({ ...item, email: normalizedEmail });
+  };
+
+  if (args.primaryContact?.email && isValidEmail(args.primaryContact.email)) {
+    pushItem({
+      key: `primary:${String(args.primaryContact.id || "primary")}`,
+      contactId: String(args.primaryContact.id || "").trim() || null,
+      label: args.primaryContact.name || "Primary contact",
+      email: args.primaryContact.email,
+      kind: "primary",
+    });
+  }
+
+  for (const contact of args.contacts) {
+    if (!isValidEmail(contact.email)) continue;
+    pushItem({
+      key: `contact:${String(contact.id || contact.email || "")}`,
+      contactId: String(contact.id || "").trim() || null,
+      label: contact.name || contact.email || "Contact",
+      email: String(contact.email || ""),
+      kind: contact.isPrimary ? "primary" : "contact",
+    });
+  }
+
+  return items;
+}
+
 function addDaysDateValue(days: number) {
   const date = new Date();
   date.setDate(date.getDate() + days);
@@ -256,6 +320,7 @@ function FocusCard({
 
 export default function CustomerDetailManager(props: CustomerDetailManagerProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const defaultTaskAssigneeUserId = props.assignedSalesUserId || props.currentStaffUserId;
   const defaultTaskAssigneeLabel = props.assignedSalesLabel || props.currentStaffLabel || "You";
   const [accountBusy, setAccountBusy] = useState(false);
@@ -266,6 +331,20 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
   const [hotLeadBusy, setHotLeadBusy] = useState(false);
   const [taskBusy, setTaskBusy] = useState(false);
   const [routeQueueBusy, setRouteQueueBusy] = useState(false);
+  const [gmailStatus, setGmailStatus] = useState<GmailConnectionState>({
+    loading: true,
+    connected: false,
+    gmailEmail: null,
+    error: null,
+    oauthStatus: null,
+  });
+  const [emailDrawerOpen, setEmailDrawerOpen] = useState(false);
+  const [emailBusy, setEmailBusy] = useState(false);
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailBody, setEmailBody] = useState("");
+  const [emailBatchLabel, setEmailBatchLabel] = useState("");
+  const [selectedEmailRecipientKeys, setSelectedEmailRecipientKeys] = useState<string[]>([]);
+  const [emailResults, setEmailResults] = useState<EmailSendResult[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -395,7 +474,26 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
           ? "Create the next follow-up task before this lead cools off."
           : !hasPrimaryContact
             ? "Add the primary contact so the next outreach has a clear owner."
-            : "Update routing or log the latest account touchpoint.";
+          : "Update routing or log the latest account touchpoint.";
+  const emailRecipients = useMemo(
+    () =>
+      buildEmailRecipientPreview({
+        primaryContact: {
+          id: props.primaryContact?.id,
+          name: contactName,
+          email: contactEmail,
+          phone: contactPhone,
+          title: contactTitle,
+          isPrimary: true,
+        },
+        contacts,
+      }),
+    [contactEmail, contactName, contactPhone, contactTitle, contacts, props.primaryContact?.id]
+  );
+  const selectedEmailRecipients = useMemo(
+    () => emailRecipients.filter((recipient) => selectedEmailRecipientKeys.includes(recipient.key)),
+    [emailRecipients, selectedEmailRecipientKeys]
+  );
 
   useEffect(() => {
     setContacts(props.contacts);
@@ -420,6 +518,77 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
     setTaskAssignedUserId((current) => current || defaultTaskAssigneeUserId);
   }, [defaultTaskAssigneeUserId]);
 
+  useEffect(() => {
+    setSelectedEmailRecipientKeys((current) => {
+      const available = new Set(emailRecipients.map((recipient) => recipient.key));
+      const filtered = current.filter((key) => available.has(key));
+      const fallback = emailRecipients.slice(0, 10).map((recipient) => recipient.key);
+      const next = filtered.length > 0 ? filtered : fallback;
+      if (next.length === current.length && next.every((item, index) => item === current[index])) {
+        return current;
+      }
+      return next;
+    });
+  }, [emailRecipients]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadGmailStatus() {
+      try {
+        const res = await fetch("/api/workspace/email/connection", { cache: "no-store" });
+        const json = await parseJsonSafe(res);
+        if (!active) return;
+        if (!res.ok) {
+          setGmailStatus({
+            loading: false,
+            connected: false,
+            gmailEmail: null,
+            error: String(json.error || `Unable to load Gmail status (${res.status})`),
+            oauthStatus: null,
+          });
+          return;
+        }
+
+        const oauthStatus = String(json.oauthStatus || "").trim() || null;
+        const connected = json.connected === true && typeof json.connection === "object" && json.connection !== null;
+        if (connected) {
+          setGmailStatus({
+            loading: false,
+            connected: true,
+            gmailEmail: String((json.connection as Record<string, unknown>).gmailEmail || ""),
+            error: null,
+            oauthStatus,
+          });
+          return;
+        }
+
+        setGmailStatus({
+          loading: false,
+          connected: false,
+          gmailEmail: null,
+          error: String(json.error || "").trim() || null,
+          oauthStatus,
+        });
+      } catch (loadError) {
+        if (!active) return;
+        setGmailStatus({
+          loading: false,
+          connected: false,
+          gmailEmail: null,
+          error: loadError instanceof Error ? loadError.message : "Unable to load Gmail connection status",
+          oauthStatus: null,
+        });
+      }
+    }
+
+    void loadGmailStatus();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const selectedTaskAssigneeLabel =
     props.salesOptions.find((option) => option.userId === taskAssignedUserId)?.label ||
     (taskAssignedUserId === props.currentStaffUserId ? defaultTaskAssigneeLabel : null);
@@ -427,6 +596,15 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
   function setSuccessMessage(message: string) {
     setSuccess(message);
     setError(null);
+  }
+
+  function toggleEmailRecipient(key: string) {
+    setSelectedEmailRecipientKeys((current) => (current.includes(key) ? current.filter((item) => item !== key) : [...current, key]));
+  }
+
+  function connectGoogleMailbox() {
+    const returnTo = pathname || `/workspace/customers/${props.customerId}`;
+    window.location.href = `/api/workspace/email/oauth/start?returnTo=${encodeURIComponent(returnTo)}`;
   }
 
   function markActivityTouched(timestamp = new Date().toISOString()) {
@@ -928,6 +1106,69 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
     }
   }
 
+  async function sendRouteEmail() {
+    if (!gmailStatus.connected) {
+      setError(gmailStatus.error || "Connect a Google mailbox before sending route email.");
+      setSuccess(null);
+      return;
+    }
+
+    if (!emailSubject.trim()) {
+      setError("Enter an email subject first.");
+      setSuccess(null);
+      return;
+    }
+
+    if (!emailBody.trim()) {
+      setError("Enter an email body first.");
+      setSuccess(null);
+      return;
+    }
+
+    if (selectedEmailRecipients.length === 0) {
+      setError("Select at least one recipient with a valid email.");
+      setSuccess(null);
+      return;
+    }
+
+    setEmailBusy(true);
+    setError(null);
+    setSuccess(null);
+    setEmailResults([]);
+
+    try {
+      const res = await fetch("/api/workspace/email/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customer_id: props.customerId,
+          subject: emailSubject,
+          body: emailBody,
+          batch_label: emailBatchLabel || null,
+          route_day: routeDay || null,
+          recipients: selectedEmailRecipients.map((recipient) => ({
+            customer_id: props.customerId,
+            contact_id: recipient.contactId,
+            email: recipient.email,
+          })),
+        }),
+      });
+      const json = await parseJsonSafe(res);
+      if (!res.ok) throw new Error(String(json.error || `Send failed (${res.status})`));
+
+      const results = Array.isArray(json.results) ? (json.results as EmailSendResult[]) : [];
+      setEmailResults(results);
+      markActivityTouched();
+      setSuccessMessage(`Route email finished: ${Number(json.sentCount || 0)} sent, ${Number(json.failedCount || 0)} failed.`);
+      router.refresh();
+    } catch (sendError) {
+      setError(sendError instanceof Error ? sendError.message : "Send failed");
+      setSuccess(null);
+    } finally {
+      setEmailBusy(false);
+    }
+  }
+
   return (
     <div className="space-y-3">
       {error ? <p className="rounded-xl border border-[#f1d1d1] bg-[#fff5f5] px-3 py-2 text-sm text-[#991b1b]">{error}</p> : null}
@@ -1006,7 +1247,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
 
         <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-8">
           <ActionButton href={callHref} label="Call" />
-          <ActionButton href={emailHref} label="Email" />
+          <ActionButton label="Route Email" onClick={() => jumpToSection("customer-route-email")} />
           <ActionButton label="Text" disabled helper="Coming soon" />
           <ActionButton label="New Task" onClick={() => jumpToSection("customer-create-task", taskTitleInputRef.current)} />
           <ActionButton href={websiteHref} label="SITE" disabled={!websiteHref} />
@@ -1557,6 +1798,138 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
           description="Capture the latest account context, assign the next task, and leave clean internal handoff notes from one place."
         />
         <div className="mt-3 grid gap-3 xl:grid-cols-3">
+          <div id="customer-route-email" className="scroll-mt-28 rounded-2xl border border-[#dbe9ef] bg-[#f9fcfd] p-3 xl:col-span-3">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-[#173543]">Route Email</p>
+                <p className="mt-1 text-sm text-[#5c7483]">Send one Gmail message per selected contact and log each send attempt into the account timeline.</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <StatusPill
+                  label={
+                    gmailStatus.loading
+                      ? "Checking mailbox"
+                      : gmailStatus.connected
+                        ? `Connected ${gmailStatus.gmailEmail}`
+                        : "Mailbox disconnected"
+                  }
+                  tone={gmailStatus.loading ? "neutral" : gmailStatus.connected ? "ok" : "warn"}
+                />
+                <button
+                  type="button"
+                  onClick={connectGoogleMailbox}
+                  className="rounded-full border border-[#cfdde6] bg-white px-3 py-1.5 text-sm font-semibold text-[#21424d] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
+                >
+                  {gmailStatus.connected ? "Reconnect Google" : "Connect Google"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEmailDrawerOpen((current) => !current)}
+                  className="rounded-full bg-[#173543] px-3.5 py-1.5 text-sm font-semibold text-white"
+                >
+                  {emailDrawerOpen ? "Close Compose" : "Open Compose"}
+                </button>
+              </div>
+            </div>
+
+            {gmailStatus.oauthStatus ? (
+              <p
+                className={[
+                  "mt-3 rounded-xl border px-3 py-2 text-sm",
+                  gmailStatus.oauthStatus.startsWith("connected:")
+                    ? "border-[#bfe8df] bg-[#effcf8] text-[#0f766e]"
+                    : "border-[#f1d1d1] bg-[#fff5f5] text-[#991b1b]",
+                ].join(" ")}
+              >
+                {gmailStatus.oauthStatus.startsWith("connected:")
+                  ? `Google mailbox connected: ${gmailStatus.oauthStatus.replace(/^connected:/, "").trim()}`
+                  : gmailStatus.oauthStatus}
+              </p>
+            ) : null}
+
+            {!emailDrawerOpen ? null : (
+              <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1.3fr)_minmax(280px,0.7fr)]">
+                <div className="grid gap-3">
+                  <label className="grid gap-1 text-sm text-[#4a6575]">
+                    <span>Subject</span>
+                    <input value={emailSubject} onChange={(event) => setEmailSubject(event.target.value)} disabled={emailBusy} className={inputClass} placeholder="Route follow-up for this week" />
+                  </label>
+                  <label className="grid gap-1 text-sm text-[#4a6575]">
+                    <span>Body</span>
+                    <textarea
+                      value={emailBody}
+                      onChange={(event) => setEmailBody(event.target.value)}
+                      rows={8}
+                      disabled={emailBusy}
+                      className="rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a]"
+                      placeholder="Write the route outreach message. Each selected recipient gets an individual Gmail send."
+                    />
+                  </label>
+                  <label className="grid gap-1 text-sm text-[#4a6575]">
+                    <span>Batch Label</span>
+                    <input value={emailBatchLabel} onChange={(event) => setEmailBatchLabel(event.target.value)} disabled={emailBusy} className={inputClass} placeholder="SFV Tuesday route" />
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    <button type="button" onClick={() => void sendRouteEmail()} disabled={emailBusy || !gmailStatus.connected} className="rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+                      {emailBusy ? "Sending..." : `Send ${selectedEmailRecipients.length} Email${selectedEmailRecipients.length === 1 ? "" : "s"}`}
+                    </button>
+                    {emailHref ? <ActionButton href={emailHref} label="Open Mailto" /> : null}
+                  </div>
+                </div>
+
+                <aside className="rounded-2xl border border-[#dbe9ef] bg-white p-3">
+                  <p className="text-sm font-semibold text-[#173543]">Recipient Preview</p>
+                  <p className="mt-1 text-sm text-[#5c7483]">Blank or invalid emails are excluded automatically. Max 50 recipients per request.</p>
+                  <div className="mt-3 space-y-2.5">
+                    {emailRecipients.map((recipient) => {
+                      const checked = selectedEmailRecipientKeys.includes(recipient.key);
+                      return (
+                        <label key={recipient.key} className="flex items-start gap-3 rounded-xl border border-[#dbe9ef] bg-[#f9fcfd] px-3 py-2.5">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleEmailRecipient(recipient.key)}
+                            className="mt-1 h-4 w-4 rounded border-[#cfdde6] text-[#14b8a6]"
+                          />
+                          <span className="min-w-0">
+                            <span className="block font-semibold text-[#173543]">{recipient.label}</span>
+                            <span className="mt-1 block text-sm text-[#4a6575]">{recipient.email}</span>
+                            <span className="mt-1 block text-xs uppercase tracking-wide text-[#6b8593]">{recipient.kind === "primary" ? "Primary contact" : "Additional contact"}</span>
+                          </span>
+                        </label>
+                      );
+                    })}
+                    {emailRecipients.length === 0 ? <div className="rounded-xl border border-dashed border-[#d3e1e8] bg-[#f9fcfd] px-3 py-4 text-sm text-[#5d7685]">No valid contact emails are available on this account.</div> : null}
+                  </div>
+                </aside>
+              </div>
+            )}
+
+            {emailResults.length > 0 ? (
+              <div className="mt-3 rounded-2xl border border-[#dbe9ef] bg-white p-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <StatusPill label={`${emailResults.filter((result) => result.status === "sent").length} sent`} tone="ok" />
+                  <StatusPill label={`${emailResults.filter((result) => result.status === "failed").length} failed`} tone={emailResults.some((result) => result.status === "failed") ? "warn" : "neutral"} />
+                </div>
+                <div className="mt-3 space-y-2.5">
+                  {emailResults.map((result) => (
+                    <div key={`${result.toEmail}:${result.contactId || "none"}`} className="rounded-xl border border-[#dbe9ef] bg-[#f9fcfd] px-3 py-2.5">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-semibold text-[#173543]">{result.toEmail}</p>
+                        <StatusPill label={result.status === "sent" ? "Sent" : "Failed"} tone={result.status === "sent" ? "ok" : "warn"} />
+                      </div>
+                      <p className="mt-1 text-sm text-[#4a6575]">
+                        {result.gmailEmail || "Gmail mailbox unavailable"}
+                        {result.providerThreadId ? ` • Thread ${result.providerThreadId}` : ""}
+                      </p>
+                      {result.error ? <p className="mt-1 text-sm text-[#9f2a2a]">{result.error}</p> : null}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
+
           <div id="customer-log-activity" className="scroll-mt-28 rounded-2xl border border-[#dbe9ef] bg-[#f9fcfd] p-3">
             <p className="text-sm font-semibold text-[#173543]">Log Activity</p>
             <p className="mt-1 text-sm text-[#5c7483]">Capture the call, email, meeting, or task update that moved the account.</p>

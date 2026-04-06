@@ -34,6 +34,12 @@ function getActivityNotes(details: Record<string, unknown> | null): string | nul
   return text || null;
 }
 
+function getActivityDetailText(details: Record<string, unknown> | null, key: string): string | null {
+  const value = details?.[key];
+  const text = typeof value === "string" ? value.trim() : "";
+  return text || null;
+}
+
 function readHotLeadState(details: Record<string, unknown> | null): boolean | null {
   const value = details?.hot_lead;
   if (value === true || value === "true" || value === 1 || value === "1") return true;
@@ -397,6 +403,15 @@ function ActivityCard({
 }) {
   const notes = getActivityNotes(item.details);
   const hotLeadState = readHotLeadState(item.details);
+  const to = getActivityDetailText(item.details, "to");
+  const subject = getActivityDetailText(item.details, "subject");
+  const provider = getActivityDetailText(item.details, "provider");
+  const gmailEmail = getActivityDetailText(item.details, "gmail_email");
+  const batchLabel = getActivityDetailText(item.details, "batch_label");
+  const routeDay = getActivityDetailText(item.details, "route_day");
+  const error = getActivityDetailText(item.details, "error");
+  const threadId = getActivityDetailText(item.details, "provider_thread_id");
+  const isEmailActivity = item.activityType === "email_sent" || item.activityType === "email_failed";
 
   return (
     <div className="rounded-xl border border-[#dbe9ef] bg-[#f9fcfd] px-3 py-2.5">
@@ -412,6 +427,15 @@ function ActivityCard({
       <p className="mt-1 text-xs uppercase tracking-wide text-[#6b8593]">
         {item.activityType}{item.entityType ? ` • ${item.entityType}` : ""}
       </p>
+      {isEmailActivity ? (
+        <div className="mt-2 space-y-1 text-sm text-[#4a6575]">
+          <p>{to ? `To ${to}` : "Recipient unavailable"}{subject ? ` • ${subject}` : ""}</p>
+          <p>{provider ? `Provider ${provider}` : "Provider unavailable"}{gmailEmail ? ` • Sent from ${gmailEmail}` : ""}</p>
+          {batchLabel || routeDay ? <p>{batchLabel ? `Batch ${batchLabel}` : "Batch not set"}{routeDay ? ` • ${routeDay}` : ""}</p> : null}
+          {threadId ? <p>Thread {threadId}</p> : null}
+          {error ? <p className="text-[#9f2a2a]">{error}</p> : null}
+        </div>
+      ) : null}
       {notes ? <p className="mt-2 whitespace-pre-wrap text-sm text-[#4a6575]">{notes}</p> : null}
     </div>
   );
