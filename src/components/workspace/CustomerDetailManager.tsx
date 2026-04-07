@@ -435,6 +435,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
   const [routeOutcomeTaskEnabled, setRouteOutcomeTaskEnabled] = useState(false);
   const [routeOutcomeTaskTitle, setRouteOutcomeTaskTitle] = useState("");
   const [routeOutcomeTaskDueDate, setRouteOutcomeTaskDueDate] = useState("");
+  const emailSubjectInputRef = useRef<HTMLInputElement | null>(null);
   const taskTitleInputRef = useRef<HTMLInputElement | null>(null);
   const activitySummaryInputRef = useRef<HTMLInputElement | null>(null);
   const accountCompanyInputRef = useRef<HTMLInputElement | null>(null);
@@ -534,6 +535,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
   const primaryDisplayName = contactName.trim() || "No primary contact";
   const primaryDisplayTitle = contactTitle?.trim() || "No title";
   const primaryDisplayEmail = contactEmail?.trim() || "No email";
+  const hasPrimaryQuickActions = Boolean(callHref || emailHref);
 
   useEffect(() => {
     setContacts(props.contacts);
@@ -698,6 +700,15 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
     setEmailResults([]);
     setError(null);
     setSuccess(null);
+  }
+
+  function openAccountEmailForPrimary() {
+    const primaryRecipient = emailRecipients.find((recipient) => recipient.kind === "primary");
+    if (!primaryRecipient) return;
+
+    openEmailCompose();
+    setSelectedEmailRecipientKeys([primaryRecipient.key]);
+    jumpToSection("customer-route-email", emailSubjectInputRef.current);
   }
 
   function connectGoogleMailbox() {
@@ -2205,7 +2216,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
                 <div className="grid gap-3">
                   <label className="grid gap-1 text-sm text-[#4a6575]">
                     <span>Subject</span>
-                    <input value={emailSubject} onChange={(event) => setEmailSubject(event.target.value)} disabled={emailBusy} className={inputClass} placeholder="Follow-up on your account" />
+                    <input ref={emailSubjectInputRef} value={emailSubject} onChange={(event) => setEmailSubject(event.target.value)} disabled={emailBusy} className={inputClass} placeholder="Follow-up on your account" />
                   </label>
                   <label className="grid gap-1 text-sm text-[#4a6575]">
                     <span>Body</span>
@@ -2331,6 +2342,51 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
           <div id="customer-create-task" className="scroll-mt-28 rounded-2xl border border-[#dbe9ef] bg-[#f9fcfd] p-3">
             <p className="text-sm font-semibold text-[#173543]">Create Follow-Up Task</p>
             <p className="mt-1 text-sm text-[#5c7483]">Assign the next explicit owner, due date, time, and optional browser reminder for this account.</p>
+            <div className="mt-3 rounded-xl border border-[#dbe9ef] bg-white px-3 py-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7a909d]">Primary Contact Quick Actions</p>
+                  <p className="mt-1 text-sm text-[#4a6575]">
+                    {hasPrimaryQuickActions
+                      ? `Uses the current primary contact: ${primaryDisplayName}`
+                      : "Add a primary contact email or phone to use these quick actions."}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <a
+                    href={callHref || undefined}
+                    className={[
+                      "rounded-full border px-3 py-1.5 text-sm font-semibold transition",
+                      callHref
+                        ? "border-[#d0dde5] bg-white text-[#24404d] hover:border-[#14b8a6] hover:text-[#0f766e]"
+                        : "pointer-events-none cursor-not-allowed border-[#e2eaee] bg-[#f5f8fa] text-[#8ba0ac]",
+                    ].join(" ")}
+                  >
+                    Call (Primary)
+                  </a>
+                  <button
+                    type="button"
+                    onClick={openAccountEmailForPrimary}
+                    className={[
+                      "rounded-full border px-3 py-1.5 text-sm font-semibold transition",
+                      emailHref
+                        ? "border-[#d0dde5] bg-white text-[#24404d] hover:border-[#14b8a6] hover:text-[#0f766e]"
+                        : "pointer-events-none cursor-not-allowed border-[#e2eaee] bg-[#f5f8fa] text-[#8ba0ac]",
+                    ].join(" ")}
+                    disabled={!emailHref}
+                  >
+                    Email (Primary)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => jumpToSection("customer-account-management", accountCompanyInputRef.current)}
+                    className="rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm font-semibold text-[#24404d] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
+                  >
+                    Open Account
+                  </button>
+                </div>
+              </div>
+            </div>
             <div className="mt-3 grid gap-3">
               <label className="grid gap-1 text-sm text-[#4a6575]">
                 <span>Title</span>
