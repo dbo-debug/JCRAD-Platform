@@ -1865,24 +1865,16 @@ function CustomerCard({
           </div>
           <div className="min-w-0 space-y-2">
             <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={(event) => {
-                  stopCardEvent(event);
-                  onFocus(customer.id);
-                }}
+              <Link
+                href={`/workspace/customers/${customer.id}`}
+                onClick={stopCardEvent}
                 className={[
                   "truncate text-left text-base font-semibold transition",
                   focused ? "text-[#0f766e]" : "text-[#173543] hover:text-[#0f766e]",
                 ].join(" ")}
               >
                 {customer.name}
-              </button>
-              {focused ? (
-                <span className="rounded-full border border-[#d7e6ed] bg-[#f4f9fc] px-2 py-0.5 text-[11px] font-semibold text-[#173543]">
-                  Focused
-                </span>
-              ) : null}
+              </Link>
               {selected ? (
                 <span className="rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-2 py-0.5 text-[11px] font-semibold text-[#2563eb]">
                   In Group

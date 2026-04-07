@@ -70,6 +70,19 @@ function formatAddress(customer: {
   return [lineOne, lineTwo].filter(Boolean).join(" • ") || null;
 }
 
+function normalizeTelHref(value: string | null | undefined) {
+  const phone = String(value || "").trim();
+  if (!phone) return null;
+  const normalized = phone.replace(/[^\d+]/g, "");
+  const digits = normalized.replace(/\D/g, "");
+  return digits.length >= 7 ? `tel:${normalized}` : null;
+}
+
+function normalizeMailtoHref(value: string | null | undefined) {
+  const email = String(value || "").trim();
+  return email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? `mailto:${email}` : null;
+}
+
 export default async function WorkspaceCustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const staff = await requireStaff();
   const { id } = await params;
@@ -103,6 +116,8 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
     String(authEmailById.get(staff.userId) || "").trim() ||
     staff.userId;
   const primaryContact = detail.contacts.find((contact) => contact.isPrimary) || null;
+  const primaryCallHref = normalizeTelHref(primaryContact?.phone || detail.customer.mainPhone);
+  const primaryEmailHref = normalizeMailtoHref(primaryContact?.email || detail.customer.primaryContactEmail);
   const territoryOptions = territories.map((territory) => ({
     code: territory.code,
     label: formatTerritoryOptionLabel(territory),
@@ -251,6 +266,36 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
                     <> • Reminder {task.reminderOffsetMinutes === 0 ? "at task time" : `${task.reminderOffsetMinutes} min before`}</>
                   ) : null}
                 </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <a
+                    href={primaryCallHref || undefined}
+                    className={[
+                      "rounded-full border px-3 py-1.5 text-sm font-semibold transition",
+                      primaryCallHref
+                        ? "border-[#d0dde5] bg-white text-[#24404d] hover:border-[#14b8a6] hover:text-[#0f766e]"
+                        : "pointer-events-none cursor-not-allowed border-[#e2eaee] bg-[#f5f8fa] text-[#8ba0ac]",
+                    ].join(" ")}
+                  >
+                    Call
+                  </a>
+                  <a
+                    href={primaryEmailHref || undefined}
+                    className={[
+                      "rounded-full border px-3 py-1.5 text-sm font-semibold transition",
+                      primaryEmailHref
+                        ? "border-[#d0dde5] bg-white text-[#24404d] hover:border-[#14b8a6] hover:text-[#0f766e]"
+                        : "pointer-events-none cursor-not-allowed border-[#e2eaee] bg-[#f5f8fa] text-[#8ba0ac]",
+                    ].join(" ")}
+                  >
+                    Email
+                  </a>
+                  <Link
+                    href={`/workspace/customers/${detail.customer.id}#customer-account-management`}
+                    className="rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm font-semibold text-[#24404d] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
+                  >
+                    Open Account
+                  </Link>
+                </div>
               </div>
             ))}
             {detail.tasks.length === 0 ? <EmptyState label="No customer tasks yet." /> : null}

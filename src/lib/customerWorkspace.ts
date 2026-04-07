@@ -228,11 +228,25 @@ function getRowTimestamp(value: unknown): number {
   return Number.isFinite(parsed) ? parsed : -1;
 }
 
-function getLastContactedAt(activityRows: GenericRow[]): string | null {
-  return activityRows
-    .filter((row) => CONTACT_ACTIVITY_TYPES.has(normalizeText(row.activity_type)))
-    .map((row) => firstText(row.created_at))
-    .filter((value): value is string => Boolean(value))
+function isContactActivityRow(row: GenericRow) {
+  const activityType = normalizeText(row.activity_type);
+  if (!activityType) return false;
+  if (CONTACT_ACTIVITY_TYPES.has(activityType)) return true;
+  if (activityType.startsWith("call")) return true;
+  if (activityType === "email" || activityType.startsWith("email_")) return true;
+  if (activityType === "sms" || activityType.startsWith("sms_")) return true;
+  if (activityType.includes("meeting")) return true;
+  return false;
+}
+
+function getLastContactedAt(args: { customer: GenericRow; activityRows: GenericRow[] }): string | null {
+  return uniqueStrings([
+    firstText(args.customer.last_contacted_at, args.customer.first_contacted_at, args.customer.contacted_at),
+    ...args.activityRows
+      .filter((row) => isContactActivityRow(row))
+      .map((row) => firstText(row.created_at)),
+  ])
+    .filter(Boolean)
     .map((value) => ({ value, time: Date.parse(value) }))
     .filter((row) => Number.isFinite(row.time))
     .sort((a, b) => b.time - a.time)[0]?.value || null;
@@ -662,15 +676,17 @@ export async function loadCustomerWorkspaceDetail(customerId: string): Promise<C
     data.customerTasks
       .filter((row) => String(row.customer_id || "").trim() === customerId)
       .map((row) => {
-        const assignee = profileById.get(String(row.assigned_user_id || ""));
+        const assignedUserId = firstText(row.assigned_user_id);
+        const assignee = profileById.get(String(assignedUserId || ""));
+        const assigneeAuthUser = assignedUserId ? authUserById.get(assignedUserId) : null;
         const completedAt = firstText(row.completed_at) || null;
         return {
           id: String(row.id || ""),
           title: firstText(row.title) || "Untitled task",
           dueDate: firstText(row.due_date),
           dueAt: firstText(row.due_at),
-          assignedUserId: firstText(row.assigned_user_id),
-          assignedUserName: formatProfileName(assignee),
+          assignedUserId,
+          assignedUserName: formatProfileName(assignee) || firstText(assigneeAuthUser?.email) || assignedUserId,
           status: firstText(row.status) || "open",
           priority: typeof row.priority === "number" ? row.priority : Number.isFinite(Number(row.priority)) ? Number(row.priority) : null,
           reminderOffsetMinutes:
@@ -769,7 +785,7 @@ function buildCustomerSummary({
     accountId: identifiers.accountId,
     userIds: membershipUserIds,
   });
-  const lastContactedAt = getLastContactedAt(activityRows);
+  const lastContactedAt = getLastContactedAt({ customer, activityRows });
 
   const assignedSalesUserId = firstText(customer.assigned_sales_user_id, customer.owner_user_id);
   const assignedSalesProfile = assignedSalesUserId ? profileById.get(assignedSalesUserId) : null;
