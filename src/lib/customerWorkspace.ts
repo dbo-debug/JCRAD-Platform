@@ -190,8 +190,11 @@ const CONTACT_ACTIVITY_TYPES = new Set([
   "call",
   "email",
   "email_sent",
+  "email_received",
   "sms_sent",
   "meeting",
+  "visit_logged",
+  "visit_completed",
 ]);
 
 function uniqueStrings(values: Array<unknown>): string[] {
@@ -236,6 +239,7 @@ function isContactActivityRow(row: GenericRow) {
   if (activityType === "email" || activityType.startsWith("email_")) return true;
   if (activityType === "sms" || activityType.startsWith("sms_")) return true;
   if (activityType.includes("meeting")) return true;
+  if (activityType === "visit" || activityType.startsWith("visit_")) return true;
   return false;
 }
 

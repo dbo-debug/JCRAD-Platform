@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { startTransition, useCallback, useEffect, useMemo, useState, type KeyboardEvent, type MouseEvent } from "react";
 import type { CustomerSummary } from "@/lib/customerWorkspace";
-import { isRouteEligibleCustomer } from "@/lib/routeEligibility";
 import type { PendingRouteStop } from "@/lib/routeStopQueue";
 import type { RouteRepOption, TerritoryOption } from "@/lib/routeWorkspace";
 import CustomerSelectionMap from "@/components/workspace/CustomerSelectionMap";
@@ -35,7 +34,6 @@ type CustomerWorkspaceIndexProps = {
     status: string;
     stage: string;
     contactCoverage: string;
-    routeReadiness: string;
     orderState: string;
     organizeBy: string;
     sort: string;
@@ -45,7 +43,6 @@ type CustomerWorkspaceIndexProps = {
 type BulkActionKind =
   | "assign_sales_rep"
   | "assign_territory"
-  | "assign_route_day"
   | "add_to_pending_stops"
   | "remove_from_pending_stops"
   | "convert_to_source"
@@ -59,14 +56,12 @@ type BulkActionState = {
 type SavedViewKey = "all" | "pipeline" | "unassigned" | "missing_primary" | "with_orders" | "hall_of_flowers" | "needs_coordinates" | "archived";
 type SortKey = "activity_desc" | "name_asc" | "name_desc" | "orders_desc" | "owner_asc";
 type ContactCoverageFilter = "all" | "has_contacts" | "missing_primary" | "no_contacts";
-type RouteReadinessFilter = "all" | "route_ready" | "no_territory" | "no_route_rep" | "no_coords" | "address_ready";
 type OrderStateFilter = "all" | "has_orders" | "no_orders";
 type HotLeadFilter = "all" | "hot" | "not_hot";
 type TaskStateFilter = "all" | "has_open_task" | "no_open_task" | "overdue_task";
-type OrganizeBy = "none" | "territory" | "owner" | "route_day" | "stage";
-type WorkflowMode = "work_queue" | "segment_builder" | "route_prep";
+type OrganizeBy = "none" | "territory" | "owner" | "stage";
+type WorkflowMode = "work_queue" | "segment_builder";
 
-const ROUTE_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const WORKSPACE_STICKY_TOP_CLASS = "top-[calc(var(--workspace-header-offset,5rem)+1rem)]";
 const CUSTOMER_SEGMENT_STORAGE_KEY_PREFIX = "jc-rad:customer-segment";
 const EMAIL_CAMPAIGN_WORKING_GROUP_HANDOFF_KEY = "jc-rad:email-campaign-working-group";
@@ -100,12 +95,6 @@ const WORKFLOW_MODE_COPY: Record<
     title: "Segment Builder",
     description: "Target broader account sets for sourcing, outreach prep, and operational selection.",
     helper: "Use this mode when you need filtering depth, grouping, and persistent working-group behavior.",
-  },
-  route_prep: {
-    label: "Route Prep",
-    title: "Route Prep",
-    description: "Route-ready accounts, coordinate cleanup, pending stop candidates, and territory planning.",
-    helper: "Use this mode to prep field work before you jump into routes or the route runner.",
   },
 };
 
@@ -338,18 +327,9 @@ function toolbarSelectClass() {
   return "h-9 min-w-0 rounded-full border border-[#cedde6] bg-[#fbfdfe] px-3 text-sm text-[#173543] outline-none transition focus:border-[#14b8a6] focus:bg-white";
 }
 
-function getRouteReadiness(customer: CustomerSummary): Exclude<RouteReadinessFilter, "all"> | "other" {
-  if (!customer.territoryCode) return "no_territory";
-  if (!customer.assignedRouteRepUserId) return "no_route_rep";
-  const coordinateState = getCoordinateCoverageState(customer);
-  if (coordinateState === "address_ready") return "address_ready";
-  if (coordinateState !== "has_coords") return "no_coords";
-  return isRouteEligibleCustomer(customer) ? "route_ready" : "other";
-}
-
 function compareGroupLabels(left: string, right: string) {
-  if (left.startsWith("Unassigned") || left === "No Stage" || left === "No Route Day") return 1;
-  if (right.startsWith("Unassigned") || right === "No Stage" || right === "No Route Day") return -1;
+  if (left.startsWith("Unassigned") || left === "No Stage") return 1;
+  if (right.startsWith("Unassigned") || right === "No Stage") return -1;
   return left.localeCompare(right);
 }
 
@@ -357,7 +337,6 @@ function getWorkflowMode(args: {
   savedView: SavedViewKey;
   hotLeadFilter: HotLeadFilter;
   taskStateFilter: TaskStateFilter;
-  routeReadiness: RouteReadinessFilter;
   orderState: OrderStateFilter;
   organizeBy: OrganizeBy;
   sourceFilter: string;
@@ -369,12 +348,10 @@ function getWorkflowMode(args: {
 }) {
   if (
     args.savedView === "needs_coordinates" ||
-    args.routeReadiness !== "all" ||
     args.organizeBy === "territory" ||
-    args.organizeBy === "route_day" ||
     args.territoryFilter !== "all"
   ) {
-    return "route_prep" satisfies WorkflowMode;
+    return "segment_builder" satisfies WorkflowMode;
   }
 
   if (
@@ -407,19 +384,18 @@ function getWorkflowSummary(args: {
   savedView: SavedViewKey;
   hotLeadFilter: HotLeadFilter;
   taskStateFilter: TaskStateFilter;
-  routeReadiness: RouteReadinessFilter;
   orderState: OrderStateFilter;
   visibleCount: number;
   visibleWithOrders: number;
-  routeReadyCount: number;
+  visibleMappedCount: number;
   hotLeadCount: number;
   overdueCount: number;
 }) {
-  if (args.savedView === "needs_coordinates" || args.routeReadiness === "no_coords") {
+  if (args.savedView === "needs_coordinates") {
     return {
       eyebrow: "Focused Handoff",
-      title: "Route cleanup queue",
-      description: `${args.visibleCount} accounts need coordinate or address work before they can move into route planning.`,
+      title: "Map cleanup queue",
+      description: `${args.visibleCount} accounts need coordinate or address work before they can move cleanly into field planning.`,
     };
   }
   if (args.taskStateFilter === "overdue_task") {
@@ -450,19 +426,11 @@ function getWorkflowSummary(args: {
       description: `${args.visibleWithOrders} accounts have order activity and may need follow-up or progression.`,
     };
   }
-
-  if (args.mode === "route_prep") {
-    return {
-      eyebrow: "Workflow Mode",
-      title: "Route Prep",
-      description: `${args.routeReadyCount} visible accounts are route-ready. Use this surface to clean, group, and queue field work.`,
-    };
-  }
   if (args.mode === "segment_builder") {
     return {
       eyebrow: "Workflow Mode",
       title: "Segment Builder",
-      description: `${args.visibleCount} accounts are in your current targeting set. Refine the filters, build a working group, then act on it.`,
+      description: `${args.visibleCount} accounts are in your current targeting set. Refine the filters, build a working group, then act on it. ${args.visibleMappedCount} are mappable right now.`,
     };
   }
   return {
@@ -518,22 +486,12 @@ export default function CustomerWorkspaceIndex({
       ? initialFilters.contactCoverage
       : "all"
   );
-  const [routeReadiness, setRouteReadiness] = useState<RouteReadinessFilter>(
-    initialFilters.routeReadiness === "route_ready" ||
-      initialFilters.routeReadiness === "no_territory" ||
-      initialFilters.routeReadiness === "no_route_rep" ||
-      initialFilters.routeReadiness === "no_coords" ||
-      initialFilters.routeReadiness === "address_ready"
-      ? initialFilters.routeReadiness
-      : "all"
-  );
   const [orderState, setOrderState] = useState<OrderStateFilter>(
     initialFilters.orderState === "has_orders" || initialFilters.orderState === "no_orders" ? initialFilters.orderState : "all"
   );
   const [organizeBy, setOrganizeBy] = useState<OrganizeBy>(
     initialFilters.organizeBy === "territory" ||
       initialFilters.organizeBy === "owner" ||
-      initialFilters.organizeBy === "route_day" ||
       initialFilters.organizeBy === "stage"
       ? initialFilters.organizeBy
       : "none"
@@ -564,7 +522,6 @@ export default function CustomerWorkspaceIndex({
         initialFilters.owner ||
         initialFilters.status ||
         initialFilters.stage ||
-        (initialFilters.routeReadiness && initialFilters.routeReadiness !== "all") ||
         (initialFilters.orderState && initialFilters.orderState !== "all")
     )
   );
@@ -601,7 +558,6 @@ export default function CustomerWorkspaceIndex({
     setQueryParam(params, "status", statusFilter);
     setQueryParam(params, "stage", stageFilter);
     setQueryParam(params, "contactCoverage", contactCoverage);
-    setQueryParam(params, "routeReadiness", routeReadiness);
     setQueryParam(params, "orderState", orderState);
     setQueryParam(params, "organizeBy", organizeBy, ["none", ""]);
     setQueryParam(params, "sort", sortKey, ["activity_desc", ""]);
@@ -616,7 +572,6 @@ export default function CustomerWorkspaceIndex({
     organizeBy,
     ownerFilter,
     pathname,
-    routeReadiness,
     router,
     savedView,
     searchParams,
@@ -652,7 +607,6 @@ export default function CustomerWorkspaceIndex({
     if (contactCoverage === "has_contacts" && customer.contactCount === 0) return false;
     if (contactCoverage === "missing_primary" && customer.primaryContacts.length > 0) return false;
     if (contactCoverage === "no_contacts" && customer.contactCount > 0) return false;
-    if (routeReadiness !== "all" && getRouteReadiness(customer) !== routeReadiness) return false;
     if (orderState === "has_orders" && customer.counts.orders === 0) return false;
     if (orderState === "no_orders" && customer.counts.orders > 0) return false;
 
@@ -702,17 +656,13 @@ export default function CustomerWorkspaceIndex({
   const canRemoveSelectedFromPending = selectedSegmentPendingCount > 0;
   const mapCustomers = mapSurfaceMode === "segment" ? selectedSegmentCustomers : visibleCustomers;
   const mapScopedSelectedCustomerIds = mapCustomers.filter((customer) => selectedCustomerIdSet.has(customer.id)).map((customer) => customer.id);
-  const focusedVisibleCustomer = visibleCustomers.find((customer) => customer.id === focusedCustomerId) || null;
   const focusedMapCustomer = mapCustomers.find((customer) => customer.id === focusedCustomerId) || null;
   const allVisibleSelected = visibleCustomers.length > 0 && selectedVisibleCustomerIds.length === visibleCustomers.length;
 
   const visibleWithOwners = visibleCustomers.filter((customer) => customer.assignedSalesName).length;
   const hotLeadCount = visibleCustomers.filter((customer) => customer.isHotLead).length;
   const overdueVisibleCount = visibleCustomers.filter((customer) => customer.overdueTaskCount > 0).length;
-  const routeReadyCount = visibleCustomers.filter((customer) => getRouteReadiness(customer) === "route_ready").length;
   const visibleMappedCount = visibleCustomers.filter((customer) => getCoordinateCoverageState(customer) === "has_coords").length;
-  const selectedSegmentMappedCount = selectedSegmentCustomers.filter((customer) => getCoordinateCoverageState(customer) === "has_coords").length;
-  const selectedSegmentRouteReadyCount = selectedSegmentCustomers.filter((customer) => getRouteReadiness(customer) === "route_ready").length;
   const visibleWithOrders = visibleCustomers.filter((customer) => customer.counts.orders > 0).length;
   const navCounts = {
     all: activeCustomers.length,
@@ -730,7 +680,6 @@ export default function CustomerWorkspaceIndex({
     sourceFilter !== "all",
     importSourceFilter !== "all",
     contactCoverage !== "all",
-    routeReadiness !== "all",
     orderState !== "all",
     organizeBy !== "none",
   ].filter(Boolean).length;
@@ -738,7 +687,6 @@ export default function CustomerWorkspaceIndex({
     savedView,
     hotLeadFilter,
     taskStateFilter,
-    routeReadiness,
     orderState,
     organizeBy,
     sourceFilter,
@@ -753,33 +701,22 @@ export default function CustomerWorkspaceIndex({
     savedView,
     hotLeadFilter,
     taskStateFilter,
-    routeReadiness,
     orderState,
     visibleCount: visibleCustomers.length,
     visibleWithOrders,
-    routeReadyCount,
+    visibleMappedCount,
     hotLeadCount,
     overdueCount: overdueVisibleCount,
   });
   const territoryStats = buildTerritoryStats(visibleCustomers, referenceNow);
-  const routePrepMetricRows =
-    workflowMode === "route_prep"
-      ? [
-          { label: "Visible", value: String(visibleCustomers.length) },
-          { label: "Working Group", value: String(selectedSegmentCustomers.length) },
-          { label: "Mapped", value: String(visibleMappedCount) },
-          { label: "Group Mapped", value: String(selectedSegmentMappedCount) },
-          { label: "Group Route Ready", value: String(selectedSegmentRouteReadyCount) },
-          { label: "Visible Route Ready", value: String(routeReadyCount) },
-        ]
-      : [
-          { label: "Visible", value: String(visibleCustomers.length) },
-          { label: "Assigned", value: String(visibleWithOwners) },
-          { label: "Hot", value: String(hotLeadCount) },
-          { label: "Overdue", value: String(overdueVisibleCount) },
-          { label: "Route Ready", value: String(routeReadyCount) },
-          { label: "Orders", value: String(visibleWithOrders) },
-        ];
+  const workspaceMetricRows = [
+    { label: "Visible", value: String(visibleCustomers.length) },
+    { label: "Working Group", value: String(selectedSegmentCustomers.length) },
+    { label: "Assigned", value: String(visibleWithOwners) },
+    { label: "Hot", value: String(hotLeadCount) },
+    { label: "Overdue", value: String(overdueVisibleCount) },
+    { label: "Mapped", value: String(visibleMappedCount) },
+  ];
 
   const sections =
     organizeBy === "territory"
@@ -813,24 +750,6 @@ export default function CustomerWorkspaceIndex({
               customers: groupedCustomers,
               statLine: `${groupedCustomers.filter((customer) => customer.counts.orders > 0).length} with orders`,
             }))
-        : organizeBy === "route_day"
-          ? Array.from(
-              visibleCustomers.reduce((groups, customer) => {
-                const key = customer.routeDay || "No Route Day";
-                const existing = groups.get(key) || [];
-                existing.push(customer);
-                groups.set(key, existing);
-                return groups;
-              }, new Map<string, CustomerSummary[]>())
-            )
-              .sort((left, right) => compareGroupLabels(left[0], right[0]))
-              .map(([key, groupedCustomers]) => ({
-                key,
-                label: key,
-                description: `${groupedCustomers.length} accounts`,
-                customers: groupedCustomers,
-                statLine: `${groupedCustomers.filter((customer) => getRouteReadiness(customer) === "route_ready").length} route ready`,
-              }))
           : organizeBy === "stage"
             ? Array.from(
                 visibleCustomers.reduce((groups, customer) => {
@@ -855,7 +774,7 @@ export default function CustomerWorkspaceIndex({
                   label: "All Customers",
                   description: `${visibleCustomers.length} filtered accounts`,
                   customers: visibleCustomers,
-                  statLine: `${visibleWithOrders} with orders • ${routeReadyCount} route ready`,
+                  statLine: `${visibleWithOrders} with orders • ${visibleMappedCount} mapped`,
                 },
               ];
 
@@ -1284,8 +1203,6 @@ export default function CustomerWorkspaceIndex({
           payload = { assigned_sales_user_id: bulkAction.value || null };
         } else if (bulkAction.kind === "assign_territory") {
           payload = { territory_code: bulkAction.value || null };
-        } else if (bulkAction.kind === "assign_route_day") {
-          payload = { route_day: bulkAction.value || null };
         } else {
           skippedCount += 1;
           continue;
@@ -1364,7 +1281,7 @@ export default function CustomerWorkspaceIndex({
           </div>
 
           <div className="mt-4 grid gap-2 rounded-[20px] border border-[#dbe8ef] bg-white/90 p-3">
-            {routePrepMetricRows.map((metric) => (
+            {workspaceMetricRows.map((metric) => (
               <MetricLine key={metric.label} label={metric.label} value={metric.value} />
             ))}
           </div>
@@ -1385,7 +1302,7 @@ export default function CustomerWorkspaceIndex({
                 <span className="rounded-full border border-[#d7e6ed] bg-white px-3 py-1.5 text-sm text-[#4f6877]">{visibleCustomers.length} visible</span>
                 <span className="rounded-full border border-[#ffd3cf] bg-[#fff2f0] px-3 py-1.5 text-sm text-[#b44b40]">{hotLeadCount} hot</span>
                 <span className="rounded-full border border-[#f1ddad] bg-[#fff9eb] px-3 py-1.5 text-sm text-[#8a5b00]">{overdueVisibleCount} overdue</span>
-                <span className="rounded-full border border-[#d7e6ed] bg-white px-3 py-1.5 text-sm text-[#4f6877]">{routeReadyCount} route ready</span>
+                <span className="rounded-full border border-[#d7e6ed] bg-white px-3 py-1.5 text-sm text-[#4f6877]">{visibleMappedCount} mapped</span>
               </div>
             </div>
 
@@ -1444,22 +1361,12 @@ export default function CustomerWorkspaceIndex({
                   </button>
                 </>
               ) : null}
-              {workflowMode === "route_prep" ? (
-                <>
-                  <button type="button" onClick={() => applyWorkflowMode("route_prep")} className={denseButtonClass()}>
-                    Route Ready
-                  </button>
-                  <button type="button" onClick={() => applyWorkspacePreset("needs_coordinates")} className={denseButtonClass()}>
-                    Needs Coordinates
-                  </button>
-                  <button type="button" onClick={() => startTransition(() => setRouteReadiness("address_ready"))} className={denseButtonClass()}>
-                    Address Ready
-                  </button>
-                  <button type="button" onClick={() => startTransition(() => setOrganizeBy("territory"))} className={denseButtonClass()}>
-                    Group by Territory
-                  </button>
-                </>
-              ) : null}
+              <button type="button" onClick={() => applyWorkspacePreset("needs_coordinates")} className={denseButtonClass()}>
+                Needs Coordinates
+              </button>
+              <button type="button" onClick={() => startTransition(() => setOrganizeBy("territory"))} className={denseButtonClass()}>
+                Group by Territory
+              </button>
               <button
                 type="button"
                 onClick={() => setShowFilteredMap((current) => !current)}
@@ -1553,14 +1460,6 @@ export default function CustomerWorkspaceIndex({
                 </option>
               ))}
             </select>
-            <select value={routeReadiness} onChange={(event) => startTransition(() => setRouteReadiness(event.target.value as RouteReadinessFilter))} aria-label="Route readiness" className={toolbarSelectClass()}>
-              <option value="all">All Route States</option>
-              <option value="route_ready">Route Ready</option>
-              <option value="no_territory">No Territory</option>
-              <option value="no_route_rep">No Route Rep</option>
-              <option value="no_coords">Needs Coordinates</option>
-              <option value="address_ready">Address Ready</option>
-            </select>
             <select value={sortKey} onChange={(event) => startTransition(() => setSortKey(event.target.value as SortKey))} aria-label="Sort" className={toolbarSelectClass()}>
               <option value="activity_desc">Recent</option>
               <option value="name_asc">Name A-Z</option>
@@ -1650,9 +1549,6 @@ export default function CustomerWorkspaceIndex({
             <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4f6877]">
               Visible {visibleCustomers.length}
             </span>
-            <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4f6877]">
-              Focused {focusedVisibleCustomer?.name || focusedMapCustomer?.name || "None"}
-            </span>
             <span className="rounded-full border border-[#bfe8e2] bg-[#f5fffd] px-3 py-1.5 text-sm font-medium text-[#0f766e]">
               Working Group {selectedCustomerIds.length}
             </span>
@@ -1698,7 +1594,7 @@ export default function CustomerWorkspaceIndex({
             customers={mapCustomers}
             title="Filtered Accounts Map"
             description="Use the current visible results or your saved working group as a field-sales workbench. Visible accounts can stay neutral on the map, one account can be focused for inspection, and only checked accounts join the working group."
-            emptyLabel={mapSurfaceMode === "segment" ? "The current working group has no mappable accounts yet." : "No filtered accounts are route-available yet. Geocode the visible set here before moving into route planning."}
+            emptyLabel={mapSurfaceMode === "segment" ? "The current working group has no mappable accounts yet." : "No filtered accounts are mappable yet. Geocode the visible set here before moving into field planning."}
             secondaryActionLabel="Open Account"
             secondaryActionHref={(customerId) => `/workspace/customers/${customerId}`}
             focusedCustomerId={focusedMapCustomer?.id || null}
@@ -1798,7 +1694,6 @@ function CustomerCard({
   const phoneHref = normalizeTelHref(primaryContact?.phone || customer.mainPhone);
   const websiteHref = normalizeWebsiteHref(customer.website);
   const mapsHref = buildGoogleMapsSearchHref(customer);
-  const routeReadiness = getRouteReadiness(customer);
   const followUpState = getFollowUpState(customer);
   const contactState = getContactState(customer);
   const needsCoordinates = getCoordinateCoverageState(customer) !== "has_coords";
@@ -1907,7 +1802,18 @@ function CustomerCard({
         ) : null}
         <span className={["rounded-full border px-2 py-0.5 text-[11px] font-semibold", contactChipClass(customer)].join(" ")}>{contactState.label}</span>
         <span className={["rounded-full border px-2 py-0.5 text-[11px] font-semibold", followUpChipClass(customer)].join(" ")}>{followUpState}</span>
-        <RouteReadinessPill state={routeReadiness} />
+        <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-2.5 py-1 text-xs font-semibold text-[#4f6877]">
+          {customer.territoryCode ? `Territory ${customer.territoryCode}` : "No Territory"}
+        </span>
+        {needsCoordinates ? (
+          <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-2.5 py-1 text-xs font-semibold text-[#4f6877]">
+            Needs Coordinates
+          </span>
+        ) : (
+          <span className="rounded-full border border-[#bde8e4] bg-[#e9fbf9] px-2.5 py-1 text-xs font-semibold text-[#0f766e]">
+            Map Ready
+          </span>
+        )}
         {customer.counts.estimates > 0 ? (
           <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-2 py-0.5 text-[11px] font-semibold text-[#4f6877]">
             {customer.counts.estimates} estimate{customer.counts.estimates === 1 ? "" : "s"}
@@ -2072,9 +1978,7 @@ function BulkActionBar({
       ? "Sales rep"
       : action.kind === "assign_territory"
         ? "Territory"
-        : action.kind === "assign_route_day"
-          ? "Route day"
-          : null;
+        : null;
 
   return (
     <section className="rounded-[24px] border border-[#bfe8e2] bg-[linear-gradient(180deg,#f5fffd_0%,#ffffff_100%)] p-4 shadow-[0_14px_30px_rgba(16,42,67,0.08)]">
@@ -2108,14 +2012,6 @@ function BulkActionBar({
             className="h-10 rounded-full border border-[#d0dde5] bg-white px-4 text-sm font-semibold text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543] disabled:cursor-not-allowed disabled:opacity-60"
           >
             Assign Territory
-          </button>
-          <button
-            type="button"
-            onClick={() => onActionChange({ kind: "assign_route_day", value: "" })}
-            disabled={busy}
-            className="h-10 rounded-full border border-[#d0dde5] bg-white px-4 text-sm font-semibold text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543] disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            Assign Route Day
           </button>
           <button
             type="button"
@@ -2200,11 +2096,7 @@ function BulkActionBar({
                           {option.label}
                         </option>
                       ))
-                    : ROUTE_DAYS.map((routeDay) => (
-                        <option key={routeDay} value={routeDay}>
-                          {routeDay}
-                        </option>
-                      ))}
+                    : null}
               </select>
             </label>
           ) : (
@@ -2296,28 +2188,4 @@ function QuickAction({ href, label, external = false }: { href: string | null; l
       {label}
     </a>
   );
-}
-
-function RouteReadinessPill({ state }: { state: ReturnType<typeof getRouteReadiness> }) {
-  const toneClass =
-    state === "route_ready"
-      ? "border-[#bde8e4] bg-[#e9fbf9] text-[#0f766e]"
-      : state === "no_territory" || state === "no_route_rep"
-        ? "border-[#f1ddad] bg-[#fff9eb] text-[#9a6b00]"
-      : "border-[#d7e6ed] bg-[#f8fbfc] text-[#4f6877]";
-
-  const label =
-    state === "route_ready"
-            ? "Route Available"
-      : state === "no_territory"
-        ? "No Territory"
-        : state === "no_route_rep"
-          ? "No Route Rep"
-          : state === "address_ready"
-            ? "Address Ready"
-            : state === "no_coords"
-              ? "Needs Coordinates"
-              : "Route Open";
-
-  return <span className={["rounded-full border px-2.5 py-1 text-xs font-semibold", toneClass].join(" ")}>{label}</span>;
 }
