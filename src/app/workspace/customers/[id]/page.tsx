@@ -16,6 +16,26 @@ function formatDate(value: unknown): string {
   return new Date(parsed).toLocaleDateString();
 }
 
+function formatDateTime(value: unknown): string {
+  const text = String(value || "").trim();
+  if (!text) return "Unknown";
+  const parsed = Date.parse(text);
+  if (!Number.isFinite(parsed)) return "Unknown";
+
+  const date = new Date(parsed);
+  const datePart = date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
+  const timePart = date.toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+
+  return `${datePart} • ${timePart}`;
+}
+
 function formatMoney(value: unknown): string {
   const amount = Number(value);
   if (!Number.isFinite(amount)) return "Pending";
@@ -261,11 +281,11 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
                 </div>
                 <p className="mt-1 text-sm text-[#4a6575]">
                   {task.assignedUserName || "Unassigned"}
-                  {task.dueDate ? ` • Due ${formatDate(task.dueDate)}` : " • No due date"}
+                  {task.dueDate ? ` • Due ${formatDateTime(task.dueDate)}` : " • No due date"}
                 </p>
                 <p className="mt-1 text-xs text-[#5d7685]">
-                  Created {formatDate(task.createdAt)}
-                  {task.completedAt ? ` • Completed ${formatDate(task.completedAt)}` : ""}
+                  Created {formatDateTime(task.createdAt)}
+                  {task.completedAt ? ` • Completed ${formatDateTime(task.completedAt)}` : ""}
                 </p>
               </div>
             ))}
@@ -339,7 +359,7 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
               <div key={note.id} className="rounded-xl border border-[#dbe9ef] bg-[#f9fcfd] px-3 py-2.5">
                 <p className="whitespace-pre-wrap text-sm text-[#173543]">{note.note}</p>
                 <p className="mt-2 text-xs text-[#5d7685]">
-                  {note.authorName || "Unknown author"} • {formatDate(note.createdAt)}
+                  {note.authorName || "Unknown author"} • {formatDateTime(note.createdAt)}
                 </p>
               </div>
             ))}
@@ -422,7 +442,7 @@ function ActivityCard({
         {item.activityType === "event_quick_add" ? <HeaderBadge tone="event" label="Hall of Flowers" /> : null}
       </div>
       <p className="mt-1 text-sm text-[#4a6575]">
-        {item.actorName || "System"} • {formatDate(item.createdAt)}
+        {item.actorName || "System"} • {formatDateTime(item.createdAt)}
       </p>
       <p className="mt-1 text-xs uppercase tracking-wide text-[#6b8593]">
         {item.activityType}{item.entityType ? ` • ${item.entityType}` : ""}

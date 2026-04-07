@@ -96,6 +96,14 @@ type EmailSendResult = {
   error: string | null;
 };
 
+type EmailComposeSnapshot = {
+  wasOpen: boolean;
+  subject: string;
+  body: string;
+  label: string;
+  selectedRecipientKeys: string[];
+};
+
 const ROUTE_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const VISIT_STATUS_OPTIONS = [
   "due",
@@ -406,6 +414,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
   const taskTitleInputRef = useRef<HTMLInputElement | null>(null);
   const activitySummaryInputRef = useRef<HTMLInputElement | null>(null);
   const accountCompanyInputRef = useRef<HTMLInputElement | null>(null);
+  const emailComposeSnapshotRef = useRef<EmailComposeSnapshot | null>(null);
 
   const composedAddress = [address1, address2, [city, stateCode, postalCode].filter(Boolean).join(", ")].filter(Boolean).join(" • ") || null;
   const addressMapHref = buildAddressMapHref({
@@ -613,6 +622,51 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
 
   function toggleEmailRecipient(key: string) {
     setSelectedEmailRecipientKeys((current) => (current.includes(key) ? current.filter((item) => item !== key) : [...current, key]));
+  }
+
+  function captureEmailComposeSnapshot() {
+    emailComposeSnapshotRef.current = {
+      wasOpen: emailDrawerOpen,
+      subject: emailSubject,
+      body: emailBody,
+      label: emailBatchLabel,
+      selectedRecipientKeys: [...selectedEmailRecipientKeys],
+    };
+  }
+
+  function openEmailCompose() {
+    if (!emailDrawerOpen) {
+      captureEmailComposeSnapshot();
+    }
+    setEmailDrawerOpen(true);
+  }
+
+  function toggleEmailCompose() {
+    if (!emailDrawerOpen) {
+      openEmailCompose();
+      return;
+    }
+    setEmailDrawerOpen(false);
+  }
+
+  function cancelEmailCompose() {
+    const snapshot = emailComposeSnapshotRef.current;
+    if (snapshot) {
+      setEmailSubject(snapshot.subject);
+      setEmailBody(snapshot.body);
+      setEmailBatchLabel(snapshot.label);
+      setSelectedEmailRecipientKeys(snapshot.selectedRecipientKeys);
+      setEmailDrawerOpen(snapshot.wasOpen);
+    } else {
+      setEmailSubject("");
+      setEmailBody("");
+      setEmailBatchLabel("");
+      setSelectedEmailRecipientKeys([]);
+      setEmailDrawerOpen(false);
+    }
+    setEmailResults([]);
+    setError(null);
+    setSuccess(null);
   }
 
   function connectGoogleMailbox() {
@@ -1167,7 +1221,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
 
   async function sendRouteEmail() {
     if (!gmailStatus.connected) {
-      setError(gmailStatus.error || "Connect a Google mailbox before sending route email.");
+      setError(gmailStatus.error || "Connect a Google mailbox before sending account email.");
       setSuccess(null);
       return;
     }
@@ -1218,7 +1272,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
       const results = Array.isArray(json.results) ? (json.results as EmailSendResult[]) : [];
       setEmailResults(results);
       markActivityTouched();
-      setSuccessMessage(`Route email finished: ${Number(json.sentCount || 0)} sent, ${Number(json.failedCount || 0)} failed.`);
+      setSuccessMessage(`Account email finished: ${Number(json.sentCount || 0)} sent, ${Number(json.failedCount || 0)} failed.`);
       router.refresh();
     } catch (sendError) {
       setError(sendError instanceof Error ? sendError.message : "Send failed");
@@ -1306,7 +1360,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
 
         <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-8">
           <ActionButton href={callHref} label="Call" />
-          <ActionButton label="Route Email" onClick={() => jumpToSection("customer-route-email")} />
+          <ActionButton label="Account Email" onClick={() => jumpToSection("customer-route-email")} />
           <ActionButton label="Text" disabled helper="Coming soon" />
           <ActionButton label="New Task" onClick={() => jumpToSection("customer-create-task", taskTitleInputRef.current)} />
           <ActionButton href={websiteHref} label="SITE" disabled={!websiteHref} />
@@ -1993,8 +2047,8 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
           <div id="customer-route-email" className="scroll-mt-28 rounded-2xl border border-[#dbe9ef] bg-[#f9fcfd] p-3 xl:col-span-3">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold text-[#173543]">Route Email</p>
-                <p className="mt-1 text-sm text-[#5c7483]">Send one Gmail message per selected contact and log each send attempt into the account timeline.</p>
+                <p className="text-sm font-semibold text-[#173543]">Account Email</p>
+                <p className="mt-1 text-sm text-[#5c7483]">Send one Gmail message per selected contact on this account and log each send attempt into the account timeline.</p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <StatusPill
@@ -2016,7 +2070,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
                 </button>
                 <button
                   type="button"
-                  onClick={() => setEmailDrawerOpen((current) => !current)}
+                  onClick={toggleEmailCompose}
                   className="rounded-full bg-[#173543] px-3.5 py-1.5 text-sm font-semibold text-white"
                 >
                   {emailDrawerOpen ? "Close Compose" : "Open Compose"}
@@ -2044,7 +2098,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
                 <div className="grid gap-3">
                   <label className="grid gap-1 text-sm text-[#4a6575]">
                     <span>Subject</span>
-                    <input value={emailSubject} onChange={(event) => setEmailSubject(event.target.value)} disabled={emailBusy} className={inputClass} placeholder="Route follow-up for this week" />
+                    <input value={emailSubject} onChange={(event) => setEmailSubject(event.target.value)} disabled={emailBusy} className={inputClass} placeholder="Follow-up on your account" />
                   </label>
                   <label className="grid gap-1 text-sm text-[#4a6575]">
                     <span>Body</span>
@@ -2054,16 +2108,24 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
                       rows={8}
                       disabled={emailBusy}
                       className="rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a]"
-                      placeholder="Write the route outreach message. Each selected recipient gets an individual Gmail send."
+                      placeholder="Write the account email. Each selected contact receives an individual Gmail send."
                     />
                   </label>
                   <label className="grid gap-1 text-sm text-[#4a6575]">
-                    <span>Batch Label</span>
-                    <input value={emailBatchLabel} onChange={(event) => setEmailBatchLabel(event.target.value)} disabled={emailBusy} className={inputClass} placeholder="SFV Tuesday route" />
+                    <span>Send Label</span>
+                    <input value={emailBatchLabel} onChange={(event) => setEmailBatchLabel(event.target.value)} disabled={emailBusy} className={inputClass} placeholder="Buyer follow-up April" />
                   </label>
                   <div className="flex flex-wrap gap-2">
                     <button type="button" onClick={() => void sendRouteEmail()} disabled={emailBusy || !gmailStatus.connected} className="rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
                       {emailBusy ? "Sending..." : `Send ${selectedEmailRecipients.length} Email${selectedEmailRecipients.length === 1 ? "" : "s"}`}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={cancelEmailCompose}
+                      disabled={emailBusy}
+                      className="rounded-full border border-[#d0dde5] bg-white px-4 py-2 text-sm font-semibold text-[#24404d] transition hover:border-[#14b8a6] hover:text-[#0f766e] disabled:opacity-60"
+                    >
+                      Cancel
                     </button>
                     {emailHref ? <ActionButton href={emailHref} label="Open Mailto" /> : null}
                   </div>
@@ -2071,7 +2133,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
 
                 <aside className="rounded-2xl border border-[#dbe9ef] bg-white p-3">
                   <p className="text-sm font-semibold text-[#173543]">Recipient Preview</p>
-                  <p className="mt-1 text-sm text-[#5c7483]">Blank or invalid emails are excluded automatically. Max 50 recipients per request.</p>
+                  <p className="mt-1 text-sm text-[#5c7483]">Select the contacts on this account you want to email. Blank or invalid emails are excluded automatically. Max 50 recipients per request.</p>
                   <div className="mt-3 space-y-2.5">
                     {emailRecipients.map((recipient) => {
                       const checked = selectedEmailRecipientKeys.includes(recipient.key);
