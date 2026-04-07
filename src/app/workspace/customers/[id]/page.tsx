@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import CustomerDetailManager from "@/components/workspace/CustomerDetailManager";
+import LocalDateTime from "@/components/workspace/LocalDateTime";
 import { loadCustomerWorkspaceDetail } from "@/lib/customerWorkspace";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatTerritoryOptionLabel, loadTerritories } from "@/lib/territories";
@@ -14,26 +15,6 @@ function formatDate(value: unknown): string {
   const parsed = Date.parse(text);
   if (!Number.isFinite(parsed)) return "Unknown";
   return new Date(parsed).toLocaleDateString();
-}
-
-function formatDateTime(value: unknown): string {
-  const text = String(value || "").trim();
-  if (!text) return "Unknown";
-  const parsed = Date.parse(text);
-  if (!Number.isFinite(parsed)) return "Unknown";
-
-  const date = new Date(parsed);
-  const datePart = date.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-  });
-  const timePart = date.toLocaleTimeString(undefined, {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
-
-  return `${datePart} • ${timePart}`;
 }
 
 function formatMoney(value: unknown): string {
@@ -240,30 +221,6 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
           </div>
         </Panel>
 
-        <Panel title="Customer Users">
-          <div className="space-y-2.5">
-            {detail.users.map((user) => (
-              <div key={user.userId} className="rounded-xl border border-[#dbe9ef] bg-[#f9fcfd] px-3 py-2.5">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="font-semibold text-[#173543]">{user.fullName}</p>
-                  <span className="rounded-full border border-[#d7e6ed] bg-white px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#4f6877]">
-                    {user.membershipRole}
-                  </span>
-                  {user.isPrimary ? (
-                    <span className="rounded-full border border-[#bde8e4] bg-[#e9fbf9] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#0f766e]">
-                      Primary
-                    </span>
-                  ) : null}
-                </div>
-                <p className="mt-1 text-sm text-[#4a6575]">{user.email || "No email"} • {user.status}</p>
-              </div>
-            ))}
-            {detail.users.length === 0 ? <EmptyState label="No mapped users found." /> : null}
-          </div>
-        </Panel>
-      </section>
-
-      <section className="grid gap-3 xl:grid-cols-1">
         <Panel title="Account Task History" id="customer-linked-task-list">
           <div className="space-y-2.5">
             {detail.tasks.map((task) => (
@@ -281,11 +238,11 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
                 </div>
                 <p className="mt-1 text-sm text-[#4a6575]">
                   {task.assignedUserName || "Unassigned"}
-                  {task.dueDate ? ` • Due ${formatDateTime(task.dueDate)}` : " • No due date"}
+                  {task.dueDate ? <> • Due <LocalDateTime value={task.dueDate} fallback={formatDate(task.dueDate)} /></> : " • No due date"}
                 </p>
                 <p className="mt-1 text-xs text-[#5d7685]">
-                  Created {formatDateTime(task.createdAt)}
-                  {task.completedAt ? ` • Completed ${formatDateTime(task.completedAt)}` : ""}
+                  Created <LocalDateTime value={task.createdAt} fallback={formatDate(task.createdAt)} />
+                  {task.completedAt ? <> • Completed <LocalDateTime value={task.completedAt} fallback={formatDate(task.completedAt)} /></> : ""}
                 </p>
               </div>
             ))}
@@ -359,7 +316,7 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
               <div key={note.id} className="rounded-xl border border-[#dbe9ef] bg-[#f9fcfd] px-3 py-2.5">
                 <p className="whitespace-pre-wrap text-sm text-[#173543]">{note.note}</p>
                 <p className="mt-2 text-xs text-[#5d7685]">
-                  {note.authorName || "Unknown author"} • {formatDateTime(note.createdAt)}
+                  {note.authorName || "Unknown author"} • <LocalDateTime value={note.createdAt} fallback={formatDate(note.createdAt)} />
                 </p>
               </div>
             ))}
@@ -442,7 +399,7 @@ function ActivityCard({
         {item.activityType === "event_quick_add" ? <HeaderBadge tone="event" label="Hall of Flowers" /> : null}
       </div>
       <p className="mt-1 text-sm text-[#4a6575]">
-        {item.actorName || "System"} • {formatDateTime(item.createdAt)}
+        {item.actorName || "System"} • <LocalDateTime value={item.createdAt} fallback={formatDate(item.createdAt)} />
       </p>
       <p className="mt-1 text-xs uppercase tracking-wide text-[#6b8593]">
         {item.activityType}{item.entityType ? ` • ${item.entityType}` : ""}

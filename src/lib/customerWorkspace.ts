@@ -73,6 +73,8 @@ export type CustomerSummary = {
     packagingSubmissions: number;
     documents: number;
   };
+  hasBeenContacted: boolean;
+  lastContactedAt: string | null;
   lastActivityAt: string | null;
 };
 
@@ -182,6 +184,13 @@ function normalizeText(value: unknown): string {
 }
 
 const CLOSED_TASK_STATUSES = new Set(["completed", "closed", "cancelled"]);
+const CONTACT_ACTIVITY_TYPES = new Set([
+  "call",
+  "email",
+  "email_sent",
+  "sms_sent",
+  "meeting",
+]);
 
 function uniqueStrings(values: Array<unknown>): string[] {
   return Array.from(new Set(values.map((value) => String(value || "").trim()).filter(Boolean)));
@@ -215,6 +224,16 @@ function readHotLeadState(details: unknown): boolean | null {
 function getRowTimestamp(value: unknown): number {
   const parsed = Date.parse(String(value || ""));
   return Number.isFinite(parsed) ? parsed : -1;
+}
+
+function getLastContactedAt(activityRows: GenericRow[]): string | null {
+  return activityRows
+    .filter((row) => CONTACT_ACTIVITY_TYPES.has(normalizeText(row.activity_type)))
+    .map((row) => firstText(row.created_at))
+    .filter((value): value is string => Boolean(value))
+    .map((value) => ({ value, time: Date.parse(value) }))
+    .filter((row) => Number.isFinite(row.time))
+    .sort((a, b) => b.time - a.time)[0]?.value || null;
 }
 
 function deriveHotLeadState(activityRows: GenericRow[], taskRows: GenericRow[]): boolean {
@@ -741,6 +760,7 @@ function buildCustomerSummary({
     accountId: identifiers.accountId,
     userIds: membershipUserIds,
   });
+  const lastContactedAt = getLastContactedAt(activityRows);
 
   const assignedSalesUserId = firstText(customer.assigned_sales_user_id, customer.owner_user_id);
   const assignedSalesProfile = assignedSalesUserId ? profileById.get(assignedSalesUserId) : null;
@@ -861,6 +881,8 @@ function buildCustomerSummary({
       packagingSubmissions: linkedPackaging.length,
       documents: linkedDocuments.length,
     },
+    hasBeenContacted: Boolean(lastContactedAt),
+    lastContactedAt,
     lastActivityAt,
   };
 }

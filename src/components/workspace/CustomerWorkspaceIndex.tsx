@@ -304,6 +304,22 @@ function getFollowUpState(customer: CustomerSummary) {
   return titleCase(customer.latestTaskStatus, "Open Task");
 }
 
+function getContactState(customer: CustomerSummary) {
+  if (!customer.hasBeenContacted) {
+    return { label: "Never Contacted", tone: "warn" as const };
+  }
+  if (customer.lastContactedAt) {
+    return { label: `Contacted ${formatDate(customer.lastContactedAt)}`, tone: "ok" as const };
+  }
+  return { label: "Contacted", tone: "ok" as const };
+}
+
+function contactChipClass(customer: CustomerSummary) {
+  return customer.hasBeenContacted
+    ? "border-[#bde8e4] bg-[#e9fbf9] text-[#0f766e]"
+    : "border-[#f1ddad] bg-[#fff9eb] text-[#9a6b00]";
+}
+
 function followUpChipClass(customer: CustomerSummary) {
   if (!customer.hasOpenTask) return "border-[#e1d7d3] bg-[#f5f1ef] text-[#6f5b54]";
   if (customer.overdueTaskCount > 0) return "border-[#f1ddad] bg-[#fff9eb] text-[#9a6b00]";
@@ -1784,9 +1800,12 @@ function CustomerCard({
   const mapsHref = buildGoogleMapsSearchHref(customer);
   const routeReadiness = getRouteReadiness(customer);
   const followUpState = getFollowUpState(customer);
+  const contactState = getContactState(customer);
   const needsCoordinates = getCoordinateCoverageState(customer) !== "has_coords";
   const bestNextAction =
-    customer.overdueTaskCount > 0
+    !customer.hasBeenContacted
+      ? "Make first outreach"
+      : customer.overdueTaskCount > 0
       ? "Handle overdue follow-up"
       : needsCoordinates
         ? "Review address and save coordinates"
@@ -1894,6 +1913,7 @@ function CustomerCard({
         {customer.isHotLead ? (
           <span className="rounded-full border border-[#ffd3cf] bg-[#fff2f0] px-2 py-0.5 text-[11px] font-semibold text-[#b44b40]">Hot Lead</span>
         ) : null}
+        <span className={["rounded-full border px-2 py-0.5 text-[11px] font-semibold", contactChipClass(customer)].join(" ")}>{contactState.label}</span>
         <span className={["rounded-full border px-2 py-0.5 text-[11px] font-semibold", followUpChipClass(customer)].join(" ")}>{followUpState}</span>
         <RouteReadinessPill state={routeReadiness} />
         {customer.counts.estimates > 0 ? (
