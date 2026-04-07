@@ -35,6 +35,11 @@ function asReminderOffsetMinutes(value: unknown): number | null {
   return [0, 5, 15, 30, 60].includes(parsed) ? parsed : null;
 }
 
+function isClosedTaskStatus(value: unknown) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return normalized === "completed" || normalized === "closed" || normalized === "cancelled";
+}
+
 async function resolveAssignedUserId(args: {
   requestedAssignedUserId: string | null;
   staff: NonNullable<Awaited<ReturnType<typeof getStaffContext>>>;
@@ -162,5 +167,81 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     id: taskRow?.id || null,
     due_at: dueAt,
     reminder_offset_minutes: reminderOffsetMinutes,
+  });
+}
+
+export async function PATCH(req: Request, context: { params: Promise<{ id: string }> }) {
+  const staff = await getStaffContext();
+  if (!staff) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const { id } = await context.params;
+  const body = await req.json().catch(() => ({}));
+  const taskId = asText(body.task_id);
+  const status = asText(body.status)?.toLowerCase() || null;
+
+  if (!taskId) {
+    return NextResponse.json({ error: "task_id required" }, { status: 400 });
+  }
+
+  if (status !== "completed") {
+    return NextResponse.json({ error: "Unsupported status update" }, { status: 400 });
+  }
+
+  const supabase = createAdminClient();
+  const { data: existingTask, error: taskLoadError } = await supabase
+    .from("customer_tasks")
+    .select("id, customer_id, title, status, completed_at")
+    .eq("id", taskId)
+    .eq("customer_id", id)
+    .maybeSingle();
+
+  if (taskLoadError) {
+    return NextResponse.json({ error: taskLoadError.message }, { status: 500 });
+  }
+
+  if (!existingTask) {
+    return NextResponse.json({ error: "Task not found" }, { status: 404 });
+  }
+
+  if (isClosedTaskStatus(existingTask.status) || asText(existingTask.completed_at)) {
+    return NextResponse.json({
+      ok: true,
+      id: existingTask.id,
+      status: "completed",
+      completed_at: asText(existingTask.completed_at),
+    });
+  }
+
+  const completedAt = new Date().toISOString();
+  const { error: updateError } = await supabase
+    .from("customer_tasks")
+    .update({
+      status: "completed",
+      completed_at: completedAt,
+    })
+    .eq("id", taskId)
+    .eq("customer_id", id);
+
+  if (updateError) {
+    return NextResponse.json({ error: updateError.message }, { status: 500 });
+  }
+
+  await supabase.from("customer_activity").insert({
+    customer_id: id,
+    activity_type: "task_completed",
+    summary: `Completed task: ${asText(existingTask.title) || "Untitled task"}`,
+    details: {
+      task_id: existingTask.id,
+      completed_at: completedAt,
+      previous_status: asText(existingTask.status) || "open",
+    },
+    actor_user_id: staff.userId,
+  });
+
+  return NextResponse.json({
+    ok: true,
+    id: existingTask.id,
+    status: "completed",
+    completed_at: completedAt,
   });
 }

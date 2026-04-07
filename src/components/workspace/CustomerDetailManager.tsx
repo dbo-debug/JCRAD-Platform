@@ -13,7 +13,6 @@ type StaffOption = {
 type TerritoryOption = {
   code: string;
   label: string;
-  routeDayDefault: string | null;
 };
 
 type PrimaryContact = {
@@ -37,9 +36,6 @@ type CustomerDetailManagerProps = {
   assignedSalesUserId: string | null;
   assignedSalesLabel: string | null;
   territoryCode: string | null;
-  routeDay: string | null;
-  assignedRouteRepUserId: string | null;
-  assignedRouteRepLabel: string | null;
   routePriority: number | null;
   visitStatus: string | null;
   lastVisitAt: string | null;
@@ -65,7 +61,6 @@ type CustomerDetailManagerProps = {
   currentStaffUserId: string;
   currentStaffLabel: string | null;
   salesOptions: StaffOption[];
-  routeRepOptions: StaffOption[];
   territoryOptions: TerritoryOption[];
   primaryContact: PrimaryContact | null;
   contacts: PrimaryContact[];
@@ -110,7 +105,6 @@ type TaskReminderOption = {
   minutes: number | null;
 };
 
-const ROUTE_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const VISIT_STATUS_OPTIONS = [
   "due",
   "scheduled",
@@ -391,8 +385,6 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
   const [assignedSalesUserId, setAssignedSalesUserId] = useState(props.assignedSalesUserId || "");
 
   const [territoryCode, setTerritoryCode] = useState(props.territoryCode || "");
-  const [routeDay, setRouteDay] = useState(props.routeDay || "");
-  const [assignedRouteRepUserId, setAssignedRouteRepUserId] = useState(props.assignedRouteRepUserId || "");
   const [routePriority, setRoutePriority] = useState(props.routePriority === null ? "" : String(props.routePriority));
   const [visitStatus, setVisitStatus] = useState(props.visitStatus || "");
   const [lastVisitAt, setLastVisitAt] = useState(toDateTimeLocalValue(props.lastVisitAt));
@@ -474,8 +466,6 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
   ].filter(Boolean) as string[];
   const hasRouteConfig = Boolean(
     territoryCode ||
-      routeDay ||
-      assignedRouteRepUserId ||
       routePriority ||
       visitStatus ||
       lastVisitAt ||
@@ -500,7 +490,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
       : !hasPrimaryContact
         ? "The account is missing a primary contact. Capture buyer info before the next handoff."
         : missingRouteStates.length > 0
-          ? "Route prep is partially blocked. Clean up missing territory or coordinates before staging stops."
+          ? "Field coverage is partially blocked. Clean up missing territory or coordinates before staging stops."
           : "The account is operational. Use quick actions to continue follow-up, routing, or activity capture.";
   const nextActionSummary =
     overdueTaskCountState > 0
@@ -843,8 +833,6 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           territory_code: territoryCode || null,
-          route_day: routeDay || null,
-          assigned_route_rep_user_id: assignedRouteRepUserId || null,
           route_priority: routePriority ? Number(routePriority) : null,
           visit_status: visitStatus || null,
           last_visit_at: lastVisitAt || null,
@@ -1211,7 +1199,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
       }
 
       if (routeOutcomeTaskEnabled) {
-        const defaultTaskTitle =
+      const defaultTaskTitle =
           outcome.key === "interested"
             ? `Follow up with ${props.companyName}`
             : outcome.key === "revisit_needed"
@@ -1225,7 +1213,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
         await createTaskRequest({
           title: routeOutcomeTaskTitle.trim() || defaultTaskTitle,
           dueDate: routeOutcomeTaskDueDate || (outcome.nextVisitDays !== null ? addDaysDateValue(outcome.nextVisitDays) : null),
-          assignedUserId: assignedRouteRepUserId || taskAssignedUserId || null,
+          assignedUserId: taskAssignedUserId || null,
           priority: routePriority ? Number(routePriority) : taskPriority ? Number(taskPriority) : null,
         });
         setRouteOutcomeTaskTitle("");
@@ -1376,7 +1364,6 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
           subject: emailSubject,
           body: emailBody,
           batch_label: emailBatchLabel || null,
-          route_day: routeDay || null,
           recipients: selectedEmailRecipients.map((recipient) => ({
             customer_id: props.customerId,
             contact_id: recipient.contactId,
@@ -1441,9 +1428,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
             detail={
               missingRouteStates.length > 0
                 ? "Fix route coverage gaps before staging this account into the pending stop queue."
-                : routeDay
-                  ? `Route plan is staged for ${routeDay}.`
-                  : "Routing details are ready for staging and handoff."
+                : "Routing details are ready for staging and handoff."
             }
             actionLabel="Open Route & Field Ops"
             onAction={() => jumpToSection("customer-route-field-ops")}
@@ -1557,9 +1542,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
             detail={
               !hasPrimaryContact
                 ? "This account needs a primary contact before the next outreach or handoff."
-                : props.assignedRouteRepLabel
-                  ? `Route rep ${props.assignedRouteRepLabel} is set. Keep contacts and ownership aligned.`
-                  : "Verify ownership, contact info, and routing coverage before the next handoff."
+                : "Verify ownership, contact info, and territory coverage before the next handoff."
             }
             actionLabel={!hasPrimaryContact ? "Add Primary Contact" : "Review Account Setup"}
             onAction={() => jumpToSection(!hasPrimaryContact ? "customer-primary-contact" : "customer-account-management", !hasPrimaryContact ? null : accountCompanyInputRef.current)}
@@ -1658,12 +1641,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
                 <select
                   value={territoryCode}
                   onChange={(event) => {
-                    const nextCode = event.target.value;
-                    const territory = props.territoryOptions.find((option) => option.code === nextCode) || null;
-                    setTerritoryCode(nextCode);
-                    if (!routeDay && territory?.routeDayDefault) {
-                      setRouteDay(territory.routeDayDefault);
-                    }
+                    setTerritoryCode(event.target.value);
                   }}
                   disabled={routeBusy}
                   className={inputClass}
@@ -1671,35 +1649,6 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
                   <option value="">Unassigned</option>
                   {props.territoryOptions.map((option) => (
                     <option key={option.code} value={option.code}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="grid min-w-0 gap-1 text-sm text-[#4a6575] xl:col-span-3">
-                <span>Run Day (Optional)</span>
-                <select value={routeDay} onChange={(event) => setRouteDay(event.target.value)} disabled={routeBusy} className={inputClass}>
-                  <option value="">Unassigned</option>
-                  {ROUTE_DAYS.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="grid min-w-0 gap-1 text-sm text-[#4a6575] md:col-span-2 xl:col-span-4">
-                <span>Assigned Route Rep</span>
-                <select
-                  value={assignedRouteRepUserId}
-                  onChange={(event) => setAssignedRouteRepUserId(event.target.value)}
-                  disabled={props.staffRole !== "admin" || routeBusy}
-                  className={inputClass}
-                >
-                  <option value="">Unassigned</option>
-                  {props.routeRepOptions.map((option) => (
-                    <option key={option.userId} value={option.userId}>
                       {option.label}
                     </option>
                   ))}
@@ -1757,8 +1706,8 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8398a5]">Routing Snapshot</p>
               <div className="mt-2 space-y-1.5">
                 <p className="break-words font-medium text-[#173543]">{territoryMeta?.label || "Territory not assigned"}</p>
-                <p>{routeDay ? `Run day saved for later: ${routeDay}` : "Run day is optional for now."}</p>
-                <p>{assignedRouteRepUserId ? "Route rep assigned" : "No route rep assigned"}</p>
+                <p>{routePriority ? `Priority ${routePriority}` : "Priority not assigned"}</p>
+                <p>{visitStatus ? `Visit status ${titleCase(visitStatus)}` : "Visit status not assigned"}</p>
               </div>
             </div>
 

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import CustomerDetailManager from "@/components/workspace/CustomerDetailManager";
 import LocalDateTime from "@/components/workspace/LocalDateTime";
+import CustomerTaskCompleteButton from "@/components/workspace/CustomerTaskCompleteButton";
 import { loadCustomerWorkspaceDetail } from "@/lib/customerWorkspace";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatTerritoryOptionLabel, loadTerritories } from "@/lib/territories";
@@ -121,9 +122,14 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
   const territoryOptions = territories.map((territory) => ({
     code: territory.code,
     label: formatTerritoryOptionLabel(territory),
-    routeDayDefault: territory.routeDayDefault,
   }));
   const address = formatAddress(detail.customer);
+  const assignedSalesValue =
+    detail.customer.assignedSalesName || detail.customer.assignedSalesEmail || "Unassigned";
+  const assignedSalesHelper =
+    detail.customer.assignedSalesName && detail.customer.assignedSalesEmail
+      ? detail.customer.assignedSalesEmail
+      : undefined;
 
   return (
     <div className="space-y-4">
@@ -172,8 +178,7 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
         <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
           <SummaryCard label="Status" value={detail.customer.status} />
           <SummaryCard label="Stage" value={detail.customer.stage || "Not set"} />
-          <SummaryCard label="Assigned Sales" value={detail.customer.assignedSalesName || "Unassigned"} helper={detail.customer.assignedSalesEmail || undefined} />
-          <SummaryCard label="Route Rep" value={detail.customer.assignedRouteRepName || "Unassigned"} helper={detail.customer.assignedRouteRepEmail || undefined} />
+          <SummaryCard label="Assigned Sales" value={assignedSalesValue} helper={assignedSalesHelper} />
           <SummaryCard label="City" value={detail.customer.city || "Not set"} />
           <SummaryCard label="Last Activity" value={formatDate(detail.customer.lastActivityAt)} />
         </div>
@@ -191,9 +196,6 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
         assignedSalesUserId={detail.customer.assignedSalesUserId}
         assignedSalesLabel={detail.customer.assignedSalesName}
         territoryCode={detail.customer.territoryCode}
-        routeDay={detail.customer.routeDay}
-        assignedRouteRepUserId={detail.customer.assignedRouteRepUserId}
-        assignedRouteRepLabel={detail.customer.assignedRouteRepName}
         routePriority={detail.customer.routePriority}
         visitStatus={detail.customer.visitStatus}
         lastVisitAt={detail.customer.lastVisitAt}
@@ -219,7 +221,6 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
         currentStaffUserId={staff.userId}
         currentStaffLabel={currentStaffLabel}
         salesOptions={salesOptions}
-        routeRepOptions={salesOptions}
         territoryOptions={territoryOptions}
         primaryContact={primaryContact}
         contacts={detail.contacts}
@@ -267,6 +268,9 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
                   ) : null}
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
+                  {!task.completedAt && task.status !== "completed" ? (
+                    <CustomerTaskCompleteButton customerId={detail.customer.id} taskId={task.id} />
+                  ) : null}
                   <a
                     href={primaryCallHref || undefined}
                     className={[
@@ -437,7 +441,6 @@ function ActivityCard({
   const provider = getActivityDetailText(item.details, "provider");
   const gmailEmail = getActivityDetailText(item.details, "gmail_email");
   const batchLabel = getActivityDetailText(item.details, "batch_label");
-  const routeDay = getActivityDetailText(item.details, "route_day");
   const error = getActivityDetailText(item.details, "error");
   const threadId = getActivityDetailText(item.details, "provider_thread_id");
   const isEmailActivity = item.activityType === "email_sent" || item.activityType === "email_failed";
@@ -460,7 +463,7 @@ function ActivityCard({
         <div className="mt-2 space-y-1 text-sm text-[#4a6575]">
           <p>{to ? `To ${to}` : "Recipient unavailable"}{subject ? ` • ${subject}` : ""}</p>
           <p>{provider ? `Provider ${provider}` : "Provider unavailable"}{gmailEmail ? ` • Sent from ${gmailEmail}` : ""}</p>
-          {batchLabel || routeDay ? <p>{batchLabel ? `Batch ${batchLabel}` : "Batch not set"}{routeDay ? ` • ${routeDay}` : ""}</p> : null}
+          {batchLabel ? <p>Batch {batchLabel}</p> : null}
           {threadId ? <p>Thread {threadId}</p> : null}
           {error ? <p className="text-[#9f2a2a]">{error}</p> : null}
         </div>
