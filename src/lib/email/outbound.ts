@@ -80,6 +80,7 @@ export async function sendLoggedOutboundEmail(args: LoggedOutboundSendArgs): Pro
         provider_thread_id: sendResult.providerThreadId,
         status: "sent",
         sent_at: new Date().toISOString(),
+        last_event_at: new Date().toISOString(),
         error_message: null,
       })
       .eq("id", outboundRow.id);

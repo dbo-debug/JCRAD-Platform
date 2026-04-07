@@ -14,12 +14,66 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
   const { id } = await context.params;
   const body = await req.json().catch(() => ({}));
 
+  const contactId = asText(body.contact_id);
   const name = asText(body.name);
   const email = asText(body.email);
   const phone = asText(body.phone);
   const title = asText(body.title);
 
   const supabase = createAdminClient();
+
+  if (contactId) {
+    const { data: targetContact, error: targetError } = await supabase
+      .from("customer_contacts")
+      .select("id, name, email, phone, title")
+      .eq("id", contactId)
+      .eq("customer_id", id)
+      .maybeSingle();
+
+    if (targetError) {
+      return NextResponse.json({ error: targetError.message }, { status: 500 });
+    }
+    if (!targetContact) {
+      return NextResponse.json({ error: "Contact not found" }, { status: 404 });
+    }
+
+    const clearPrimary = await supabase.from("customer_contacts").update({ is_primary: false }).eq("customer_id", id);
+    if (clearPrimary.error) {
+      return NextResponse.json({ error: clearPrimary.error.message }, { status: 500 });
+    }
+
+    const nextName = name ?? targetContact.name ?? null;
+    const nextEmail = email ?? targetContact.email ?? null;
+    const nextPhone = phone ?? targetContact.phone ?? null;
+    const nextTitle = title ?? targetContact.title ?? null;
+
+    const { error: promoteError } = await supabase
+      .from("customer_contacts")
+      .update({
+        name: nextName,
+        email: nextEmail,
+        phone: nextPhone,
+        title: nextTitle,
+        is_primary: true,
+      })
+      .eq("id", contactId)
+      .eq("customer_id", id);
+
+    if (promoteError) {
+      return NextResponse.json({ error: promoteError.message }, { status: 500 });
+    }
+
+    const { error: customerErr } = await supabase
+      .from("customers")
+      .update({ primary_contact_email: nextEmail })
+      .eq("id", id);
+
+    if (customerErr) {
+      return NextResponse.json({ error: customerErr.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true });
+  }
 
   const { data: existingRows, error: existingErr } = await supabase
     .from("customer_contacts")

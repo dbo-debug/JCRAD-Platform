@@ -68,6 +68,7 @@ const GOOGLE_OAUTH_SCOPES = [
   "email",
   "profile",
   "https://www.googleapis.com/auth/gmail.send",
+  "https://www.googleapis.com/auth/gmail.readonly",
 ];
 
 function asText(value: unknown): string | null {
@@ -126,6 +127,9 @@ function getGmailConnectionSelectColumns() {
     "encrypted_refresh_token",
     "token_expiry_at",
     "scopes",
+    "gmail_history_id",
+    "last_mail_sync_at",
+    "last_mail_sync_error",
   ].join(", ");
 }
 
@@ -356,6 +360,72 @@ export async function getGmailConnectionStatus(userId: string): Promise<GmailCon
       scopes: refreshed.connection.scopes,
       tokenExpiryAt: refreshed.connection.token_expiry_at,
     },
+  };
+}
+
+export async function getActiveGmailConnectionForUser(args: { userId: string; gmailConnectionId?: string | null }) {
+  return loadActiveConnection(args);
+}
+
+export async function gmailApiRequest(args: {
+  userId: string;
+  gmailConnectionId?: string | null;
+  path: string;
+  method?: "GET" | "POST";
+  searchParams?: Record<string, string | number | Array<string | number> | null | undefined>;
+  body?: unknown;
+}) {
+  const connectionResult = await loadActiveConnection({
+    userId: args.userId,
+    gmailConnectionId: args.gmailConnectionId,
+  });
+
+  if (!connectionResult.ok) {
+    return connectionResult;
+  }
+
+  const url = new URL(`https://gmail.googleapis.com/gmail/v1/users/me/${args.path.replace(/^\/+/, "")}`);
+  Object.entries(args.searchParams || {}).forEach(([key, value]) => {
+    if (value === null || value === undefined || value === "") return;
+    if (Array.isArray(value)) {
+      value.forEach((item) => {
+        if (item === null || item === undefined || item === "") return;
+        url.searchParams.append(key, String(item));
+      });
+      return;
+    }
+    url.searchParams.set(key, String(value));
+  });
+
+  const response = await fetch(url.toString(), {
+    method: args.method || "GET",
+    headers: {
+      Authorization: `Bearer ${connectionResult.connection.access_token}`,
+      ...(args.body ? { "Content-Type": "application/json" } : {}),
+    },
+    body: args.body ? JSON.stringify(args.body) : undefined,
+  });
+
+  const json = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!response.ok) {
+    return {
+      ok: false as const,
+      error:
+        asText((json.error as Record<string, unknown> | undefined)?.message) ||
+        asText(json.error_description) ||
+        `Gmail API request failed (${response.status})`,
+      code: "provider_error" as const,
+      gmailConnectionId: connectionResult.connection.id,
+      gmailEmail: connectionResult.connection.gmail_email,
+    };
+  }
+
+  return {
+    ok: true as const,
+    gmailConnectionId: connectionResult.connection.id,
+    gmailEmail: connectionResult.connection.gmail_email,
+    scopes: connectionResult.connection.scopes,
+    data: json,
   };
 }
 

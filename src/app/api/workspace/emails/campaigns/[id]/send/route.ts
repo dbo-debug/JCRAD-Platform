@@ -183,6 +183,12 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
             provider_thread_id: sendResult.providerThreadId,
             error_message: null,
             sent_at: new Date().toISOString(),
+            last_event_at: new Date().toISOString(),
+            bounced_at: null,
+            bounce_reason: null,
+            replied_at: null,
+            reply_message_id: null,
+            reply_from_email: null,
           }
         : {
             status: "failed",
@@ -190,6 +196,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
             provider_message_id: null,
             provider_thread_id: null,
             error_message: sendResult.error,
+            last_event_at: null,
           };
 
     await admin

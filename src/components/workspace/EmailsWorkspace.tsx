@@ -82,7 +82,7 @@ function campaignToForm(campaign: EmailCampaignDetail | null): CampaignFormState
 }
 
 function summarizeCampaign(campaign: EmailCampaignSummary) {
-  return `${campaign.counts.sent} sent • ${campaign.counts.failed} failed • ${campaign.counts.total} recipients`;
+  return `${campaign.counts.accepted} accepted • ${campaign.counts.failed} failed • ${campaign.counts.bounced} bounced • ${campaign.counts.replied} replied`;
 }
 
 function relativeDate(value: string | null) {
@@ -95,6 +95,7 @@ function relativeDate(value: string | null) {
 function statusTone(status: string) {
   if (status === "sent") return "border-[#bde8e4] bg-[#e9fbf9] text-[#0f766e]";
   if (status === "failed") return "border-[#f1d1d1] bg-[#fff5f5] text-[#991b1b]";
+  if (status === "bounced") return "border-[#f1ddad] bg-[#fff9eb] text-[#9a6b00]";
   if (status === "archived") return "border-[#d7e6ed] bg-[#f8fbfc] text-[#4f6877]";
   return "border-[#f1ddad] bg-[#fff9eb] text-[#9a6b00]";
 }
@@ -345,6 +346,27 @@ export default function EmailsWorkspace(props: EmailsWorkspaceProps) {
     }
   }
 
+  async function refreshMailboxOutcomes() {
+    setBusy("sync");
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/workspace/email/sync", {
+        method: "POST",
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(String(json.error || `Sync failed (${res.status})`));
+      setMessage(
+        `Mailbox sync finished: ${Number(json.bouncedCount || 0)} bounced, ${Number(json.repliedCount || 0)} replied.`
+      );
+      router.refresh();
+    } catch (syncError) {
+      setError(syncError instanceof Error ? syncError.message : "Mailbox sync failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   function toggleRecipient(email: string) {
     workingGroupRecipientEmailsRef.current = null;
     setSelectedRecipientEmails((current) =>
@@ -456,6 +478,9 @@ export default function EmailsWorkspace(props: EmailsWorkspaceProps) {
               </button>
               <button type="button" onClick={() => void sendTest()} disabled={!selectedCampaignId || busy !== null || !gmailStatus.connected} className="rounded-full border border-[#cfdde6] bg-white px-4 py-2 text-sm font-semibold text-[#21424d] disabled:opacity-60">
                 {busy === "test" ? "Sending..." : "Send Test"}
+              </button>
+              <button type="button" onClick={() => void refreshMailboxOutcomes()} disabled={busy !== null || !gmailStatus.connected} className="rounded-full border border-[#cfdde6] bg-white px-4 py-2 text-sm font-semibold text-[#21424d] disabled:opacity-60">
+                {busy === "sync" ? "Refreshing..." : "Refresh Outcomes"}
               </button>
               <button type="button" onClick={() => void sendBatch()} disabled={!selectedCampaignId || busy !== null || !gmailStatus.connected || selectedRecipientOptions.length === 0} className="rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
                 {busy === "send" ? "Sending..." : `Send Batch (${selectedRecipientOptions.length})`}
@@ -622,8 +647,17 @@ export default function EmailsWorkspace(props: EmailsWorkspaceProps) {
                 </div>
 
                 <div className="rounded-[24px] border border-[#dbe8ef] bg-white p-5 shadow-sm">
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <OutcomeMetric label="Accepted" value={String(props.selectedCampaign?.recipients.filter((recipient) => Boolean(recipient.sentAt)).length || 0)} tone="ok" />
+                    <OutcomeMetric label="Failed at Send" value={String(props.selectedCampaign?.recipients.filter((recipient) => recipient.status === "failed").length || 0)} tone="bad" />
+                    <OutcomeMetric label="Bounced Later" value={String(props.selectedCampaign?.recipients.filter((recipient) => recipient.status === "bounced" || recipient.bouncedAt).length || 0)} tone="warn" />
+                    <OutcomeMetric label="Replied" value={String(props.selectedCampaign?.recipients.filter((recipient) => Boolean(recipient.repliedAt)).length || 0)} tone="info" />
+                  </div>
+                </div>
+
+                <div className="rounded-[24px] border border-[#dbe8ef] bg-white p-5 shadow-sm">
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#7891a0]">Results</p>
-                  <p className="mt-1 text-sm text-[#5c7483]">Recent send state for this campaign.</p>
+                  <p className="mt-1 text-sm text-[#5c7483]">Accepted by Gmail is tracked separately from later bounce and reply outcomes.</p>
                   <div className="mt-3 space-y-2">
                     {props.selectedCampaign?.recipients.map((recipient) => (
                       <div key={recipient.id} className="rounded-2xl border border-[#dbe8ef] bg-[#f9fcfd] px-3 py-3">
@@ -634,7 +668,13 @@ export default function EmailsWorkspace(props: EmailsWorkspaceProps) {
                           </span>
                         </div>
                         <p className="mt-1 text-sm text-[#4f6877]">{recipient.companyName || "Unknown company"}{recipient.contactName ? ` • ${recipient.contactName}` : ""}</p>
-                        <p className="mt-1 text-xs text-[#6d8593]">{relativeDate(recipient.sentAt || recipient.createdAt)}</p>
+                        <p className="mt-1 text-xs text-[#6d8593]">
+                          Accepted {relativeDate(recipient.sentAt || recipient.createdAt)}
+                          {recipient.bouncedAt ? ` • Bounced ${relativeDate(recipient.bouncedAt)}` : ""}
+                          {recipient.repliedAt ? ` • Replied ${relativeDate(recipient.repliedAt)}` : ""}
+                        </p>
+                        {recipient.replyFromEmail ? <p className="mt-1 text-sm text-[#0f766e]">Reply from {recipient.replyFromEmail}</p> : null}
+                        {recipient.bounceReason ? <p className="mt-1 text-sm text-[#9a6b00]">{recipient.bounceReason}</p> : null}
                         {recipient.errorMessage ? <p className="mt-1 text-sm text-[#991b1b]">{recipient.errorMessage}</p> : null}
                       </div>
                     ))}
@@ -656,6 +696,24 @@ function Field({ label, children, className }: { label: string; children: ReactN
       <span>{label}</span>
       {children}
     </label>
+  );
+}
+
+function OutcomeMetric({ label, value, tone }: { label: string; value: string; tone: "ok" | "bad" | "warn" | "info" }) {
+  const toneClass =
+    tone === "ok"
+      ? "border-[#bde8e4] bg-[#e9fbf9] text-[#0f766e]"
+      : tone === "bad"
+        ? "border-[#f1d1d1] bg-[#fff5f5] text-[#991b1b]"
+        : tone === "warn"
+          ? "border-[#f1ddad] bg-[#fff9eb] text-[#9a6b00]"
+          : "border-[#cfe1ff] bg-[#eef5ff] text-[#285ea8]";
+
+  return (
+    <div className={["rounded-2xl border px-4 py-3", toneClass].join(" ")}>
+      <p className="text-xs font-semibold uppercase tracking-[0.14em]">{label}</p>
+      <p className="mt-1 text-2xl font-semibold">{value}</p>
+    </div>
   );
 }
 

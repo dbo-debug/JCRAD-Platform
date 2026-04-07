@@ -384,6 +384,8 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
   const [contactPhone, setContactPhone] = useState(props.primaryContact?.phone || "");
   const [contactTitle, setContactTitle] = useState(props.primaryContact?.title || "");
   const [contacts, setContacts] = useState(props.contacts);
+  const [isPrimaryEditorOpen, setIsPrimaryEditorOpen] = useState(false);
+  const [isContactComposerOpen, setIsContactComposerOpen] = useState(false);
   const [editingContactId, setEditingContactId] = useState("");
   const [secondaryContactName, setSecondaryContactName] = useState("");
   const [secondaryContactEmail, setSecondaryContactEmail] = useState("");
@@ -416,8 +418,8 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
   const territoryMeta = props.territoryOptions.find((option) => option.code === territoryCode) || null;
   const hasCoords = hasValidCoordinates(latitude, longitude);
   const hasAddress = Boolean(address1.trim() || city.trim() || stateCode.trim() || postalCode.trim());
-  const callHref = normalizeTelHref(props.primaryContact?.phone || props.mainPhone);
-  const emailHref = normalizeMailtoHref(props.primaryContact?.email || primaryContactEmail);
+  const callHref = normalizeTelHref(contactPhone || props.mainPhone);
+  const emailHref = normalizeMailtoHref(contactEmail || primaryContactEmail);
   const websiteHref = normalizeWebsiteHref(props.website);
   const coordinateCoverageState =
     hasCoords ? "has_coords" : geocodeStatus === "failed" ? "failed" : geocodeStatus === "needs_review" ? "needs_review" : hasAddress ? "address_ready" : "missing_address";
@@ -494,10 +496,21 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
     () => emailRecipients.filter((recipient) => selectedEmailRecipientKeys.includes(recipient.key)),
     [emailRecipients, selectedEmailRecipientKeys]
   );
+  const additionalContacts = useMemo(() => contacts.filter((contact) => !contact.isPrimary), [contacts]);
+  const primaryDisplayName = contactName.trim() || "No primary contact";
+  const primaryDisplayTitle = contactTitle?.trim() || "No title";
+  const primaryDisplayEmail = contactEmail?.trim() || "No email";
 
   useEffect(() => {
     setContacts(props.contacts);
   }, [props.contacts]);
+
+  useEffect(() => {
+    setContactName(props.primaryContact?.name || "");
+    setContactEmail(props.primaryContact?.email || "");
+    setContactPhone(props.primaryContact?.phone || "");
+    setContactTitle(props.primaryContact?.title || "");
+  }, [props.primaryContact?.email, props.primaryContact?.id, props.primaryContact?.name, props.primaryContact?.phone, props.primaryContact?.title]);
 
   useEffect(() => {
     setIsHotLead(props.isHotLead);
@@ -723,6 +736,8 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
       });
       const json = await parseJsonSafe(res);
       if (!res.ok) throw new Error(String(json.error || `Save failed (${res.status})`));
+      setIsPrimaryEditorOpen(false);
+      router.refresh();
       setSuccessMessage("Primary contact updated.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
@@ -732,6 +747,16 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
   }
 
   function resetSecondaryContactDraft() {
+    setIsContactComposerOpen(false);
+    setEditingContactId("");
+    setSecondaryContactName("");
+    setSecondaryContactEmail("");
+    setSecondaryContactPhone("");
+    setSecondaryContactTitle("");
+  }
+
+  function startAddingContact() {
+    setIsContactComposerOpen(true);
     setEditingContactId("");
     setSecondaryContactName("");
     setSecondaryContactEmail("");
@@ -740,6 +765,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
   }
 
   function startEditingContact(contact: PrimaryContact) {
+    setIsContactComposerOpen(true);
     setEditingContactId(String(contact.id || ""));
     setSecondaryContactName(contact.name || "");
     setSecondaryContactEmail(contact.email || "");
@@ -767,6 +793,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
       const json = await parseJsonSafe(res);
       if (!res.ok) throw new Error(String(json.error || `Save failed (${res.status})`));
       resetSecondaryContactDraft();
+      router.refresh();
       setSuccessMessage(editingContactId ? "Contact updated." : "Contact added.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
@@ -791,9 +818,41 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
       if (editingContactId === contactId) {
         resetSecondaryContactDraft();
       }
+      router.refresh();
       setSuccessMessage("Contact removed.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Delete failed");
+    } finally {
+      setContactBusy(false);
+    }
+  }
+
+  async function promoteContactToPrimary() {
+    if (!editingContactId) return;
+
+    setContactBusy(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const res = await fetch(`/api/workspace/customers/${props.customerId}/primary-contact`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contact_id: editingContactId,
+          name: secondaryContactName,
+          email: secondaryContactEmail,
+          phone: secondaryContactPhone,
+          title: secondaryContactTitle,
+        }),
+      });
+      const json = await parseJsonSafe(res);
+      if (!res.ok) throw new Error(String(json.error || `Promote failed (${res.status})`));
+      resetSecondaryContactDraft();
+      router.refresh();
+      setSuccessMessage("Contact promoted to primary.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Promote failed");
     } finally {
       setContactBusy(false);
     }
@@ -1690,47 +1749,115 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
 
           <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
             <div className="rounded-2xl border border-[#dbe9ef] bg-[#f9fcfd] p-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7a909d]">Primary Contact</p>
-              <div className="mt-3 grid gap-3 md:grid-cols-2">
-                <label className="grid gap-1 text-sm text-[#4a6575]">
-                  <span>Name</span>
-                  <input value={contactName} onChange={(e) => setContactName(e.target.value)} disabled={contactBusy} className={inputClass} />
-                </label>
-                <label className="grid gap-1 text-sm text-[#4a6575]">
-                  <span>Title</span>
-                  <input value={contactTitle} onChange={(e) => setContactTitle(e.target.value)} disabled={contactBusy} className={inputClass} />
-                </label>
-                <label className="grid gap-1 text-sm text-[#4a6575]">
-                  <span>Email</span>
-                  <input value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} disabled={contactBusy} className={inputClass} />
-                </label>
-                <label className="grid gap-1 text-sm text-[#4a6575]">
-                  <span>Phone</span>
-                  <input value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} disabled={contactBusy} className={inputClass} />
-                </label>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7a909d]">Primary Contact</p>
+                  <p className="mt-1 text-sm text-[#5c7483]">Account-level email and call quick actions use this contact by default.</p>
+                </div>
+                {!isPrimaryEditorOpen ? (
+                  <div className="flex flex-wrap gap-2">
+                    <a
+                      href={normalizeMailtoHref(contactEmail) || undefined}
+                      className={[
+                        "rounded-full border px-3 py-1.5 text-sm font-semibold transition",
+                        normalizeMailtoHref(contactEmail)
+                          ? "border-[#d0dde5] bg-white text-[#24404d] hover:border-[#14b8a6] hover:text-[#0f766e]"
+                          : "cursor-not-allowed border-[#e2eaee] bg-[#f5f8fa] text-[#8ba0ac] pointer-events-none",
+                      ].join(" ")}
+                    >
+                      Email
+                    </a>
+                    <a
+                      href={normalizeTelHref(contactPhone) || undefined}
+                      className={[
+                        "rounded-full border px-3 py-1.5 text-sm font-semibold transition",
+                        normalizeTelHref(contactPhone)
+                          ? "border-[#d0dde5] bg-white text-[#24404d] hover:border-[#14b8a6] hover:text-[#0f766e]"
+                          : "cursor-not-allowed border-[#e2eaee] bg-[#f5f8fa] text-[#8ba0ac] pointer-events-none",
+                      ].join(" ")}
+                    >
+                      Call
+                    </a>
+                    <button type="button" onClick={() => setIsPrimaryEditorOpen(true)} className="rounded-full bg-[#173543] px-3.5 py-1.5 text-sm font-semibold text-white">
+                      Edit Primary
+                    </button>
+                  </div>
+                ) : null}
               </div>
-              <div className="mt-3">
-                <button type="button" onClick={() => void savePrimaryContact()} disabled={contactBusy} className="rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
-                  {contactBusy ? "Saving..." : "Save Primary Contact"}
-                </button>
-              </div>
+
+              {!isPrimaryEditorOpen ? (
+                <div className="mt-3 rounded-xl border border-[#dbe9ef] bg-white px-3 py-3">
+                  <p className="font-semibold text-[#173543]">{primaryDisplayName}</p>
+                  <p className="mt-1 text-sm text-[#4a6575]">{primaryDisplayTitle}</p>
+                  <p className="mt-1 text-sm text-[#4a6575]">{primaryDisplayEmail}{contactPhone?.trim() ? ` • ${contactPhone.trim()}` : ""}</p>
+                </div>
+              ) : (
+                <>
+                  <div className="mt-3 grid gap-3 md:grid-cols-2">
+                    <label className="grid gap-1 text-sm text-[#4a6575]">
+                      <span>Name</span>
+                      <input value={contactName} onChange={(e) => setContactName(e.target.value)} disabled={contactBusy} className={inputClass} />
+                    </label>
+                    <label className="grid gap-1 text-sm text-[#4a6575]">
+                      <span>Title</span>
+                      <input value={contactTitle} onChange={(e) => setContactTitle(e.target.value)} disabled={contactBusy} className={inputClass} />
+                    </label>
+                    <label className="grid gap-1 text-sm text-[#4a6575]">
+                      <span>Email</span>
+                      <input value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} disabled={contactBusy} className={inputClass} />
+                    </label>
+                    <label className="grid gap-1 text-sm text-[#4a6575]">
+                      <span>Phone</span>
+                      <input value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} disabled={contactBusy} className={inputClass} />
+                    </label>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button type="button" onClick={() => void savePrimaryContact()} disabled={contactBusy} className="rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+                      {contactBusy ? "Saving..." : "Save Primary"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setContactName(props.primaryContact?.name || "");
+                        setContactEmail(props.primaryContact?.email || "");
+                        setContactPhone(props.primaryContact?.phone || "");
+                        setContactTitle(props.primaryContact?.title || "");
+                        setIsPrimaryEditorOpen(false);
+                      }}
+                      disabled={contactBusy}
+                      className="rounded-full border border-[#d0dde5] bg-white px-4 py-2 text-sm font-semibold text-[#24404d] transition hover:border-[#14b8a6] hover:text-[#0f766e] disabled:opacity-60"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="rounded-2xl border border-[#dbe9ef] bg-[#f9fcfd] p-3">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7a909d]">Additional Contacts</p>
-                  <p className="mt-1 text-sm text-[#5c7483]">Edit or remove non-primary contacts here.</p>
+                  <p className="mt-1 text-sm text-[#5c7483]">Work the broader contact bench with explicit row actions instead of a persistent editor.</p>
                 </div>
-                {editingContactId ? (
-                  <button type="button" onClick={resetSecondaryContactDraft} className="rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm font-semibold text-[#24404d] transition hover:border-[#14b8a6] hover:text-[#0f766e]">
-                    Cancel Edit
+                {!isContactComposerOpen ? (
+                  <button type="button" onClick={startAddingContact} className="rounded-full bg-[#173543] px-3.5 py-1.5 text-sm font-semibold text-white">
+                    Add Contact
                   </button>
-                ) : null}
+                ) : (
+                  <button type="button" onClick={resetSecondaryContactDraft} className="rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm font-semibold text-[#24404d] transition hover:border-[#14b8a6] hover:text-[#0f766e]">
+                    Cancel
+                  </button>
+                )}
               </div>
 
               <div className="mt-3 space-y-2.5">
-                {contacts.filter((contact) => !contact.isPrimary).map((contact) => (
+                {additionalContacts.map((contact) => {
+                  const isEditingRow = editingContactId === String(contact.id || "");
+                  const rowEmailHref = normalizeMailtoHref(contact.email);
+                  const rowCallHref = normalizeTelHref(contact.phone);
+
+                  return (
                   <div key={contact.id} className="rounded-xl border border-[#dbe9ef] bg-white px-3 py-2.5">
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div className="min-w-0">
@@ -1739,11 +1866,38 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
                         <p className="mt-1 text-sm text-[#4a6575]">{contact.email || "No email"}{contact.phone ? ` • ${contact.phone}` : ""}</p>
                       </div>
                       <div className="flex flex-wrap gap-2">
+                        <a
+                          href={rowEmailHref || undefined}
+                          className={[
+                            "rounded-full border px-3 py-1.5 text-sm font-semibold transition",
+                            rowEmailHref
+                              ? "border-[#d0dde5] bg-white text-[#24404d] hover:border-[#14b8a6] hover:text-[#0f766e]"
+                              : "cursor-not-allowed border-[#e2eaee] bg-[#f5f8fa] text-[#8ba0ac] pointer-events-none",
+                          ].join(" ")}
+                        >
+                          Email
+                        </a>
+                        <a
+                          href={rowCallHref || undefined}
+                          className={[
+                            "rounded-full border px-3 py-1.5 text-sm font-semibold transition",
+                            rowCallHref
+                              ? "border-[#d0dde5] bg-white text-[#24404d] hover:border-[#14b8a6] hover:text-[#0f766e]"
+                              : "cursor-not-allowed border-[#e2eaee] bg-[#f5f8fa] text-[#8ba0ac] pointer-events-none",
+                          ].join(" ")}
+                        >
+                          Call
+                        </a>
                         <button
                           type="button"
                           onClick={() => startEditingContact(contact)}
                           disabled={contactBusy}
-                          className="rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm font-semibold text-[#24404d] transition hover:border-[#14b8a6] hover:text-[#0f766e] disabled:opacity-60"
+                          className={[
+                            "rounded-full border px-3 py-1.5 text-sm font-semibold transition disabled:opacity-60",
+                            isEditingRow
+                              ? "border-[#14b8a6] bg-[#effcf8] text-[#0f766e]"
+                              : "border-[#d0dde5] bg-white text-[#24404d] hover:border-[#14b8a6] hover:text-[#0f766e]",
+                          ].join(" ")}
                         >
                           Edit
                         </button>
@@ -1757,36 +1911,74 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
                         </button>
                       </div>
                     </div>
+
+                    {isEditingRow ? (
+                      <>
+                        <div className="mt-3 grid gap-3 md:grid-cols-2">
+                          <label className="grid gap-1 text-sm text-[#4a6575]">
+                            <span>Name</span>
+                            <input value={secondaryContactName} onChange={(e) => setSecondaryContactName(e.target.value)} disabled={contactBusy} className={inputClass} />
+                          </label>
+                          <label className="grid gap-1 text-sm text-[#4a6575]">
+                            <span>Title</span>
+                            <input value={secondaryContactTitle} onChange={(e) => setSecondaryContactTitle(e.target.value)} disabled={contactBusy} className={inputClass} />
+                          </label>
+                          <label className="grid gap-1 text-sm text-[#4a6575]">
+                            <span>Email</span>
+                            <input value={secondaryContactEmail} onChange={(e) => setSecondaryContactEmail(e.target.value)} disabled={contactBusy} className={inputClass} />
+                          </label>
+                          <label className="grid gap-1 text-sm text-[#4a6575]">
+                            <span>Phone</span>
+                            <input value={secondaryContactPhone} onChange={(e) => setSecondaryContactPhone(e.target.value)} disabled={contactBusy} className={inputClass} />
+                          </label>
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <button type="button" onClick={() => void saveSecondaryContact()} disabled={contactBusy} className="rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+                            {contactBusy ? "Saving..." : "Save"}
+                          </button>
+                          <button type="button" onClick={() => void promoteContactToPrimary()} disabled={contactBusy} className="rounded-full border border-[#d0dde5] bg-white px-4 py-2 text-sm font-semibold text-[#24404d] transition hover:border-[#14b8a6] hover:text-[#0f766e] disabled:opacity-60">
+                            Promote To Primary
+                          </button>
+                          <button type="button" onClick={resetSecondaryContactDraft} disabled={contactBusy} className="rounded-full border border-[#d0dde5] bg-white px-4 py-2 text-sm font-semibold text-[#24404d] transition hover:border-[#14b8a6] hover:text-[#0f766e] disabled:opacity-60">
+                            Cancel
+                          </button>
+                        </div>
+                      </>
+                    ) : null}
                   </div>
-                ))}
-                {contacts.filter((contact) => !contact.isPrimary).length === 0 ? (
+                )})}
+                {additionalContacts.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-[#d3e1e8] bg-white px-3 py-4 text-sm text-[#5d7685]">No additional contacts yet.</div>
                 ) : null}
               </div>
 
-              <div className="mt-3 grid gap-3 md:grid-cols-2">
-                <label className="grid gap-1 text-sm text-[#4a6575]">
-                  <span>Name</span>
-                  <input value={secondaryContactName} onChange={(e) => setSecondaryContactName(e.target.value)} disabled={contactBusy} className={inputClass} />
-                </label>
-                <label className="grid gap-1 text-sm text-[#4a6575]">
-                  <span>Title</span>
-                  <input value={secondaryContactTitle} onChange={(e) => setSecondaryContactTitle(e.target.value)} disabled={contactBusy} className={inputClass} />
-                </label>
-                <label className="grid gap-1 text-sm text-[#4a6575]">
-                  <span>Email</span>
-                  <input value={secondaryContactEmail} onChange={(e) => setSecondaryContactEmail(e.target.value)} disabled={contactBusy} className={inputClass} />
-                </label>
-                <label className="grid gap-1 text-sm text-[#4a6575]">
-                  <span>Phone</span>
-                  <input value={secondaryContactPhone} onChange={(e) => setSecondaryContactPhone(e.target.value)} disabled={contactBusy} className={inputClass} />
-                </label>
-              </div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button type="button" onClick={() => void saveSecondaryContact()} disabled={contactBusy} className="rounded-full bg-[#173543] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
-                  {contactBusy ? "Saving..." : editingContactId ? "Save Contact" : "Add Contact"}
-                </button>
-              </div>
+              {isContactComposerOpen && !editingContactId ? (
+                <>
+                  <div className="mt-3 grid gap-3 md:grid-cols-2">
+                    <label className="grid gap-1 text-sm text-[#4a6575]">
+                      <span>Name</span>
+                      <input value={secondaryContactName} onChange={(e) => setSecondaryContactName(e.target.value)} disabled={contactBusy} className={inputClass} />
+                    </label>
+                    <label className="grid gap-1 text-sm text-[#4a6575]">
+                      <span>Title</span>
+                      <input value={secondaryContactTitle} onChange={(e) => setSecondaryContactTitle(e.target.value)} disabled={contactBusy} className={inputClass} />
+                    </label>
+                    <label className="grid gap-1 text-sm text-[#4a6575]">
+                      <span>Email</span>
+                      <input value={secondaryContactEmail} onChange={(e) => setSecondaryContactEmail(e.target.value)} disabled={contactBusy} className={inputClass} />
+                    </label>
+                    <label className="grid gap-1 text-sm text-[#4a6575]">
+                      <span>Phone</span>
+                      <input value={secondaryContactPhone} onChange={(e) => setSecondaryContactPhone(e.target.value)} disabled={contactBusy} className={inputClass} />
+                    </label>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button type="button" onClick={() => void saveSecondaryContact()} disabled={contactBusy} className="rounded-full bg-[#173543] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+                      {contactBusy ? "Saving..." : "Add Contact"}
+                    </button>
+                  </div>
+                </>
+              ) : null}
             </div>
           </div>
         </section>

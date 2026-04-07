@@ -17,8 +17,10 @@ export type EmailCampaignSummary = {
   imageUrl: string | null;
   counts: {
     total: number;
-    sent: number;
+    accepted: number;
     failed: number;
+    bounced: number;
+    replied: number;
     queued: number;
     skipped: number;
   };
@@ -32,12 +34,18 @@ export type EmailCampaignRecipientRecord = {
   email: string;
   companyName: string | null;
   contactName: string | null;
-  status: "queued" | "sent" | "failed" | "skipped";
+  status: "queued" | "sent" | "failed" | "skipped" | "bounced";
   outboundEmailId: string | null;
   providerMessageId: string | null;
   providerThreadId: string | null;
   errorMessage: string | null;
   sentAt: string | null;
+  bouncedAt: string | null;
+  bounceReason: string | null;
+  repliedAt: string | null;
+  replyMessageId: string | null;
+  replyFromEmail: string | null;
+  lastEventAt: string | null;
   createdAt: string | null;
 };
 
@@ -94,8 +102,10 @@ function isValidEmail(value: string | null) {
 function buildCampaignSummary(row: GenericRow, recipientRows: GenericRow[]): EmailCampaignSummary {
   const counts = {
     total: recipientRows.length,
-    sent: recipientRows.filter((recipient) => String(recipient.status || "") === "sent").length,
+    accepted: recipientRows.filter((recipient) => Boolean(asText(recipient.sent_at))).length,
     failed: recipientRows.filter((recipient) => String(recipient.status || "") === "failed").length,
+    bounced: recipientRows.filter((recipient) => String(recipient.status || "") === "bounced").length,
+    replied: recipientRows.filter((recipient) => Boolean(asText(recipient.replied_at))).length,
     queued: recipientRows.filter((recipient) => String(recipient.status || "") === "queued").length,
     skipped: recipientRows.filter((recipient) => String(recipient.status || "") === "skipped").length,
   };
@@ -132,6 +142,12 @@ function buildRecipientRecord(row: GenericRow): EmailCampaignRecipientRecord {
     providerThreadId: asText(row.provider_thread_id),
     errorMessage: asText(row.error_message),
     sentAt: asText(row.sent_at),
+    bouncedAt: asText(row.bounced_at),
+    bounceReason: asText(row.bounce_reason),
+    repliedAt: asText(row.replied_at),
+    replyMessageId: asText(row.reply_message_id),
+    replyFromEmail: asText(row.reply_from_email),
+    lastEventAt: asText(row.last_event_at),
     createdAt: asText(row.created_at),
   };
 }
