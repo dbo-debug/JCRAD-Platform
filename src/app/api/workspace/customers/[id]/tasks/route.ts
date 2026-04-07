@@ -178,6 +178,7 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
   const body = await req.json().catch(() => ({}));
   const taskId = asText(body.task_id);
   const status = asText(body.status)?.toLowerCase() || null;
+  const completionNote = asText(body.completion_note);
 
   if (!taskId) {
     return NextResponse.json({ error: "task_id required" }, { status: 400 });
@@ -234,6 +235,7 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
       task_id: existingTask.id,
       completed_at: completedAt,
       previous_status: asText(existingTask.status) || "open",
+      notes: completionNote,
     },
     actor_user_id: staff.userId,
   });
