@@ -46,9 +46,9 @@ export default async function WorkspaceCustomersPage({
           href="/workspace/customers?savedView=pipeline&organizeBy=stage&sort=activity_desc"
         />
         <ModeCard
-          label="Route Prep"
-          title="Prep the field queue"
-          detail={`${metrics.missingPrimaryContact} missing primary contacts • use route readiness and coordinate cleanup`}
+          label="Map Cleanup"
+          title="Prep the field surface"
+          detail={`${metrics.missingPrimaryContact} missing primary contacts • clean up coordinates and account coverage`}
           href="/workspace/customers?savedView=needs_coordinates&sort=activity_desc"
         />
       </section>
@@ -71,7 +71,6 @@ export default async function WorkspaceCustomersPage({
           status: asQueryValue(params?.status),
           stage: asQueryValue(params?.stage),
           contactCoverage: asQueryValue(params?.contactCoverage),
-          routeReadiness: asQueryValue(params?.routeReadiness),
           orderState: asQueryValue(params?.orderState),
           organizeBy: asQueryValue(params?.organizeBy),
           sort: asQueryValue(params?.sort),

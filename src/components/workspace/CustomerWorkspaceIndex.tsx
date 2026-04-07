@@ -1033,7 +1033,6 @@ export default function CustomerWorkspaceIndex({
       setStatusFilter("all");
       setStageFilter("all");
       setContactCoverage("all");
-      setRouteReadiness("all");
       setOrderState("all");
       setOrganizeBy("none");
       setSortKey("activity_desc");
@@ -1048,9 +1047,6 @@ export default function CustomerWorkspaceIndex({
         setOrganizeBy("stage");
         return;
       }
-
-      setRouteReadiness("route_ready");
-      setOrganizeBy("territory");
     });
   }
 
@@ -1068,7 +1064,6 @@ export default function CustomerWorkspaceIndex({
       setStatusFilter("all");
       setStageFilter("all");
       setContactCoverage("all");
-      setRouteReadiness("all");
       setOrderState("all");
       setOrganizeBy("none");
       setSortKey("activity_desc");
