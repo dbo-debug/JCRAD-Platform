@@ -238,11 +238,18 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
                 </div>
                 <p className="mt-1 text-sm text-[#4a6575]">
                   {task.assignedUserName || "Unassigned"}
-                  {task.dueDate ? <> • Due <LocalDateTime value={task.dueDate} fallback={formatDate(task.dueDate)} /></> : " • No due date"}
+                  {task.dueAt ? (
+                    <> • Due <LocalDateTime value={task.dueAt} fallback={formatDate(task.dueDate || task.dueAt)} /></>
+                  ) : task.dueDate ? (
+                    ` • Due ${formatDate(task.dueDate)}`
+                  ) : " • No due date"}
                 </p>
                 <p className="mt-1 text-xs text-[#5d7685]">
                   Created <LocalDateTime value={task.createdAt} fallback={formatDate(task.createdAt)} />
                   {task.completedAt ? <> • Completed <LocalDateTime value={task.completedAt} fallback={formatDate(task.completedAt)} /></> : ""}
+                  {task.reminderOffsetMinutes !== null ? (
+                    <> • Reminder {task.reminderOffsetMinutes === 0 ? "at task time" : `${task.reminderOffsetMinutes} min before`}</>
+                  ) : null}
                 </p>
               </div>
             ))}

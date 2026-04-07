@@ -104,6 +104,12 @@ type EmailComposeSnapshot = {
   selectedRecipientKeys: string[];
 };
 
+type TaskReminderOption = {
+  value: string;
+  label: string;
+  minutes: number | null;
+};
+
 const ROUTE_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const VISIT_STATUS_OPTIONS = [
   "due",
@@ -118,6 +124,14 @@ const VISIT_STATUS_OPTIONS = [
   "sample_drop",
   "interested",
   "revisit_needed",
+];
+const TASK_REMINDER_OPTIONS: TaskReminderOption[] = [
+  { value: "", label: "None", minutes: null },
+  { value: "0", label: "At task time", minutes: 0 },
+  { value: "5", label: "5 min before", minutes: 5 },
+  { value: "15", label: "15 min before", minutes: 15 },
+  { value: "30", label: "30 min before", minutes: 30 },
+  { value: "60", label: "1 hour before", minutes: 60 },
 ];
 
 const sectionClass = "rounded-2xl border border-[#dbe9ef] bg-white p-4 shadow-sm";
@@ -153,6 +167,14 @@ function parseCoordinate(value: string) {
   if (!trimmed) return null;
   const parsed = Number(trimmed);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function combineLocalDateAndTime(dateValue: string, timeValue: string) {
+  const date = dateValue.trim();
+  if (!date) return null;
+  if (!timeValue.trim()) return null;
+  const combined = new Date(`${date}T${timeValue.trim()}`);
+  return Number.isFinite(combined.getTime()) ? combined.toISOString() : null;
 }
 
 function hasValidCoordinates(latitude: string, longitude: string) {
@@ -405,8 +427,10 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
   const [activityDetails, setActivityDetails] = useState("");
   const [taskTitle, setTaskTitle] = useState("");
   const [taskDueDate, setTaskDueDate] = useState("");
+  const [taskDueTime, setTaskDueTime] = useState("");
   const [taskAssignedUserId, setTaskAssignedUserId] = useState(defaultTaskAssigneeUserId);
   const [taskPriority, setTaskPriority] = useState("2");
+  const [taskReminderOffset, setTaskReminderOffset] = useState("");
   const [routeOutcomeBusy, setRouteOutcomeBusy] = useState<string | null>(null);
   const [routeOutcomeTaskEnabled, setRouteOutcomeTaskEnabled] = useState(false);
   const [routeOutcomeTaskTitle, setRouteOutcomeTaskTitle] = useState("");
@@ -415,6 +439,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
   const activitySummaryInputRef = useRef<HTMLInputElement | null>(null);
   const accountCompanyInputRef = useRef<HTMLInputElement | null>(null);
   const emailComposeSnapshotRef = useRef<EmailComposeSnapshot | null>(null);
+  const scheduledTaskReminderTimeoutsRef = useRef<number[]>([]);
 
   const composedAddress = [address1, address2, [city, stateCode, postalCode].filter(Boolean).join(", ")].filter(Boolean).join(" • ") || null;
   const addressMapHref = buildAddressMapHref({
@@ -539,6 +564,12 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
   useEffect(() => {
     setTaskAssignedUserId((current) => current || defaultTaskAssigneeUserId);
   }, [defaultTaskAssigneeUserId]);
+
+  useEffect(() => {
+    return () => {
+      clearScheduledTaskReminderTimeouts();
+    };
+  }, []);
 
   useEffect(() => {
     setSelectedEmailRecipientKeys((current) => {
@@ -678,6 +709,12 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
     setLastActivityAtState(timestamp);
   }
 
+  function clearScheduledTaskReminderTimeouts() {
+    for (const timeoutId of scheduledTaskReminderTimeoutsRef.current) {
+      window.clearTimeout(timeoutId);
+    }
+  }
+
   function registerTaskCreated(dueDate: string | null | undefined) {
     const dueAt = String(dueDate || "").trim() || null;
     setHasOpenTaskState(true);
@@ -705,6 +742,50 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
     setGeocodeProvider((payload.geocode_provider as string | null | undefined) ?? geocodeProvider);
     if ("latitude" in payload) setLatitude(payload.latitude == null ? "" : String(payload.latitude));
     if ("longitude" in payload) setLongitude(payload.longitude == null ? "" : String(payload.longitude));
+  }
+
+  async function scheduleBrowserTaskReminder(args: {
+    title: string;
+    dueAt: string | null;
+    reminderOffsetMinutes: number | null;
+  }) {
+    if (!args.dueAt || args.reminderOffsetMinutes === null) return { status: "none" as const };
+    if (typeof window === "undefined" || typeof Notification === "undefined") {
+      return { status: "unsupported" as const };
+    }
+
+    let permission = Notification.permission;
+    if (permission === "default") {
+      permission = await Notification.requestPermission();
+    }
+    if (permission !== "granted") {
+      return { status: "blocked" as const };
+    }
+
+    const dueAtMs = Date.parse(args.dueAt);
+    if (!Number.isFinite(dueAtMs)) {
+      return { status: "invalid" as const };
+    }
+
+    const reminderAtMs = dueAtMs - args.reminderOffsetMinutes * 60_000;
+    const delay = reminderAtMs - Date.now();
+    if (delay <= 0) {
+      return { status: "past" as const };
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      const dueText = new Date(dueAtMs).toLocaleTimeString(undefined, {
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      });
+      new Notification("Follow-up reminder", {
+        body: `${args.title} • ${props.companyName} • ${dueText}`,
+      });
+    }, delay);
+
+    scheduledTaskReminderTimeoutsRef.current.push(timeoutId);
+    return { status: "scheduled" as const };
   }
 
   async function saveAccount() {
@@ -1012,29 +1093,55 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
       return;
     }
 
+    if (taskDueTime && !taskDueDate) {
+      setError("Choose a due date before setting a time.");
+      return;
+    }
+
     setTaskBusy(true);
     setError(null);
     setSuccess(null);
 
     try {
+      const dueAt = combineLocalDateAndTime(taskDueDate, taskDueTime);
+      const reminderOffsetMinutes = taskReminderOffset ? Number(taskReminderOffset) : null;
       const res = await fetch(`/api/workspace/customers/${props.customerId}/tasks`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: taskTitle,
           due_date: taskDueDate || null,
+          due_at: dueAt,
           assigned_user_id: taskAssignedUserId || defaultTaskAssigneeUserId,
           priority: taskPriority ? Number(taskPriority) : null,
+          reminder_offset_minutes: reminderOffsetMinutes,
         }),
       });
       const json = await parseJsonSafe(res);
       if (!res.ok) throw new Error(String(json.error || `Save failed (${res.status})`));
+      const reminderStatus = await scheduleBrowserTaskReminder({
+        title: taskTitle,
+        dueAt,
+        reminderOffsetMinutes,
+      });
       setTaskTitle("");
       setTaskDueDate("");
+      setTaskDueTime("");
       setTaskPriority("2");
-      registerTaskCreated(taskDueDate);
+      setTaskReminderOffset("");
+      registerTaskCreated(dueAt || taskDueDate);
       markActivityTouched();
-      setSuccessMessage("Task created.");
+      const reminderMessage =
+        reminderStatus.status === "scheduled"
+          ? " Reminder scheduled in this browser tab."
+          : reminderStatus.status === "blocked"
+            ? " Browser notifications are blocked, so no reminder was scheduled."
+            : reminderStatus.status === "unsupported"
+              ? " Browser notifications are not supported here."
+              : reminderStatus.status === "past"
+                ? " Reminder time has already passed, so no browser reminder was scheduled."
+                : "";
+      setSuccessMessage(`Task created.${reminderMessage}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
     } finally {
@@ -2223,16 +2330,22 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
 
           <div id="customer-create-task" className="scroll-mt-28 rounded-2xl border border-[#dbe9ef] bg-[#f9fcfd] p-3">
             <p className="text-sm font-semibold text-[#173543]">Create Follow-Up Task</p>
-            <p className="mt-1 text-sm text-[#5c7483]">Assign the next explicit owner, due date, and priority for this account.</p>
+            <p className="mt-1 text-sm text-[#5c7483]">Assign the next explicit owner, due date, time, and optional browser reminder for this account.</p>
             <div className="mt-3 grid gap-3">
               <label className="grid gap-1 text-sm text-[#4a6575]">
                 <span>Title</span>
                 <input ref={taskTitleInputRef} value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} disabled={taskBusy} className={inputClass} placeholder="Send updated pricing sheet." />
               </label>
-              <label className="grid gap-1 text-sm text-[#4a6575]">
-                <span>Due Date</span>
-                <input type="date" value={taskDueDate} onChange={(e) => setTaskDueDate(e.target.value)} disabled={taskBusy} className={inputClass} />
-              </label>
+              <div className="grid gap-3 md:grid-cols-2">
+                <label className="grid gap-1 text-sm text-[#4a6575]">
+                  <span>Due Date</span>
+                  <input type="date" value={taskDueDate} onChange={(e) => setTaskDueDate(e.target.value)} disabled={taskBusy} className={inputClass} />
+                </label>
+                <label className="grid gap-1 text-sm text-[#4a6575]">
+                  <span>Time</span>
+                  <input type="time" value={taskDueTime} onChange={(e) => setTaskDueTime(e.target.value)} disabled={taskBusy || !taskDueDate} className={inputClass} />
+                </label>
+              </div>
               <label className="grid gap-1 text-sm text-[#4a6575]">
                 <span>Priority</span>
                 <select value={taskPriority} onChange={(e) => setTaskPriority(e.target.value)} disabled={taskBusy} className={inputClass}>
@@ -2254,6 +2367,19 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
                 </select>
                 <span className="text-xs text-[#6b8593]">
                   Defaulting to {selectedTaskAssigneeLabel || defaultTaskAssigneeLabel}.
+                </span>
+              </label>
+              <label className="grid gap-1 text-sm text-[#4a6575]">
+                <span>Reminder</span>
+                <select value={taskReminderOffset} onChange={(e) => setTaskReminderOffset(e.target.value)} disabled={taskBusy || !taskDueDate || !taskDueTime} className={inputClass}>
+                  {TASK_REMINDER_OPTIONS.map((option) => (
+                    <option key={option.value || "none"} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-xs text-[#6b8593]">
+                  V1 reminders only work while this browser tab stays open. Permission is requested only if you choose a reminder.
                 </span>
               </label>
             </div>

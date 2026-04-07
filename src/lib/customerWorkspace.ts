@@ -123,10 +123,12 @@ export type CustomerDetail = {
     id: string;
     title: string;
     dueDate: string | null;
+    dueAt: string | null;
     assignedUserId: string | null;
     assignedUserName: string | null;
     status: string;
     priority: number | null;
+    reminderOffsetMinutes: number | null;
     createdAt: string | null;
     completedAt: string | null;
   }>;
@@ -666,10 +668,17 @@ export async function loadCustomerWorkspaceDetail(customerId: string): Promise<C
           id: String(row.id || ""),
           title: firstText(row.title) || "Untitled task",
           dueDate: firstText(row.due_date),
+          dueAt: firstText(row.due_at),
           assignedUserId: firstText(row.assigned_user_id),
           assignedUserName: formatProfileName(assignee),
           status: firstText(row.status) || "open",
           priority: typeof row.priority === "number" ? row.priority : Number.isFinite(Number(row.priority)) ? Number(row.priority) : null,
+          reminderOffsetMinutes:
+            typeof row.reminder_offset_minutes === "number"
+              ? row.reminder_offset_minutes
+              : Number.isFinite(Number(row.reminder_offset_minutes))
+                ? Number(row.reminder_offset_minutes)
+                : null,
           createdAt: firstText(row.created_at) || null,
           completedAt,
         };
@@ -679,8 +688,8 @@ export async function loadCustomerWorkspaceDetail(customerId: string): Promise<C
         const otherStatusWeight = b.completedAt ? 1 : 0;
         if (statusWeight !== otherStatusWeight) return statusWeight - otherStatusWeight;
 
-        const aDue = Date.parse(String(a.dueDate || ""));
-        const bDue = Date.parse(String(b.dueDate || ""));
+        const aDue = Date.parse(String(a.dueAt || a.dueDate || ""));
+        const bDue = Date.parse(String(b.dueAt || b.dueDate || ""));
         if (Number.isFinite(aDue) || Number.isFinite(bDue)) {
           return (Number.isFinite(aDue) ? aDue : Number.MAX_SAFE_INTEGER) - (Number.isFinite(bDue) ? bDue : Number.MAX_SAFE_INTEGER);
         }
