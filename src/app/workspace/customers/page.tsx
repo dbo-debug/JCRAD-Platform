@@ -46,10 +46,10 @@ export default async function WorkspaceCustomersPage({
           href="/workspace/customers?savedView=pipeline&organizeBy=stage&sort=activity_desc"
         />
         <ModeCard
-          label="Map Cleanup"
-          title="Prep the field surface"
-          detail={`${metrics.missingPrimaryContact} missing primary contacts • clean up coordinates and account coverage`}
-          href="/workspace/customers?savedView=needs_coordinates&sort=activity_desc"
+          label="Route Prep"
+          title="Prep the field queue"
+          detail={`${metrics.missingPrimaryContact} missing primary contacts • territory grouping, map cleanup, and pending stop staging`}
+          href="/workspace/customers?organizeBy=territory&sort=activity_desc"
         />
       </section>
       <CustomerWorkspaceIndex

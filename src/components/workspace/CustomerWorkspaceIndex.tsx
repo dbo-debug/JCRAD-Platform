@@ -60,7 +60,7 @@ type OrderStateFilter = "all" | "has_orders" | "no_orders";
 type HotLeadFilter = "all" | "hot" | "not_hot";
 type TaskStateFilter = "all" | "has_open_task" | "no_open_task" | "overdue_task";
 type OrganizeBy = "none" | "territory" | "owner" | "stage";
-type WorkflowMode = "work_queue" | "segment_builder";
+type WorkflowMode = "work_queue" | "segment_builder" | "route_prep";
 
 const WORKSPACE_STICKY_TOP_CLASS = "top-[calc(var(--workspace-header-offset,5rem)+1rem)]";
 const CUSTOMER_SEGMENT_STORAGE_KEY_PREFIX = "jc-rad:customer-segment";
@@ -95,6 +95,12 @@ const WORKFLOW_MODE_COPY: Record<
     title: "Segment Builder",
     description: "Target broader account sets for sourcing, outreach prep, and operational selection.",
     helper: "Use this mode when you need filtering depth, grouping, and persistent working-group behavior.",
+  },
+  route_prep: {
+    label: "Route Prep",
+    title: "Route Prep",
+    description: "Prep territory-based field work using map visibility, coordinate cleanup, and working-group staging.",
+    helper: "Use this mode to group by territory, inspect map coverage, and move the working group into pending stops.",
   },
 };
 
@@ -351,7 +357,7 @@ function getWorkflowMode(args: {
     args.organizeBy === "territory" ||
     args.territoryFilter !== "all"
   ) {
-    return "segment_builder" satisfies WorkflowMode;
+    return "route_prep" satisfies WorkflowMode;
   }
 
   if (
@@ -424,6 +430,13 @@ function getWorkflowSummary(args: {
       eyebrow: "Focused Handoff",
       title: "Order activity watch",
       description: `${args.visibleWithOrders} accounts have order activity and may need follow-up or progression.`,
+    };
+  }
+  if (args.mode === "route_prep") {
+    return {
+      eyebrow: "Workflow Mode",
+      title: "Route Prep",
+      description: `${args.visibleCount} accounts are in field-prep scope. ${args.visibleMappedCount} are mappable right now; use territory grouping, the map surface, and pending stops to shape the next field run.`,
     };
   }
   if (args.mode === "segment_builder") {
@@ -663,6 +676,7 @@ export default function CustomerWorkspaceIndex({
   const hotLeadCount = visibleCustomers.filter((customer) => customer.isHotLead).length;
   const overdueVisibleCount = visibleCustomers.filter((customer) => customer.overdueTaskCount > 0).length;
   const visibleMappedCount = visibleCustomers.filter((customer) => getCoordinateCoverageState(customer) === "has_coords").length;
+  const selectedSegmentMappedCount = selectedSegmentCustomers.filter((customer) => getCoordinateCoverageState(customer) === "has_coords").length;
   const visibleWithOrders = visibleCustomers.filter((customer) => customer.counts.orders > 0).length;
   const navCounts = {
     all: activeCustomers.length,
@@ -709,14 +723,24 @@ export default function CustomerWorkspaceIndex({
     overdueCount: overdueVisibleCount,
   });
   const territoryStats = buildTerritoryStats(visibleCustomers, referenceNow);
-  const workspaceMetricRows = [
-    { label: "Visible", value: String(visibleCustomers.length) },
-    { label: "Working Group", value: String(selectedSegmentCustomers.length) },
-    { label: "Assigned", value: String(visibleWithOwners) },
-    { label: "Hot", value: String(hotLeadCount) },
-    { label: "Overdue", value: String(overdueVisibleCount) },
-    { label: "Mapped", value: String(visibleMappedCount) },
-  ];
+  const workspaceMetricRows =
+    workflowMode === "route_prep"
+      ? [
+          { label: "Visible", value: String(visibleCustomers.length) },
+          { label: "Working Group", value: String(selectedSegmentCustomers.length) },
+          { label: "Mapped", value: String(visibleMappedCount) },
+          { label: "Group Mapped", value: String(selectedSegmentMappedCount) },
+          { label: "Pending Stops", value: String(pendingStops.length) },
+          { label: "Hot", value: String(hotLeadCount) },
+        ]
+      : [
+          { label: "Visible", value: String(visibleCustomers.length) },
+          { label: "Working Group", value: String(selectedSegmentCustomers.length) },
+          { label: "Assigned", value: String(visibleWithOwners) },
+          { label: "Hot", value: String(hotLeadCount) },
+          { label: "Overdue", value: String(overdueVisibleCount) },
+          { label: "Mapped", value: String(visibleMappedCount) },
+        ];
 
   const sections =
     organizeBy === "territory"
@@ -1047,6 +1071,12 @@ export default function CustomerWorkspaceIndex({
         setOrganizeBy("stage");
         return;
       }
+
+      if (mode === "route_prep") {
+        setSavedView("all");
+        setOrganizeBy("territory");
+        return;
+      }
     });
   }
 
@@ -1356,12 +1386,19 @@ export default function CustomerWorkspaceIndex({
                   </button>
                 </>
               ) : null}
-              <button type="button" onClick={() => applyWorkspacePreset("needs_coordinates")} className={denseButtonClass()}>
-                Needs Coordinates
-              </button>
-              <button type="button" onClick={() => startTransition(() => setOrganizeBy("territory"))} className={denseButtonClass()}>
-                Group by Territory
-              </button>
+              {workflowMode === "route_prep" ? (
+                <>
+                  <button type="button" onClick={() => applyWorkflowMode("route_prep")} className={denseButtonClass()}>
+                    Territory View
+                  </button>
+                  <button type="button" onClick={() => applyWorkspacePreset("needs_coordinates")} className={denseButtonClass()}>
+                    Needs Coordinates
+                  </button>
+                  <button type="button" onClick={() => startTransition(() => setOrganizeBy("territory"))} className={denseButtonClass()}>
+                    Group by Territory
+                  </button>
+                </>
+              ) : null}
               <button
                 type="button"
                 onClick={() => setShowFilteredMap((current) => !current)}
