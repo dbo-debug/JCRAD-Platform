@@ -325,7 +325,7 @@ type WorkspacePresetKey = "all" | "hall_of_flowers" | "hot_leads" | "no_task" | 
 
 function denseButtonClass(tone: "primary" | "secondary" = "secondary") {
   return tone === "primary"
-    ? "inline-flex h-9 items-center justify-center rounded-full bg-[#173543] px-3.5 text-sm font-semibold text-white transition hover:bg-[#0f2a35]"
+    ? "inline-flex h-9 items-center justify-center rounded-full bg-[#6c537f] px-3.5 text-sm font-semibold text-white transition hover:bg-[#785c8d]"
     : "inline-flex h-9 items-center justify-center rounded-full border border-[#decfe8] bg-white px-3.5 text-sm font-medium text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543]";
 }
 
@@ -925,8 +925,14 @@ export default function CustomerWorkspaceIndex({
 
   function toggleCustomerSelection(customerId: string) {
     setSelectedCustomerIds((current) => {
-      const next = current.includes(customerId) ? current.filter((id) => id !== customerId) : [...current, customerId];
+      const alreadySelected = current.includes(customerId);
+      const next = alreadySelected ? current.filter((id) => id !== customerId) : [...current, customerId];
       persistSelectedSegment(next);
+      setFocusedCustomerId((focusedCurrent) => {
+        if (!alreadySelected) return customerId;
+        if (focusedCurrent !== customerId) return focusedCurrent;
+        return next[next.length - 1] || "";
+      });
       return next;
     });
   }
@@ -939,12 +945,14 @@ export default function CustomerWorkspaceIndex({
   function selectAllVisible() {
     setSelectedCustomerIds(visibleCustomerIds);
     persistSelectedSegment(visibleCustomerIds);
+    setFocusedCustomerId((current) => current || visibleCustomerIds[0] || "");
     setBulkStatusMessage(null);
   }
 
   function clearSelection() {
     setSelectedCustomerIds([]);
     persistSelectedSegment([]);
+    setFocusedCustomerId("");
     setBulkStatusMessage(null);
   }
 
@@ -1881,19 +1889,6 @@ function CustomerCard({
       <p className="mt-3 truncate text-sm text-[#5c7483]">{metadataLine || "No recent metadata yet."}</p>
 
       <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-[#e6eef3] pt-3">
-        <button
-          type="button"
-          onClick={(event) => {
-            stopCardEvent(event);
-            onFocus(customer.id);
-          }}
-          className={[
-            "inline-flex h-8 items-center justify-center rounded-full border px-3 text-sm font-medium transition",
-            focused ? "border-[#173543] bg-[#173543] text-white" : "border-[#cddbe4] bg-white text-[#21424d] hover:border-[#173543] hover:text-[#173543]",
-          ].join(" ")}
-        >
-          Focus Account
-        </button>
         {needsCoordinates ? <QuickAction href={mapsHref} label="Open Maps" external /> : null}
         <QuickAction href={phoneHref} label="Call" />
         <QuickAction href={primaryEmailHref} label="Email" />

@@ -158,7 +158,7 @@ export default function BulkProductMediaClient({ catalogItemId, initialMedia }: 
   });
 
   const thumbnailSrc = useMemo(
-    () => String(media.thumbnail_url || "").trim() || "/brand/motley-on-white.png",
+    () => String(media.thumbnail_url || "").trim() || "/brand/greyscale.png",
     [media.thumbnail_url]
   );
 

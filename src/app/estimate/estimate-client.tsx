@@ -243,7 +243,7 @@ export default function EstimateClient({ staffRole, customerOptions }: EstimateC
       <header className="rounded-2xl border border-[#dce7ee] bg-[linear-gradient(180deg,#ffffff_0%,#fcf7fd_100%)] p-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-center gap-3">
-            <img src="/brand/motley-on-white.png" alt="Motley Terpz" className="h-16 w-16 rounded-xl border border-[#e8ddf0] bg-white p-2" />
+            <img src="/brand/greyscale.png" alt="Motley Terpz" className="h-16 w-16 rounded-xl border border-[#e8ddf0] bg-white p-2" />
             <div>
               <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#5b7382]">Estimate</div>
               <h1 className="text-2xl font-semibold tracking-tight text-[#1a3240]">JC RAD Estimate</h1>

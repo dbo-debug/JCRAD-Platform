@@ -116,7 +116,7 @@ export default function EstimatePrintClient({ estimateId }: EstimatePrintClientP
       <header className="estimate-break-avoid rounded-2xl border border-[#e8ddf0] bg-white p-4 shadow-[0_16px_24px_-24px_rgba(16,24,40,0.45)]">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-center gap-3">
-            <img src="/brand/motley-on-white.png" alt="Motley Terpz" className="h-14 w-14 rounded-xl border border-[#e8ddf0] bg-white p-2" />
+            <img src="/brand/greyscale.png" alt="Motley Terpz" className="h-14 w-14 rounded-xl border border-[#e8ddf0] bg-white p-2" />
             <div className="space-y-0.5">
               <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#5b7382]">Estimate PDF</div>
               <h1 className="text-2xl font-semibold tracking-tight text-[#1a3240]">JC RAD Estimate</h1>

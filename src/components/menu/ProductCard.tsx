@@ -164,7 +164,7 @@ export default function ProductCard({ item, onAdd }: ProductCardProps) {
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#f9fbfc] to-[#eef3f6]">
             <img
-              src="/brand/motley-on-white.png"
+              src="/brand/greyscale.png"
               alt=""
               aria-hidden="true"
               loading="lazy"

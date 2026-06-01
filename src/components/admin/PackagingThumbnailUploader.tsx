@@ -16,7 +16,7 @@ export default function PackagingThumbnailUploader({
 }: PackagingThumbnailUploaderProps) {
   const router = useRouter();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string>(String(initialThumbnailUrl || "").trim() || "/brand/motley-on-white.png");
+  const [previewUrl, setPreviewUrl] = useState<string>(String(initialThumbnailUrl || "").trim() || "/brand/greyscale.png");
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);

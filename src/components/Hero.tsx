@@ -30,7 +30,7 @@ export default function Hero({
           <p className="max-w-xl text-white/90 md:text-lg md:leading-relaxed">{description}</p>
         </div>
         <div className="hidden self-center justify-self-end md:block">
-          <img src="/brand/mot-white-on-white.png" alt="Motley Terpz" className="h-auto w-[260px] opacity-90" />
+          <img src="/brand/motley_terpz_3d_true_transparent.png" alt="Motley Terpz" className="h-auto w-[320px]" />
         </div>
       </div>
     </section>

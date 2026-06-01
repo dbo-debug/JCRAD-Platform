@@ -51,7 +51,7 @@ export default function PackagingSkuMediaClient({ id }: { id: string }) {
   }, [id]);
 
   const thumbnailSrc = useMemo(
-    () => String(sku?.thumbnail_url || "").trim() || "/brand/motley-on-white.png",
+    () => String(sku?.thumbnail_url || "").trim() || "/brand/greyscale.png",
     [sku?.thumbnail_url]
   );
 

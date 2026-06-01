@@ -1659,7 +1659,7 @@ export default function MenuClient({
 
   const branding = (
     <div className="flex items-center gap-4">
-      <img src="/brand/motley-on-white.png" alt="Motley Terpz" className="h-12 w-auto" />
+      <img src="/brand/greyscale.png" alt="Motley Terpz" className="h-12 w-auto" />
       <div className="hidden sm:block text-sm text-[#2f4654]">Wholesale • Copack • Fast turnaround</div>
     </div>
   );

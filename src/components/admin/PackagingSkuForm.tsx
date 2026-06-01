@@ -403,7 +403,7 @@ export default function PackagingSkuForm({
     }
   }
 
-  const thumbnailPreview = localPreviewUrl || String(form.thumbnail_url || "").trim() || "/brand/motley-on-white.png";
+  const thumbnailPreview = localPreviewUrl || String(form.thumbnail_url || "").trim() || "/brand/greyscale.png";
 
   return (
     <form onSubmit={onSubmit} className="space-y-5 rounded-xl border border-[var(--surface-border)] bg-white p-5 shadow-sm">

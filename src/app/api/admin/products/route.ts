@@ -224,8 +224,8 @@ export async function GET(req: Request) {
       });
 
     const chosen = imageMedia[0];
-    if (!chosen) return "/brand/motley-on-white.png";
-    return mediaUrl(chosen) || "/brand/motley-on-white.png";
+    if (!chosen) return "/brand/greyscale.png";
+    return mediaUrl(chosen) || "/brand/greyscale.png";
   }
 
   return NextResponse.json({

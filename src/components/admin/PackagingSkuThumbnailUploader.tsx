@@ -15,7 +15,7 @@ type SkuResponse = {
 
 export default function PackagingSkuThumbnailUploader({ skuId }: PackagingSkuThumbnailUploaderProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string>("/brand/motley-on-white.png");
+  const [previewUrl] = useState<string>("/brand/greyscale.png");
   const [name, setName] = useState<string>("Packaging SKU");
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -41,7 +41,7 @@ export default function PackagingSkuThumbnailUploader({ skuId }: PackagingSkuThu
         return;
       }
 
-      const nextUrl = String(json?.sku?.thumbnail_url || "").trim() || "/brand/motley-on-white.png";
+      const nextUrl = String(json?.sku?.thumbnail_url || "").trim() || "/brand/greyscale.png";
       const nextName = String(json?.sku?.name || "").trim() || "Packaging SKU";
       setPreviewUrl(nextUrl);
       setName(nextName);

@@ -270,7 +270,7 @@ export default function BulkProductsTable() {
                   <tr key={product.id} className="border-b border-[#eef3f6] last:border-b-0">
                     <td className="px-4 py-3">
                       <img
-                        src={product.thumbnail_url || "/brand/motley-on-white.png"}
+                        src={product.thumbnail_url || "/brand/greyscale.png"}
                         alt={`${product.name || "Product"} image`}
                         className="h-14 w-14 rounded-md border border-[#eadff1] object-cover"
                       />

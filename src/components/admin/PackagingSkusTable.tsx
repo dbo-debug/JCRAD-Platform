@@ -212,7 +212,7 @@ export default function PackagingSkusTable() {
                 const thumbnailSrc = String(row.thumbnail_url || "").trim();
                 const imageSrc = thumbnailSrc
                   ? `${thumbnailSrc}${thumbnailSrc.includes("?") ? "&" : "?"}t=${encodeURIComponent(String(row.id || ""))}`
-                  : "/brand/motley-on-white.png";
+                  : "/brand/greyscale.png";
                 return (
                   <tr key={row.id} className="border-b border-[#eef3f6] last:border-b-0">
                     <td className="px-4 py-3">

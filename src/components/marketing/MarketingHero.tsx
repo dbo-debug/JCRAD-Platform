@@ -40,7 +40,7 @@ export default function MarketingHero({
           </div>
           {brandMarkSrc ? (
             <div className="hidden self-center justify-self-end md:block">
-              <img src={brandMarkSrc} alt="Motley Terpz" className="h-auto w-[260px] opacity-90" />
+              <img src={brandMarkSrc} alt="Motley Terpz" className="h-auto w-[320px]" />
             </div>
           ) : null}
         </div>
