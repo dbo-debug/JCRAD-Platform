@@ -15,7 +15,7 @@ type SkuResponse = {
 
 export default function PackagingSkuThumbnailUploader({ skuId }: PackagingSkuThumbnailUploaderProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [previewUrl] = useState<string>("/brand/greyscale.png");
+  const [previewUrl, setPreviewUrl] = useState<string>("/brand/greyscale.png");
   const [name, setName] = useState<string>("Packaging SKU");
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -82,8 +82,8 @@ export default function PackagingSkuThumbnailUploader({ skuId }: PackagingSkuThu
       if (nextUrl) setPreviewUrl(nextUrl);
       setSelectedFile(null);
       setSuccess("Saved thumbnail.");
-    } catch (err: any) {
-      setError(err?.message || "Upload failed");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Upload failed");
     } finally {
       setUploading(false);
     }
