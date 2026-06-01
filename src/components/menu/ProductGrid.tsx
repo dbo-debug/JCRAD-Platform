@@ -16,7 +16,7 @@ export default function ProductGrid({ items, onAdd, emptyMessage }: ProductGridP
         <div className="mt-4">
           <Link
             href="/portal/onboarding"
-            className="inline-flex rounded-full border border-[#cfdde5] px-3 py-1.5 text-xs font-semibold text-[#2f4a59] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
+            className="inline-flex rounded-full border border-[#ddcfe8] px-3 py-1.5 text-xs font-semibold text-[#2f4a59] transition hover:border-[#8f52dc] hover:text-[#6f32b5]"
           >
             Request sourcing help
           </Link>

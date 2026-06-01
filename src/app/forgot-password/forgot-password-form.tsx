@@ -36,7 +36,7 @@ export default function ForgotPasswordForm() {
   return (
     <div className="flex min-h-[72vh] items-center justify-center">
       <div className="w-full max-w-lg rounded-3xl border border-[#cfe0e8] bg-white p-8 shadow-[0_26px_46px_-32px_rgba(16,24,40,0.45)] md:p-9">
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0f766e]">Account Recovery</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#6f32b5]">Account Recovery</p>
         <h1 className="mt-2 text-3xl font-semibold text-[#13303f]">Reset your password</h1>
         <p className="mt-2 text-sm text-[#4a6575]">Enter your account email and we&apos;ll send reset instructions.</p>
 
@@ -54,19 +54,19 @@ export default function ForgotPasswordForm() {
             type="submit"
             fullWidth
             disabled={submitting}
-            className="mt-6 rounded-full bg-[#14b8a6] text-white shadow-[0_0_0_1px_rgba(20,184,166,0.24)] hover:bg-[#14b8a6]"
+            className="mt-6 rounded-full bg-[#8f52dc] text-white shadow-[0_0_0_1px_rgba(20,184,166,0.24)] hover:bg-[#8f52dc]"
           >
             {submitting ? "Sending..." : "Send reset instructions"}
           </Button>
         </form>
 
         {message ? (
-          <p className={`mt-4 text-sm ${success ? "text-[#0f766e]" : "text-[#9a3d3d]"}`}>{message}</p>
+          <p className={`mt-4 text-sm ${success ? "text-[#6f32b5]" : "text-[#9a3d3d]"}`}>{message}</p>
         ) : null}
 
         <p className="mt-5 text-sm text-[#4a6575]">
           Remembered your password?{" "}
-          <Link href="/login" className="font-semibold text-[#0f766e] underline underline-offset-4">
+          <Link href="/login" className="font-semibold text-[#6f32b5] underline underline-offset-4">
             Back to login
           </Link>
         </p>

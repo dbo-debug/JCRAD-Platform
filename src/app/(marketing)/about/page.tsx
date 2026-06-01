@@ -70,8 +70,8 @@ export default function AboutPage() {
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           {MILESTONES.map((item) => (
-            <Card key={`${item.year}-${item.title}`} className="border border-[#dbe9ef] bg-white p-5 text-[#153447] shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#0f766e]">{item.year}</p>
+            <Card key={`${item.year}-${item.title}`} className="border border-[#eadff1] bg-white p-5 text-[#153447] shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#6f32b5]">{item.year}</p>
               <h3 className="mt-2 text-lg font-semibold">{item.title}</h3>
               <p className="mt-2 text-sm text-[#4a6575]">{item.body}</p>
             </Card>
@@ -83,18 +83,18 @@ export default function AboutPage() {
         <h2 className="text-2xl font-semibold text-[#13303f] md:text-3xl">Operating philosophy</h2>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           {PHILOSOPHY.map((item) => (
-            <div key={item} className="rounded-xl border border-[#dbe9ef] bg-white px-4 py-3 text-sm font-medium text-[#234353]">
+            <div key={item} className="rounded-xl border border-[#eadff1] bg-white px-4 py-3 text-sm font-medium text-[#234353]">
               {item}
             </div>
           ))}
         </div>
       </section>
 
-      <section className="rounded-2xl border border-[#dbe9ef] bg-white p-6 md:p-8">
+      <section className="rounded-2xl border border-[#eadff1] bg-white p-6 md:p-8">
         <h2 className="text-2xl font-semibold text-[#13303f] md:text-3xl">Why operators work with JC RAD Inc.</h2>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           {WHY_OPERATORS_CHOOSE_US.map((item) => (
-            <div key={item} className="rounded-xl border border-[#dbe9ef] bg-[#f9fcfd] px-4 py-3 text-sm font-medium text-[#234353]">
+            <div key={item} className="rounded-xl border border-[#eadff1] bg-[#fdf8fd] px-4 py-3 text-sm font-medium text-[#234353]">
               {item}
             </div>
           ))}
@@ -112,7 +112,7 @@ export default function AboutPage() {
           <div className="flex flex-col gap-3 sm:flex-row">
             <Link
               href="/menu"
-              className="inline-flex items-center justify-center rounded-full bg-[#14b8a6] px-5 py-3 text-sm font-semibold text-white transition hover:opacity-95"
+              className="inline-flex items-center justify-center rounded-full bg-[#8f52dc] px-5 py-3 text-sm font-semibold text-white transition hover:opacity-95"
             >
               View Menu
             </Link>

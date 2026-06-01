@@ -16,7 +16,7 @@ export default function PackagingThumbnailUploader({
 }: PackagingThumbnailUploaderProps) {
   const router = useRouter();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string>(String(initialThumbnailUrl || "").trim() || "/brand/PRIMARY.png");
+  const [previewUrl, setPreviewUrl] = useState<string>(String(initialThumbnailUrl || "").trim() || "/brand/motley-on-white.png");
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -86,7 +86,7 @@ export default function PackagingThumbnailUploader({
       <img
         src={previewUrl}
         alt={`${name || "Packaging SKU"} thumbnail`}
-        className="h-40 w-40 cursor-pointer rounded-md border border-[#dbe9ef] object-cover"
+        className="h-40 w-40 cursor-pointer rounded-md border border-[#eadff1] object-cover"
         onClick={() => {
           if (hasPreview) setOpen(true);
         }}
@@ -98,20 +98,20 @@ export default function PackagingThumbnailUploader({
           type="file"
           accept="image/*"
           onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-          className="rounded border border-[#cfdde5] bg-white px-3 py-2 text-sm text-[#173543]"
+          className="rounded border border-[#ddcfe8] bg-white px-3 py-2 text-sm text-[#173543]"
         />
 
         <button
           type="button"
           onClick={onUpload}
           disabled={uploading || !selectedFile}
-          className="w-fit rounded bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95 disabled:opacity-60"
+          className="w-fit rounded bg-[#8f52dc] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95 disabled:opacity-60"
         >
           {uploading ? "Uploading..." : "Upload Thumbnail"}
         </button>
 
         {error ? <p className="text-sm text-[#991b1b]">{error}</p> : null}
-        {success ? <p className="text-sm text-[#0f766e]">{success}</p> : null}
+        {success ? <p className="text-sm text-[#6f32b5]">{success}</p> : null}
       </div>
 
       {open ? (
@@ -120,12 +120,12 @@ export default function PackagingThumbnailUploader({
           onClick={() => setOpen(false)}
         >
           <div
-            className="relative w-full max-w-5xl rounded-lg border border-[#dbe9ef] bg-white p-4"
+            className="relative w-full max-w-5xl rounded-lg border border-[#eadff1] bg-white p-4"
             onClick={(e) => e.stopPropagation()}
           >
             <button
               type="button"
-              className="absolute right-3 top-3 rounded border border-[#cfdde5] px-2 py-1 text-[#4f6877] hover:text-[#173543]"
+              className="absolute right-3 top-3 rounded border border-[#ddcfe8] px-2 py-1 text-[#4f6877] hover:text-[#173543]"
               onClick={() => setOpen(false)}
             >
               X

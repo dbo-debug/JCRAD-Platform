@@ -11,7 +11,7 @@ type BreakdownColumnProps = {
 
 export default function BreakdownColumn({ title, line, unitLabel, group }: BreakdownColumnProps) {
   return (
-    <section className="overflow-hidden rounded-xl border border-[#dbe6ed] bg-[#fbfdfe]">
+    <section className="overflow-hidden rounded-xl border border-[#e8ddf0] bg-[#fffafd]">
       <div className="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#5c7787]">
         {title}
       </div>

@@ -88,12 +88,12 @@ export function visitStatusChipClass(status: string | null | undefined) {
     case "revisit_needed":
       return "border-[#ffd2d2] bg-[#fff0f0] text-[#9a3d3d]";
     default:
-      return "border-[#d7e6ed] bg-[#f8fbfc] text-[#4a6575]";
+      return "border-[#e5d8ef] bg-[#fcf7fd] text-[#4a6575]";
   }
 }
 
 export function priorityChipClass(priority: number | null) {
-  if (priority === null) return "border-[#d7e6ed] bg-[#f8fbfc] text-[#4a6575]";
+  if (priority === null) return "border-[#e5d8ef] bg-[#fcf7fd] text-[#4a6575]";
   if (priority <= 1) return "border-[#ffd2d2] bg-[#fff0f0] text-[#9a3d3d]";
   if (priority <= 3) return "border-[#f4ddb0] bg-[#fff6df] text-[#946200]";
   return "border-[#d0e4ff] bg-[#eef5ff] text-[#285ea8]";

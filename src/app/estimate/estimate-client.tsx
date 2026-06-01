@@ -215,7 +215,7 @@ export default function EstimateClient({ staffRole, customerOptions }: EstimateC
             href={`/estimate/${encodeURIComponent(safeEstimateId)}/print`}
             target="_blank"
             rel="noopener noreferrer"
-            className="rounded-full bg-[#14b8a6] px-3 py-1.5 text-xs font-semibold text-white"
+            className="rounded-full bg-[#8f52dc] px-3 py-1.5 text-xs font-semibold text-white"
           >
             Print / Save as PDF
           </Link>
@@ -230,20 +230,20 @@ export default function EstimateClient({ staffRole, customerOptions }: EstimateC
 
   return (
     <div className="estimate-page mx-auto max-w-6xl space-y-3 rounded-2xl border border-[#dbe5ec] bg-white p-3.5 shadow-[0_20px_32px_-28px_rgba(16,24,40,0.55)] md:p-4">
-      <div className="no-print flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-[#dce6eb] bg-[#fbfdfe] px-3 py-2 shadow-[0_14px_24px_-24px_rgba(16,24,40,0.4)]">
+      <div className="no-print flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-[#dce6eb] bg-[#fffafd] px-3 py-2 shadow-[0_14px_24px_-24px_rgba(16,24,40,0.4)]">
         <div className="text-xs font-medium tracking-[0.08em] text-[#607988]">Need to add or adjust products?</div>
         <Link
           href={backToMenuHref}
-          className="inline-flex rounded-full border border-[#cfe0e7] px-3 py-1.5 text-xs font-semibold text-[#2a4655] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
+          className="inline-flex rounded-full border border-[#decee9] px-3 py-1.5 text-xs font-semibold text-[#2a4655] transition hover:border-[#8f52dc] hover:text-[#6f32b5]"
         >
           Back to Menu
         </Link>
       </div>
 
-      <header className="rounded-2xl border border-[#dce7ee] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbfc_100%)] p-3">
+      <header className="rounded-2xl border border-[#dce7ee] bg-[linear-gradient(180deg,#ffffff_0%,#fcf7fd_100%)] p-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-center gap-3">
-            <img src="/brand/BLACK.png" alt="JC RAD" className="h-16 w-16 rounded-xl border border-[#dbe6ed] bg-white p-2" />
+            <img src="/brand/motley-on-white.png" alt="Motley Terpz" className="h-16 w-16 rounded-xl border border-[#e8ddf0] bg-white p-2" />
             <div>
               <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#5b7382]">Estimate</div>
               <h1 className="text-2xl font-semibold tracking-tight text-[#1a3240]">JC RAD Estimate</h1>
@@ -256,13 +256,13 @@ export default function EstimateClient({ staffRole, customerOptions }: EstimateC
           <div className="no-print flex flex-wrap gap-2">
             <Link
               href={backToMenuHref}
-              className="rounded-full border border-[#d2dfe7] px-3 py-1.5 text-xs font-semibold text-[#274555] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
+              className="rounded-full border border-[#d2dfe7] px-3 py-1.5 text-xs font-semibold text-[#274555] transition hover:border-[#8f52dc] hover:text-[#6f32b5]"
             >
               Back to Menu
             </Link>
             <Link
               href={`/estimate/${encodeURIComponent(safeEstimateId)}/print`}
-              className="rounded-full bg-[#14b8a6] px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-95"
+              className="rounded-full bg-[#8f52dc] px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-95"
             >
               Send Estimate PDF
             </Link>
@@ -276,12 +276,12 @@ export default function EstimateClient({ staffRole, customerOptions }: EstimateC
           </div>
         </div>
         {attachedCustomer ? (
-          <div className="mt-3 flex flex-wrap items-center gap-3 rounded-2xl border border-[#dce7ee] bg-[#fbfdfe] px-3 py-2.5">
+          <div className="mt-3 flex flex-wrap items-center gap-3 rounded-2xl border border-[#dce7ee] bg-[#fffafd] px-3 py-2.5">
             {attachedCustomer.logo_url ? (
               <img
                 src={attachedCustomer.logo_url}
                 alt={attachedCustomer.company_name || attachedCustomer.contact_name || "Customer logo"}
-                className="h-14 w-14 rounded-xl border border-[#dbe6ed] bg-white object-contain p-2"
+                className="h-14 w-14 rounded-xl border border-[#e8ddf0] bg-white object-contain p-2"
               />
             ) : null}
             <div className="space-y-0.5">
@@ -297,7 +297,7 @@ export default function EstimateClient({ staffRole, customerOptions }: EstimateC
       </header>
 
       {staffRole ? (
-        <section className="no-print rounded-2xl border border-[#dce7ee] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbfc_100%)] p-3 shadow-[0_14px_24px_-24px_rgba(16,24,40,0.4)]">
+        <section className="no-print rounded-2xl border border-[#dce7ee] bg-[linear-gradient(180deg,#ffffff_0%,#fcf7fd_100%)] p-3 shadow-[0_14px_24px_-24px_rgba(16,24,40,0.4)]">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#5b7382]">Formal Estimate</div>
@@ -320,7 +320,7 @@ export default function EstimateClient({ staffRole, customerOptions }: EstimateC
               value={customerQuery}
               onChange={(e) => setCustomerQuery(e.target.value)}
               placeholder="Search by company, contact, email, or phone"
-              className="w-full rounded-xl border border-[#d2dfe7] bg-white px-3 py-2 text-sm text-[#173543] outline-none transition focus:border-[#14b8a6]"
+              className="w-full rounded-xl border border-[#d2dfe7] bg-white px-3 py-2 text-sm text-[#173543] outline-none transition focus:border-[#8f52dc]"
             />
             <div className="grid gap-2 md:grid-cols-2">
               {filteredCustomerOptions.map((customer) => {
@@ -331,7 +331,7 @@ export default function EstimateClient({ staffRole, customerOptions }: EstimateC
                     type="button"
                     onClick={() => void updateAttachedCustomer(customer.id)}
                     disabled={busy || selected}
-                    className="rounded-xl border border-[#dbe6ed] bg-white px-3 py-2 text-left shadow-[0_12px_24px_-24px_rgba(16,24,40,0.45)] transition hover:border-[#14b8a6] disabled:cursor-not-allowed disabled:opacity-60"
+                    className="rounded-xl border border-[#e8ddf0] bg-white px-3 py-2 text-left shadow-[0_12px_24px_-24px_rgba(16,24,40,0.45)] transition hover:border-[#8f52dc] disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <div className="text-sm font-semibold text-[#173543]">{customer.company_name}</div>
                     <div className="text-xs text-[#607988]">
@@ -347,7 +347,7 @@ export default function EstimateClient({ staffRole, customerOptions }: EstimateC
       ) : null}
 
       <div className="rounded-2xl border border-[#e2ebf0] bg-[repeating-linear-gradient(135deg,#ffffff_0px,#ffffff_18px,#f6f9fb_18px,#f6f9fb_36px)] px-3 py-2 shadow-[0_14px_30px_-26px_rgba(16,24,40,0.4)]">
-        <div className="rounded-full border border-[#d4e3e3] bg-[#eef7f6] px-3 py-1 text-center text-[10px] font-medium tracking-[0.08em] text-[#0f766e]">
+        <div className="rounded-full border border-[#d4e3e3] bg-[#eef7f6] px-3 py-1 text-center text-[10px] font-medium tracking-[0.08em] text-[#6f32b5]">
           WHOLESALE ESTIMATE • BULK + COPACK • COMPLIANCE-FIRST
         </div>
       </div>
@@ -370,7 +370,7 @@ export default function EstimateClient({ staffRole, customerOptions }: EstimateC
       {error ? <div className="rounded-xl border border-[#f3d2d2] bg-[#fff4f4] px-3 py-1.5 text-xs text-[#991b1b]">{error}</div> : null}
 
       {lines.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-[#d5e2ea] bg-[#fbfdfe] p-6 text-center text-sm text-[#607988]">
+        <div className="rounded-2xl border border-dashed border-[#d5e2ea] bg-[#fffafd] p-6 text-center text-sm text-[#607988]">
           No line items yet.
         </div>
       ) : (
@@ -398,24 +398,24 @@ export default function EstimateClient({ staffRole, customerOptions }: EstimateC
         </section>
       )}
 
-      <footer className="estimate-summary ml-auto w-full max-w-[420px] rounded-2xl border border-[#dbe6ed] bg-white p-3 shadow-[0_16px_24px_-24px_rgba(16,24,40,0.5)]">
+      <footer className="estimate-summary ml-auto w-full max-w-[420px] rounded-2xl border border-[#e8ddf0] bg-white p-3 shadow-[0_16px_24px_-24px_rgba(16,24,40,0.5)]">
         <div className="space-y-1.5 text-xs text-[#4e6777] [font-variant-numeric:tabular-nums]">
           <div className="flex items-center justify-between"><span>Subtotal</span><Money value={estimate?.subtotal} className="font-semibold text-[#1f3746]" /></div>
           <div className="flex items-center justify-between"><span>Adjustments</span><Money value={estimate?.adjustments} className="font-semibold text-[#1f3746]" /></div>
-          <div className="flex items-center justify-between border-t border-[#dbe6ed] pt-1.5 text-sm text-[#153346]"><span className="font-semibold">Total</span><Money value={estimate?.total} className="text-base font-bold" /></div>
+          <div className="flex items-center justify-between border-t border-[#e8ddf0] pt-1.5 text-sm text-[#153346]"><span className="font-semibold">Total</span><Money value={estimate?.total} className="text-base font-bold" /></div>
         </div>
         <div className="no-print mt-3 flex flex-wrap gap-2">
           <button
             onClick={confirmOrder}
             disabled={busy || lines.length === 0 || packagingReviewBlocked}
             title={packagingReviewBlocked ? "Packaging approval is required before requesting an order." : undefined}
-            className="rounded-full border border-[#cfdce4] px-3 py-1.5 text-xs font-semibold text-[#24404d] transition hover:border-[#14b8a6] hover:text-[#0f766e] disabled:cursor-not-allowed disabled:opacity-55"
+            className="rounded-full border border-[#cfdce4] px-3 py-1.5 text-xs font-semibold text-[#24404d] transition hover:border-[#8f52dc] hover:text-[#6f32b5] disabled:cursor-not-allowed disabled:opacity-55"
           >
             {busy ? "Working..." : "Request Order"}
           </button>
           <Link
             href={backToMenuHref}
-            className="rounded-full border border-[#d2dfe7] px-3 py-1.5 text-xs font-semibold text-[#274555] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
+            className="rounded-full border border-[#d2dfe7] px-3 py-1.5 text-xs font-semibold text-[#274555] transition hover:border-[#8f52dc] hover:text-[#6f32b5]"
           >
             Back to Menu
           </Link>

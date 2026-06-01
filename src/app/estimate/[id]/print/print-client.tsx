@@ -97,11 +97,11 @@ export default function EstimatePrintClient({ estimateId }: EstimatePrintClientP
   if (missingId) {
     return (
       <div className="estimate-page mx-auto max-w-3xl space-y-3 bg-white p-4">
-        <div className="rounded-2xl border border-[#dbe6ed] bg-white p-5 text-center shadow-[0_16px_24px_-24px_rgba(16,24,40,0.45)]">
+        <div className="rounded-2xl border border-[#e8ddf0] bg-white p-5 text-center shadow-[0_16px_24px_-24px_rgba(16,24,40,0.45)]">
           <h1 className="text-xl font-semibold tracking-tight text-[#1a3240]">No estimate selected</h1>
           <p className="mt-1 text-sm text-[#607988]">Open an estimate from the menu first, then print to PDF.</p>
           <div className="mt-3">
-            <Link href="/menu" className="inline-flex rounded-full bg-[#14b8a6] px-3 py-1.5 text-xs font-semibold text-white">
+            <Link href="/menu" className="inline-flex rounded-full bg-[#8f52dc] px-3 py-1.5 text-xs font-semibold text-white">
               Back to Menu
             </Link>
           </div>
@@ -113,10 +113,10 @@ export default function EstimatePrintClient({ estimateId }: EstimatePrintClientP
 
   return (
     <div className="estimate-page mx-auto max-w-5xl space-y-3 bg-white p-3 md:p-4">
-      <header className="estimate-break-avoid rounded-2xl border border-[#dbe6ed] bg-white p-4 shadow-[0_16px_24px_-24px_rgba(16,24,40,0.45)]">
+      <header className="estimate-break-avoid rounded-2xl border border-[#e8ddf0] bg-white p-4 shadow-[0_16px_24px_-24px_rgba(16,24,40,0.45)]">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-center gap-3">
-            <img src="/brand/BLACK.png" alt="JC RAD" className="h-14 w-14 rounded-xl border border-[#dbe6ed] bg-white p-2" />
+            <img src="/brand/motley-on-white.png" alt="Motley Terpz" className="h-14 w-14 rounded-xl border border-[#e8ddf0] bg-white p-2" />
             <div className="space-y-0.5">
               <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#5b7382]">Estimate PDF</div>
               <h1 className="text-2xl font-semibold tracking-tight text-[#1a3240]">JC RAD Estimate</h1>
@@ -130,7 +130,7 @@ export default function EstimatePrintClient({ estimateId }: EstimatePrintClientP
             <button
               type="button"
               onClick={() => window.print()}
-              className="rounded-full bg-[#14b8a6] px-3 py-1.5 text-xs font-semibold text-white"
+              className="rounded-full bg-[#8f52dc] px-3 py-1.5 text-xs font-semibold text-white"
             >
               Download PDF
             </button>
@@ -139,7 +139,7 @@ export default function EstimatePrintClient({ estimateId }: EstimatePrintClientP
               onClick={() => {
                 setSendEmailMessage("Estimate email sending is not wired yet. Download the PDF from this screen for now.");
               }}
-              className="rounded-full border border-[#14b8a6] px-3 py-1.5 text-xs font-semibold text-[#0f766e]"
+              className="rounded-full border border-[#8f52dc] px-3 py-1.5 text-xs font-semibold text-[#6f32b5]"
             >
               Send Email
             </button>
@@ -149,12 +149,12 @@ export default function EstimatePrintClient({ estimateId }: EstimatePrintClientP
           </div>
         </div>
         {attachedCustomer ? (
-          <div className="mt-3 flex flex-wrap items-center gap-3 rounded-2xl border border-[#dce7ee] bg-[#fbfdfe] px-3 py-2.5">
+          <div className="mt-3 flex flex-wrap items-center gap-3 rounded-2xl border border-[#dce7ee] bg-[#fffafd] px-3 py-2.5">
             {attachedCustomer.logo_url ? (
               <img
                 src={attachedCustomer.logo_url}
                 alt={attachedCustomer.company_name || attachedCustomer.contact_name || "Customer logo"}
-                className="h-14 w-14 rounded-xl border border-[#dbe6ed] bg-white object-contain p-2"
+                className="h-14 w-14 rounded-xl border border-[#e8ddf0] bg-white object-contain p-2"
               />
             ) : null}
             <div className="space-y-0.5">
@@ -178,7 +178,7 @@ export default function EstimatePrintClient({ estimateId }: EstimatePrintClientP
       </header>
 
       <div className="estimate-break-avoid rounded-2xl border border-[#e2ebf0] bg-[repeating-linear-gradient(135deg,#ffffff_0px,#ffffff_18px,#f6f9fb_18px,#f6f9fb_36px)] px-3 py-2">
-        <div className="rounded-full border border-[#d4e3e3] bg-[#eef7f6] px-3 py-1 text-center text-[10px] font-medium tracking-[0.08em] text-[#0f766e]">
+        <div className="rounded-full border border-[#d4e3e3] bg-[#eef7f6] px-3 py-1 text-center text-[10px] font-medium tracking-[0.08em] text-[#6f32b5]">
           ESTIMATE BREAKDOWN
         </div>
       </div>
@@ -211,11 +211,11 @@ export default function EstimatePrintClient({ estimateId }: EstimatePrintClientP
       ) : null}
 
       {estimate ? (
-        <footer className="estimate-summary estimate-break-avoid ml-auto w-full max-w-[420px] rounded-2xl border border-[#dbe6ed] bg-white p-3 shadow-[0_16px_24px_-24px_rgba(16,24,40,0.45)]">
+        <footer className="estimate-summary estimate-break-avoid ml-auto w-full max-w-[420px] rounded-2xl border border-[#e8ddf0] bg-white p-3 shadow-[0_16px_24px_-24px_rgba(16,24,40,0.45)]">
           <div className="space-y-1.5 text-xs text-[#4e6777] [font-variant-numeric:tabular-nums]">
             <div className="flex items-center justify-between"><span>Subtotal</span><Money value={estimate.subtotal} className="font-semibold text-[#1f3746]" /></div>
             <div className="flex items-center justify-between"><span>Adjustments</span><Money value={estimate.adjustments} className="font-semibold text-[#1f3746]" /></div>
-            <div className="flex items-center justify-between border-t border-[#dbe6ed] pt-1.5 text-sm text-[#153346]"><span className="font-semibold">Total</span><Money value={estimate.total} className="text-base font-bold" /></div>
+            <div className="flex items-center justify-between border-t border-[#e8ddf0] pt-1.5 text-sm text-[#153346]"><span className="font-semibold">Total</span><Money value={estimate.total} className="text-base font-bold" /></div>
           </div>
         </footer>
       ) : null}

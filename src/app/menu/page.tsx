@@ -664,7 +664,7 @@ export default async function MenuPage() {
             const thumbnailRaw = String(catalogItem?.thumbnail_url || "").trim() || null;
             const thumbnailResolved = await resolveMaybeStorageUrl(supabase, thumbnailRaw, "catalog-public");
             const mediaFallback = mediaByProduct[productId] || null;
-            const imageUrl = thumbnailResolved || mediaFallback || "/brand/BLACK.png";
+            const imageUrl = thumbnailResolved || mediaFallback || "/brand/motley-on-white.png";
             const videoRaw = String(catalogItem?.video_url || "").trim() || null;
             const videoResolved = await resolveMaybeStorageUrl(supabase, videoRaw, "catalog-public");
 

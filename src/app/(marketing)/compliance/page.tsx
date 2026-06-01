@@ -61,7 +61,7 @@ export default function CompliancePage() {
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           {COMPLIANCE_AREAS.map((item) => (
-            <Card key={item.title} className="border border-[#dbe9ef] bg-white p-5 text-[#153447] shadow-sm">
+            <Card key={item.title} className="border border-[#eadff1] bg-white p-5 text-[#153447] shadow-sm">
               <h3 className="text-lg font-semibold">{item.title}</h3>
               <p className="mt-2 text-sm text-[#4a6575]">{item.body}</p>
             </Card>
@@ -76,14 +76,14 @@ export default function CompliancePage() {
         </p>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           {COMMON_DOCS.map((item) => (
-            <div key={item} className="rounded-xl border border-[#dbe9ef] bg-white px-4 py-3 text-sm font-medium text-[#234353]">
+            <div key={item} className="rounded-xl border border-[#eadff1] bg-white px-4 py-3 text-sm font-medium text-[#234353]">
               {item}
             </div>
           ))}
         </div>
       </section>
 
-      <section className="rounded-2xl border border-[#dbe9ef] bg-white p-6 md:p-8">
+      <section className="rounded-2xl border border-[#eadff1] bg-white p-6 md:p-8">
         <h2 className="text-2xl font-semibold text-[#13303f] md:text-3xl">Our approach</h2>
         <p className="mt-3 max-w-4xl text-sm text-[#4a6575]">
           Packaging should be simple. Compliance should be clean. Product quality should stay high while cost stays disciplined.
@@ -102,7 +102,7 @@ export default function CompliancePage() {
           <div className="flex flex-col gap-3 sm:flex-row">
             <Link
               href="/signup"
-              className="inline-flex items-center justify-center rounded-full bg-[#14b8a6] px-5 py-3 text-sm font-semibold text-white transition hover:opacity-95"
+              className="inline-flex items-center justify-center rounded-full bg-[#8f52dc] px-5 py-3 text-sm font-semibold text-white transition hover:opacity-95"
             >
               Create Account
             </Link>

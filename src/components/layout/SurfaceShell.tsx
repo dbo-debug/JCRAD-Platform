@@ -15,7 +15,7 @@ export default function SurfaceShell({
 }: SurfaceShellProps) {
   const shellClassName = [
     "min-h-screen text-[var(--text)]",
-    "bg-[radial-gradient(circle_at_top,#f1fbff_0%,#f7fbfd_36%,#ffffff_82%)]",
+    "bg-[radial-gradient(circle_at_top,#f1fbff_0%,#fdf7fb_36%,#ffffff_82%)]",
     className,
   ]
     .filter(Boolean)

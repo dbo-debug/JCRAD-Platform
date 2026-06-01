@@ -20,7 +20,7 @@ export default async function MarketingLayout({ children }: { children: ReactNod
   const dashboardHref = role === "admin" || role === "sales" ? "/admin" : "/dashboard";
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,#f3fbff_0%,#f7fbfd_35%,#ffffff_80%)] text-[#173543]">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,#f3fbff_0%,#fdf7fb_35%,#ffffff_80%)] text-[#173543]">
       <MarketingHeader isAuthenticated={Boolean(user)} dashboardHref={dashboardHref} />
       <main className="mx-auto w-full max-w-7xl px-4 py-8 md:px-6 md:py-12">{children}</main>
       <MarketingFooter />

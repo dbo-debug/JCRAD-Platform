@@ -128,8 +128,8 @@ const TASK_REMINDER_OPTIONS: TaskReminderOption[] = [
   { value: "60", label: "1 hour before", minutes: 60 },
 ];
 
-const sectionClass = "rounded-2xl border border-[#dbe9ef] bg-white p-4 shadow-sm";
-const inputClass = "min-w-0 w-full rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a]";
+const sectionClass = "rounded-2xl border border-[#eadff1] bg-white p-4 shadow-sm";
+const inputClass = "min-w-0 w-full rounded-lg border border-[#ddcfe9] bg-white px-3 py-2 text-sm text-[#1f2d3a]";
 
 async function parseJsonSafe(res: Response): Promise<Record<string, unknown>> {
   const contentType = res.headers.get("content-type") || "";
@@ -277,10 +277,10 @@ function formatShortDateTime(value: string | null | undefined) {
 function StatusPill({ label, tone = "neutral" }: { label: string; tone?: "neutral" | "warn" | "ok" }) {
   const toneClass =
     tone === "ok"
-      ? "border-[#bde8e4] bg-[#e9fbf9] text-[#0f766e]"
+      ? "border-[#e8d7f7] bg-[#fcf3ff] text-[#6f32b5]"
       : tone === "warn"
         ? "border-[#f1ddad] bg-[#fff9eb] text-[#9a6b00]"
-        : "border-[#d7e6ed] bg-[#f8fbfc] text-[#4f6877]";
+        : "border-[#e5d8ef] bg-[#fcf7fd] text-[#4f6877]";
 
   return (
     <span
@@ -321,10 +321,10 @@ function FocusCard({
 }) {
   const toneClass =
     tone === "ok"
-      ? "border-[#bde8e4] bg-[#effcf9]"
+      ? "border-[#e8d7f7] bg-[#fcf5ff]"
       : tone === "warn"
         ? "border-[#f1ddad] bg-[#fffaf0]"
-        : "border-[#dbe9ef] bg-[#f9fcfd]";
+        : "border-[#eadff1] bg-[#fdf8fd]";
 
   return (
     <div className={["rounded-2xl border p-3", toneClass].join(" ")}>
@@ -334,7 +334,7 @@ function FocusCard({
       <button
         type="button"
         onClick={onAction}
-        className="mt-3 inline-flex rounded-full border border-[#cfdde6] bg-white px-3 py-1.5 text-sm font-semibold text-[#21424d] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
+        className="mt-3 inline-flex rounded-full border border-[#ddcfe9] bg-white px-3 py-1.5 text-sm font-semibold text-[#21424d] transition hover:border-[#8f52dc] hover:text-[#6f32b5]"
       >
         {actionLabel}
       </button>
@@ -355,6 +355,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
   const [hotLeadBusy, setHotLeadBusy] = useState(false);
   const [taskBusy, setTaskBusy] = useState(false);
   const [routeQueueBusy, setRouteQueueBusy] = useState(false);
+  const [eraseBusy, setEraseBusy] = useState(false);
   const [gmailStatus, setGmailStatus] = useState<GmailConnectionState>({
     loading: true,
     connected: false,
@@ -1148,6 +1149,34 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
     }
   }
 
+  async function eraseAccount() {
+    if (props.staffRole !== "admin" || eraseBusy) return;
+    const confirmed = window.confirm(
+      `Are you sure you want to erase ${props.companyName}?\n\nThis permanently deletes the CRM account and related account records.`
+    );
+    if (!confirmed) return;
+
+    setEraseBusy(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const res = await fetch(`/api/workspace/customers/${encodeURIComponent(props.customerId)}/erase`, {
+        method: "DELETE",
+      });
+      const json = await parseJsonSafe(res);
+      if (!res.ok) {
+        throw new Error(String(json.error || "Failed to erase account"));
+      }
+      router.push("/workspace/customers");
+      router.refresh();
+    } catch (eraseError) {
+      setError(eraseError instanceof Error ? eraseError.message : "Failed to erase account");
+    } finally {
+      setEraseBusy(false);
+    }
+  }
+
   async function createTaskRequest(task: { title: string; dueDate?: string | null; assignedUserId?: string | null; priority?: number | null }) {
     const res = await fetch(`/api/workspace/customers/${props.customerId}/tasks`, {
       method: "POST",
@@ -1390,16 +1419,16 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
   return (
     <div className="space-y-3">
       {error ? <p className="rounded-xl border border-[#f1d1d1] bg-[#fff5f5] px-3 py-2 text-sm text-[#991b1b]">{error}</p> : null}
-      {success ? <p className="rounded-xl border border-[#bfe8df] bg-[#effcf8] px-3 py-2 text-sm text-[#0f766e]">{success}</p> : null}
+      {success ? <p className="rounded-xl border border-[#ddcfee] bg-[#fbf4ff] px-3 py-2 text-sm text-[#6f32b5]">{success}</p> : null}
 
-      <section className="rounded-[28px] border border-[#dbe9ef] bg-[linear-gradient(180deg,#fbfefe_0%,#f3f9fb_100%)] p-4 shadow-sm">
+      <section className="rounded-[28px] border border-[#eadff1] bg-[linear-gradient(180deg,#fffafd_0%,#f9f2fb_100%)] p-4 shadow-sm">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6a8796]">Account Operating Summary</p>
             <h2 className="mt-1 text-lg font-semibold text-[#173543]">What matters now on this account</h2>
             <p className="mt-1 max-w-3xl text-sm text-[#4a6575]">{accountPrioritySummary}</p>
           </div>
-          <div className="max-w-full rounded-full border border-[#d7e6ed] bg-white px-3 py-1.5 text-xs font-medium text-[#4f6877]">
+          <div className="max-w-full rounded-full border border-[#e5d8ef] bg-white px-3 py-1.5 text-xs font-medium text-[#4f6877]">
             {props.assignedSalesLabel || "No assigned sales rep"} • {visitStatus ? titleCase(visitStatus) : "No visit status"} • {lastActivityAtState ? `Last activity ${formatShortDateTime(lastActivityAtState)}` : "No recent activity"}
           </div>
         </div>
@@ -1449,14 +1478,14 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
         </div>
       </section>
 
-      <section className="rounded-[28px] border border-[#cfe5e8] bg-[linear-gradient(180deg,#173543_0%,#1d4658_100%)] p-4 text-white shadow-[0_16px_40px_rgba(16,42,67,0.16)]">
+      <section className="rounded-[28px] border border-[#d8cce7] bg-[linear-gradient(180deg,#5a446f_0%,#6a527f_100%)] p-4 text-white shadow-[0_16px_40px_rgba(86,62,113,0.18)]">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#9fd9d2]">Quick Actions</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#eadcf5]">Quick Actions</p>
             <h2 className="mt-1 text-lg font-semibold">Continue the account workflow without hunting</h2>
-            <p className="mt-1 text-sm text-[#d3e6eb]">Calls and email fire immediately. The rest jump to the existing follow-up, routing, account, and timeline surfaces below.</p>
+            <p className="mt-1 text-sm text-[#efe6f6]">Calls and email fire immediately. The rest jump to the existing follow-up, routing, account, and timeline surfaces below.</p>
           </div>
-          <div className="max-w-full rounded-full border border-white/15 bg-black/10 px-3 py-1.5 text-xs font-medium text-[#d7edf0]">
+          <div className="max-w-full rounded-full border border-white/16 bg-white/8 px-3 py-1.5 text-xs font-medium text-[#f2e9f8]">
             {territoryCode || "No territory"} • {visitStatus ? titleCase(visitStatus) : "No visit status"} • {hasCoords ? "Map ready" : "Needs coords"}
           </div>
         </div>
@@ -1484,7 +1513,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
           description="Use the account state above to decide what happens next. These shortcuts enter the exact section that advances the account."
         />
         <div className="mt-3 grid gap-3 lg:grid-cols-2 xl:grid-cols-5">
-          <div className="rounded-2xl border border-[#dbe9ef] bg-[#f9fcfd] p-3">
+          <div className="rounded-2xl border border-[#eadff1] bg-[#fdf8fd] p-3">
             <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7a909d]">Hot Lead Status</p>
             <p className="mt-1 text-sm font-semibold text-[#173543]">{isHotLead ? "This account is currently hot." : "This account is not currently hot."}</p>
             <p className="mt-1 text-sm text-[#4a6575]">
@@ -1494,7 +1523,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
               type="button"
               onClick={() => void updateHotLead(!isHotLead)}
               disabled={hotLeadBusy}
-              className="mt-3 inline-flex rounded-full border border-[#cfdde6] bg-white px-3 py-1.5 text-sm font-semibold text-[#21424d] transition hover:border-[#14b8a6] hover:text-[#0f766e] disabled:opacity-60"
+              className="mt-3 inline-flex rounded-full border border-[#ddcfe9] bg-white px-3 py-1.5 text-sm font-semibold text-[#21424d] transition hover:border-[#8f52dc] hover:text-[#6f32b5] disabled:opacity-60"
             >
               {hotLeadBusy ? "Saving..." : isHotLead ? "Clear Hot Lead" : "Mark Hot Lead"}
             </button>
@@ -1562,18 +1591,18 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
                   href={addressMapHref}
                   target="_blank"
                   rel="noreferrer"
-                  className="rounded-full border border-[#cfdde6] bg-white px-3 py-1.5 text-sm font-semibold text-[#21424d] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
+                  className="rounded-full border border-[#ddcfe9] bg-white px-3 py-1.5 text-sm font-semibold text-[#21424d] transition hover:border-[#8f52dc] hover:text-[#6f32b5]"
                 >
                   Open in Maps
                 </a>
               ) : (
-                <span className="rounded-full border border-[#d9e5eb] bg-[#f7fbfd] px-3 py-1.5 text-sm text-[#89a0ad]">Open in Maps</span>
+                <span className="rounded-full border border-[#d9e5eb] bg-[#fdf7fb] px-3 py-1.5 text-sm text-[#89a0ad]">Open in Maps</span>
               )}
               <button
                 type="button"
                 onClick={() => void saveRouteOps()}
                 disabled={routeBusy}
-                className="rounded-full bg-[#173543] px-3.5 py-1.5 text-sm font-semibold text-white disabled:opacity-60"
+                className="rounded-full bg-[#6c537f] px-3.5 py-1.5 text-sm font-semibold text-white transition hover:bg-[#785c8d] disabled:opacity-60"
               >
                 {routeBusy ? "Saving..." : hasRouteConfig ? "Update Route Settings" : "Save Route Settings"}
               </button>
@@ -1590,7 +1619,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
               {visitStatus ? <StatusPill label={titleCase(visitStatus)} /> : null}
             </div>
 
-            <div className="rounded-2xl border border-[#e1ebf1] bg-[#fbfdfe] p-3">
+            <div className="rounded-2xl border border-[#e1ebf1] bg-[#fffafd] p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <p className="text-sm font-semibold text-[#173543]">Quick Visit Outcomes</p>
@@ -1601,7 +1630,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
                     type="checkbox"
                     checked={routeOutcomeTaskEnabled}
                     onChange={(event) => setRouteOutcomeTaskEnabled(event.target.checked)}
-                    className="h-4 w-4 rounded border-[#cfdde6] text-[#14b8a6]"
+                    className="h-4 w-4 rounded border-[#ddcfe9] text-[#8f52dc]"
                   />
                   <span>Create task</span>
                 </label>
@@ -1701,7 +1730,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
             </div>
           </div>
 
-          <aside className="grid min-w-0 gap-3 rounded-2xl border border-[#e1ebf1] bg-[#fbfdfe] p-3 text-sm text-[#4a6575]">
+          <aside className="grid min-w-0 gap-3 rounded-2xl border border-[#e1ebf1] bg-[#fffafd] p-3 text-sm text-[#4a6575]">
             <div className="min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8398a5]">Routing Snapshot</p>
               <div className="mt-2 space-y-1.5">
@@ -1711,14 +1740,14 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
               </div>
             </div>
 
-            <div className="rounded-xl border border-[#dbe9ef] bg-white px-3 py-2.5">
+            <div className="rounded-xl border border-[#eadff1] bg-white px-3 py-2.5">
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8398a5]">Coverage Gaps</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {missingRouteStates.length > 0 ? missingRouteStates.map((item) => <StatusPill key={item} label={item} tone="warn" />) : <StatusPill label="Route Ready" tone="ok" />}
               </div>
             </div>
 
-            <div className="rounded-xl border border-[#dbe9ef] bg-white px-3 py-2.5">
+            <div className="rounded-xl border border-[#eadff1] bg-white px-3 py-2.5">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8398a5]">Coordinate Status</p>
@@ -1744,7 +1773,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
                     type="button"
                     onClick={handleGenerateCoordinates}
                     disabled={!addressMapHref}
-                    className="rounded-full border border-[#cfdde6] bg-white px-3 py-1.5 text-sm font-semibold text-[#21424d] transition hover:border-[#14b8a6] hover:text-[#0f766e] disabled:cursor-not-allowed disabled:border-[#d9e5eb] disabled:bg-[#f7fbfd] disabled:text-[#89a0ad]"
+                    className="rounded-full border border-[#ddcfe9] bg-white px-3 py-1.5 text-sm font-semibold text-[#21424d] transition hover:border-[#8f52dc] hover:text-[#6f32b5] disabled:cursor-not-allowed disabled:border-[#d9e5eb] disabled:bg-[#fdf7fb] disabled:text-[#89a0ad]"
                   >
                     Open in Maps
                   </button>
@@ -1752,7 +1781,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
                     type="button"
                     onClick={handleReviewCoordinates}
                     disabled={!coordinateMapHref}
-                    className="rounded-full border border-[#cfdde6] bg-white px-3 py-1.5 text-sm font-semibold text-[#21424d] transition hover:border-[#14b8a6] hover:text-[#0f766e] disabled:cursor-not-allowed disabled:border-[#d9e5eb] disabled:bg-[#f7fbfd] disabled:text-[#89a0ad]"
+                    className="rounded-full border border-[#ddcfe9] bg-white px-3 py-1.5 text-sm font-semibold text-[#21424d] transition hover:border-[#8f52dc] hover:text-[#6f32b5] disabled:cursor-not-allowed disabled:border-[#d9e5eb] disabled:bg-[#fdf7fb] disabled:text-[#89a0ad]"
                   >
                     Review Coordinates
                   </button>
@@ -1760,7 +1789,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
                     type="button"
                     onClick={() => void retryGeocode()}
                     disabled={!hasAddress || routeBusy}
-                    className="rounded-full border border-[#cfdde6] bg-white px-3 py-1.5 text-sm font-semibold text-[#21424d] transition hover:border-[#14b8a6] hover:text-[#0f766e] disabled:cursor-not-allowed disabled:border-[#d9e5eb] disabled:bg-[#f7fbfd] disabled:text-[#89a0ad]"
+                    className="rounded-full border border-[#ddcfe9] bg-white px-3 py-1.5 text-sm font-semibold text-[#21424d] transition hover:border-[#8f52dc] hover:text-[#6f32b5] disabled:cursor-not-allowed disabled:border-[#d9e5eb] disabled:bg-[#fdf7fb] disabled:text-[#89a0ad]"
                   >
                     {routeBusy ? "Saving..." : "Retry Geocode"}
                   </button>
@@ -1774,7 +1803,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
               ) : null}
             </div>
 
-            <div className="rounded-xl border border-[#dbe9ef] bg-white px-3 py-2.5">
+            <div className="rounded-xl border border-[#eadff1] bg-white px-3 py-2.5">
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8398a5]">Address</p>
               <p className="mt-1 text-sm text-[#456271]">{composedAddress || "No address on file"}</p>
             </div>
@@ -1859,7 +1888,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
             </label>
           </div>
           <div className="mt-3">
-            <button type="button" onClick={() => void saveAccount()} disabled={accountBusy} className="rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+            <button type="button" onClick={() => void saveAccount()} disabled={accountBusy} className="rounded-full bg-[#8f52dc] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
               {accountBusy ? "Saving..." : "Save Account"}
             </button>
           </div>
@@ -1869,7 +1898,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
           <SectionHeader title="Contacts" description="Keep the primary buyer current and maintain the wider account contact bench from one place." />
 
           <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-            <div className="rounded-2xl border border-[#dbe9ef] bg-[#f9fcfd] p-3">
+            <div className="rounded-2xl border border-[#eadff1] bg-[#fdf8fd] p-3">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7a909d]">Primary Contact</p>
@@ -1882,7 +1911,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
                       className={[
                         "rounded-full border px-3 py-1.5 text-sm font-semibold transition",
                         normalizeMailtoHref(contactEmail)
-                          ? "border-[#d0dde5] bg-white text-[#24404d] hover:border-[#14b8a6] hover:text-[#0f766e]"
+                          ? "border-[#decfe8] bg-white text-[#24404d] hover:border-[#8f52dc] hover:text-[#6f32b5]"
                           : "cursor-not-allowed border-[#e2eaee] bg-[#f5f8fa] text-[#8ba0ac] pointer-events-none",
                       ].join(" ")}
                     >
@@ -1893,13 +1922,13 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
                       className={[
                         "rounded-full border px-3 py-1.5 text-sm font-semibold transition",
                         normalizeTelHref(contactPhone)
-                          ? "border-[#d0dde5] bg-white text-[#24404d] hover:border-[#14b8a6] hover:text-[#0f766e]"
+                          ? "border-[#decfe8] bg-white text-[#24404d] hover:border-[#8f52dc] hover:text-[#6f32b5]"
                           : "cursor-not-allowed border-[#e2eaee] bg-[#f5f8fa] text-[#8ba0ac] pointer-events-none",
                       ].join(" ")}
                     >
                       Call
                     </a>
-                    <button type="button" onClick={() => setIsPrimaryEditorOpen(true)} className="rounded-full bg-[#173543] px-3.5 py-1.5 text-sm font-semibold text-white">
+                    <button type="button" onClick={() => setIsPrimaryEditorOpen(true)} className="rounded-full bg-[#6c537f] px-3.5 py-1.5 text-sm font-semibold text-white transition hover:bg-[#785c8d]">
                       Edit Primary
                     </button>
                   </div>
@@ -1907,7 +1936,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
               </div>
 
               {!isPrimaryEditorOpen ? (
-                <div className="mt-3 rounded-xl border border-[#dbe9ef] bg-white px-3 py-3">
+                <div className="mt-3 rounded-xl border border-[#eadff1] bg-white px-3 py-3">
                   <p className="font-semibold text-[#173543]">{primaryDisplayName}</p>
                   <p className="mt-1 text-sm text-[#4a6575]">{primaryDisplayTitle}</p>
                   <p className="mt-1 text-sm text-[#4a6575]">{primaryDisplayEmail}{contactPhone?.trim() ? ` • ${contactPhone.trim()}` : ""}</p>
@@ -1933,7 +1962,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
                     </label>
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <button type="button" onClick={() => void savePrimaryContact()} disabled={contactBusy} className="rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+                    <button type="button" onClick={() => void savePrimaryContact()} disabled={contactBusy} className="rounded-full bg-[#8f52dc] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
                       {contactBusy ? "Saving..." : "Save Primary"}
                     </button>
                     <button
@@ -1946,7 +1975,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
                         setIsPrimaryEditorOpen(false);
                       }}
                       disabled={contactBusy}
-                      className="rounded-full border border-[#d0dde5] bg-white px-4 py-2 text-sm font-semibold text-[#24404d] transition hover:border-[#14b8a6] hover:text-[#0f766e] disabled:opacity-60"
+                      className="rounded-full border border-[#decfe8] bg-white px-4 py-2 text-sm font-semibold text-[#24404d] transition hover:border-[#8f52dc] hover:text-[#6f32b5] disabled:opacity-60"
                     >
                       Cancel
                     </button>
@@ -1955,18 +1984,18 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
               )}
             </div>
 
-            <div className="rounded-2xl border border-[#dbe9ef] bg-[#f9fcfd] p-3">
+            <div className="rounded-2xl border border-[#eadff1] bg-[#fdf8fd] p-3">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7a909d]">Additional Contacts</p>
                   <p className="mt-1 text-sm text-[#5c7483]">Work the broader contact bench with explicit row actions instead of a persistent editor.</p>
                 </div>
                 {!isContactComposerOpen ? (
-                  <button type="button" onClick={startAddingContact} className="rounded-full bg-[#173543] px-3.5 py-1.5 text-sm font-semibold text-white">
+                  <button type="button" onClick={startAddingContact} className="rounded-full bg-[#6c537f] px-3.5 py-1.5 text-sm font-semibold text-white transition hover:bg-[#785c8d]">
                     Add Contact
                   </button>
                 ) : (
-                  <button type="button" onClick={resetSecondaryContactDraft} className="rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm font-semibold text-[#24404d] transition hover:border-[#14b8a6] hover:text-[#0f766e]">
+                  <button type="button" onClick={resetSecondaryContactDraft} className="rounded-full border border-[#decfe8] bg-white px-3 py-1.5 text-sm font-semibold text-[#24404d] transition hover:border-[#8f52dc] hover:text-[#6f32b5]">
                     Cancel
                   </button>
                 )}
@@ -1979,7 +2008,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
                   const rowCallHref = normalizeTelHref(contact.phone);
 
                   return (
-                  <div key={contact.id} className="rounded-xl border border-[#dbe9ef] bg-white px-3 py-2.5">
+                  <div key={contact.id} className="rounded-xl border border-[#eadff1] bg-white px-3 py-2.5">
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div className="min-w-0">
                         <p className="font-semibold text-[#173543]">{contact.name || "Unnamed contact"}</p>
@@ -1992,7 +2021,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
                           className={[
                             "rounded-full border px-3 py-1.5 text-sm font-semibold transition",
                             rowEmailHref
-                              ? "border-[#d0dde5] bg-white text-[#24404d] hover:border-[#14b8a6] hover:text-[#0f766e]"
+                              ? "border-[#decfe8] bg-white text-[#24404d] hover:border-[#8f52dc] hover:text-[#6f32b5]"
                               : "cursor-not-allowed border-[#e2eaee] bg-[#f5f8fa] text-[#8ba0ac] pointer-events-none",
                           ].join(" ")}
                         >
@@ -2003,7 +2032,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
                           className={[
                             "rounded-full border px-3 py-1.5 text-sm font-semibold transition",
                             rowCallHref
-                              ? "border-[#d0dde5] bg-white text-[#24404d] hover:border-[#14b8a6] hover:text-[#0f766e]"
+                              ? "border-[#decfe8] bg-white text-[#24404d] hover:border-[#8f52dc] hover:text-[#6f32b5]"
                               : "cursor-not-allowed border-[#e2eaee] bg-[#f5f8fa] text-[#8ba0ac] pointer-events-none",
                           ].join(" ")}
                         >
@@ -2016,8 +2045,8 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
                           className={[
                             "rounded-full border px-3 py-1.5 text-sm font-semibold transition disabled:opacity-60",
                             isEditingRow
-                              ? "border-[#14b8a6] bg-[#effcf8] text-[#0f766e]"
-                              : "border-[#d0dde5] bg-white text-[#24404d] hover:border-[#14b8a6] hover:text-[#0f766e]",
+                              ? "border-[#cdb0e8] bg-[#f8f0fe] text-[#6f32b5]"
+                              : "border-[#decfe8] bg-white text-[#24404d] hover:border-[#8f52dc] hover:text-[#6f32b5]",
                           ].join(" ")}
                         >
                           Edit
@@ -2054,13 +2083,13 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
                           </label>
                         </div>
                         <div className="mt-3 flex flex-wrap gap-2">
-                          <button type="button" onClick={() => void saveSecondaryContact()} disabled={contactBusy} className="rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+                          <button type="button" onClick={() => void saveSecondaryContact()} disabled={contactBusy} className="rounded-full bg-[#8f52dc] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
                             {contactBusy ? "Saving..." : "Save"}
                           </button>
-                          <button type="button" onClick={() => void promoteContactToPrimary()} disabled={contactBusy} className="rounded-full border border-[#d0dde5] bg-white px-4 py-2 text-sm font-semibold text-[#24404d] transition hover:border-[#14b8a6] hover:text-[#0f766e] disabled:opacity-60">
+                          <button type="button" onClick={() => void promoteContactToPrimary()} disabled={contactBusy} className="rounded-full border border-[#decfe8] bg-white px-4 py-2 text-sm font-semibold text-[#24404d] transition hover:border-[#8f52dc] hover:text-[#6f32b5] disabled:opacity-60">
                             Promote To Primary
                           </button>
-                          <button type="button" onClick={resetSecondaryContactDraft} disabled={contactBusy} className="rounded-full border border-[#d0dde5] bg-white px-4 py-2 text-sm font-semibold text-[#24404d] transition hover:border-[#14b8a6] hover:text-[#0f766e] disabled:opacity-60">
+                          <button type="button" onClick={resetSecondaryContactDraft} disabled={contactBusy} className="rounded-full border border-[#decfe8] bg-white px-4 py-2 text-sm font-semibold text-[#24404d] transition hover:border-[#8f52dc] hover:text-[#6f32b5] disabled:opacity-60">
                             Cancel
                           </button>
                         </div>
@@ -2094,7 +2123,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
                     </label>
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <button type="button" onClick={() => void saveSecondaryContact()} disabled={contactBusy} className="rounded-full bg-[#173543] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+                    <button type="button" onClick={() => void saveSecondaryContact()} disabled={contactBusy} className="rounded-full bg-[#6c537f] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#785c8d] disabled:opacity-60">
                       {contactBusy ? "Saving..." : "Add Contact"}
                     </button>
                   </div>
@@ -2111,7 +2140,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
           description="Capture the latest account context, assign the next task, and leave clean internal handoff notes from one place."
         />
         <div className="mt-3 grid gap-3 xl:grid-cols-3">
-          <div id="customer-route-email" className="scroll-mt-28 rounded-2xl border border-[#dbe9ef] bg-[#f9fcfd] p-3 xl:col-span-3">
+          <div id="customer-route-email" className="scroll-mt-28 rounded-2xl border border-[#eadff1] bg-[#fdf8fd] p-3 xl:col-span-3">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold text-[#173543]">Account Email</p>
@@ -2131,14 +2160,14 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
                 <button
                   type="button"
                   onClick={connectGoogleMailbox}
-                  className="rounded-full border border-[#cfdde6] bg-white px-3 py-1.5 text-sm font-semibold text-[#21424d] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
+                  className="rounded-full border border-[#ddcfe9] bg-white px-3 py-1.5 text-sm font-semibold text-[#21424d] transition hover:border-[#8f52dc] hover:text-[#6f32b5]"
                 >
                   {gmailStatus.connected ? "Reconnect Google" : "Connect Google"}
                 </button>
                 <button
                   type="button"
                   onClick={toggleEmailCompose}
-                  className="rounded-full bg-[#173543] px-3.5 py-1.5 text-sm font-semibold text-white"
+                  className="rounded-full bg-[#6c537f] px-3.5 py-1.5 text-sm font-semibold text-white transition hover:bg-[#785c8d]"
                 >
                   {emailDrawerOpen ? "Close Compose" : "Open Compose"}
                 </button>
@@ -2150,7 +2179,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
                 className={[
                   "mt-3 rounded-xl border px-3 py-2 text-sm",
                   gmailStatus.oauthStatus.startsWith("connected:")
-                    ? "border-[#bfe8df] bg-[#effcf8] text-[#0f766e]"
+                    ? "border-[#ddcfee] bg-[#fbf4ff] text-[#6f32b5]"
                     : "border-[#f1d1d1] bg-[#fff5f5] text-[#991b1b]",
                 ].join(" ")}
               >
@@ -2174,7 +2203,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
                       onChange={(event) => setEmailBody(event.target.value)}
                       rows={8}
                       disabled={emailBusy}
-                      className="rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a]"
+                      className="rounded-lg border border-[#ddcfe9] bg-white px-3 py-2 text-sm text-[#1f2d3a]"
                       placeholder="Write the account email. Each selected contact receives an individual Gmail send."
                     />
                   </label>
@@ -2183,14 +2212,14 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
                     <input value={emailBatchLabel} onChange={(event) => setEmailBatchLabel(event.target.value)} disabled={emailBusy} className={inputClass} placeholder="Buyer follow-up April" />
                   </label>
                   <div className="flex flex-wrap gap-2">
-                    <button type="button" onClick={() => void sendRouteEmail()} disabled={emailBusy || !gmailStatus.connected} className="rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+                    <button type="button" onClick={() => void sendRouteEmail()} disabled={emailBusy || !gmailStatus.connected} className="rounded-full bg-[#8f52dc] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
                       {emailBusy ? "Sending..." : `Send ${selectedEmailRecipients.length} Email${selectedEmailRecipients.length === 1 ? "" : "s"}`}
                     </button>
                     <button
                       type="button"
                       onClick={cancelEmailCompose}
                       disabled={emailBusy}
-                      className="rounded-full border border-[#d0dde5] bg-white px-4 py-2 text-sm font-semibold text-[#24404d] transition hover:border-[#14b8a6] hover:text-[#0f766e] disabled:opacity-60"
+                      className="rounded-full border border-[#decfe8] bg-white px-4 py-2 text-sm font-semibold text-[#24404d] transition hover:border-[#8f52dc] hover:text-[#6f32b5] disabled:opacity-60"
                     >
                       Cancel
                     </button>
@@ -2198,19 +2227,19 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
                   </div>
                 </div>
 
-                <aside className="rounded-2xl border border-[#dbe9ef] bg-white p-3">
+                <aside className="rounded-2xl border border-[#eadff1] bg-white p-3">
                   <p className="text-sm font-semibold text-[#173543]">Recipient Preview</p>
                   <p className="mt-1 text-sm text-[#5c7483]">Select the contacts on this account you want to email. Blank or invalid emails are excluded automatically. Max 50 recipients per request.</p>
                   <div className="mt-3 space-y-2.5">
                     {emailRecipients.map((recipient) => {
                       const checked = selectedEmailRecipientKeys.includes(recipient.key);
                       return (
-                        <label key={recipient.key} className="flex items-start gap-3 rounded-xl border border-[#dbe9ef] bg-[#f9fcfd] px-3 py-2.5">
+                        <label key={recipient.key} className="flex items-start gap-3 rounded-xl border border-[#eadff1] bg-[#fdf8fd] px-3 py-2.5">
                           <input
                             type="checkbox"
                             checked={checked}
                             onChange={() => toggleEmailRecipient(recipient.key)}
-                            className="mt-1 h-4 w-4 rounded border-[#cfdde6] text-[#14b8a6]"
+                            className="mt-1 h-4 w-4 rounded border-[#ddcfe9] text-[#8f52dc]"
                           />
                           <span className="min-w-0">
                             <span className="block font-semibold text-[#173543]">{recipient.label}</span>
@@ -2220,21 +2249,21 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
                         </label>
                       );
                     })}
-                    {emailRecipients.length === 0 ? <div className="rounded-xl border border-dashed border-[#d3e1e8] bg-[#f9fcfd] px-3 py-4 text-sm text-[#5d7685]">No valid contact emails are available on this account.</div> : null}
+                    {emailRecipients.length === 0 ? <div className="rounded-xl border border-dashed border-[#d3e1e8] bg-[#fdf8fd] px-3 py-4 text-sm text-[#5d7685]">No valid contact emails are available on this account.</div> : null}
                   </div>
                 </aside>
               </div>
             )}
 
             {emailResults.length > 0 ? (
-              <div className="mt-3 rounded-2xl border border-[#dbe9ef] bg-white p-3">
+              <div className="mt-3 rounded-2xl border border-[#eadff1] bg-white p-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <StatusPill label={`${emailResults.filter((result) => result.status === "sent").length} sent`} tone="ok" />
                   <StatusPill label={`${emailResults.filter((result) => result.status === "failed").length} failed`} tone={emailResults.some((result) => result.status === "failed") ? "warn" : "neutral"} />
                 </div>
                 <div className="mt-3 space-y-2.5">
                   {emailResults.map((result) => (
-                    <div key={`${result.toEmail}:${result.contactId || "none"}`} className="rounded-xl border border-[#dbe9ef] bg-[#f9fcfd] px-3 py-2.5">
+                    <div key={`${result.toEmail}:${result.contactId || "none"}`} className="rounded-xl border border-[#eadff1] bg-[#fdf8fd] px-3 py-2.5">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="font-semibold text-[#173543]">{result.toEmail}</p>
                         <StatusPill label={result.status === "sent" ? "Sent" : "Failed"} tone={result.status === "sent" ? "ok" : "warn"} />
@@ -2251,7 +2280,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
             ) : null}
           </div>
 
-          <div id="customer-log-activity" className="scroll-mt-28 rounded-2xl border border-[#dbe9ef] bg-[#f9fcfd] p-3">
+          <div id="customer-log-activity" className="scroll-mt-28 rounded-2xl border border-[#eadff1] bg-[#fdf8fd] p-3">
             <p className="text-sm font-semibold text-[#173543]">Log Activity</p>
             <p className="mt-1 text-sm text-[#5c7483]">Capture the call, email, meeting, or task update that moved the account.</p>
             <div className="mt-3 grid gap-3">
@@ -2276,22 +2305,22 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
                   onChange={(e) => setActivityDetails(e.target.value)}
                   rows={3}
                   disabled={activityBusy}
-                  className="rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a]"
+                  className="rounded-lg border border-[#ddcfe9] bg-white px-3 py-2 text-sm text-[#1f2d3a]"
                   placeholder="Optional context for the timeline entry."
                 />
               </label>
             </div>
             <div className="mt-3">
-              <button type="button" onClick={() => void createActivity()} disabled={activityBusy} className="rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+              <button type="button" onClick={() => void createActivity()} disabled={activityBusy} className="rounded-full bg-[#8f52dc] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
                 {activityBusy ? "Saving..." : "Log Activity"}
               </button>
             </div>
           </div>
 
-          <div id="customer-create-task" className="scroll-mt-28 rounded-2xl border border-[#dbe9ef] bg-[#f9fcfd] p-3">
+          <div id="customer-create-task" className="scroll-mt-28 rounded-2xl border border-[#eadff1] bg-[#fdf8fd] p-3">
             <p className="text-sm font-semibold text-[#173543]">Create Follow-Up Task</p>
             <p className="mt-1 text-sm text-[#5c7483]">Assign the next explicit owner, due date, time, and optional browser reminder for this account.</p>
-            <div className="mt-3 rounded-xl border border-[#dbe9ef] bg-white px-3 py-3">
+            <div className="mt-3 rounded-xl border border-[#eadff1] bg-white px-3 py-3">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7a909d]">Primary Contact Quick Actions</p>
@@ -2307,7 +2336,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
                     className={[
                       "rounded-full border px-3 py-1.5 text-sm font-semibold transition",
                       callHref
-                        ? "border-[#d0dde5] bg-white text-[#24404d] hover:border-[#14b8a6] hover:text-[#0f766e]"
+                        ? "border-[#decfe8] bg-white text-[#24404d] hover:border-[#8f52dc] hover:text-[#6f32b5]"
                         : "pointer-events-none cursor-not-allowed border-[#e2eaee] bg-[#f5f8fa] text-[#8ba0ac]",
                     ].join(" ")}
                   >
@@ -2319,7 +2348,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
                     className={[
                       "rounded-full border px-3 py-1.5 text-sm font-semibold transition",
                       emailHref
-                        ? "border-[#d0dde5] bg-white text-[#24404d] hover:border-[#14b8a6] hover:text-[#0f766e]"
+                        ? "border-[#decfe8] bg-white text-[#24404d] hover:border-[#8f52dc] hover:text-[#6f32b5]"
                         : "pointer-events-none cursor-not-allowed border-[#e2eaee] bg-[#f5f8fa] text-[#8ba0ac]",
                     ].join(" ")}
                     disabled={!emailHref}
@@ -2329,7 +2358,7 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
                   <button
                     type="button"
                     onClick={() => jumpToSection("customer-account-management", accountCompanyInputRef.current)}
-                    className="rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm font-semibold text-[#24404d] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
+                    className="rounded-full border border-[#decfe8] bg-white px-3 py-1.5 text-sm font-semibold text-[#24404d] transition hover:border-[#8f52dc] hover:text-[#6f32b5]"
                   >
                     Open Account
                   </button>
@@ -2389,13 +2418,13 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
               </label>
             </div>
             <div className="mt-3">
-              <button type="button" onClick={() => void createTask()} disabled={taskBusy} className="rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+              <button type="button" onClick={() => void createTask()} disabled={taskBusy} className="rounded-full bg-[#8f52dc] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
                 {taskBusy ? "Saving..." : "Create Task"}
               </button>
             </div>
           </div>
 
-          <div className="rounded-2xl border border-[#dbe9ef] bg-[#f9fcfd] p-3">
+          <div className="rounded-2xl border border-[#eadff1] bg-[#fdf8fd] p-3">
             <p className="text-sm font-semibold text-[#173543]">Add Internal Note</p>
             <p className="mt-1 text-sm text-[#5c7483]">Leave relationship context, handoff notes, or operational detail that should stay internal.</p>
             <textarea
@@ -2403,17 +2432,37 @@ export default function CustomerDetailManager(props: CustomerDetailManagerProps)
               onChange={(e) => setNote(e.target.value)}
               rows={8}
               disabled={noteBusy}
-              className="mt-3 w-full rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a]"
+              className="mt-3 w-full rounded-lg border border-[#ddcfe9] bg-white px-3 py-2 text-sm text-[#1f2d3a]"
               placeholder="Add relationship context, follow-up notes, or handoff details."
             />
             <div className="mt-3">
-              <button type="button" onClick={() => void createNote()} disabled={noteBusy} className="rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+              <button type="button" onClick={() => void createNote()} disabled={noteBusy} className="rounded-full bg-[#8f52dc] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
                 {noteBusy ? "Saving..." : "Add Note"}
               </button>
             </div>
           </div>
         </div>
       </section>
+
+      {props.staffRole === "admin" ? (
+        <section className="rounded-2xl border border-[#f1d1d1] bg-[#fff8f8] p-4 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#a0443f]">Danger Zone</p>
+          <h2 className="mt-1 text-base font-semibold text-[#7f1d1d]">Erase Account</h2>
+          <p className="mt-1 text-sm text-[#7a4b4b]">
+            Permanently remove this account from the CRM. You will get a confirmation dialog before the delete runs.
+          </p>
+          <div className="mt-3">
+            <button
+              type="button"
+              onClick={() => void eraseAccount()}
+              disabled={eraseBusy}
+              className="rounded-full border border-[#e08b8b] bg-white px-4 py-2 text-sm font-semibold text-[#a12727] transition hover:border-[#c64d4d] hover:text-[#8f1d1d] disabled:opacity-60"
+            >
+              {eraseBusy ? "Erasing..." : "Erase Account"}
+            </button>
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }
@@ -2434,8 +2483,8 @@ function ActionButton({
   const className = [
     "flex h-9 items-center justify-center whitespace-nowrap rounded-full border px-3 text-[13px] font-semibold tracking-[0.01em] transition",
     disabled || (!href && !onClick)
-      ? "cursor-not-allowed border-white/8 bg-white/[0.06] text-[#89a8b2]"
-      : "border-white/10 bg-white/[0.08] text-[#f2fbfd] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] hover:border-[#8de0d6] hover:bg-white/[0.14]",
+      ? "cursor-not-allowed border-white/8 bg-white/[0.06] text-[#c0b1cf]"
+      : "border-white/10 bg-white/[0.1] text-[#fcf8ff] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] hover:border-[#d8c1ec] hover:bg-white/[0.16]",
   ].join(" ");
 
   const labelContent = (

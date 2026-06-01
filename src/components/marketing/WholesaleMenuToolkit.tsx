@@ -113,34 +113,34 @@ export default function WholesaleMenuToolkit({ items }: WholesaleMenuToolkitProp
           <button
             type="button"
             onClick={onCopyAll}
-            className="inline-flex items-center justify-center rounded-full border border-[#cfe0e7] bg-white px-4 py-2 text-sm font-semibold text-[#2b4756] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
+            className="inline-flex items-center justify-center rounded-full border border-[#decee9] bg-white px-4 py-2 text-sm font-semibold text-[#2b4756] transition hover:border-[#8f52dc] hover:text-[#6f32b5]"
           >
             Copy Full Menu
           </button>
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           {categoryGroups.map((section) => (
-            <div key={section.category} className="rounded-2xl border border-[#dbe9ef] bg-white p-5 shadow-sm">
+            <div key={section.category} className="rounded-2xl border border-[#eadff1] bg-white p-5 shadow-sm">
               <div className="flex items-center justify-between gap-3">
                 <h3 className="text-lg font-semibold text-[#153447]">{section.category}</h3>
                 <button
                   type="button"
                   onClick={() => onCopySection(section.category, section.items)}
-                  className="inline-flex items-center justify-center rounded-full border border-[#cfe0e7] bg-white px-3 py-1.5 text-xs font-semibold text-[#2b4756] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
+                  className="inline-flex items-center justify-center rounded-full border border-[#decee9] bg-white px-3 py-1.5 text-xs font-semibold text-[#2b4756] transition hover:border-[#8f52dc] hover:text-[#6f32b5]"
                 >
                   {`Copy ${section.category} Menu`}
                 </button>
               </div>
-              <pre className="mt-3 whitespace-pre-wrap rounded-xl border border-[#e0eaef] bg-[#f9fcfd] p-3 text-sm leading-relaxed text-[#2f4958]">
+              <pre className="mt-3 whitespace-pre-wrap rounded-xl border border-[#e0eaef] bg-[#fdf8fd] p-3 text-sm leading-relaxed text-[#2f4958]">
                 {buildCopyText(section.category, section.items)}
               </pre>
               {copyStatus[section.category] ? (
-                <p className="mt-2 text-xs font-semibold text-[#0f766e]">{copyStatus[section.category]}</p>
+                <p className="mt-2 text-xs font-semibold text-[#6f32b5]">{copyStatus[section.category]}</p>
               ) : null}
             </div>
           ))}
         </div>
-        {copyStatus.all ? <p className="text-xs font-semibold text-[#0f766e]">{copyStatus.all}</p> : null}
+        {copyStatus.all ? <p className="text-xs font-semibold text-[#6f32b5]">{copyStatus.all}</p> : null}
       </section>
 
       <section className="rounded-3xl border border-[#d3e8ea] bg-[#edf9f7] p-6 md:p-8">
@@ -154,14 +154,14 @@ export default function WholesaleMenuToolkit({ items }: WholesaleMenuToolkitProp
             value={phone}
             onChange={(event) => setPhone(event.target.value)}
             placeholder="(555) 123-4567"
-            className="w-full rounded-lg border border-[#c9d7e2] bg-white px-4 py-3 text-[#1f2d3a] placeholder:text-[#8aa0ae] transition-colors focus:border-[#14b8a6] focus:outline-none"
+            className="w-full rounded-lg border border-[#dbcde6] bg-white px-4 py-3 text-[#1f2d3a] placeholder:text-[#8aa0ae] transition-colors focus:border-[#8f52dc] focus:outline-none"
           />
           <label className="flex items-start gap-3 text-sm text-[#3f5f6e]">
             <input
               type="checkbox"
               checked={consent}
               onChange={(event) => setConsent(event.target.checked)}
-              className="mt-0.5 h-4 w-4 rounded border-[#bdd3dd] text-[#14b8a6] focus:ring-[#14b8a6]"
+              className="mt-0.5 h-4 w-4 rounded border-[#bdd3dd] text-[#8f52dc] focus:ring-[#8f52dc]"
             />
             <span>
               By submitting your phone number, you agree to receive menu updates and marketing text messages from JC RAD
@@ -170,12 +170,12 @@ export default function WholesaleMenuToolkit({ items }: WholesaleMenuToolkitProp
           </label>
           <button
             type="submit"
-            className="inline-flex items-center justify-center rounded-full bg-[#14b8a6] px-5 py-3 text-sm font-semibold text-white transition hover:opacity-95"
+            className="inline-flex items-center justify-center rounded-full bg-[#8f52dc] px-5 py-3 text-sm font-semibold text-white transition hover:opacity-95"
           >
             Send Menu by Text
           </button>
         </form>
-        {smsMessage ? <p className="mt-3 text-sm font-medium text-[#0f766e]">{smsMessage}</p> : null}
+        {smsMessage ? <p className="mt-3 text-sm font-medium text-[#6f32b5]">{smsMessage}</p> : null}
       </section>
     </div>
   );

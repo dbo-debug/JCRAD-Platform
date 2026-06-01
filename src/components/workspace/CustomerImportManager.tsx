@@ -113,14 +113,14 @@ export default function CustomerImportManager({ fields, canApply }: { fields: Im
 
   return (
     <div className="space-y-6">
-      <section className="rounded-2xl border border-[#dbe9ef] bg-white p-6 shadow-sm">
+      <section className="rounded-2xl border border-[#eadff1] bg-white p-6 shadow-sm">
         <div className="grid gap-4 md:grid-cols-2">
           <label className="grid gap-1 text-sm text-[#4a6575]">
             <span>Spreadsheet ID or URL</span>
             <input
               value={spreadsheetIdOrUrl}
               onChange={(e) => setSpreadsheetIdOrUrl(e.target.value)}
-              className="rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a]"
+              className="rounded-lg border border-[#ddcfe9] bg-white px-3 py-2 text-sm text-[#1f2d3a]"
               placeholder="Google Sheet URL or spreadsheet ID"
             />
           </label>
@@ -129,7 +129,7 @@ export default function CustomerImportManager({ fields, canApply }: { fields: Im
             <input
               value={tabName}
               onChange={(e) => setTabName(e.target.value)}
-              className="rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a]"
+              className="rounded-lg border border-[#ddcfe9] bg-white px-3 py-2 text-sm text-[#1f2d3a]"
               placeholder="Accounts"
             />
           </label>
@@ -140,7 +140,7 @@ export default function CustomerImportManager({ fields, canApply }: { fields: Im
             type="button"
             onClick={() => void runPreview()}
             disabled={!spreadsheetIdOrUrl || !tabName || busy !== null}
-            className="rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+            className="rounded-full bg-[#8f52dc] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
           >
             {busy === "preview" ? "Loading Preview..." : "Preview Import"}
           </button>
@@ -153,7 +153,7 @@ export default function CustomerImportManager({ fields, canApply }: { fields: Im
               type="button"
               onClick={() => void applyImport()}
               disabled={!preview || busy !== null}
-              className="rounded-full border border-[#14b8a6] px-4 py-2 text-sm font-semibold text-[#0f766e] disabled:opacity-60"
+              className="rounded-full border border-[#8f52dc] px-4 py-2 text-sm font-semibold text-[#6f32b5] disabled:opacity-60"
             >
               {busy === "apply" ? "Applying..." : "Apply Import"}
             </button>
@@ -163,7 +163,7 @@ export default function CustomerImportManager({ fields, canApply }: { fields: Im
         </div>
         {error ? <p className="mt-3 text-sm text-[#991b1b]">{error}</p> : null}
         {successReport ? (
-          <div className="mt-3 rounded-xl border border-[#b7efe6] bg-[#f2fffb] px-4 py-3 text-sm text-[#0f766e]">
+          <div className="mt-3 rounded-xl border border-[#b7efe6] bg-[#f2fffb] px-4 py-3 text-sm text-[#6f32b5]">
             <p className="font-semibold text-[#0b5f58]">Import activity summary</p>
             <div className="mt-2 grid gap-1 md:grid-cols-2">
               <p>Accounts created: {Number(successReport.customersCreated || 0)}</p>
@@ -179,7 +179,7 @@ export default function CustomerImportManager({ fields, canApply }: { fields: Im
 
       {preview ? (
         <>
-          <section className="rounded-2xl border border-[#dbe9ef] bg-white p-6 shadow-sm">
+          <section className="rounded-2xl border border-[#eadff1] bg-white p-6 shadow-sm">
             <h2 className="text-lg font-semibold text-[#173543]">Column Mapping</h2>
             <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {fields.map((field) => (
@@ -188,7 +188,7 @@ export default function CustomerImportManager({ fields, canApply }: { fields: Im
                   <select
                     value={mapping[field.key] || ""}
                     onChange={(e) => setMapping((prev) => ({ ...prev, [field.key]: e.target.value || null }))}
-                    className="rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a]"
+                    className="rounded-lg border border-[#ddcfe9] bg-white px-3 py-2 text-sm text-[#1f2d3a]"
                   >
                     <option value="">Unmapped</option>
                     {preview.headers.map((header) => (
@@ -205,7 +205,7 @@ export default function CustomerImportManager({ fields, canApply }: { fields: Im
                 type="button"
                 onClick={() => void runPreview(mapping)}
                 disabled={busy !== null}
-                className="rounded-full border border-[#cfdde5] px-4 py-2 text-sm font-semibold text-[#24404d] disabled:opacity-60"
+                className="rounded-full border border-[#ddcfe8] px-4 py-2 text-sm font-semibold text-[#24404d] disabled:opacity-60"
               >
                 Refresh Preview
               </button>
@@ -214,16 +214,16 @@ export default function CustomerImportManager({ fields, canApply }: { fields: Im
 
           <section className="grid gap-4 md:grid-cols-5">
             {Object.entries(preview.summary).map(([key, value]) => (
-              <div key={key} className="rounded-2xl border border-[#dbe9ef] bg-white p-5 shadow-sm">
+              <div key={key} className="rounded-2xl border border-[#eadff1] bg-white p-5 shadow-sm">
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#5d7685]">{key.replace(/_/g, " ")}</p>
                 <p className="mt-2 text-2xl font-semibold text-[#173543]">{value}</p>
               </div>
             ))}
           </section>
 
-          <section className="overflow-hidden rounded-2xl border border-[#dbe9ef] bg-white shadow-sm">
+          <section className="overflow-hidden rounded-2xl border border-[#eadff1] bg-white shadow-sm">
             <table className="min-w-full divide-y divide-[#e6eef3] text-sm">
-              <thead className="bg-[#f7fbfd] text-left text-[#5b7382]">
+              <thead className="bg-[#fdf7fb] text-left text-[#5b7382]">
                 <tr>
                   <th className="px-4 py-3 font-semibold">Row</th>
                   <th className="px-4 py-3 font-semibold">Store</th>

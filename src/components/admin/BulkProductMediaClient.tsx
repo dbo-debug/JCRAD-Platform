@@ -158,7 +158,7 @@ export default function BulkProductMediaClient({ catalogItemId, initialMedia }: 
   });
 
   const thumbnailSrc = useMemo(
-    () => String(media.thumbnail_url || "").trim() || "/brand/PRIMARY.png",
+    () => String(media.thumbnail_url || "").trim() || "/brand/motley-on-white.png",
     [media.thumbnail_url]
   );
 
@@ -303,18 +303,18 @@ export default function BulkProductMediaClient({ catalogItemId, initialMedia }: 
         <img
           src={thumbnailSrc}
           alt="Product thumbnail"
-          className="h-40 w-40 rounded-md border border-[#dbe9ef] object-cover"
+          className="h-40 w-40 rounded-md border border-[#eadff1] object-cover"
         />
         <input
           type="file"
           accept=".jpg,.jpeg,.png,.webp,.heic,image/jpeg,image/png,image/webp,image/heic"
           onChange={(event) => onSelect("thumbnail", event)}
           disabled={uploading.thumbnail}
-          className="rounded border border-[#cfdde5] bg-white px-3 py-2 text-sm text-[#173543]"
+          className="rounded border border-[#ddcfe8] bg-white px-3 py-2 text-sm text-[#173543]"
         />
         {uploading.thumbnail ? <p className="text-sm text-[#5b7382]">Uploading thumbnail...</p> : null}
         {errors.thumbnail ? <p className="text-sm text-[#991b1b]">{errors.thumbnail}</p> : null}
-        {saved.thumbnail ? <p className="text-sm text-[#0f766e]">{saved.thumbnail}</p> : null}
+        {saved.thumbnail ? <p className="text-sm text-[#6f32b5]">{saved.thumbnail}</p> : null}
       </section>
 
       <section className="space-y-3">
@@ -324,9 +324,9 @@ export default function BulkProductMediaClient({ catalogItemId, initialMedia }: 
             <video
               controls
               src={media.video_url}
-              className="max-h-64 w-full max-w-lg rounded-md border border-[#dbe9ef] bg-[#f6fbfd]"
+              className="max-h-64 w-full max-w-lg rounded-md border border-[#eadff1] bg-[#fdf7fb]"
             />
-            <a href={media.video_url} target="_blank" rel="noreferrer" className="text-sm text-[#0f766e] underline">
+            <a href={media.video_url} target="_blank" rel="noreferrer" className="text-sm text-[#6f32b5] underline">
               Open video
             </a>
           </div>
@@ -338,17 +338,17 @@ export default function BulkProductMediaClient({ catalogItemId, initialMedia }: 
           accept=".mp4,.mov,.webm,video/mp4,video/quicktime,video/webm"
           onChange={(event) => onSelect("video", event)}
           disabled={uploading.video}
-          className="rounded border border-[#cfdde5] bg-white px-3 py-2 text-sm text-[#173543]"
+          className="rounded border border-[#ddcfe8] bg-white px-3 py-2 text-sm text-[#173543]"
         />
         {uploading.video ? <p className="text-sm text-[#5b7382]">Uploading video...</p> : null}
         {errors.video ? <p className="text-sm text-[#991b1b]">{errors.video}</p> : null}
-        {saved.video ? <p className="text-sm text-[#0f766e]">{saved.video}</p> : null}
+        {saved.video ? <p className="text-sm text-[#6f32b5]">{saved.video}</p> : null}
       </section>
 
       <section className="space-y-3">
         <div className="text-sm text-[#5b7382]">COA PDF</div>
         {media.coa_url ? (
-          <a href={media.coa_url} target="_blank" rel="noreferrer" className="text-sm text-[#0f766e] underline">
+          <a href={media.coa_url} target="_blank" rel="noreferrer" className="text-sm text-[#6f32b5] underline">
             Open COA PDF
           </a>
         ) : (
@@ -359,11 +359,11 @@ export default function BulkProductMediaClient({ catalogItemId, initialMedia }: 
           accept=".pdf,application/pdf"
           onChange={(event) => onSelect("coa", event)}
           disabled={uploading.coa}
-          className="rounded border border-[#cfdde5] bg-white px-3 py-2 text-sm text-[#173543]"
+          className="rounded border border-[#ddcfe8] bg-white px-3 py-2 text-sm text-[#173543]"
         />
         {uploading.coa ? <p className="text-sm text-[#5b7382]">Uploading COA...</p> : null}
         {errors.coa ? <p className="text-sm text-[#991b1b]">{errors.coa}</p> : null}
-        {saved.coa ? <p className="text-sm text-[#0f766e]">{saved.coa}</p> : null}
+        {saved.coa ? <p className="text-sm text-[#6f32b5]">{saved.coa}</p> : null}
       </section>
     </div>
   );

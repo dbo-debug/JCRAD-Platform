@@ -117,7 +117,7 @@ export default function PackagingUploadClient({
           <select
             value={category}
             onChange={(e) => setCategory(e.target.value as PackagingCategory)}
-            className="rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a] focus:border-[#14b8a6] focus:outline-none"
+            className="rounded-lg border border-[#ddcfe9] bg-white px-3 py-2 text-sm text-[#1f2d3a] focus:border-[#8f52dc] focus:outline-none"
           >
             {PACKAGING_CATEGORIES.map((value) => (
               <option key={value} value={value}>
@@ -133,7 +133,7 @@ export default function PackagingUploadClient({
             <input
               type="file"
               onChange={(e) => setFrontFile(e.target.files?.[0] || null)}
-              className="rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a] file:mr-3 file:rounded file:border-0 file:bg-[#eef7f6] file:px-2 file:py-1 file:text-xs file:font-semibold file:text-[#0f766e] focus:border-[#14b8a6] focus:outline-none"
+              className="rounded-lg border border-[#ddcfe9] bg-white px-3 py-2 text-sm text-[#1f2d3a] file:mr-3 file:rounded file:border-0 file:bg-[#eef7f6] file:px-2 file:py-1 file:text-xs file:font-semibold file:text-[#6f32b5] focus:border-[#8f52dc] focus:outline-none"
             />
           </label>
           <label className="grid gap-1.5">
@@ -141,7 +141,7 @@ export default function PackagingUploadClient({
             <input
               type="file"
               onChange={(e) => setBackFile(e.target.files?.[0] || null)}
-              className="rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a] file:mr-3 file:rounded file:border-0 file:bg-[#eef7f6] file:px-2 file:py-1 file:text-xs file:font-semibold file:text-[#0f766e] focus:border-[#14b8a6] focus:outline-none"
+              className="rounded-lg border border-[#ddcfe9] bg-white px-3 py-2 text-sm text-[#1f2d3a] file:mr-3 file:rounded file:border-0 file:bg-[#eef7f6] file:px-2 file:py-1 file:text-xs file:font-semibold file:text-[#6f32b5] focus:border-[#8f52dc] focus:outline-none"
             />
           </label>
         </div>
@@ -152,7 +152,7 @@ export default function PackagingUploadClient({
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             rows={3}
-            className="rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a] placeholder:text-[#8aa0ae] focus:border-[#14b8a6] focus:outline-none"
+            className="rounded-lg border border-[#ddcfe9] bg-white px-3 py-2 text-sm text-[#1f2d3a] placeholder:text-[#8aa0ae] focus:border-[#8f52dc] focus:outline-none"
             placeholder="Packaging notes for compliance review"
           />
         </label>
@@ -163,7 +163,7 @@ export default function PackagingUploadClient({
           </div>
         ) : null}
         {success ? (
-          <div className="rounded-xl border border-[#cde9e6] bg-[#eefaf8] px-3 py-2 text-sm text-[#0f766e]">
+          <div className="rounded-xl border border-[#cde9e6] bg-[#eefaf8] px-3 py-2 text-sm text-[#6f32b5]">
             {success}
           </div>
         ) : null}
@@ -172,13 +172,13 @@ export default function PackagingUploadClient({
           <button
             type="submit"
             disabled={busy}
-            className="inline-flex items-center rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center rounded-full bg-[#8f52dc] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {busy ? "Submitting..." : "Submit Packaging"}
           </button>
           <Link
             href={returnTo}
-            className="inline-flex items-center rounded-full border border-[#cfdce4] px-4 py-2 text-sm font-semibold text-[#24404d] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
+            className="inline-flex items-center rounded-full border border-[#cfdce4] px-4 py-2 text-sm font-semibold text-[#24404d] transition hover:border-[#8f52dc] hover:text-[#6f32b5]"
           >
             Back
           </Link>
@@ -190,7 +190,7 @@ export default function PackagingUploadClient({
         {PACKAGING_CATEGORIES.map((cat) => {
           const rows = submissionsByCategory.get(cat) || [];
           return (
-            <div key={cat} className="space-y-2 rounded-xl border border-[#dbe9ef] bg-[#f9fcfd] p-4">
+            <div key={cat} className="space-y-2 rounded-xl border border-[#eadff1] bg-[#fdf8fd] p-4">
               <p className="text-sm font-semibold text-[#173543]">{packagingCategoryLabel(cat)}</p>
               {rows.length === 0 ? (
                 <p className="text-sm text-[#5d7685]">No submissions yet.</p>
@@ -204,12 +204,12 @@ export default function PackagingUploadClient({
                       {row.review_notes ? <p className="mt-1 text-xs text-[#5d7685]">Review: {row.review_notes}</p> : null}
                       <div className="mt-1 flex flex-wrap gap-3 text-xs">
                         {row.front_image_url ? (
-                          <a href={row.front_image_url} target="_blank" rel="noreferrer" className="text-[#0f766e] underline">
+                          <a href={row.front_image_url} target="_blank" rel="noreferrer" className="text-[#6f32b5] underline">
                             Front artwork
                           </a>
                         ) : null}
                         {row.back_image_url ? (
-                          <a href={row.back_image_url} target="_blank" rel="noreferrer" className="text-[#0f766e] underline">
+                          <a href={row.back_image_url} target="_blank" rel="noreferrer" className="text-[#6f32b5] underline">
                             Back artwork
                           </a>
                         ) : null}

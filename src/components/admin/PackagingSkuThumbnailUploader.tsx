@@ -15,7 +15,7 @@ type SkuResponse = {
 
 export default function PackagingSkuThumbnailUploader({ skuId }: PackagingSkuThumbnailUploaderProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string>("/brand/PRIMARY.png");
+  const [previewUrl, setPreviewUrl] = useState<string>("/brand/motley-on-white.png");
   const [name, setName] = useState<string>("Packaging SKU");
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -41,7 +41,7 @@ export default function PackagingSkuThumbnailUploader({ skuId }: PackagingSkuThu
         return;
       }
 
-      const nextUrl = String(json?.sku?.thumbnail_url || "").trim() || "/brand/PRIMARY.png";
+      const nextUrl = String(json?.sku?.thumbnail_url || "").trim() || "/brand/motley-on-white.png";
       const nextName = String(json?.sku?.name || "").trim() || "Packaging SKU";
       setPreviewUrl(nextUrl);
       setName(nextName);
@@ -102,7 +102,7 @@ export default function PackagingSkuThumbnailUploader({ skuId }: PackagingSkuThu
         <img
           src={previewUrl}
           alt={`${name} thumbnail`}
-          className="h-40 w-40 rounded-md border border-[#dbe9ef] object-cover"
+          className="h-40 w-40 rounded-md border border-[#eadff1] object-cover"
         />
       )}
 
@@ -111,20 +111,20 @@ export default function PackagingSkuThumbnailUploader({ skuId }: PackagingSkuThu
           type="file"
           accept="image/*"
           onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-          className="rounded border border-[#cfdde5] bg-white px-3 py-2 text-sm text-[#173543]"
+          className="rounded border border-[#ddcfe8] bg-white px-3 py-2 text-sm text-[#173543]"
         />
 
         <button
           type="button"
           onClick={onUpload}
           disabled={uploading || !selectedFile}
-          className="w-fit rounded bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95 disabled:opacity-60"
+          className="w-fit rounded bg-[#8f52dc] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95 disabled:opacity-60"
         >
           {uploading ? "Uploading..." : "Upload Thumbnail"}
         </button>
 
         {error ? <p className="text-sm text-[#991b1b]">{error}</p> : null}
-        {success ? <p className="text-sm text-[#0f766e]">{success}</p> : null}
+        {success ? <p className="text-sm text-[#6f32b5]">{success}</p> : null}
       </div>
     </section>
   );

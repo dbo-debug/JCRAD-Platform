@@ -16,7 +16,7 @@ export default function MarketingFooter() {
           <p className="text-sm text-[#4a6575]">JC RAD Inc. Wholesale and Copack platform.</p>
           <nav className="flex flex-wrap gap-4">
             {FOOTER_LINKS.map((item) => (
-              <Link key={item.href} href={item.href} className="text-sm text-[#3d5a6a] transition hover:text-[#0f766e]">
+              <Link key={item.href} href={item.href} className="text-sm text-[#3d5a6a] transition hover:text-[#6f32b5]">
                 {item.label}
               </Link>
             ))}

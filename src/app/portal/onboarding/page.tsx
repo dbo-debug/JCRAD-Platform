@@ -23,12 +23,12 @@ export default async function PortalOnboardingPage() {
 
         <div className="flex flex-wrap gap-3">
           <Link href="/estimate" className="inline-flex">
-            <Button className="rounded-full border border-[#cfdce4] bg-white text-[#24404d] hover:border-[#14b8a6] hover:text-[#0f766e]">
+            <Button className="rounded-full border border-[#cfdce4] bg-white text-[#24404d] hover:border-[#8f52dc] hover:text-[#6f32b5]">
               Back to Estimate
             </Button>
           </Link>
           <Link href="/dashboard" className="inline-flex">
-            <Button className="rounded-full border border-[#cfdce4] bg-white text-[#24404d] hover:border-[#14b8a6] hover:text-[#0f766e]">
+            <Button className="rounded-full border border-[#cfdce4] bg-white text-[#24404d] hover:border-[#8f52dc] hover:text-[#6f32b5]">
               Back to Dashboard
             </Button>
           </Link>

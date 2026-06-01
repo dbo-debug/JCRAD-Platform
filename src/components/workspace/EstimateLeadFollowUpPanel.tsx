@@ -42,8 +42,8 @@ function formatMoney(value: number | null): string {
 
 function statusTone(value: string, packagingPending: boolean): string {
   if (packagingPending) return "border-[#f1ddad] bg-[#fff9eb] text-[#9a6b00]";
-  if (value === "converted") return "border-[#bde8e4] bg-[#e9fbf9] text-[#0f766e]";
-  return "border-[#d7e6ed] bg-[#f8fbfc] text-[#4f6877]";
+  if (value === "converted") return "border-[#e8d7f7] bg-[#fcf3ff] text-[#6f32b5]";
+  return "border-[#e5d8ef] bg-[#fcf7fd] text-[#4f6877]";
 }
 
 export default async function EstimateLeadFollowUpPanel({
@@ -74,7 +74,7 @@ export default async function EstimateLeadFollowUpPanel({
   );
 
   return (
-    <section className="rounded-[24px] border border-[#dbe9ef] bg-white p-4 shadow-sm">
+    <section className="rounded-[24px] border border-[#eadff1] bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Estimate Follow-Up</p>
@@ -83,7 +83,7 @@ export default async function EstimateLeadFollowUpPanel({
         </div>
         <Link
           href="/estimate"
-          className="rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm text-[#42606f] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
+          className="rounded-full border border-[#decfe8] bg-white px-3 py-1.5 text-sm text-[#42606f] transition hover:border-[#8f52dc] hover:text-[#6f32b5]"
         >
           Open Estimate Workspace
         </Link>
@@ -99,7 +99,7 @@ export default async function EstimateLeadFollowUpPanel({
             return (
               <div
                 key={row.id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#dbe9ef] bg-[#fbfdfe] px-3 py-3 text-sm"
+                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#eadff1] bg-[#fffafd] px-3 py-3 text-sm"
               >
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7891a0]">
@@ -127,14 +127,14 @@ export default async function EstimateLeadFollowUpPanel({
                   {hasResolvedCustomer ? (
                     <Link
                       href={`/workspace/customers/${encodeURIComponent(row.resolvedCustomer!.customerId)}`}
-                      className="rounded-full border border-[#cfdce4] px-2 py-1 text-xs font-semibold text-[#294452] hover:border-[#14b8a6] hover:text-[#0f766e]"
+                      className="rounded-full border border-[#cfdce4] px-2 py-1 text-xs font-semibold text-[#294452] hover:border-[#8f52dc] hover:text-[#6f32b5]"
                     >
                       Open account
                     </Link>
                   ) : null}
                   <Link
                     href={`/estimate/${encodeURIComponent(row.id)}/print`}
-                    className="rounded-full border border-[#cfdce4] px-2 py-1 text-xs font-semibold text-[#294452] hover:border-[#14b8a6] hover:text-[#0f766e]"
+                    className="rounded-full border border-[#cfdce4] px-2 py-1 text-xs font-semibold text-[#294452] hover:border-[#8f52dc] hover:text-[#6f32b5]"
                   >
                     Open estimate
                   </Link>
@@ -142,7 +142,7 @@ export default async function EstimateLeadFollowUpPanel({
                     <input type="hidden" name="estimate_id" value={row.id} />
                     <button
                       type="submit"
-                      className="rounded-full border border-[#c7ddd7] bg-[#effcf9] px-2 py-1 text-xs font-semibold text-[#0f766e] hover:border-[#14b8a6]"
+                      className="rounded-full border border-[#c7ddd7] bg-[#fcf5ff] px-2 py-1 text-xs font-semibold text-[#6f32b5] hover:border-[#8f52dc]"
                     >
                       {hasResolvedCustomer ? "Refresh account follow-up" : "Create lead and follow-up"}
                     </button>

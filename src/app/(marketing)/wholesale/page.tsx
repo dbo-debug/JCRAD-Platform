@@ -224,7 +224,7 @@ export default async function WholesalePage() {
           <div className="flex flex-col gap-3 sm:flex-row">
             <Link
               href="/menu"
-              className="inline-flex items-center justify-center rounded-full bg-[#14b8a6] px-5 py-3 text-sm font-semibold text-white transition hover:opacity-95"
+              className="inline-flex items-center justify-center rounded-full bg-[#8f52dc] px-5 py-3 text-sm font-semibold text-white transition hover:opacity-95"
             >
               View Live Menu
             </Link>

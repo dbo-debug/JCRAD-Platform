@@ -47,17 +47,17 @@ export default function HomePage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <Link
           href="/menu"
-          className="inline-flex items-center justify-center rounded-full bg-[#14b8a6] px-5 py-3 text-sm font-semibold text-white transition hover:opacity-95"
+          className="inline-flex items-center justify-center rounded-full bg-[#8f52dc] px-5 py-3 text-sm font-semibold text-white transition hover:opacity-95"
         >
           View Menu
         </Link>
         <Link
           href="/signup"
-          className="inline-flex items-center justify-center rounded-full border border-[#cfe0e7] bg-white px-5 py-3 text-sm font-semibold text-[#2b4756] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
+          className="inline-flex items-center justify-center rounded-full border border-[#decee9] bg-white px-5 py-3 text-sm font-semibold text-[#2b4756] transition hover:border-[#8f52dc] hover:text-[#6f32b5]"
         >
           Build Estimate
         </Link>
-        <Link href="/contact?intent=call" className="text-sm font-semibold text-[#0f766e] underline underline-offset-4">
+        <Link href="/contact?intent=call" className="text-sm font-semibold text-[#6f32b5] underline underline-offset-4">
           Book a Call
         </Link>
       </div>
@@ -71,10 +71,10 @@ export default function HomePage() {
         ].map((item) => (
           <div
             key={item}
-            className="rounded-2xl border border-[#dbe9ef] bg-white px-4 py-3 text-sm font-semibold text-[#21404f] shadow-sm"
+            className="rounded-2xl border border-[#eadff1] bg-white px-4 py-3 text-sm font-semibold text-[#21404f] shadow-sm"
           >
             <div className="flex items-center justify-center gap-2 text-center">
-              <span className="h-2 w-2 rounded-full bg-[#14b8a6]" />
+              <span className="h-2 w-2 rounded-full bg-[#8f52dc]" />
               <span>{item}</span>
             </div>
           </div>
@@ -150,7 +150,7 @@ export default function HomePage() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {CATEGORIES.map((category) => (
             <Link key={category.label} href="/menu" className="group">
-              <Card className="relative overflow-hidden rounded-2xl border border-[#dbe9ef] bg-white p-0 text-white transition group-hover:-translate-y-0.5 group-hover:shadow-md">
+              <Card className="relative overflow-hidden rounded-2xl border border-[#eadff1] bg-white p-0 text-white transition group-hover:-translate-y-0.5 group-hover:shadow-md">
                 <img src={category.imageSrc} alt={category.label} className="h-48 w-full object-cover" />
                 <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(7,17,24,0.06)_0%,rgba(7,17,24,0.72)_68%,rgba(7,17,24,0.86)_100%)]" />
                 <div className="absolute inset-x-0 bottom-0 p-4">
@@ -183,7 +183,7 @@ export default function HomePage() {
               body: "Align packaging and documentation checkpoints early so launch planning stays realistic.",
             },
           ].map((item) => (
-            <Card key={item.title} className="rounded-2xl border border-[#dbe9ef] bg-white p-5 text-[#153447] shadow-sm">
+            <Card key={item.title} className="rounded-2xl border border-[#eadff1] bg-white p-5 text-[#153447] shadow-sm">
               <h3 className="text-base font-semibold">{item.title}</h3>
               <p className="mt-2 text-sm text-[#4a6575]">{item.body}</p>
             </Card>
@@ -207,7 +207,7 @@ export default function HomePage() {
           ].map((item) => (
             <div
               key={item}
-              className="rounded-xl border border-[#dbe9ef] bg-[#f9fcfd] px-4 py-3 text-sm font-medium text-[#234353]"
+              className="rounded-xl border border-[#eadff1] bg-[#fdf8fd] px-4 py-3 text-sm font-medium text-[#234353]"
             >
               {item}
             </div>
@@ -237,7 +237,7 @@ export default function HomePage() {
               body: "Menu-driven pricing visibility",
             },
           ].map((item) => (
-            <Card key={item.title} className="rounded-2xl border border-[#dbe9ef] bg-white p-5 text-[#153447] shadow-sm">
+            <Card key={item.title} className="rounded-2xl border border-[#eadff1] bg-white p-5 text-[#153447] shadow-sm">
               <h3 className="text-base font-semibold">{item.title}</h3>
               <p className="mt-2 text-sm text-[#4a6575]">{item.body}</p>
             </Card>
@@ -246,7 +246,7 @@ export default function HomePage() {
         <div>
           <Link
             href="/menu"
-            className="inline-flex items-center justify-center rounded-full bg-[#14b8a6] px-5 py-3 text-sm font-semibold text-white transition hover:opacity-95"
+            className="inline-flex items-center justify-center rounded-full bg-[#8f52dc] px-5 py-3 text-sm font-semibold text-white transition hover:opacity-95"
           >
             Open Menu
           </Link>
@@ -266,7 +266,7 @@ export default function HomePage() {
             "Review production cost structure",
             "Export a professional estimate",
           ].map((item) => (
-            <Card key={item} className="rounded-xl border border-[#dbe9ef] bg-white p-4 text-sm font-medium text-[#234353] shadow-sm">
+            <Card key={item} className="rounded-xl border border-[#eadff1] bg-white p-4 text-sm font-medium text-[#234353] shadow-sm">
               {item}
             </Card>
           ))}
@@ -274,14 +274,14 @@ export default function HomePage() {
         <div>
           <Link
             href="/signup"
-            className="inline-flex items-center justify-center rounded-full border border-[#cfe0e7] bg-white px-5 py-3 text-sm font-semibold text-[#2b4756] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
+            className="inline-flex items-center justify-center rounded-full border border-[#decee9] bg-white px-5 py-3 text-sm font-semibold text-[#2b4756] transition hover:border-[#8f52dc] hover:text-[#6f32b5]"
           >
             Start Estimate
           </Link>
         </div>
       </section>
 
-      <section className="rounded-2xl border border-[#dbe9ef] bg-white p-6">
+      <section className="rounded-2xl border border-[#eadff1] bg-white p-6">
         <h2 className="text-2xl font-semibold text-[#13303f]">Compliance-first execution</h2>
         <p className="mt-2 text-sm text-[#4a6575]">
           Packaging review, production planning, and documentation expectations are considered early so launch plans stay realistic.
@@ -296,7 +296,7 @@ export default function HomePage() {
           <div className="flex flex-col gap-3 sm:flex-row">
             <Link
               href="/menu"
-              className="inline-flex items-center justify-center rounded-full bg-[#14b8a6] px-5 py-3 text-sm font-semibold text-white transition hover:opacity-95"
+              className="inline-flex items-center justify-center rounded-full bg-[#8f52dc] px-5 py-3 text-sm font-semibold text-white transition hover:opacity-95"
             >
               View Menu
             </Link>

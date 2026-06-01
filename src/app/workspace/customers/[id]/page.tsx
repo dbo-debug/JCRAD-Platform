@@ -139,14 +139,14 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
         action={
           <Link
             href="/workspace/customers"
-            className="inline-flex rounded-full border border-[#cfdde5] px-4 py-2 text-sm font-semibold text-[#24404d] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
+            className="inline-flex rounded-full border border-[#ddcfe8] px-4 py-2 text-sm font-semibold text-[#24404d] transition hover:border-[#8f52dc] hover:text-[#6f32b5]"
           >
             Back to Customers
           </Link>
         }
       />
 
-      <section className="rounded-2xl border border-[#dbe9ef] bg-white p-4 shadow-sm">
+      <section className="rounded-2xl border border-[#eadff1] bg-white p-4 shadow-sm">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#6b8593]">Account Snapshot</p>
@@ -240,10 +240,10 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
         <Panel title="Account Task History" id="customer-linked-task-list">
           <div className="space-y-2.5">
             {detail.tasks.map((task) => (
-              <div key={task.id} className="rounded-xl border border-[#dbe9ef] bg-[#f9fcfd] px-3 py-2.5">
+              <div key={task.id} className="rounded-xl border border-[#eadff1] bg-[#fdf8fd] px-3 py-2.5">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="font-semibold text-[#173543]">{task.title}</p>
-                  <span className="rounded-full border border-[#d7e6ed] bg-white px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#4f6877]">
+                  <span className="rounded-full border border-[#e5d8ef] bg-white px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#4f6877]">
                     {task.status}
                   </span>
                   {task.priority !== null ? (
@@ -276,7 +276,7 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
                     className={[
                       "rounded-full border px-3 py-1.5 text-sm font-semibold transition",
                       primaryCallHref
-                        ? "border-[#d0dde5] bg-white text-[#24404d] hover:border-[#14b8a6] hover:text-[#0f766e]"
+                        ? "border-[#decfe8] bg-white text-[#24404d] hover:border-[#8f52dc] hover:text-[#6f32b5]"
                         : "pointer-events-none cursor-not-allowed border-[#e2eaee] bg-[#f5f8fa] text-[#8ba0ac]",
                     ].join(" ")}
                   >
@@ -287,7 +287,7 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
                     className={[
                       "rounded-full border px-3 py-1.5 text-sm font-semibold transition",
                       primaryEmailHref
-                        ? "border-[#d0dde5] bg-white text-[#24404d] hover:border-[#14b8a6] hover:text-[#0f766e]"
+                        ? "border-[#decfe8] bg-white text-[#24404d] hover:border-[#8f52dc] hover:text-[#6f32b5]"
                         : "pointer-events-none cursor-not-allowed border-[#e2eaee] bg-[#f5f8fa] text-[#8ba0ac]",
                     ].join(" ")}
                   >
@@ -295,7 +295,7 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
                   </a>
                   <Link
                     href={`/workspace/customers/${detail.customer.id}#customer-account-management`}
-                    className="rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm font-semibold text-[#24404d] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
+                    className="rounded-full border border-[#decfe8] bg-white px-3 py-1.5 text-sm font-semibold text-[#24404d] transition hover:border-[#8f52dc] hover:text-[#6f32b5]"
                   >
                     Open Account
                   </Link>
@@ -352,7 +352,7 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
           <Panel title="Customer Documents">
             <div className="space-y-2.5">
               {detail.documents.map((doc) => (
-                <div key={doc.id} className="rounded-xl border border-[#dbe9ef] bg-[#f9fcfd] px-3 py-2.5">
+                <div key={doc.id} className="rounded-xl border border-[#eadff1] bg-[#fdf8fd] px-3 py-2.5">
                   <p className="font-semibold text-[#173543]">
                     {String(doc.title || doc.file_name || doc.name || `Document ${doc.id.slice(0, 8)}`)}
                   </p>
@@ -369,7 +369,7 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
         <Panel title="Internal Notes">
           <div className="space-y-2.5">
             {detail.notes.map((note) => (
-              <div key={note.id} className="rounded-xl border border-[#dbe9ef] bg-[#f9fcfd] px-3 py-2.5">
+              <div key={note.id} className="rounded-xl border border-[#eadff1] bg-[#fdf8fd] px-3 py-2.5">
                 <p className="whitespace-pre-wrap text-sm text-[#173543]">{note.note}</p>
                 <p className="mt-2 text-xs text-[#5d7685]">
                   {note.authorName || "Unknown author"} • <LocalDateTime value={note.createdAt} fallback={formatDate(note.createdAt)} />
@@ -386,7 +386,7 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
 
 function SummaryCard({ label, value, helper }: { label: string; value: string; helper?: string }) {
   return (
-    <div className="min-w-0 rounded-2xl border border-[#dbe9ef] bg-white p-4 shadow-sm">
+    <div className="min-w-0 rounded-2xl border border-[#eadff1] bg-white p-4 shadow-sm">
       <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#5d7685]">{label}</p>
       <p title={value} className="mt-1.5 truncate text-base font-semibold text-[#173543]">{value}</p>
       {helper ? <p title={helper} className="mt-1 truncate text-sm text-[#4a6575]">{helper}</p> : null}
@@ -403,14 +403,14 @@ function HeaderBadge({
 }) {
   const toneClass =
     tone === "ok"
-      ? "border-[#bde8e4] bg-[#e9fbf9] text-[#0f766e]"
+      ? "border-[#e8d7f7] bg-[#fcf3ff] text-[#6f32b5]"
       : tone === "warn"
         ? "border-[#f1ddad] bg-[#fff9eb] text-[#9a6b00]"
         : tone === "event"
           ? "border-[#f1ddad] bg-[#fff9eb] text-[#8a5b00]"
           : tone === "hot"
             ? "border-[#ffd3cf] bg-[#fff2f0] text-[#b44b40]"
-            : "border-[#d7e6ed] bg-[#f8fbfc] text-[#4f6877]";
+            : "border-[#e5d8ef] bg-[#fcf7fd] text-[#4f6877]";
 
   return (
     <span
@@ -446,7 +446,7 @@ function ActivityCard({
   const isEmailActivity = item.activityType === "email_sent" || item.activityType === "email_failed";
 
   return (
-    <div className="rounded-xl border border-[#dbe9ef] bg-[#f9fcfd] px-3 py-2.5">
+    <div className="rounded-xl border border-[#eadff1] bg-[#fdf8fd] px-3 py-2.5">
       <div className="flex flex-wrap items-center gap-2">
         <p className="font-semibold text-[#173543]">{item.summary}</p>
         {hotLeadState === true ? <HeaderBadge tone="hot" label="Hot Lead" /> : null}
@@ -475,7 +475,7 @@ function ActivityCard({
 
 function Panel({ title, children, id }: { title: string; children: ReactNode; id?: string }) {
   return (
-    <section id={id} className="scroll-mt-28 rounded-2xl border border-[#dbe9ef] bg-white p-4 shadow-sm">
+    <section id={id} className="scroll-mt-28 rounded-2xl border border-[#eadff1] bg-white p-4 shadow-sm">
       <h2 className="text-base font-semibold text-[#173543]">{title}</h2>
       <div className="mt-3">{children}</div>
     </section>
@@ -483,7 +483,7 @@ function Panel({ title, children, id }: { title: string; children: ReactNode; id
 }
 
 function EmptyState({ label }: { label: string }) {
-  return <div className="rounded-xl border border-dashed border-[#d3e1e8] bg-[#f9fcfd] px-3 py-4 text-sm text-[#5d7685]">{label}</div>;
+  return <div className="rounded-xl border border-dashed border-[#d3e1e8] bg-[#fdf8fd] px-3 py-4 text-sm text-[#5d7685]">{label}</div>;
 }
 
 function RecordTable({
@@ -494,9 +494,9 @@ function RecordTable({
   columns: Array<{ key: string; label: string; format?: (value: unknown) => string }>;
 }) {
   return rows.length > 0 ? (
-    <div className="overflow-hidden rounded-xl border border-[#dbe9ef]">
+    <div className="overflow-hidden rounded-xl border border-[#eadff1]">
       <table className="min-w-full divide-y divide-[#e6eef3] text-sm">
-        <thead className="bg-[#f7fbfd] text-left text-[#5b7382]">
+        <thead className="bg-[#fdf7fb] text-left text-[#5b7382]">
           <tr>
             {columns.map((column) => (
               <th key={column.key} className="px-3 py-2.5 font-semibold">
@@ -521,7 +521,7 @@ function RecordTable({
                 </td>
               ))}
               <td className="px-3 py-2.5">
-                <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-[#4f6877]">
+                <span className="rounded-full border border-[#e5d8ef] bg-[#fcf7fd] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-[#4f6877]">
                   {matchLabel(String(row.matchType || ""))}
                 </span>
               </td>

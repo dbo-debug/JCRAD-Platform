@@ -23,7 +23,7 @@ export default async function WorkspaceSourcesPage({
         action={
           <Link
             href="/workspace/sources/quick-add"
-            className="inline-flex rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95"
+            className="inline-flex rounded-full bg-[#8f52dc] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95"
           >
             Quick Add Source
           </Link>
@@ -57,7 +57,7 @@ export default async function WorkspaceSourcesPage({
 
 function MetricCard({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-[24px] border border-[#d7e6ed] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbfd_100%)] p-5 shadow-[0_12px_30px_rgba(16,42,67,0.06)]">
+    <div className="rounded-[24px] border border-[#e5d8ef] bg-[linear-gradient(180deg,#ffffff_0%,#fdf7fb_100%)] p-5 shadow-[0_12px_30px_rgba(16,42,67,0.06)]">
       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#617d8c]">{label}</p>
       <p className="mt-2 text-3xl font-semibold text-[#173543]">{value}</p>
     </div>

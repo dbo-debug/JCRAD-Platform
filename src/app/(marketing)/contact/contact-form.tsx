@@ -40,7 +40,7 @@ export default function ContactForm() {
   if (submitted) {
     return (
       <Card className="border border-[#cfe5e8] bg-[#eefaf9] p-6 text-[#153447]">
-        <h2 className="text-xl font-semibold text-[#0f766e]">Thanks, we received your request.</h2>
+        <h2 className="text-xl font-semibold text-[#6f32b5]">Thanks, we received your request.</h2>
         <p className="mt-2 text-sm text-[#3f6274]">Our team will follow up shortly to continue your {getIntentLabel(intent).toLowerCase()} request.</p>
         <button
           type="button"
@@ -54,7 +54,7 @@ export default function ContactForm() {
   }
 
   return (
-    <Card className="border border-[#dbe9ef] bg-white p-6 text-[#153447]">
+    <Card className="border border-[#eadff1] bg-white p-6 text-[#153447]">
       <form className="space-y-4" onSubmit={onSubmit}>
         <div>
           <label className="mb-1 block text-sm font-medium text-[#274555]">Inquiry Type</label>
@@ -73,17 +73,17 @@ export default function ContactForm() {
         <div className="grid gap-4 md:grid-cols-2">
           <div>
             <label className="mb-1 block text-sm font-medium text-[#274555]">Name</label>
-            <Input value={name} onChange={(event) => setName(event.target.value)} required className="border-[#d0dee6] bg-white text-[#173543] placeholder:text-[#7a92a0] focus-visible:ring-[#14b8a6] focus-visible:ring-offset-white" />
+            <Input value={name} onChange={(event) => setName(event.target.value)} required className="border-[#d0dee6] bg-white text-[#173543] placeholder:text-[#7a92a0] focus-visible:ring-[#8f52dc] focus-visible:ring-offset-white" />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-[#274555]">Company</label>
-            <Input value={company} onChange={(event) => setCompany(event.target.value)} required className="border-[#d0dee6] bg-white text-[#173543] placeholder:text-[#7a92a0] focus-visible:ring-[#14b8a6] focus-visible:ring-offset-white" />
+            <Input value={company} onChange={(event) => setCompany(event.target.value)} required className="border-[#d0dee6] bg-white text-[#173543] placeholder:text-[#7a92a0] focus-visible:ring-[#8f52dc] focus-visible:ring-offset-white" />
           </div>
         </div>
 
         <div>
           <label className="mb-1 block text-sm font-medium text-[#274555]">Email</label>
-          <Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required className="border-[#d0dee6] bg-white text-[#173543] placeholder:text-[#7a92a0] focus-visible:ring-[#14b8a6] focus-visible:ring-offset-white" />
+          <Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required className="border-[#d0dee6] bg-white text-[#173543] placeholder:text-[#7a92a0] focus-visible:ring-[#8f52dc] focus-visible:ring-offset-white" />
         </div>
 
         <div>
@@ -93,12 +93,12 @@ export default function ContactForm() {
             onChange={(event) => setMessage(event.target.value)}
             rows={5}
             required
-            className="w-full rounded-md border border-[#d0dee6] bg-white px-3 py-2.5 text-sm text-[#173543] placeholder:text-[#7a92a0] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#14b8a6]"
+            className="w-full rounded-md border border-[#d0dee6] bg-white px-3 py-2.5 text-sm text-[#173543] placeholder:text-[#7a92a0] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8f52dc]"
             placeholder="Tell us your category, timeline, and goals."
           />
         </div>
 
-        <Button type="submit" className="rounded-full bg-[#14b8a6] text-white hover:bg-[#14b8a6]">
+        <Button type="submit" className="rounded-full bg-[#8f52dc] text-white hover:bg-[#8f52dc]">
           Send Request
         </Button>
       </form>

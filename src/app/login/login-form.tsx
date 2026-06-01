@@ -50,7 +50,7 @@ export default function LoginForm({ returnTo }: LoginFormProps) {
   return (
     <div className="flex items-center justify-center">
       <div className="w-full max-w-lg rounded-3xl border border-[#cfe0e8] bg-white p-8 shadow-[0_26px_46px_-32px_rgba(16,24,40,0.45)] md:p-9">
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0f766e]">Customer Access</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#6f32b5]">Customer Access</p>
         <h1 className="mt-2 text-3xl font-semibold text-[#13303f]">Sign in to continue</h1>
         <p className="mt-2 text-sm text-[#4a6575]">Access your estimates, onboarding, and customer portal.</p>
 
@@ -74,7 +74,7 @@ export default function LoginForm({ returnTo }: LoginFormProps) {
             className="mt-4"
           />
           <div className="mt-2 text-right">
-            <Link href="/forgot-password" className="text-sm font-semibold text-[#0f766e] underline underline-offset-4">
+            <Link href="/forgot-password" className="text-sm font-semibold text-[#6f32b5] underline underline-offset-4">
               Forgot password?
             </Link>
           </div>
@@ -83,20 +83,20 @@ export default function LoginForm({ returnTo }: LoginFormProps) {
             type="submit"
             fullWidth
             disabled={submitting}
-            className="mt-6 rounded-full bg-[#14b8a6] text-white shadow-[0_0_0_1px_rgba(20,184,166,0.24)] hover:bg-[#14b8a6]"
+            className="mt-6 rounded-full bg-[#8f52dc] text-white shadow-[0_0_0_1px_rgba(20,184,166,0.24)] hover:bg-[#8f52dc]"
           >
             {submitting ? "Signing in..." : "Sign in"}
           </Button>
 
           <p className="mt-4 text-center text-sm text-[#4a6575]">
             Need an account?{" "}
-            <Link href={signupHref} className="font-semibold text-[#0f766e] underline underline-offset-4">
+            <Link href={signupHref} className="font-semibold text-[#6f32b5] underline underline-offset-4">
               Create account
             </Link>
           </p>
         </form>
 
-        {message ? <p className="mt-4 text-sm text-[#0f766e]">{message}</p> : null}
+        {message ? <p className="mt-4 text-sm text-[#6f32b5]">{message}</p> : null}
 
         <div className="mt-6 rounded-2xl border border-[#d9e7ee] bg-[#f5fbfd] p-4 text-sm text-[#446172]">
           <p>
@@ -104,7 +104,7 @@ export default function LoginForm({ returnTo }: LoginFormProps) {
             estimate.
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-4 text-sm font-semibold">
-            <Link href="/menu" className="text-[#0f766e] underline underline-offset-4">
+            <Link href="/menu" className="text-[#6f32b5] underline underline-offset-4">
               View Menu
             </Link>
             <Link href="/contact" className="text-[#2c4c5b] underline underline-offset-4">

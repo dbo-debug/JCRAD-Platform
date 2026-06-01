@@ -176,7 +176,7 @@ export default async function WorkspaceTasksPage({
         />
       </section>
 
-      <section className="rounded-[24px] border border-[#dbe8ef] bg-white p-5 shadow-sm">
+      <section className="rounded-[24px] border border-[#e9def1] bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-[760px]">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">{queueSummary.eyebrow}</p>
@@ -185,12 +185,12 @@ export default async function WorkspaceTasksPage({
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-full border border-[#f1ddad] bg-[#fff9eb] px-3 py-1.5 text-sm text-[#8a5b00]">{overdueTasks.length} overdue</span>
-            <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4f6877]">{openTasks.length} open</span>
-            <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4f6877]">{completedTasks.length} completed</span>
+            <span className="rounded-full border border-[#e5d8ef] bg-[#fcf7fd] px-3 py-1.5 text-sm text-[#4f6877]">{openTasks.length} open</span>
+            <span className="rounded-full border border-[#e5d8ef] bg-[#fcf7fd] px-3 py-1.5 text-sm text-[#4f6877]">{completedTasks.length} completed</span>
             {staff.role === "admin" ? (
-              <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4f6877]">{affectedCustomerCount} customers affected</span>
+              <span className="rounded-full border border-[#e5d8ef] bg-[#fcf7fd] px-3 py-1.5 text-sm text-[#4f6877]">{affectedCustomerCount} customers affected</span>
             ) : (
-              <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4f6877]">Assigned to me only</span>
+              <span className="rounded-full border border-[#e5d8ef] bg-[#fcf7fd] px-3 py-1.5 text-sm text-[#4f6877]">Assigned to me only</span>
             )}
           </div>
         </div>
@@ -216,8 +216,8 @@ export default async function WorkspaceTasksPage({
                 tone === "overdue"
                   ? "border-[#f1d6d3] bg-[#fff7f6]"
                   : tone === "completed"
-                    ? "border-[#dce7ed] bg-[#f9fcfd]"
-                    : "border-[#dbe8ef] bg-white",
+                    ? "border-[#dce7ed] bg-[#fdf8fd]"
+                    : "border-[#e9def1] bg-white",
               ].join(" ")}
             >
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -230,15 +230,15 @@ export default async function WorkspaceTasksPage({
                           ? "border-[#f1d6d3] bg-[#fff1ef] text-[#a0443f]"
                           : tone === "completed"
                             ? "border-[#d8e4ea] bg-white text-[#5d7583]"
-                            : "border-[#d7e6ed] bg-[#f8fbfc] text-[#496574]",
+                            : "border-[#e5d8ef] bg-[#fcf7fd] text-[#496574]",
                       ].join(" ")}
                     >
                       {tone === "overdue" ? "Needs attention now" : tone === "completed" ? "Completed" : "Active follow-up"}
                     </span>
-                    <span className="rounded-full border border-[#d7e6ed] bg-white px-2.5 py-1 text-[11px] font-semibold text-[#496574]">
+                    <span className="rounded-full border border-[#e5d8ef] bg-white px-2.5 py-1 text-[11px] font-semibold text-[#496574]">
                       {titleCase(task.status, "Open")}
                     </span>
-                    <span className="rounded-full border border-[#d7e6ed] bg-white px-2.5 py-1 text-[11px] font-semibold text-[#496574]">
+                    <span className="rounded-full border border-[#e5d8ef] bg-white px-2.5 py-1 text-[11px] font-semibold text-[#496574]">
                       {getPriorityLabel(task.priority)}
                     </span>
                   </div>
@@ -287,7 +287,7 @@ export default async function WorkspaceTasksPage({
                         "rounded-full px-3 py-1.5 text-sm font-semibold transition",
                         tone === "overdue"
                           ? "bg-[#173543] text-white hover:bg-[#0f2a35]"
-                          : "border border-[#d0dde5] bg-white text-[#42606f] hover:border-[#14b8a6] hover:text-[#0f766e]",
+                          : "border border-[#decfe8] bg-white text-[#42606f] hover:border-[#8f52dc] hover:text-[#6f32b5]",
                       ].join(" ")}
                     >
                       {primaryCta.label}
@@ -296,7 +296,7 @@ export default async function WorkspaceTasksPage({
                   {task.customer ? (
                     <Link
                       href={`/workspace/customers/${task.customer.id}#customer-tasks`}
-                      className="rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm text-[#42606f] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
+                      className="rounded-full border border-[#decfe8] bg-white px-3 py-1.5 text-sm text-[#42606f] transition hover:border-[#8f52dc] hover:text-[#6f32b5]"
                     >
                       Open task context
                     </Link>
@@ -308,7 +308,7 @@ export default async function WorkspaceTasksPage({
         })}
 
         {visibleTasks.length === 0 ? (
-          <div className="rounded-[24px] border border-dashed border-[#cfdde6] bg-[#fbfdfe] px-4 py-12 text-center">
+          <div className="rounded-[24px] border border-dashed border-[#ddcfe9] bg-[#fffafd] px-4 py-12 text-center">
             <p className="text-lg font-semibold text-[#173543]">No follow-up tasks in this queue.</p>
             <p className="mt-2 text-sm text-[#5c7483]">
               {view === "overdue"
@@ -345,12 +345,12 @@ function QueueCard({
     <Link
       href={href}
       className={[
-        "rounded-xl border p-4 shadow-sm transition hover:border-[#14b8a6]",
+        "rounded-xl border p-4 shadow-sm transition hover:border-[#8f52dc]",
         active
-          ? "border-[#14b8a6] bg-[#effcf9]"
+          ? "border-[#8f52dc] bg-[#fcf5ff]"
           : tone === "warn"
             ? "border-[#f1ddad] bg-[#fff9eb]"
-            : "border-[#dbe9ef] bg-white",
+            : "border-[#eadff1] bg-white",
       ].join(" ")}
     >
       <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#5d7685]">{label}</p>
@@ -380,10 +380,10 @@ function TaskViewChip({
       className={[
         "rounded-full border px-3 py-1.5 text-sm font-semibold transition",
         active
-          ? "border-[#14b8a6] bg-[#effcf9] text-[#0f766e]"
+          ? "border-[#8f52dc] bg-[#fcf5ff] text-[#6f32b5]"
           : tone === "warn"
-            ? "border-[#f1ddad] bg-[#fff9eb] text-[#8a5b00] hover:border-[#14b8a6]"
-            : "border-[#d7e6ed] bg-[#f8fbfc] text-[#4f6877] hover:border-[#14b8a6]",
+            ? "border-[#f1ddad] bg-[#fff9eb] text-[#8a5b00] hover:border-[#8f52dc]"
+            : "border-[#e5d8ef] bg-[#fcf7fd] text-[#4f6877] hover:border-[#8f52dc]",
       ].join(" ")}
     >
       {label} ({count})
@@ -401,7 +401,7 @@ function InfoBlock({
   detail: string;
 }) {
   return (
-    <div className="rounded-[18px] border border-[#e3edf2] bg-[#f8fbfc] px-3 py-3">
+    <div className="rounded-[18px] border border-[#e3edf2] bg-[#fcf7fd] px-3 py-3">
       <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#7a909d]">{label}</p>
       <p className="mt-1 text-sm font-semibold text-[#294653]">{value}</p>
       <p className="mt-1 text-xs text-[#7a909d]">{detail}</p>

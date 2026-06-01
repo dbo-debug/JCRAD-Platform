@@ -53,7 +53,7 @@ export default function MenuLayout({
   return (
     <div className="min-h-screen bg-white text-[#111827]">
       <div className="mx-auto w-full max-w-screen-2xl px-4 pb-8 pt-4 md:px-6">
-        <header className="mb-2.5 rounded-2xl border border-[#e4eaee] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbfc_100%)] p-3 shadow-[0_14px_34px_-26px_rgba(16,24,40,0.28)]">
+        <header className="mb-2.5 rounded-2xl border border-[#e4eaee] bg-[linear-gradient(180deg,#ffffff_0%,#fcf7fd_100%)] p-3 shadow-[0_14px_34px_-26px_rgba(16,24,40,0.28)]">
           <div className="flex flex-wrap items-center gap-3">
             <div className="min-w-48 flex-1">{branding}</div>
             <label className="min-w-56 flex-[1.2]">
@@ -61,7 +61,7 @@ export default function MenuLayout({
                 value={searchValue}
                 onChange={handleSearch}
                 placeholder="Search flower, concentrate, vape..."
-                className="w-full rounded-full border border-[#d7e1e8] bg-[#fbfdfe] px-4 py-2 text-sm text-[#1f2937] placeholder:text-[#8ba1af] focus:border-[#14b8a6] focus:outline-none"
+                className="w-full rounded-full border border-[#d7e1e8] bg-[#fffafd] px-4 py-2 text-sm text-[#1f2937] placeholder:text-[#8ba1af] focus:border-[#8f52dc] focus:outline-none"
               />
             </label>
             <div className="inline-flex rounded-full border border-[#d3dde4] bg-[#f7fafb] p-1 text-xs">
@@ -70,7 +70,7 @@ export default function MenuLayout({
                 onClick={() => onModeChange("bulk")}
                 className={[
                   "rounded-full px-3 py-1.5 font-semibold transition",
-                  mode === "bulk" ? "bg-[#14b8a6] text-white" : "text-[#4e6473] hover:text-[#21313c]",
+                  mode === "bulk" ? "bg-[#8f52dc] text-white" : "text-[#4e6473] hover:text-[#21313c]",
                 ].join(" ")}
               >
                 Bulk
@@ -92,14 +92,14 @@ export default function MenuLayout({
               <button
                 type="button"
                 onClick={onOpenCart}
-                className="rounded-full border border-[#d3dde4] bg-[#f7fafb] px-3 py-2 text-sm font-semibold text-[#1f2937] transition hover:border-[#14b8a6]"
+                className="rounded-full border border-[#d3dde4] bg-[#f7fafb] px-3 py-2 text-sm font-semibold text-[#1f2937] transition hover:border-[#8f52dc]"
               >
                 Estimate Cart ({cartCount})
               </button>
             </div>
           </div>
           {valueStrip ? (
-            <div className="mt-3 rounded-full border border-[#d4e3e3] bg-[#eef7f6] px-4 py-1.5 text-center text-xs font-medium tracking-[0.08em] text-[#0f766e]">
+            <div className="mt-3 rounded-full border border-[#d4e3e3] bg-[#eef7f6] px-4 py-1.5 text-center text-xs font-medium tracking-[0.08em] text-[#6f32b5]">
               {valueStrip}
             </div>
           ) : null}

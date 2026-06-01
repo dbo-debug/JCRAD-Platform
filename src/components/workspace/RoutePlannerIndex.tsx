@@ -117,7 +117,7 @@ export default function RoutePlannerIndex({ customers, routeRepOptions, territor
 
   return (
     <div className="space-y-5">
-      <section className="rounded-[28px] border border-[#d8e6ee] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbfd_100%)] p-5 shadow-[0_24px_60px_rgba(16,42,67,0.08)] lg:px-6">
+      <section className="rounded-[28px] border border-[#d8e6ee] bg-[linear-gradient(180deg,#ffffff_0%,#fdf7fb_100%)] p-5 shadow-[0_24px_60px_rgba(16,42,67,0.08)] lg:px-6">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div className="max-w-[780px]">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6c8797]">Route Planning</p>
@@ -126,7 +126,7 @@ export default function RoutePlannerIndex({ customers, routeRepOptions, territor
               Filter by territory, assigned rep, visit state, and priority. This planner stays focused on route-available, geocoded stops so route generation starts from the eligible set.
             </p>
           </div>
-          <div className="grid w-full gap-3 rounded-2xl border border-[#dbe8ef] bg-white/85 p-4 shadow-sm sm:max-w-[320px] xl:w-[320px] xl:flex-none">
+          <div className="grid w-full gap-3 rounded-2xl border border-[#e9def1] bg-white/85 p-4 shadow-sm sm:max-w-[320px] xl:w-[320px] xl:flex-none">
             <MetricLine label="Eligible Stops" value={String(visibleCustomers.length)} />
             <MetricLine label="Due Today" value={String(stats.dueToday)} />
             <MetricLine label="Visited Today" value={String(stats.visitedToday)} />
@@ -136,7 +136,7 @@ export default function RoutePlannerIndex({ customers, routeRepOptions, territor
         </div>
       </section>
 
-      <section className="rounded-[28px] border border-[#dbe8ef] bg-white p-5 shadow-[0_12px_32px_rgba(16,42,67,0.06)] lg:px-6">
+      <section className="rounded-[28px] border border-[#e9def1] bg-white p-5 shadow-[0_12px_32px_rgba(16,42,67,0.06)] lg:px-6">
         <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-[minmax(0,1.4fr)_repeat(4,minmax(0,0.9fr))]">
           <label className="grid gap-1 text-sm text-[#4b6676]">
             <span className="font-medium">Search stops</span>
@@ -144,7 +144,7 @@ export default function RoutePlannerIndex({ customers, routeRepOptions, territor
               value={search}
               onChange={(event) => startTransition(() => setSearch(event.target.value))}
               placeholder="Search account, contact, territory, rep"
-              className="rounded-2xl border border-[#cedde6] bg-[#fbfdfe] px-4 py-3 text-sm text-[#173543] outline-none transition focus:border-[#14b8a6] focus:bg-white"
+              className="rounded-2xl border border-[#cedde6] bg-[#fffafd] px-4 py-3 text-sm text-[#173543] outline-none transition focus:border-[#8f52dc] focus:bg-white"
             />
           </label>
 
@@ -175,7 +175,7 @@ export default function RoutePlannerIndex({ customers, routeRepOptions, territor
               { value: "follow_up_needed", label: "Follow-Up Needed" },
             ]}
           />
-          <div className="inline-flex rounded-full border border-[#d0dde5] bg-white p-1">
+          <div className="inline-flex rounded-full border border-[#decfe8] bg-white p-1">
             <button
               type="button"
               onClick={() => startTransition(() => setViewMode("list"))}
@@ -193,7 +193,7 @@ export default function RoutePlannerIndex({ customers, routeRepOptions, territor
           </div>
           <Link
             href="/workspace/routes/run"
-            className="inline-flex rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95"
+            className="inline-flex rounded-full bg-[#8f52dc] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95"
           >
             Open Route Runner
           </Link>
@@ -210,7 +210,7 @@ export default function RoutePlannerIndex({ customers, routeRepOptions, territor
                 setTerritoryFocus("all");
               });
             }}
-            className="rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543]"
+            className="rounded-full border border-[#decfe8] bg-white px-3 py-1.5 text-sm text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543]"
           >
             Reset filters
           </button>
@@ -230,14 +230,14 @@ export default function RoutePlannerIndex({ customers, routeRepOptions, territor
 
       <section className={viewMode === "map" ? "hidden" : "space-y-5"}>
         {territorySections.length > 0 ? (
-          <nav className="rounded-[24px] border border-[#dbe8ef] bg-white p-4 shadow-[0_12px_32px_rgba(16,42,67,0.05)]">
+          <nav className="rounded-[24px] border border-[#e9def1] bg-white p-4 shadow-[0_12px_32px_rgba(16,42,67,0.05)]">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Territory Jump</p>
             <div className="mt-3 flex flex-wrap gap-2">
               {territorySections.map((territory) => (
                 <a
                   key={territory.territoryKey}
                   href={`#planner-territory-${territory.territoryKey}`}
-                  className="rounded-full border border-[#d5e1e8] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4a6575] transition hover:bg-white hover:text-[#173543]"
+                  className="rounded-full border border-[#d5e1e8] bg-[#fcf7fd] px-3 py-1.5 text-sm text-[#4a6575] transition hover:bg-white hover:text-[#173543]"
                 >
                     {territory.label} ({territory.accountCount})
                   </a>
@@ -251,7 +251,7 @@ export default function RoutePlannerIndex({ customers, routeRepOptions, territor
             key={territory.territoryKey}
             id={`planner-territory-${territory.territoryKey}`}
             open={index < 3}
-            className="rounded-[28px] border border-[#dbe8ef] bg-white p-5 shadow-[0_12px_32px_rgba(16,42,67,0.06)]"
+            className="rounded-[28px] border border-[#e9def1] bg-white p-5 shadow-[0_12px_32px_rgba(16,42,67,0.06)]"
           >
             <summary className="cursor-pointer list-none">
               <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
@@ -290,7 +290,7 @@ export default function RoutePlannerIndex({ customers, routeRepOptions, territor
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
-                          <Link href={`/workspace/customers/${customer.id}`} className="text-lg font-semibold text-[#173543] transition hover:text-[#0f766e]">
+                          <Link href={`/workspace/customers/${customer.id}`} className="text-lg font-semibold text-[#173543] transition hover:text-[#6f32b5]">
                             {customer.name}
                           </Link>
                           <span className={["rounded-full border px-2.5 py-1 text-xs font-semibold", visitStatusChipClass(customer.visitStatus)].join(" ")}>
@@ -307,7 +307,7 @@ export default function RoutePlannerIndex({ customers, routeRepOptions, territor
 
                       <Link
                         href={`/workspace/routes/run?customerId=${customer.id}`}
-                        className="inline-flex rounded-full border border-[#b9d5df] bg-white px-3 py-1.5 text-sm font-semibold text-[#21414d] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
+                        className="inline-flex rounded-full border border-[#ddc6ea] bg-white px-3 py-1.5 text-sm font-semibold text-[#21414d] transition hover:border-[#8f52dc] hover:text-[#6f32b5]"
                       >
                         Run Stop
                       </Link>
@@ -331,16 +331,16 @@ export default function RoutePlannerIndex({ customers, routeRepOptions, territor
                     </div>
 
                     <div className="mt-4 flex flex-wrap gap-2 text-sm">
-                      <Link href={`/workspace/customers/${customer.id}`} className="rounded-full border border-[#d5e1e8] bg-[#f8fbfc] px-3 py-1.5 text-[#4a6575] transition hover:bg-white">
+                      <Link href={`/workspace/customers/${customer.id}`} className="rounded-full border border-[#d5e1e8] bg-[#fcf7fd] px-3 py-1.5 text-[#4a6575] transition hover:bg-white">
                         Open account
                       </Link>
                       {phoneHref ? (
-                        <a href={phoneHref} className="rounded-full border border-[#d5e1e8] bg-[#f8fbfc] px-3 py-1.5 text-[#4a6575] transition hover:bg-white">
+                        <a href={phoneHref} className="rounded-full border border-[#d5e1e8] bg-[#fcf7fd] px-3 py-1.5 text-[#4a6575] transition hover:bg-white">
                           Call contact
                         </a>
                       ) : null}
                       {emailHref ? (
-                        <a href={emailHref} className="rounded-full border border-[#d5e1e8] bg-[#f8fbfc] px-3 py-1.5 text-[#4a6575] transition hover:bg-white">
+                        <a href={emailHref} className="rounded-full border border-[#d5e1e8] bg-[#fcf7fd] px-3 py-1.5 text-[#4a6575] transition hover:bg-white">
                           Email contact
                         </a>
                       ) : null}
@@ -353,7 +353,7 @@ export default function RoutePlannerIndex({ customers, routeRepOptions, territor
         ))}
 
         {visibleCustomers.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-[#d3e1e8] bg-[#f9fcfd] px-4 py-6 text-sm text-[#5d7685]">
+          <div className="rounded-xl border border-dashed border-[#d3e1e8] bg-[#fdf8fd] px-4 py-6 text-sm text-[#5d7685]">
             No route-available stops match the current filters.
           </div>
         ) : null}
@@ -379,7 +379,7 @@ function MetricLine({ label, value }: { label: string; value: string }) {
 
 function MiniMetric({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-2xl border border-[#dbe8ef] bg-[#f8fbfc] px-3 py-2 text-sm">
+    <div className="rounded-2xl border border-[#e9def1] bg-[#fcf7fd] px-3 py-2 text-sm">
       <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7d95a3]">{label}</p>
       <p className="mt-1 text-lg font-semibold text-[#173543]">{value}</p>
     </div>
@@ -396,10 +396,10 @@ function TerritoryOwnerPill({ ownerState, ownerLabel }: { ownerState: "owned" | 
 function InlinePill({ label, tone }: { label: string; tone: "neutral" | "warn" | "ok" }) {
   const toneClass =
     tone === "ok"
-      ? "border-[#bde8e4] bg-[#e9fbf9] text-[#0f766e]"
+      ? "border-[#e8d7f7] bg-[#fcf3ff] text-[#6f32b5]"
       : tone === "warn"
         ? "border-[#f1ddad] bg-[#fff9eb] text-[#9a6b00]"
-        : "border-[#d7e6ed] bg-[#f8fbfc] text-[#4f6877]";
+        : "border-[#e5d8ef] bg-[#fcf7fd] text-[#4f6877]";
 
   return (
     <span
@@ -428,7 +428,7 @@ function FilterSelect({
       <select
         value={value}
         onChange={(event) => startTransition(() => onChange(event.target.value))}
-        className="rounded-2xl border border-[#cedde6] bg-[#fbfdfe] px-4 py-3 text-sm text-[#173543] outline-none transition focus:border-[#14b8a6] focus:bg-white"
+        className="rounded-2xl border border-[#cedde6] bg-[#fffafd] px-4 py-3 text-sm text-[#173543] outline-none transition focus:border-[#8f52dc] focus:bg-white"
       >
         <option value="all">All</option>
         {options.map((option) => (
@@ -443,7 +443,7 @@ function FilterSelect({
 
 function InfoBlock({ label, title, lines }: { label: string; title: string; lines: Array<string | null> }) {
   return (
-    <div className="rounded-2xl border border-[#e1ebf1] bg-[#fbfdfe] p-3">
+    <div className="rounded-2xl border border-[#e1ebf1] bg-[#fffafd] p-3">
       <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7d95a3]">{label}</p>
       <p className="mt-1 font-semibold text-[#173543]">{title}</p>
       <div className="mt-2 space-y-1 text-sm text-[#5a7483]">

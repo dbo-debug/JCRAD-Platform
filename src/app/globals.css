@@ -1,15 +1,15 @@
 @import "tailwindcss";
 
 /* =========================================================
-   JC RAD - Global Theme Tokens (shadcn-compatible)
+   Motley Terpz - Global Theme Tokens (shadcn-compatible)
    This fixes errors like: "Cannot apply unknown utility class `border-border`"
    ========================================================= */
 
 :root {
-  --surface-bg: #f7fbfd;
+  --surface-bg: #fdf7fb;
   --surface-card: #ffffff;
-  --surface-border: #dbe9ef;
-  --accent: #14b8a6;
+  --surface-border: #eadff1;
+  --accent: #8f52dc;
   --text: #173543;
 
   --background: 0 0% 100%;
@@ -30,7 +30,7 @@
   --muted: 210 40% 96.1%;
   --muted-foreground: 215.4 16.3% 46.9%;
 
-  --accent: 173 79% 40%;
+  --accent: 270 66% 59%;
   --accent-foreground: 0 0% 100%;
 
   --destructive: 0 84.2% 60.2%;
@@ -85,7 +85,7 @@ body {
 body {
   @apply text-foreground;
   background:
-    radial-gradient(circle at top, #f1fbff 0%, #f7fbfd 36%, #ffffff 82%),
+    radial-gradient(circle at top, #f8eefc 0%, #fdf7fb 34%, #fffdf6 82%),
     var(--surface-bg);
   color: var(--text);
 }

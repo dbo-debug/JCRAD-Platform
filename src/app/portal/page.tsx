@@ -14,7 +14,7 @@ export default async function PortalPage() {
 
   const isApproved = verificationStatus === "approved";
   const badgeClass = isApproved
-    ? "border-[#14b8a6]/35 bg-[#14b8a6]/10 text-[#0f766e]"
+    ? "border-[#8f52dc]/35 bg-[#8f52dc]/10 text-[#6f32b5]"
     : "border-amber-300/45 bg-amber-100 text-amber-700";
 
   return (
@@ -44,7 +44,7 @@ export default async function PortalPage() {
             </p>
             <div className="mt-4">
               <Link href="/portal/onboarding" className="inline-flex">
-                <Button className="rounded-full bg-[#14b8a6] text-white hover:bg-[#14b8a6]">Start onboarding</Button>
+                <Button className="rounded-full bg-[#8f52dc] text-white hover:bg-[#8f52dc]">Start onboarding</Button>
               </Link>
             </div>
           </Card>

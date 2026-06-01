@@ -93,10 +93,10 @@ function relativeDate(value: string | null) {
 }
 
 function statusTone(status: string) {
-  if (status === "sent") return "border-[#bde8e4] bg-[#e9fbf9] text-[#0f766e]";
+  if (status === "sent") return "border-[#e8d7f7] bg-[#fcf3ff] text-[#6f32b5]";
   if (status === "failed") return "border-[#f1d1d1] bg-[#fff5f5] text-[#991b1b]";
   if (status === "bounced") return "border-[#f1ddad] bg-[#fff9eb] text-[#9a6b00]";
-  if (status === "archived") return "border-[#d7e6ed] bg-[#f8fbfc] text-[#4f6877]";
+  if (status === "archived") return "border-[#e5d8ef] bg-[#fcf7fd] text-[#4f6877]";
   return "border-[#f1ddad] bg-[#fff9eb] text-[#9a6b00]";
 }
 
@@ -407,7 +407,7 @@ export default function EmailsWorkspace(props: EmailsWorkspaceProps) {
   return (
     <div className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
       <aside className="space-y-4">
-        <div className="rounded-[24px] border border-[#dbe8ef] bg-white p-4 shadow-sm">
+        <div className="rounded-[24px] border border-[#e9def1] bg-white p-4 shadow-sm">
           <button
             type="button"
             onClick={() => void createCampaign()}
@@ -425,8 +425,8 @@ export default function EmailsWorkspace(props: EmailsWorkspaceProps) {
                 className={[
                   "w-full rounded-2xl border px-3 py-3 text-left transition",
                   selectedCampaignId === campaign.id
-                    ? "border-[#14b8a6] bg-[#effcf8]"
-                    : "border-[#dbe8ef] bg-[#f9fcfd] hover:border-[#c5d9e3] hover:bg-white",
+                    ? "border-[#8f52dc] bg-[#effcf8]"
+                    : "border-[#e9def1] bg-[#fdf8fd] hover:border-[#c5d9e3] hover:bg-white",
                 ].join(" ")}
               >
                 <div className="flex items-center justify-between gap-2">
@@ -439,11 +439,11 @@ export default function EmailsWorkspace(props: EmailsWorkspaceProps) {
                 <p className="mt-2 text-xs text-[#6d8593]">{summarizeCampaign(campaign)}</p>
               </button>
             ))}
-            {props.campaigns.length === 0 ? <div className="rounded-2xl border border-dashed border-[#dbe8ef] bg-[#f9fcfd] px-3 py-4 text-sm text-[#5c7483]">No campaigns yet.</div> : null}
+            {props.campaigns.length === 0 ? <div className="rounded-2xl border border-dashed border-[#e9def1] bg-[#fdf8fd] px-3 py-4 text-sm text-[#5c7483]">No campaigns yet.</div> : null}
           </div>
         </div>
 
-        <div className="rounded-[24px] border border-[#dbe8ef] bg-white p-4 shadow-sm">
+        <div className="rounded-[24px] border border-[#e9def1] bg-white p-4 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#7891a0]">Mailbox</p>
           <p className="mt-2 text-sm text-[#173543]">
             {gmailStatus.loading
@@ -454,7 +454,7 @@ export default function EmailsWorkspace(props: EmailsWorkspaceProps) {
           </p>
           <a
             href={`/api/workspace/email/oauth/start?returnTo=${encodeURIComponent(pathname + (selectedCampaignId ? `?campaign=${selectedCampaignId}` : ""))}`}
-            className="mt-3 inline-flex rounded-full border border-[#cfdde6] bg-white px-3 py-1.5 text-sm font-semibold text-[#21424d] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
+            className="mt-3 inline-flex rounded-full border border-[#ddcfe9] bg-white px-3 py-1.5 text-sm font-semibold text-[#21424d] transition hover:border-[#8f52dc] hover:text-[#6f32b5]"
           >
             {gmailStatus.connected ? "Reconnect Google" : "Connect Google"}
           </a>
@@ -463,9 +463,9 @@ export default function EmailsWorkspace(props: EmailsWorkspaceProps) {
 
       <div className="space-y-6">
         {error ? <p className="rounded-xl border border-[#f1d1d1] bg-[#fff5f5] px-3 py-2 text-sm text-[#991b1b]">{error}</p> : null}
-        {message ? <p className="rounded-xl border border-[#bfe8df] bg-[#effcf8] px-3 py-2 text-sm text-[#0f766e]">{message}</p> : null}
+        {message ? <p className="rounded-xl border border-[#bfe8df] bg-[#effcf8] px-3 py-2 text-sm text-[#6f32b5]">{message}</p> : null}
 
-        <section className="rounded-[24px] border border-[#dbe8ef] bg-white p-5 shadow-sm">
+        <section className="rounded-[24px] border border-[#e9def1] bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#7891a0]">Emails</p>
@@ -473,23 +473,23 @@ export default function EmailsWorkspace(props: EmailsWorkspaceProps) {
               <p className="mt-1 text-sm text-[#5c7483]">Build image-led rep introduction and area outreach emails without turning the CRM into a newsletter system.</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={() => void saveCampaign()} disabled={!selectedCampaignId || busy !== null} className="rounded-full border border-[#cfdde6] bg-white px-4 py-2 text-sm font-semibold text-[#21424d] disabled:opacity-60">
+              <button type="button" onClick={() => void saveCampaign()} disabled={!selectedCampaignId || busy !== null} className="rounded-full border border-[#ddcfe9] bg-white px-4 py-2 text-sm font-semibold text-[#21424d] disabled:opacity-60">
                 {busy === "save" ? "Saving..." : "Save Draft"}
               </button>
-              <button type="button" onClick={() => void sendTest()} disabled={!selectedCampaignId || busy !== null || !gmailStatus.connected} className="rounded-full border border-[#cfdde6] bg-white px-4 py-2 text-sm font-semibold text-[#21424d] disabled:opacity-60">
+              <button type="button" onClick={() => void sendTest()} disabled={!selectedCampaignId || busy !== null || !gmailStatus.connected} className="rounded-full border border-[#ddcfe9] bg-white px-4 py-2 text-sm font-semibold text-[#21424d] disabled:opacity-60">
                 {busy === "test" ? "Sending..." : "Send Test"}
               </button>
-              <button type="button" onClick={() => void refreshMailboxOutcomes()} disabled={busy !== null || !gmailStatus.connected} className="rounded-full border border-[#cfdde6] bg-white px-4 py-2 text-sm font-semibold text-[#21424d] disabled:opacity-60">
+              <button type="button" onClick={() => void refreshMailboxOutcomes()} disabled={busy !== null || !gmailStatus.connected} className="rounded-full border border-[#ddcfe9] bg-white px-4 py-2 text-sm font-semibold text-[#21424d] disabled:opacity-60">
                 {busy === "sync" ? "Refreshing..." : "Refresh Outcomes"}
               </button>
-              <button type="button" onClick={() => void sendBatch()} disabled={!selectedCampaignId || busy !== null || !gmailStatus.connected || selectedRecipientOptions.length === 0} className="rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+              <button type="button" onClick={() => void sendBatch()} disabled={!selectedCampaignId || busy !== null || !gmailStatus.connected || selectedRecipientOptions.length === 0} className="rounded-full bg-[#8f52dc] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
                 {busy === "send" ? "Sending..." : `Send Batch (${selectedRecipientOptions.length})`}
               </button>
             </div>
           </div>
 
           {!selectedCampaignId ? (
-            <div className="mt-4 rounded-2xl border border-dashed border-[#dbe8ef] bg-[#f9fcfd] px-4 py-6 text-sm text-[#5c7483]">
+            <div className="mt-4 rounded-2xl border border-dashed border-[#e9def1] bg-[#fdf8fd] px-4 py-6 text-sm text-[#5c7483]">
               Create a campaign to start composing flyer-based outreach.
             </div>
           ) : (
@@ -522,14 +522,14 @@ export default function EmailsWorkspace(props: EmailsWorkspaceProps) {
                   </Field>
                 </div>
 
-                <div className="rounded-2xl border border-[#dbe8ef] bg-[#f9fcfd] p-4">
+                <div className="rounded-2xl border border-[#e9def1] bg-[#fdf8fd] p-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <p className="font-semibold text-[#173543]">Flyer Image</p>
                       <p className="mt-1 text-sm text-[#5c7483]">V1 uses one uploaded image and renders CTA buttons below it for better email client compatibility.</p>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <button type="button" onClick={() => fileInputRef.current?.click()} disabled={busy !== null} className="rounded-full border border-[#cfdde6] bg-white px-4 py-2 text-sm font-semibold text-[#21424d] disabled:opacity-60">
+                      <button type="button" onClick={() => fileInputRef.current?.click()} disabled={busy !== null} className="rounded-full border border-[#ddcfe9] bg-white px-4 py-2 text-sm font-semibold text-[#21424d] disabled:opacity-60">
                         {busy === "upload" ? "Uploading..." : "Upload Flyer"}
                       </button>
                     </div>
@@ -547,8 +547,8 @@ export default function EmailsWorkspace(props: EmailsWorkspaceProps) {
                   />
                   {form.imageUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={form.imageUrl} alt={form.imageAltText || form.subject} className="mt-4 w-full rounded-2xl border border-[#dbe8ef] bg-white object-cover" />
-                  ) : <div className="mt-4 rounded-2xl border border-dashed border-[#dbe8ef] bg-white px-4 py-8 text-sm text-[#5c7483]">No flyer uploaded yet.</div>}
+                    <img src={form.imageUrl} alt={form.imageAltText || form.subject} className="mt-4 w-full rounded-2xl border border-[#e9def1] bg-white object-cover" />
+                  ) : <div className="mt-4 rounded-2xl border border-dashed border-[#e9def1] bg-white px-4 py-8 text-sm text-[#5c7483]">No flyer uploaded yet.</div>}
                 </div>
 
                 <div className="grid gap-3 md:grid-cols-2">
@@ -566,13 +566,13 @@ export default function EmailsWorkspace(props: EmailsWorkspaceProps) {
                   </Field>
                 </div>
 
-                <div className="rounded-2xl border border-[#dbe8ef] bg-[#f9fcfd] p-4">
+                <div className="rounded-2xl border border-[#e9def1] bg-[#fdf8fd] p-4">
                   <label className="flex items-start gap-3">
                     <input
                       type="checkbox"
                       checked={form.includeVapeComplianceFooter}
                       onChange={(event) => setForm((current) => ({ ...current, includeVapeComplianceFooter: event.target.checked }))}
-                      className="mt-1 h-4 w-4 rounded border-[#cfdde6] text-[#14b8a6]"
+                      className="mt-1 h-4 w-4 rounded border-[#ddcfe9] text-[#8f52dc]"
                     />
                     <span>
                       <span className="block font-semibold text-[#173543]">Append vape compliance footer</span>
@@ -583,7 +583,7 @@ export default function EmailsWorkspace(props: EmailsWorkspaceProps) {
                   </label>
                 </div>
 
-                <div className="rounded-2xl border border-[#dbe8ef] bg-[#f9fcfd] p-4">
+                <div className="rounded-2xl border border-[#e9def1] bg-[#fdf8fd] p-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <p className="font-semibold text-[#173543]">Recipient Preview</p>
@@ -595,8 +595,8 @@ export default function EmailsWorkspace(props: EmailsWorkspaceProps) {
                     {filteredRecipients.slice(0, 120).map((recipient) => {
                       const checked = selectedRecipientEmails.includes(recipient.email);
                       return (
-                        <label key={recipient.key} className="flex items-start gap-3 rounded-2xl border border-[#dbe8ef] bg-white px-3 py-3">
-                          <input type="checkbox" checked={checked} onChange={() => toggleRecipient(recipient.email)} className="mt-1 h-4 w-4 rounded border-[#cfdde6] text-[#14b8a6]" />
+                        <label key={recipient.key} className="flex items-start gap-3 rounded-2xl border border-[#e9def1] bg-white px-3 py-3">
+                          <input type="checkbox" checked={checked} onChange={() => toggleRecipient(recipient.email)} className="mt-1 h-4 w-4 rounded border-[#ddcfe9] text-[#8f52dc]" />
                           <span className="min-w-0">
                             <span className="block truncate font-semibold text-[#173543]">{recipient.companyName}</span>
                             <span className="mt-1 block truncate text-sm text-[#4f6877]">{recipient.contactName || "No contact name"} • {recipient.email}</span>
@@ -610,23 +610,23 @@ export default function EmailsWorkspace(props: EmailsWorkspaceProps) {
               </div>
 
               <div className="space-y-6">
-                <div className="rounded-[24px] border border-[#dbe8ef] bg-white p-5 shadow-sm">
+                <div className="rounded-[24px] border border-[#e9def1] bg-white p-5 shadow-sm">
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#7891a0]">Preview</p>
-                  <div className="mt-3 rounded-[24px] border border-[#dbe8ef] bg-[#eef4f7] p-4">
+                  <div className="mt-3 rounded-[24px] border border-[#e9def1] bg-[#eef4f7] p-4">
                     <div className="mx-auto max-w-[520px] rounded-[24px] bg-white p-5 shadow-sm">
                       {form.preheader ? <p className="text-xs uppercase tracking-[0.12em] text-[#7a93a2]">{form.preheader}</p> : null}
                       {form.introText ? <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-[#355160]">{form.introText}</p> : null}
                       {form.imageUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={form.imageUrl} alt={form.imageAltText || form.subject} className="mt-4 w-full rounded-[18px] border border-[#dbe8ef]" />
+                        <img src={form.imageUrl} alt={form.imageAltText || form.subject} className="mt-4 w-full rounded-[18px] border border-[#e9def1]" />
                       ) : null}
                       {form.primaryCtaLabel && form.primaryCtaUrl ? <a href={form.primaryCtaUrl} className="mt-4 inline-flex rounded-full bg-[#173543] px-5 py-3 text-sm font-semibold text-white"> {form.primaryCtaLabel} </a> : null}
-                      {form.secondaryCtaLabel && form.secondaryCtaUrl ? <a href={form.secondaryCtaUrl} className="mt-3 inline-flex rounded-full border border-[#cfdde6] bg-[#f4f9fc] px-5 py-3 text-sm font-semibold text-[#173543]"> {form.secondaryCtaLabel} </a> : null}
+                      {form.secondaryCtaLabel && form.secondaryCtaUrl ? <a href={form.secondaryCtaUrl} className="mt-3 inline-flex rounded-full border border-[#ddcfe9] bg-[#fcf5fb] px-5 py-3 text-sm font-semibold text-[#173543]"> {form.secondaryCtaLabel} </a> : null}
                     </div>
                   </div>
                 </div>
 
-                <div className="rounded-[24px] border border-[#dbe8ef] bg-white p-5 shadow-sm">
+                <div className="rounded-[24px] border border-[#e9def1] bg-white p-5 shadow-sm">
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#7891a0]">Selected Recipients</p>
@@ -638,15 +638,15 @@ export default function EmailsWorkspace(props: EmailsWorkspaceProps) {
                   </div>
                   <div className="mt-3 space-y-2">
                     {selectedRecipientOptions.map((recipient) => (
-                      <div key={recipient.key} className="rounded-2xl border border-[#dbe8ef] bg-[#f9fcfd] px-3 py-2 text-sm text-[#4f6877]">
+                      <div key={recipient.key} className="rounded-2xl border border-[#e9def1] bg-[#fdf8fd] px-3 py-2 text-sm text-[#4f6877]">
                         <span className="font-semibold text-[#173543]">{recipient.companyName}</span> • {recipient.contactName || "No contact name"} • {recipient.email}
                       </div>
                     ))}
-                    {selectedRecipientOptions.length === 0 ? <div className="rounded-2xl border border-dashed border-[#dbe8ef] bg-[#f9fcfd] px-4 py-4 text-sm text-[#5c7483]">No recipients selected.</div> : null}
+                    {selectedRecipientOptions.length === 0 ? <div className="rounded-2xl border border-dashed border-[#e9def1] bg-[#fdf8fd] px-4 py-4 text-sm text-[#5c7483]">No recipients selected.</div> : null}
                   </div>
                 </div>
 
-                <div className="rounded-[24px] border border-[#dbe8ef] bg-white p-5 shadow-sm">
+                <div className="rounded-[24px] border border-[#e9def1] bg-white p-5 shadow-sm">
                   <div className="grid gap-2 sm:grid-cols-2">
                     <OutcomeMetric label="Accepted" value={String(props.selectedCampaign?.recipients.filter((recipient) => Boolean(recipient.sentAt)).length || 0)} tone="ok" />
                     <OutcomeMetric label="Failed at Send" value={String(props.selectedCampaign?.recipients.filter((recipient) => recipient.status === "failed").length || 0)} tone="bad" />
@@ -655,12 +655,12 @@ export default function EmailsWorkspace(props: EmailsWorkspaceProps) {
                   </div>
                 </div>
 
-                <div className="rounded-[24px] border border-[#dbe8ef] bg-white p-5 shadow-sm">
+                <div className="rounded-[24px] border border-[#e9def1] bg-white p-5 shadow-sm">
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#7891a0]">Results</p>
                   <p className="mt-1 text-sm text-[#5c7483]">Accepted by Gmail is tracked separately from later bounce and reply outcomes.</p>
                   <div className="mt-3 space-y-2">
                     {props.selectedCampaign?.recipients.map((recipient) => (
-                      <div key={recipient.id} className="rounded-2xl border border-[#dbe8ef] bg-[#f9fcfd] px-3 py-3">
+                      <div key={recipient.id} className="rounded-2xl border border-[#e9def1] bg-[#fdf8fd] px-3 py-3">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <p className="font-semibold text-[#173543]">{recipient.email}</p>
                           <span className={["rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide", statusTone(recipient.status)].join(" ")}>
@@ -673,12 +673,12 @@ export default function EmailsWorkspace(props: EmailsWorkspaceProps) {
                           {recipient.bouncedAt ? ` • Bounced ${relativeDate(recipient.bouncedAt)}` : ""}
                           {recipient.repliedAt ? ` • Replied ${relativeDate(recipient.repliedAt)}` : ""}
                         </p>
-                        {recipient.replyFromEmail ? <p className="mt-1 text-sm text-[#0f766e]">Reply from {recipient.replyFromEmail}</p> : null}
+                        {recipient.replyFromEmail ? <p className="mt-1 text-sm text-[#6f32b5]">Reply from {recipient.replyFromEmail}</p> : null}
                         {recipient.bounceReason ? <p className="mt-1 text-sm text-[#9a6b00]">{recipient.bounceReason}</p> : null}
                         {recipient.errorMessage ? <p className="mt-1 text-sm text-[#991b1b]">{recipient.errorMessage}</p> : null}
                       </div>
                     ))}
-                    {props.selectedCampaign?.recipients.length ? null : <div className="rounded-2xl border border-dashed border-[#dbe8ef] bg-[#f9fcfd] px-4 py-4 text-sm text-[#5c7483]">No recipient history yet.</div>}
+                    {props.selectedCampaign?.recipients.length ? null : <div className="rounded-2xl border border-dashed border-[#e9def1] bg-[#fdf8fd] px-4 py-4 text-sm text-[#5c7483]">No recipient history yet.</div>}
                   </div>
                 </div>
               </div>
@@ -702,7 +702,7 @@ function Field({ label, children, className }: { label: string; children: ReactN
 function OutcomeMetric({ label, value, tone }: { label: string; value: string; tone: "ok" | "bad" | "warn" | "info" }) {
   const toneClass =
     tone === "ok"
-      ? "border-[#bde8e4] bg-[#e9fbf9] text-[#0f766e]"
+      ? "border-[#e8d7f7] bg-[#fcf3ff] text-[#6f32b5]"
       : tone === "bad"
         ? "border-[#f1d1d1] bg-[#fff5f5] text-[#991b1b]"
         : tone === "warn"
@@ -717,5 +717,5 @@ function OutcomeMetric({ label, value, tone }: { label: string; value: string; t
   );
 }
 
-const inputClass = "w-full rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a]";
-const textareaClass = "w-full rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a]";
+const inputClass = "w-full rounded-lg border border-[#ddcfe9] bg-white px-3 py-2 text-sm text-[#1f2d3a]";
+const textareaClass = "w-full rounded-lg border border-[#ddcfe9] bg-white px-3 py-2 text-sm text-[#1f2d3a]";

@@ -91,19 +91,19 @@ export default function EstimateCartPanel({
         </div>
         <Link
           href={estimateHref}
-          className="inline-flex rounded-full border border-[#cfe0e7] px-3 py-1.5 text-xs font-semibold text-[#2a4655] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
+          className="inline-flex rounded-full border border-[#decee9] px-3 py-1.5 text-xs font-semibold text-[#2a4655] transition hover:border-[#8f52dc] hover:text-[#6f32b5]"
         >
           View Estimate
         </Link>
       </div>
 
       {editingLineId ? (
-        <div className="rounded-xl border border-[#bee6df] bg-[#ecfbf8] px-3 py-2 text-xs font-medium text-[#0f766e]">
+        <div className="rounded-xl border border-[#bee6df] bg-[#fdf4ff] px-3 py-2 text-xs font-medium text-[#6f32b5]">
           Editing a line in the menu.
           <button
             type="button"
             onClick={onCancelEdit}
-            className="ml-2 inline-flex rounded-full border border-[#9fd6cf] px-2 py-0.5 font-semibold text-[#0f766e] transition hover:border-[#0f766e]"
+            className="ml-2 inline-flex rounded-full border border-[#9fd6cf] px-2 py-0.5 font-semibold text-[#6f32b5] transition hover:border-[#6f32b5]"
           >
             Cancel
           </button>
@@ -115,7 +115,7 @@ export default function EstimateCartPanel({
           <p className="text-sm text-[#657f8f]">No line items yet. Add products from the catalog.</p>
         ) : (
           lines.map((line) => (
-            <div key={line.id} className="rounded-xl border border-[#dbe6ed] bg-[#fbfdfe] p-2.5">
+            <div key={line.id} className="rounded-xl border border-[#e8ddf0] bg-[#fffafd] p-2.5">
               <div className="flex items-start justify-between gap-2">
                 <div className="text-sm font-medium text-[#223640]">{line.title}</div>
                 <div className="flex items-center gap-1.5">
@@ -125,8 +125,8 @@ export default function EstimateCartPanel({
                     className={[
                       "rounded-full border px-2 py-0.5 text-[11px] font-semibold transition",
                       editingLineId === line.id
-                        ? "border-[#14b8a6] bg-[#ecfbf8] text-[#0f766e]"
-                        : "border-[#cfdde5] text-[#2f4a59] hover:border-[#14b8a6] hover:text-[#0f766e]",
+                        ? "border-[#8f52dc] bg-[#fdf4ff] text-[#6f32b5]"
+                        : "border-[#ddcfe8] text-[#2f4a59] hover:border-[#8f52dc] hover:text-[#6f32b5]",
                     ].join(" ")}
                   >
                     {editingLineId === line.id ? "Editing" : "Edit"}
@@ -179,7 +179,7 @@ export default function EstimateCartPanel({
         </div>
       ) : null}
       {hasCustomerPackaging && !packagingReviewPending ? (
-        <div className="rounded-xl border border-[#cde9e6] bg-[#eefaf8] px-3 py-2 text-xs font-medium text-[#0f766e]">
+        <div className="rounded-xl border border-[#cde9e6] bg-[#eefaf8] px-3 py-2 text-xs font-medium text-[#6f32b5]">
           <p>Customer packaging is approved for required categories.</p>
           <Link href={packagingUploadHref} className="mt-1 inline-flex text-xs font-semibold underline underline-offset-2">
             Manage packaging submission
@@ -194,7 +194,7 @@ export default function EstimateCartPanel({
         </div>
         <Link
           href={estimateHref}
-          className="mt-3 inline-flex w-full items-center justify-center rounded-full border border-[#14b8a6] px-3 py-2 text-sm font-semibold text-[#0f766e] transition hover:bg-[#edf9f7]"
+          className="mt-3 inline-flex w-full items-center justify-center rounded-full border border-[#8f52dc] px-3 py-2 text-sm font-semibold text-[#6f32b5] transition hover:bg-[#edf9f7]"
         >
           Open Estimate
         </Link>
@@ -205,7 +205,7 @@ export default function EstimateCartPanel({
           type="button"
           onClick={onSendEstimatePdf}
           disabled={lines.length === 0}
-          className="w-full rounded-full bg-[#14b8a6] px-3 py-2 text-sm font-semibold text-white transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
+          className="w-full rounded-full bg-[#8f52dc] px-3 py-2 text-sm font-semibold text-white transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Send Estimate PDF
         </button>
@@ -214,7 +214,7 @@ export default function EstimateCartPanel({
           onClick={onRequestOrder}
           title={requestOrderLocked ? requestOrderLockReason || "Complete compliance first." : undefined}
           disabled={requestOrderLocked || lines.length === 0}
-          className="w-full rounded-full border border-[#cfdce4] px-3 py-2 text-sm font-semibold text-[#24404d] transition hover:border-[#14b8a6] hover:text-[#0f766e] disabled:cursor-not-allowed disabled:opacity-55"
+          className="w-full rounded-full border border-[#cfdce4] px-3 py-2 text-sm font-semibold text-[#24404d] transition hover:border-[#8f52dc] hover:text-[#6f32b5] disabled:cursor-not-allowed disabled:opacity-55"
         >
           Request Order
         </button>

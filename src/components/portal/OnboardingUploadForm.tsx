@@ -153,7 +153,7 @@ export default function OnboardingUploadForm() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-[#dbe9ef] bg-[#f9fcfd] px-4 py-3 text-sm text-[#355060]">
+      <div className="rounded-2xl border border-[#eadff1] bg-[#fdf8fd] px-4 py-3 text-sm text-[#355060]">
         Upload only what you have. If your company uses a single onboarding packet, attach that under <span className="font-semibold text-[#173543]">Cannabis License</span> and you do not need to upload all four documents separately.
       </div>
       <p className="text-sm text-[#5d7685]">Up to 25 MB per file. PDFs work best for onboarding packets and compliance documents.</p>
@@ -170,7 +170,7 @@ export default function OnboardingUploadForm() {
 
             <Input
               type="file"
-              className="mt-4 border-[#d0dee6] bg-white text-[#173543] focus-visible:ring-[#14b8a6] focus-visible:ring-offset-white file:mr-3 file:rounded-md file:border-0 file:bg-[#14b8a6]/12 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-[#0f766e]"
+              className="mt-4 border-[#d0dee6] bg-white text-[#173543] focus-visible:ring-[#8f52dc] focus-visible:ring-offset-white file:mr-3 file:rounded-md file:border-0 file:bg-[#8f52dc]/12 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-[#6f32b5]"
               onChange={(event) => setFile(doc.key, event.target.files?.[0] || null)}
             />
 
@@ -184,11 +184,11 @@ export default function OnboardingUploadForm() {
           type="button"
           onClick={onSubmit}
           disabled={isPending}
-          className="rounded-full bg-[#14b8a6] text-white hover:bg-[#14b8a6] disabled:cursor-not-allowed disabled:opacity-70"
+          className="rounded-full bg-[#8f52dc] text-white hover:bg-[#8f52dc] disabled:cursor-not-allowed disabled:opacity-70"
         >
           {isPending ? "Uploading..." : "Upload Documents"}
         </Button>
-        {message ? <p className="text-sm text-[#0f766e]">{message}</p> : null}
+        {message ? <p className="text-sm text-[#6f32b5]">{message}</p> : null}
         {error ? <p className="text-sm text-[#b42318]">{error}</p> : null}
       </div>
     </div>

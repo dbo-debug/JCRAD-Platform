@@ -282,7 +282,7 @@ export default function BulkProductForm({
         <label className="grid gap-1">
           <span className="text-sm text-[#4f6877]">Category</span>
           <select
-            className="rounded border border-[#cfdde5] bg-white px-3 py-2 text-sm text-[#173543]"
+            className="rounded border border-[#ddcfe8] bg-white px-3 py-2 text-sm text-[#173543]"
             value={form.category}
             onChange={(e) => {
               const nextCategory = e.target.value as FormCategory;
@@ -301,7 +301,7 @@ export default function BulkProductForm({
             <label className="grid gap-1">
               <span className="text-sm text-[#4f6877]">Cultivation</span>
               <select
-                className="rounded border border-[#cfdde5] bg-white px-3 py-2 text-sm text-[#173543]"
+                className="rounded border border-[#ddcfe8] bg-white px-3 py-2 text-sm text-[#173543]"
                 value={flowerCultivation}
                 onChange={(e) => setFlowerCultivation(e.target.value as FlowerCultivation | "")}
               >
@@ -314,7 +314,7 @@ export default function BulkProductForm({
             <label className="grid gap-1">
               <span className="text-sm text-[#4f6877]">Flower grade</span>
               <select
-                className="rounded border border-[#cfdde5] bg-white px-3 py-2 text-sm text-[#173543]"
+                className="rounded border border-[#ddcfe8] bg-white px-3 py-2 text-sm text-[#173543]"
                 value={flowerGrade}
                 onChange={(e) => setFlowerGrade(e.target.value as FlowerGrade | "")}
               >
@@ -327,7 +327,7 @@ export default function BulkProductForm({
             <label className="grid gap-1 md:col-span-2">
               <span className="text-sm text-[#4f6877]">Strain</span>
               <input
-                className="rounded border border-[#cfdde5] bg-white px-3 py-2 text-sm text-[#173543]"
+                className="rounded border border-[#ddcfe8] bg-white px-3 py-2 text-sm text-[#173543]"
                 value={descriptorName}
                 onChange={(e) => setDescriptorName(e.target.value)}
               />
@@ -340,7 +340,7 @@ export default function BulkProductForm({
             <label className="grid gap-1">
               <span className="text-sm text-[#4f6877]">Concentrate type</span>
               <select
-                className="rounded border border-[#cfdde5] bg-white px-3 py-2 text-sm text-[#173543]"
+                className="rounded border border-[#ddcfe8] bg-white px-3 py-2 text-sm text-[#173543]"
                 value={concentrateType}
                 onChange={(e) => setConcentrateType(e.target.value as ConcentrateType | "")}
               >
@@ -353,7 +353,7 @@ export default function BulkProductForm({
             <label className="grid gap-1">
               <span className="text-sm text-[#4f6877]">Name / Strain</span>
               <input
-                className="rounded border border-[#cfdde5] bg-white px-3 py-2 text-sm text-[#173543]"
+                className="rounded border border-[#ddcfe8] bg-white px-3 py-2 text-sm text-[#173543]"
                 value={descriptorName}
                 onChange={(e) => setDescriptorName(e.target.value)}
               />
@@ -366,7 +366,7 @@ export default function BulkProductForm({
             <label className="grid gap-1">
               <span className="text-sm text-[#4f6877]">Vape medium</span>
               <select
-                className="rounded border border-[#cfdde5] bg-white px-3 py-2 text-sm text-[#173543]"
+                className="rounded border border-[#ddcfe8] bg-white px-3 py-2 text-sm text-[#173543]"
                 value={vapeMedium}
                 onChange={(e) => setVapeMedium(e.target.value as VapeMedium | "")}
               >
@@ -379,7 +379,7 @@ export default function BulkProductForm({
             <label className="grid gap-1">
               <span className="text-sm text-[#4f6877]">Name</span>
               <input
-                className="rounded border border-[#cfdde5] bg-white px-3 py-2 text-sm text-[#173543]"
+                className="rounded border border-[#ddcfe8] bg-white px-3 py-2 text-sm text-[#173543]"
                 value={descriptorName}
                 onChange={(e) => setDescriptorName(e.target.value)}
               />
@@ -391,7 +391,7 @@ export default function BulkProductForm({
           <label className="grid gap-1">
             <span className="text-sm text-[#4f6877]">Name</span>
             <input
-              className="rounded border border-[#cfdde5] bg-white px-3 py-2 text-sm text-[#173543]"
+              className="rounded border border-[#ddcfe8] bg-white px-3 py-2 text-sm text-[#173543]"
               value={descriptorName}
               onChange={(e) => setDescriptorName(e.target.value)}
             />
@@ -404,7 +404,7 @@ export default function BulkProductForm({
             type="number"
             min={0}
             step="0.01"
-            className="rounded border border-[#cfdde5] bg-white px-3 py-2 text-sm text-[#173543]"
+            className="rounded border border-[#ddcfe8] bg-white px-3 py-2 text-sm text-[#173543]"
             value={form.inventory_qty}
             onChange={(e) => setForm((prev) => ({ ...prev, inventory_qty: Number(e.target.value) }))}
           />
@@ -413,7 +413,7 @@ export default function BulkProductForm({
         <label className="grid gap-1">
           <span className="text-sm text-[#4f6877]">Inventory Unit</span>
           <select
-            className="rounded border border-[#cfdde5] bg-white px-3 py-2 text-sm text-[#173543]"
+            className="rounded border border-[#ddcfe8] bg-white px-3 py-2 text-sm text-[#173543]"
             value={form.inventory_unit}
             onChange={(e) => setForm((prev) => ({ ...prev, inventory_unit: e.target.value as InventoryUnit }))}
           >
@@ -430,7 +430,7 @@ export default function BulkProductForm({
             type="number"
             min={0}
             step="0.01"
-            className="rounded border border-[#cfdde5] bg-white px-3 py-2 text-sm text-[#173543]"
+            className="rounded border border-[#ddcfe8] bg-white px-3 py-2 text-sm text-[#173543]"
             value={form.bulk_cost_per_lb}
             onChange={(e) => setForm((prev) => ({ ...prev, bulk_cost_per_lb: Number(e.target.value) }))}
             required
@@ -445,7 +445,7 @@ export default function BulkProductForm({
             type="number"
             min={0}
             step="0.01"
-            className="rounded border border-[#cfdde5] bg-white px-3 py-2 text-sm text-[#173543]"
+            className="rounded border border-[#ddcfe8] bg-white px-3 py-2 text-sm text-[#173543]"
             value={form.bulk_sell_per_lb ?? ""}
             onChange={(e) =>
               setForm((prev) => ({
@@ -462,14 +462,14 @@ export default function BulkProductForm({
             type="number"
             min={0}
             step="0.01"
-            className="rounded border border-[#cfdde5] bg-white px-3 py-2 text-sm text-[#173543]"
+            className="rounded border border-[#ddcfe8] bg-white px-3 py-2 text-sm text-[#173543]"
             value={form.min_order}
             onChange={(e) => setForm((prev) => ({ ...prev, min_order: Number(e.target.value) }))}
           />
         </label>
       </div>
 
-      <div className="rounded border border-[#dbe9ef] bg-[#f6fbfd] px-3 py-2 text-xs text-[#5b7382]">
+      <div className="rounded border border-[#eadff1] bg-[#fdf7fb] px-3 py-2 text-xs text-[#5b7382]">
         Display name preview:{" "}
         {form.category === "flower"
           ? normalizeWhitespace(
@@ -528,13 +528,13 @@ export default function BulkProductForm({
       </div>
 
       {error ? <p className="text-sm text-[#991b1b]">{error}</p> : null}
-      {success ? <p className="text-sm text-[#0f766e]">{success}</p> : null}
+      {success ? <p className="text-sm text-[#6f32b5]">{success}</p> : null}
 
       <div className="flex flex-wrap gap-3">
         <button
           type="submit"
           disabled={busy}
-          className="rounded bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95 disabled:opacity-60"
+          className="rounded bg-[#8f52dc] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95 disabled:opacity-60"
         >
           {busy ? "Saving..." : mode === "new" ? "Create Product" : "Save Changes"}
         </button>
@@ -544,7 +544,7 @@ export default function BulkProductForm({
             name="addAnother"
             value="true"
             disabled={busy}
-            className="rounded border border-[#9ccfc8] bg-white px-4 py-2 text-sm font-semibold text-[#0f766e] transition hover:bg-[#f6fbfd] disabled:opacity-60"
+            className="rounded border border-[#9ccfc8] bg-white px-4 py-2 text-sm font-semibold text-[#6f32b5] transition hover:bg-[#fdf7fb] disabled:opacity-60"
           >
             {busy ? "Saving..." : "Create & Add Another"}
           </button>

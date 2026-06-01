@@ -22,10 +22,10 @@ type SourceDetailManagerProps = {
   staffOptions: StaffOption[];
 };
 
-const sectionClass = "rounded-2xl border border-[#dbe9ef] bg-white p-4 shadow-sm";
-const inputClass = "rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a]";
+const sectionClass = "rounded-2xl border border-[#eadff1] bg-white p-4 shadow-sm";
+const inputClass = "rounded-lg border border-[#ddcfe9] bg-white px-3 py-2 text-sm text-[#1f2d3a]";
 const sourcingPromptClass =
-  "rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-[#355564] transition hover:border-[#14b8a6] hover:bg-[#effcf9] hover:text-[#0f766e]";
+  "rounded-full border border-[#e5d8ef] bg-[#fcf7fd] px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-[#355564] transition hover:border-[#8f52dc] hover:bg-[#fcf5ff] hover:text-[#6f32b5]";
 
 const ACTIVITY_PROMPTS = [
   {
@@ -221,7 +221,7 @@ export default function SourceDetailManager(props: SourceDetailManagerProps) {
   return (
     <div className="space-y-3">
       {error ? <p className="rounded-xl border border-[#f1d1d1] bg-[#fff5f5] px-3 py-2 text-sm text-[#991b1b]">{error}</p> : null}
-      {success ? <p className="rounded-xl border border-[#bfe8df] bg-[#effcf8] px-3 py-2 text-sm text-[#0f766e]">{success}</p> : null}
+      {success ? <p className="rounded-xl border border-[#bfe8df] bg-[#effcf8] px-3 py-2 text-sm text-[#6f32b5]">{success}</p> : null}
 
       <section id="source-log-activity" className={sectionClass}>
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -233,7 +233,7 @@ export default function SourceDetailManager(props: SourceDetailManagerProps) {
             type="button"
             onClick={() => void createActivity()}
             disabled={activityBusy}
-            className="rounded-full bg-[#14b8a6] px-3.5 py-1.5 text-sm font-semibold text-white disabled:opacity-60"
+            className="rounded-full bg-[#8f52dc] px-3.5 py-1.5 text-sm font-semibold text-white disabled:opacity-60"
           >
             {activityBusy ? "Saving..." : "Log Activity"}
           </button>
@@ -356,7 +356,7 @@ export default function SourceDetailManager(props: SourceDetailManagerProps) {
             type="button"
             onClick={() => void saveProfile()}
             disabled={profileBusy}
-            className="rounded-full border border-[#d0dde5] bg-white px-3.5 py-1.5 text-sm font-semibold text-[#173543] disabled:opacity-60"
+            className="rounded-full border border-[#decfe8] bg-white px-3.5 py-1.5 text-sm font-semibold text-[#173543] disabled:opacity-60"
           >
             {profileBusy ? "Saving..." : "Save Profile"}
           </button>

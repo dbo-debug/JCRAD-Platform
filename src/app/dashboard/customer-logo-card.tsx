@@ -110,15 +110,15 @@ export default function CustomerLogoCard({ initialLogo }: CustomerLogoCardProps)
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-[#dbe9ef] bg-[#f9fcfd] p-4">
+      <div className="rounded-xl border border-[#eadff1] bg-[#fdf8fd] p-4">
         {hasLogo ? (
           <img
             src={String(logo.logo_url || "")}
             alt="Customer brand logo"
-            className="h-24 w-full rounded-lg border border-[#dbe9ef] bg-white object-contain p-3"
+            className="h-24 w-full rounded-lg border border-[#eadff1] bg-white object-contain p-3"
           />
         ) : (
-          <div className="flex h-24 items-center justify-center rounded-lg border border-dashed border-[#c9dbe4] bg-[#f6fbfd] px-4 text-sm text-[#4a6575]">
+          <div className="flex h-24 items-center justify-center rounded-lg border border-dashed border-[#c9dbe4] bg-[#fdf7fb] px-4 text-sm text-[#4a6575]">
             No logo uploaded yet.
           </div>
         )}
@@ -132,7 +132,7 @@ export default function CustomerLogoCard({ initialLogo }: CustomerLogoCardProps)
           accept={ACCEPTED_TYPES}
           onChange={onFileChange}
           disabled={busy !== null}
-          className="rounded-lg border border-[#cfdde6] bg-white px-3 py-2 text-sm text-[#1f2d3a] file:mr-3 file:rounded file:border-0 file:bg-[#eef7f6] file:px-2 file:py-1 file:text-xs file:font-semibold file:text-[#0f766e] focus:border-[#14b8a6] focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+          className="rounded-lg border border-[#ddcfe9] bg-white px-3 py-2 text-sm text-[#1f2d3a] file:mr-3 file:rounded file:border-0 file:bg-[#eef7f6] file:px-2 file:py-1 file:text-xs file:font-semibold file:text-[#6f32b5] focus:border-[#8f52dc] focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
         />
         <span className="text-xs text-[#5d7685]">JPG, PNG, or WebP up to 5MB.</span>
       </label>
@@ -141,7 +141,7 @@ export default function CustomerLogoCard({ initialLogo }: CustomerLogoCardProps)
         <div className="rounded-xl border border-[#f3d2d2] bg-[#fff4f4] px-3 py-2 text-sm text-[#991b1b]">{error}</div>
       ) : null}
       {success ? (
-        <div className="rounded-xl border border-[#cde9e6] bg-[#eefaf8] px-3 py-2 text-sm text-[#0f766e]">{success}</div>
+        <div className="rounded-xl border border-[#cde9e6] bg-[#eefaf8] px-3 py-2 text-sm text-[#6f32b5]">{success}</div>
       ) : null}
 
       <div className="flex flex-wrap gap-2">
@@ -149,7 +149,7 @@ export default function CustomerLogoCard({ initialLogo }: CustomerLogoCardProps)
           type="button"
           onClick={() => void uploadLogo()}
           disabled={!selectedFile || busy !== null}
-          className="inline-flex items-center rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex items-center rounded-full bg-[#8f52dc] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {busy === "upload" ? "Saving..." : hasLogo ? "Replace logo" : "Upload logo"}
         </button>

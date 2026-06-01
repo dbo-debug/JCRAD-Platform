@@ -147,11 +147,11 @@ export default async function DashboardPage() {
           <Card className="border border-[var(--surface-border)] bg-white p-6 text-[var(--text)] shadow-sm lg:col-span-2">
             <h2 className="text-lg font-semibold text-[#173543]">Account summary</h2>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-xl border border-[#dbe9ef] bg-[#f9fcfd] px-4 py-3">
+              <div className="rounded-xl border border-[#eadff1] bg-[#fdf8fd] px-4 py-3">
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#5d7685]">Signed in</p>
                 <p className="mt-1 text-sm font-medium text-[#173543]">{user.email}</p>
               </div>
-              <div className="rounded-xl border border-[#dbe9ef] bg-[#f9fcfd] px-4 py-3">
+              <div className="rounded-xl border border-[#eadff1] bg-[#fdf8fd] px-4 py-3">
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#5d7685]">Account type</p>
                 <p className="mt-1 text-sm font-medium capitalize text-[#173543]">{role}</p>
               </div>
@@ -163,7 +163,7 @@ export default async function DashboardPage() {
             <p className="mt-2 text-sm text-[#4a6575]">Upload compliance documents so your estimates can move into order-ready workflow.</p>
             <div className="mt-4">
               <Link href="/portal/onboarding">
-                <Button className="rounded-full bg-[#14b8a6] text-white hover:bg-[#14b8a6]">Complete onboarding</Button>
+                <Button className="rounded-full bg-[#8f52dc] text-white hover:bg-[#8f52dc]">Complete onboarding</Button>
               </Link>
             </div>
           </Card>
@@ -173,7 +173,7 @@ export default async function DashboardPage() {
           <Card className="border border-[var(--surface-border)] bg-white p-6 text-[var(--text)] shadow-sm lg:col-span-2">
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-lg font-semibold text-[#173543]">Pending projects</h2>
-              <Link href="/estimate" className="text-sm font-semibold text-[#0f766e] underline underline-offset-4">
+              <Link href="/estimate" className="text-sm font-semibold text-[#6f32b5] underline underline-offset-4">
                 Open estimator
               </Link>
             </div>
@@ -181,7 +181,7 @@ export default async function DashboardPage() {
             {recentEstimates.length > 0 ? (
               <div className="mt-4 space-y-3">
                 {recentEstimates.map((estimate) => (
-                  <div key={estimate.id} className="rounded-xl border border-[#dbe9ef] bg-[#f9fcfd] px-4 py-3">
+                  <div key={estimate.id} className="rounded-xl border border-[#eadff1] bg-[#fdf8fd] px-4 py-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="text-sm font-semibold text-[#173543]">Estimate #{estimate.id.slice(0, 8)}</p>
                       <span className="rounded-full border border-[#d4e2e9] bg-white px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-[#5d7685]">
@@ -196,7 +196,7 @@ export default async function DashboardPage() {
             ) : (
               <div className="mt-4 space-y-3">
                 {placeholderProjects.map((project) => (
-                  <div key={project.title} className="rounded-xl border border-dashed border-[#d3e1e8] bg-[#f9fcfd] px-4 py-3">
+                  <div key={project.title} className="rounded-xl border border-dashed border-[#d3e1e8] bg-[#fdf8fd] px-4 py-3">
                     <p className="text-sm font-semibold text-[#173543]">{project.title}</p>
                     <p className="mt-1 text-sm text-[#4a6575]">{project.subtitle}</p>
                   </div>
@@ -224,16 +224,16 @@ export default async function DashboardPage() {
               Upload reusable customer packaging by category. Orders stay blocked until required category submissions are approved.
             </p>
             <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              <div className="rounded-xl border border-[#dbe9ef] bg-[#fff9ed] px-4 py-3">
+              <div className="rounded-xl border border-[#eadff1] bg-[#fff9ed] px-4 py-3">
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#8a5a08]">Pending</p>
                 <p className="mt-1 text-sm font-semibold text-[#5f3b07]">{packagingWorkflow.pending}</p>
               </div>
-              <div className="rounded-xl border border-[#dbe9ef] bg-[#fff8e7] px-4 py-3">
+              <div className="rounded-xl border border-[#eadff1] bg-[#fff8e7] px-4 py-3">
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#9a6a15]">Rejected</p>
                 <p className="mt-1 text-sm font-semibold text-[#7a4f11]">{packagingWorkflow.rejected}</p>
               </div>
-              <div className="rounded-xl border border-[#dbe9ef] bg-[#eefaf8] px-4 py-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#0f766e]">Approved</p>
+              <div className="rounded-xl border border-[#eadff1] bg-[#eefaf8] px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#6f32b5]">Approved</p>
                 <p className="mt-1 text-sm font-semibold text-[#155e75]">{packagingWorkflow.approved}</p>
               </div>
             </div>
@@ -245,9 +245,9 @@ export default async function DashboardPage() {
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
               <Link href="/dashboard/packaging">
-                <Button className="rounded-full bg-[#14b8a6] text-white hover:bg-[#14b8a6]">Upload packaging files</Button>
+                <Button className="rounded-full bg-[#8f52dc] text-white hover:bg-[#8f52dc]">Upload packaging files</Button>
               </Link>
-              <Link href="/estimate" className="inline-flex items-center rounded-full border border-[#cfdce4] px-4 py-2 text-sm font-semibold text-[#24404d] transition hover:border-[#14b8a6] hover:text-[#0f766e]">
+              <Link href="/estimate" className="inline-flex items-center rounded-full border border-[#cfdce4] px-4 py-2 text-sm font-semibold text-[#24404d] transition hover:border-[#8f52dc] hover:text-[#6f32b5]">
                 Review estimate status
               </Link>
             </div>
@@ -262,7 +262,7 @@ export default async function DashboardPage() {
                 <h3 className="text-base font-semibold text-[#173543]">{item.title}</h3>
                 <p className="mt-2 text-sm text-[#4a6575]">{item.description}</p>
                 <div className="mt-4">
-                  <Link href={item.href} className="text-sm font-semibold text-[#0f766e] underline underline-offset-4">
+                  <Link href={item.href} className="text-sm font-semibold text-[#6f32b5] underline underline-offset-4">
                     Start estimate pathway
                   </Link>
                 </div>

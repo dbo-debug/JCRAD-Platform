@@ -1659,7 +1659,7 @@ export default function MenuClient({
 
   const branding = (
     <div className="flex items-center gap-4">
-      <img src="/brand/PRIMARY.png" alt="JC RAD Inc." className="h-12 w-auto" />
+      <img src="/brand/motley-on-white.png" alt="Motley Terpz" className="h-12 w-auto" />
       <div className="hidden sm:block text-sm text-[#2f4654]">Wholesale • Copack • Fast turnaround</div>
     </div>
   );
@@ -1706,13 +1706,13 @@ export default function MenuClient({
         <div className="flex items-center gap-2">
           <Link
             href={requestSamplesHref}
-            className="inline-flex rounded-full border border-[#cfe0e7] px-3 py-2 text-xs font-semibold text-[#2a4655] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
+            className="inline-flex rounded-full border border-[#decee9] px-3 py-2 text-xs font-semibold text-[#2a4655] transition hover:border-[#8f52dc] hover:text-[#6f32b5]"
           >
             Request Samples / Book Call
           </Link>
           <Link
             href={estimateHref}
-            className="inline-flex rounded-full bg-[#14b8a6] px-3 py-2 text-xs font-semibold text-white transition hover:opacity-95"
+            className="inline-flex rounded-full bg-[#8f52dc] px-3 py-2 text-xs font-semibold text-white transition hover:opacity-95"
           >
             {menuEstimateCtaLabel} ({displayCartLines.length})
           </Link>
@@ -1721,7 +1721,7 @@ export default function MenuClient({
       mobileHeaderActions={
         <Link
           href={estimateHref}
-          className="inline-flex rounded-full bg-[#14b8a6] px-3 py-2 text-sm font-semibold text-white transition hover:opacity-95"
+          className="inline-flex rounded-full bg-[#8f52dc] px-3 py-2 text-sm font-semibold text-white transition hover:opacity-95"
         >
           View Estimate
         </Link>
@@ -1743,7 +1743,7 @@ export default function MenuClient({
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-[#dce6eb] bg-white p-3 text-sm text-[#5a7282] shadow-[0_14px_24px_-24px_rgba(16,24,40,0.55)]">
             <div className="flex items-center gap-3">
               <span>{offerCards.length} products</span>
-              <div className="inline-flex items-center gap-2 rounded-full border border-[#d4e3e3] bg-[#eef7f6] px-3 py-1 text-xs font-medium text-[#0f766e]">
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#d4e3e3] bg-[#eef7f6] px-3 py-1 text-xs font-medium text-[#6f32b5]">
                 <span>{displayCartLines.length} in estimate</span>
                 <span aria-hidden="true" className="text-[#7aa7a3]">•</span>
                 <span>{asMoney(cartTotal)}</span>
@@ -1754,23 +1754,23 @@ export default function MenuClient({
                     type="checkbox"
                     checked={showDraftOffers}
                     onChange={(e) => setShowDraftOffers(e.target.checked)}
-                    className="h-4 w-4 rounded border-[#cbd8e1] text-[#14b8a6] focus:ring-[#14b8a6]"
+                    className="h-4 w-4 rounded border-[#cbd8e1] text-[#8f52dc] focus:ring-[#8f52dc]"
                   />
                   Show Draft Offers
                 </label>
               ) : null}
             </div>
             <div className="flex items-center gap-3">
-              <Link href={requestSamplesHref} className="text-[#0f766e] underline">
+              <Link href={requestSamplesHref} className="text-[#6f32b5] underline">
                 Request Samples
               </Link>
-              <Link href={estimateHref} className="font-semibold text-[#0f766e] underline underline-offset-2">
+              <Link href={estimateHref} className="font-semibold text-[#6f32b5] underline underline-offset-2">
                 Open Estimate
               </Link>
             </div>
           </div>
           {routeRunnerEstimateMessage ? (
-            <div className="rounded-2xl border border-[#dce6eb] bg-[#fbfdfe] px-3 py-2 text-sm text-[#4f6877] shadow-[0_14px_24px_-24px_rgba(16,24,40,0.55)]">
+            <div className="rounded-2xl border border-[#dce6eb] bg-[#fffafd] px-3 py-2 text-sm text-[#4f6877] shadow-[0_14px_24px_-24px_rgba(16,24,40,0.55)]">
               {routeRunnerEstimateMessage}
             </div>
           ) : null}

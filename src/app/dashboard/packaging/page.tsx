@@ -96,7 +96,7 @@ export default async function DashboardPackagingPage({ searchParams }: PageProps
             {(["vape", "flower", "pre_roll", "concentrate"] as PackagingCategory[]).map((category) => {
               const summary = byCategorySummary.get(category) || { pending: 0, approved: 0, rejected: 0 };
               return (
-                <div key={category} className="rounded-xl border border-[#dbe9ef] bg-[#f9fcfd] px-4 py-3 text-sm text-[#173543]">
+                <div key={category} className="rounded-xl border border-[#eadff1] bg-[#fdf8fd] px-4 py-3 text-sm text-[#173543]">
                   <p className="font-semibold">{packagingCategoryLabel(category)}</p>
                   <p className="mt-1 text-xs text-[#5d7685]">Pending: {summary.pending}</p>
                   <p className="text-xs text-[#5d7685]">Approved: {summary.approved}</p>

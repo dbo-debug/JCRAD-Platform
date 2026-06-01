@@ -367,14 +367,14 @@ export default function CustomerSelectionMap({
   }, []);
 
   return (
-    <section className="rounded-[28px] border border-[#dbe8ef] bg-white p-5 shadow-[0_12px_32px_rgba(16,42,67,0.06)] lg:px-6">
+    <section className="rounded-[28px] border border-[#e9def1] bg-white p-5 shadow-[0_12px_32px_rgba(16,42,67,0.06)] lg:px-6">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6c8797]">{title}</p>
           <h3 className="mt-2 text-2xl font-semibold text-[#173543]">Live territory map for proximity-based route drafting</h3>
           <p className="mt-2 max-w-3xl text-sm text-[#5c7483]">{description}</p>
         </div>
-        <div className="grid gap-2 rounded-2xl border border-[#dbe8ef] bg-[#fbfdfe] p-4 text-sm text-[#506877] shadow-sm sm:min-w-[220px]">
+        <div className="grid gap-2 rounded-2xl border border-[#e9def1] bg-[#fffafd] p-4 text-sm text-[#506877] shadow-sm sm:min-w-[220px]">
           <MapMetric label="Visible on Map" value={String(withCoords.length)} />
           <MapMetric label="Focused" value={focusedCustomer ? "1" : "0"} />
           <MapMetric label="No Coords" value={String(withoutCoords.length)} />
@@ -384,17 +384,17 @@ export default function CustomerSelectionMap({
       </div>
 
       {withCoords.length === 0 ? (
-        <div className="mt-5 rounded-2xl border border-dashed border-[#d3e1e8] bg-[#f9fcfd] px-4 py-8 text-sm text-[#5d7685]">
+        <div className="mt-5 rounded-2xl border border-dashed border-[#d3e1e8] bg-[#fdf8fd] px-4 py-8 text-sm text-[#5d7685]">
           {emptyLabel}
         </div>
       ) : (
         <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1.9fr)_minmax(300px,0.72fr)]">
           <div className="space-y-4">
-            <div className="flex flex-wrap items-center gap-2 rounded-[20px] border border-[#dbe8ef] bg-[#fbfdfe] p-3">
+            <div className="flex flex-wrap items-center gap-2 rounded-[20px] border border-[#e9def1] bg-[#fffafd] p-3">
               <select
                 value={focusKey}
                 onChange={(event) => setFocusKey(event.target.value)}
-                className="h-10 min-w-[220px] rounded-full border border-[#cedde6] bg-white px-4 text-sm text-[#173543] outline-none transition focus:border-[#14b8a6]"
+                className="h-10 min-w-[220px] rounded-full border border-[#cedde6] bg-white px-4 text-sm text-[#173543] outline-none transition focus:border-[#8f52dc]"
               >
                 {focusOptions.map((option) => (
                   <option key={option.key} value={option.key}>
@@ -402,7 +402,7 @@ export default function CustomerSelectionMap({
                   </option>
                 ))}
               </select>
-              <span className="rounded-full border border-[#d7e6ed] bg-white px-3 py-1.5 text-sm text-[#4f6877]">
+              <span className="rounded-full border border-[#e5d8ef] bg-white px-3 py-1.5 text-sm text-[#4f6877]">
                 {selectionScopeLabel === "Visible results" ? "Visible Accounts" : "Selected Working Group"}
               </span>
               <button
@@ -416,7 +416,7 @@ export default function CustomerSelectionMap({
             </div>
 
             {googleMapStatus === "ready" ? (
-              <div className="relative overflow-hidden rounded-[24px] border border-[#dbe8ef] bg-[linear-gradient(180deg,#f6fbfd_0%,#ecf7fa_100%)] shadow-sm">
+              <div className="relative overflow-hidden rounded-[24px] border border-[#e9def1] bg-[linear-gradient(180deg,#fdf7fb_0%,#ecf7fa_100%)] shadow-sm">
                 <div ref={mapRef} className="aspect-[1.7/1] min-h-[560px] w-full" />
               </div>
             ) : (
@@ -440,7 +440,7 @@ export default function CustomerSelectionMap({
               </div>
             ) : null}
             {focusedCustomer ? (
-              <div className="rounded-[24px] border border-[#dbe8ef] bg-[#fbfdfe] p-4 shadow-sm">
+              <div className="rounded-[24px] border border-[#e9def1] bg-[#fffafd] p-4 shadow-sm">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
@@ -482,7 +482,7 @@ export default function CustomerSelectionMap({
                       "rounded-full px-4 py-2 text-sm font-semibold transition",
                       selectedCustomerIdSet.has(focusedCustomer.id)
                         ? "border border-[#bfdbfe] bg-[#eff6ff] text-[#2563eb]"
-                        : "border border-[#cfdde6] bg-white text-[#24404d] hover:border-[#2563eb] hover:text-[#2563eb]",
+                        : "border border-[#ddcfe9] bg-white text-[#24404d] hover:border-[#2563eb] hover:text-[#2563eb]",
                     ].join(" ")}
                   >
                     {selectedCustomerIdSet.has(focusedCustomer.id) ? "Remove from Group" : "Add to Group"}
@@ -496,7 +496,7 @@ export default function CustomerSelectionMap({
                   secondaryActionHref(focusedCustomer.id) !== `/workspace/customers/${focusedCustomer.id}` ? (
                     <Link
                       href={secondaryActionHref(focusedCustomer.id)}
-                      className="rounded-full border border-[#cfdde6] bg-white px-4 py-2 text-sm font-semibold text-[#24404d] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
+                      className="rounded-full border border-[#ddcfe9] bg-white px-4 py-2 text-sm font-semibold text-[#24404d] transition hover:border-[#8f52dc] hover:text-[#6f32b5]"
                     >
                       {secondaryActionLabel}
                     </Link>
@@ -505,7 +505,7 @@ export default function CustomerSelectionMap({
               </div>
             ) : null}
 
-            <div className="rounded-[24px] border border-[#dbe8ef] bg-white p-4 shadow-sm">
+            <div className="rounded-[24px] border border-[#e9def1] bg-white p-4 shadow-sm">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <h4 className="text-sm font-semibold uppercase tracking-[0.12em] text-[#6f8897]">Map States</h4>
@@ -540,11 +540,11 @@ export default function CustomerSelectionMap({
                     </button>
                   ))}
                   {selectedMapCustomers.length > 8 ? (
-                    <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1 text-xs font-semibold text-[#4f6877]">
+                    <span className="rounded-full border border-[#e5d8ef] bg-[#fcf7fd] px-3 py-1 text-xs font-semibold text-[#4f6877]">
                       +{selectedMapCustomers.length - 8} more
                     </span>
             ) : (
-              <div className="rounded-[24px] border border-dashed border-[#dbe8ef] bg-[#f9fcfd] px-4 py-4 text-sm text-[#5d7685]">
+              <div className="rounded-[24px] border border-dashed border-[#e9def1] bg-[#fdf8fd] px-4 py-4 text-sm text-[#5d7685]">
                 Click a visible marker or a mini account card to focus one account without changing the working group.
               </div>
             )}
@@ -552,16 +552,16 @@ export default function CustomerSelectionMap({
               ) : null}
             </div>
 
-            <div className="rounded-[24px] border border-[#dbe8ef] bg-white p-4 shadow-sm">
+            <div className="rounded-[24px] border border-[#e9def1] bg-white p-4 shadow-sm">
               <div className="flex items-center justify-between gap-3">
                 <h4 className="text-sm font-semibold uppercase tracking-[0.12em] text-[#6f8897]">Stops Without Coordinates</h4>
-                <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-2.5 py-1 text-xs font-semibold text-[#4f6877]">
+                <span className="rounded-full border border-[#e5d8ef] bg-[#fcf7fd] px-2.5 py-1 text-xs font-semibold text-[#4f6877]">
                   {withoutCoords.length}
                 </span>
               </div>
               <div className="mt-3 space-y-2">
                 {withoutCoords.slice(0, 6).map((customer) => (
-                  <div key={customer.id} className="rounded-xl border border-[#e1ebf1] bg-[#fbfdfe] px-3 py-2 text-sm text-[#4f6877]">
+                  <div key={customer.id} className="rounded-xl border border-[#e1ebf1] bg-[#fffafd] px-3 py-2 text-sm text-[#4f6877]">
                     <p className="font-semibold text-[#173543]">{customer.name}</p>
                     <p className="mt-1">
                       Territory {customer.territoryCode || "Unassigned"} • {customer.city || "No city"}
@@ -647,14 +647,14 @@ function ProjectedCustomerMap(args: {
   }, [args.coordinateSignature, args.focusOptions, focusKey]);
 
   return (
-    <div className="relative overflow-hidden rounded-[24px] border border-[#dbe8ef] bg-[linear-gradient(180deg,#f6fbfd_0%,#ecf7fa_100%)] shadow-sm">
+    <div className="relative overflow-hidden rounded-[24px] border border-[#e9def1] bg-[linear-gradient(180deg,#fdf7fb_0%,#ecf7fa_100%)] shadow-sm">
       <div className="absolute right-3 top-3 z-20 flex flex-wrap items-center gap-2 rounded-2xl border border-white/70 bg-white/90 px-3 py-2 text-xs font-semibold text-[#35505d] shadow-sm backdrop-blur">
         <select
           value={focusKey}
           onChange={(event) => {
             setFocusKey(event.target.value);
           }}
-          className="rounded-full border border-[#d7e6ed] bg-white px-3 py-1 text-xs text-[#173543]"
+          className="rounded-full border border-[#e5d8ef] bg-white px-3 py-1 text-xs text-[#173543]"
         >
           {args.focusOptions.map((option) => (
             <option key={option.key} value={option.key}>
@@ -662,25 +662,25 @@ function ProjectedCustomerMap(args: {
             </option>
           ))}
         </select>
-        <button type="button" onClick={() => setZoom((current) => Math.min(current + 0.2, 2.4))} className="rounded-full border border-[#d7e6ed] px-2 py-1">
+        <button type="button" onClick={() => setZoom((current) => Math.min(current + 0.2, 2.4))} className="rounded-full border border-[#e5d8ef] px-2 py-1">
           +
         </button>
-        <button type="button" onClick={() => setZoom((current) => Math.max(current - 0.2, 1))} className="rounded-full border border-[#d7e6ed] px-2 py-1">
+        <button type="button" onClick={() => setZoom((current) => Math.max(current - 0.2, 1))} className="rounded-full border border-[#e5d8ef] px-2 py-1">
           -
         </button>
-        <button type="button" onClick={() => setPanY((current) => current + 80)} className="rounded-full border border-[#d7e6ed] px-2 py-1">
+        <button type="button" onClick={() => setPanY((current) => current + 80)} className="rounded-full border border-[#e5d8ef] px-2 py-1">
           N
         </button>
-        <button type="button" onClick={() => setPanY((current) => current - 80)} className="rounded-full border border-[#d7e6ed] px-2 py-1">
+        <button type="button" onClick={() => setPanY((current) => current - 80)} className="rounded-full border border-[#e5d8ef] px-2 py-1">
           S
         </button>
-        <button type="button" onClick={() => setPanX((current) => current + 80)} className="rounded-full border border-[#d7e6ed] px-2 py-1">
+        <button type="button" onClick={() => setPanX((current) => current + 80)} className="rounded-full border border-[#e5d8ef] px-2 py-1">
           W
         </button>
-        <button type="button" onClick={() => setPanX((current) => current - 80)} className="rounded-full border border-[#d7e6ed] px-2 py-1">
+        <button type="button" onClick={() => setPanX((current) => current - 80)} className="rounded-full border border-[#e5d8ef] px-2 py-1">
           E
         </button>
-        <button type="button" onClick={resetViewport} className="rounded-full border border-[#d7e6ed] px-3 py-1">
+        <button type="button" onClick={resetViewport} className="rounded-full border border-[#e5d8ef] px-3 py-1">
           Reset
         </button>
       </div>

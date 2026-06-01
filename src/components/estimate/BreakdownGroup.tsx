@@ -11,7 +11,7 @@ type BreakdownGroupProps = {
 
 export default function BreakdownGroup({ title, line, unitLabel, group }: BreakdownGroupProps) {
   return (
-    <section className="rounded-2xl border border-[#dbe6ed] bg-[#fbfdfe] p-4">
+    <section className="rounded-2xl border border-[#e8ddf0] bg-[#fffafd] p-4">
       <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#5b7382]">{title}</div>
       <div className="space-y-2">
         {group.rows.map((row) => (
@@ -29,7 +29,7 @@ export default function BreakdownGroup({ title, line, unitLabel, group }: Breakd
           </div>
         ))}
       </div>
-      <div className="mt-3 border-t border-[#dbe6ed] pt-2 text-sm font-semibold text-[#16384a]">
+      <div className="mt-3 border-t border-[#e8ddf0] pt-2 text-sm font-semibold text-[#16384a]">
         <div className="flex items-center justify-between">
           <span>{title} Subtotal</span>
           <span className="text-right">

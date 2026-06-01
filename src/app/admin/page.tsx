@@ -61,7 +61,7 @@ function isMissingOptionalRelationError(error: {
 }
 
 function logDashboardFailure(label: string, error: unknown) {
-  console.error("[admin-dashboard] section load failed", {
+  console.warn("[admin-dashboard] section load failed", {
     section: label,
     message: getDashboardFailureMessage(error),
     error,
@@ -189,7 +189,7 @@ export default async function AdminDashboardPage() {
             });
             return [];
           }
-          console.error("[admin-dashboard] platform_events query failed", {
+          console.warn("[admin-dashboard] platform_events query failed", {
             table: "platform_events",
             message: res.error.message,
             code: res.error.code,
@@ -340,11 +340,11 @@ export default async function AdminDashboardPage() {
                     <Link
                       key={customer.id}
                       href={customer.href}
-                      className="rounded-lg border border-[#dbe9ef] bg-white px-3 py-2 text-sm transition hover:border-[#14b8a6] hover:bg-[#f6fbfd]"
+                      className="rounded-lg border border-[#eadff1] bg-white px-3 py-2 text-sm transition hover:border-[#8f52dc] hover:bg-[#fdf7fb]"
                     >
                       <p className="font-semibold text-[#173543]">{customer.name}</p>
                       <p className="text-xs text-[#5b7382]">{customer.detail}</p>
-                      <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#0f766e]">{customer.ctaLabel}</p>
+                      <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6f32b5]">{customer.ctaLabel}</p>
                     </Link>
                   ))}
                   {dashboard.coordinateCleanupCustomers.length === 0 ? <p className="text-sm text-[#5b7382]">No accounts need coordinate cleanup right now.</p> : null}
@@ -374,14 +374,14 @@ export default async function AdminDashboardPage() {
                     <Link
                       key={route.id}
                       href={route.href}
-                      className="flex items-center justify-between rounded-lg border border-[#dbe9ef] bg-white px-3 py-2 text-sm transition hover:border-[#14b8a6] hover:bg-[#f6fbfd]"
+                      className="flex items-center justify-between rounded-lg border border-[#eadff1] bg-white px-3 py-2 text-sm transition hover:border-[#8f52dc] hover:bg-[#fdf7fb]"
                     >
                       <div>
                         <p className="font-semibold text-[#173543]">{route.name}</p>
                         <p className="text-xs text-[#5b7382]">{route.detail}</p>
-                        <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#0f766e]">{route.ctaLabel}</p>
+                        <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6f32b5]">{route.ctaLabel}</p>
                       </div>
-                      <span className="rounded-full bg-[#eef7f6] px-2 py-0.5 text-xs font-semibold text-[#0f766e]">{route.status}</span>
+                      <span className="rounded-full bg-[#eef7f6] px-2 py-0.5 text-xs font-semibold text-[#6f32b5]">{route.status}</span>
                     </Link>
                   ))}
                   {dashboard.activeRoutes.length === 0 ? <p className="text-sm text-[#5b7382]">No active routes right now.</p> : null}
@@ -444,7 +444,7 @@ export default async function AdminDashboardPage() {
                     <Link
                       key={source.id}
                       href={`/workspace/sources/${source.id}`}
-                      className="block rounded-lg border border-[#dbe9ef] bg-white px-3 py-3 transition hover:border-[#14b8a6] hover:bg-[#f6fbfd]"
+                      className="block rounded-lg border border-[#eadff1] bg-white px-3 py-3 transition hover:border-[#8f52dc] hover:bg-[#fdf7fb]"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div>
@@ -452,7 +452,7 @@ export default async function AdminDashboardPage() {
                           <p className="mt-1 text-xs text-[#5b7382]">
                             {source.companyName || "Independent source"} • {source.assignedBuyerName || "Unassigned buyer"}
                           </p>
-                          <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#0f766e]">Open source account</p>
+                          <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6f32b5]">Open source account</p>
                         </div>
                         <div className="text-right text-xs text-[#5b7382]">
                           <p>{source.openTaskCount} open</p>
@@ -515,11 +515,11 @@ export default async function AdminDashboardPage() {
                     <Link
                       key={task.id}
                       href={task.href}
-                      className="block rounded-lg border border-[#dbe9ef] bg-white px-3 py-2 text-sm transition hover:border-[#14b8a6] hover:bg-[#f6fbfd]"
+                      className="block rounded-lg border border-[#eadff1] bg-white px-3 py-2 text-sm transition hover:border-[#8f52dc] hover:bg-[#fdf7fb]"
                     >
                       <p className="font-semibold text-[#173543]">{task.title}</p>
                       <p className="text-xs text-[#5b7382]">{task.detail}</p>
-                      <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#0f766e]">{task.ctaLabel}</p>
+                      <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6f32b5]">{task.ctaLabel}</p>
                     </Link>
                   ))}
                   {dashboard.openTaskItems.length === 0 ? <p className="text-sm text-[#5b7382]">No assigned tasks right now.</p> : null}
@@ -553,14 +553,14 @@ export default async function AdminDashboardPage() {
                     <Link
                       key={route.id}
                       href={route.href}
-                      className="flex items-center justify-between rounded-lg border border-[#dbe9ef] bg-white px-3 py-2 text-sm transition hover:border-[#14b8a6] hover:bg-[#f6fbfd]"
+                      className="flex items-center justify-between rounded-lg border border-[#eadff1] bg-white px-3 py-2 text-sm transition hover:border-[#8f52dc] hover:bg-[#fdf7fb]"
                     >
                       <div>
                         <p className="font-semibold text-[#173543]">{route.name}</p>
                         <p className="text-xs text-[#5b7382]">{route.detail}</p>
-                        <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#0f766e]">{route.ctaLabel}</p>
+                        <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6f32b5]">{route.ctaLabel}</p>
                       </div>
-                      <span className="rounded-full bg-[#eef7f6] px-2 py-0.5 text-xs font-semibold text-[#0f766e]">{route.status}</span>
+                      <span className="rounded-full bg-[#eef7f6] px-2 py-0.5 text-xs font-semibold text-[#6f32b5]">{route.status}</span>
                     </Link>
                   ))}
                   {dashboard.activeRoutes.length === 0 ? <p className="text-sm text-[#5b7382]">No routes are currently in your scope.</p> : null}
@@ -578,27 +578,27 @@ export default async function AdminDashboardPage() {
                     <Link
                       key={customer.id}
                       href={customer.href}
-                      className="block rounded-lg border border-[#dbe9ef] bg-white px-3 py-2 text-sm transition hover:border-[#14b8a6] hover:bg-[#f6fbfd]"
+                      className="block rounded-lg border border-[#eadff1] bg-white px-3 py-2 text-sm transition hover:border-[#8f52dc] hover:bg-[#fdf7fb]"
                     >
                       <p className="font-semibold text-[#173543]">{customer.name}</p>
                       <p className="text-xs text-[#5b7382]">{customer.detail}</p>
-                      <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#0f766e]">{customer.ctaLabel}</p>
+                      <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6f32b5]">{customer.ctaLabel}</p>
                     </Link>
                   ))}
                   {dashboard.accountActivityItems.length === 0 ? <p className="text-sm text-[#5b7382]">No assigned account activity right now.</p> : null}
                 </div>
-                <div className="mt-4 border-t border-[#dbe9ef] pt-4">
+                <div className="mt-4 border-t border-[#eadff1] pt-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#5d7685]">Order watch</p>
                   <div className="mt-2 space-y-2">
                     {dashboard.recentPendingOrders.map((order) => (
                       <Link
                         key={order.id}
                         href={order.href}
-                        className="block rounded-lg border border-[#dbe9ef] bg-white px-3 py-2 text-sm transition hover:border-[#14b8a6] hover:bg-[#f6fbfd]"
+                        className="block rounded-lg border border-[#eadff1] bg-white px-3 py-2 text-sm transition hover:border-[#8f52dc] hover:bg-[#fdf7fb]"
                       >
                         <p className="font-semibold text-[#173543]">{order.name}</p>
                         <p className="text-xs text-[#5b7382]">{order.detail}</p>
-                        <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#0f766e]">{order.ctaLabel}</p>
+                        <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6f32b5]">{order.ctaLabel}</p>
                       </Link>
                     ))}
                     {dashboard.recentPendingOrders.length === 0 ? <p className="text-sm text-[#5b7382]">No open order activity right now.</p> : null}

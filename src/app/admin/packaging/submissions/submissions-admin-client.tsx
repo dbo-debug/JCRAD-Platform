@@ -114,14 +114,14 @@ export default function PackagingSubmissionsAdminClient() {
         </p>
       </QueuePurposePanel>
 
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[#dbe9ef] bg-[#f9fcfd] p-3">
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[#eadff1] bg-[#fdf8fd] p-3">
         <select
           value={statusFilter}
           onChange={(e) => {
             setBusy(true);
             setStatusFilter(e.target.value);
           }}
-          className="rounded border border-[#cfdde5] bg-white px-3 py-2 text-sm text-[#173543]"
+          className="rounded border border-[#ddcfe8] bg-white px-3 py-2 text-sm text-[#173543]"
         >
           <option value="pending">pending</option>
           <option value="approved">approved</option>
@@ -131,7 +131,7 @@ export default function PackagingSubmissionsAdminClient() {
         <button
           onClick={refresh}
           disabled={busy}
-          className="rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95 disabled:opacity-60"
+          className="rounded-full bg-[#8f52dc] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95 disabled:opacity-60"
         >
           {busy ? "Loading..." : "Refresh"}
         </button>
@@ -146,7 +146,7 @@ export default function PackagingSubmissionsAdminClient() {
           <SubmissionRow key={r.id} row={r} onReview={review} />
         ))}
         {rows.length === 0 && !busy ? (
-          <div className="rounded-2xl border border-dashed border-[#d7e6ed] bg-[#f9fcfd] px-6 py-10 text-center text-sm text-[#5b7382]">
+          <div className="rounded-2xl border border-dashed border-[#e5d8ef] bg-[#fdf8fd] px-6 py-10 text-center text-sm text-[#5b7382]">
             No packaging review items match this queue state.
           </div>
         ) : null}
@@ -159,13 +159,13 @@ function SubmissionRow({ row, onReview }: { row: Submission; onReview: (id: stri
   const [notes, setNotes] = useState(row.review_notes || "");
   const statusLabel = String(row.status || "pending").toLowerCase();
   const statusClass = statusLabel === "approved"
-    ? "bg-[#eefaf8] text-[#0f766e] border-[#cde9e6]"
+    ? "bg-[#eefaf8] text-[#6f32b5] border-[#cde9e6]"
     : statusLabel === "rejected"
       ? "bg-[#fff4f4] text-[#991b1b] border-[#f3d2d2]"
       : "bg-[#fff9ed] text-[#8a5a08] border-[#f2ddba]";
 
   return (
-    <div className="grid gap-2 rounded-xl border border-[#dbe9ef] bg-white p-4 shadow-sm">
+    <div className="grid gap-2 rounded-xl border border-[#eadff1] bg-white p-4 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7891a0]">Packaging Blocker</p>
@@ -176,7 +176,7 @@ function SubmissionRow({ row, onReview }: { row: Submission; onReview: (id: stri
         </span>
       </div>
       <div className="text-xs text-[#5b7382]">{row.customer_email} | {row.customer_phone || "No phone"} | Submitted {formatDate(row.created_at)}</div>
-      <div className="rounded-xl border border-[#e2edf2] bg-[#f9fcfd] px-3 py-3">
+      <div className="rounded-xl border border-[#e2edf2] bg-[#fdf8fd] px-3 py-3">
         <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#6a8290]">Why This Matters</p>
         <p className="mt-1 text-sm text-[#2f4a59]">
           {statusLabel === "pending"
@@ -194,12 +194,12 @@ function SubmissionRow({ row, onReview }: { row: Submission; onReview: (id: stri
 
       <div className="flex flex-wrap gap-3 text-sm">
         {row.front_image_url ? (
-          <a href={row.front_image_url} target="_blank" rel="noreferrer" className="text-[#0f766e] underline underline-offset-4">
+          <a href={row.front_image_url} target="_blank" rel="noreferrer" className="text-[#6f32b5] underline underline-offset-4">
             Front Image
           </a>
         ) : null}
         {row.back_image_url ? (
-          <a href={row.back_image_url} target="_blank" rel="noreferrer" className="text-[#0f766e] underline underline-offset-4">
+          <a href={row.back_image_url} target="_blank" rel="noreferrer" className="text-[#6f32b5] underline underline-offset-4">
             Back Image
           </a>
         ) : null}
@@ -207,12 +207,12 @@ function SubmissionRow({ row, onReview }: { row: Submission; onReview: (id: stri
 
       <div className="flex flex-wrap gap-2">
         {row.account_href ? (
-          <Link href={row.account_href} className="rounded-full border border-[#cfdce4] px-3 py-1.5 text-xs font-semibold text-[#24404d] transition hover:border-[#14b8a6] hover:text-[#0f766e]">
+          <Link href={row.account_href} className="rounded-full border border-[#cfdce4] px-3 py-1.5 text-xs font-semibold text-[#24404d] transition hover:border-[#8f52dc] hover:text-[#6f32b5]">
             Open Account
           </Link>
         ) : null}
         {row.estimate_href ? (
-          <Link href={row.estimate_href} className="rounded-full border border-[#cfdce4] px-3 py-1.5 text-xs font-semibold text-[#24404d] transition hover:border-[#14b8a6] hover:text-[#0f766e]">
+          <Link href={row.estimate_href} className="rounded-full border border-[#cfdce4] px-3 py-1.5 text-xs font-semibold text-[#24404d] transition hover:border-[#8f52dc] hover:text-[#6f32b5]">
             Open Estimate
           </Link>
         ) : null}
@@ -223,12 +223,12 @@ function SubmissionRow({ row, onReview }: { row: Submission; onReview: (id: stri
         onChange={(e) => setNotes(e.target.value)}
         placeholder="Explain the approval or the exact fix needed next."
         rows={2}
-        className="rounded border border-[#cfdde5] bg-white px-3 py-2 text-sm text-[#173543]"
+        className="rounded border border-[#ddcfe8] bg-white px-3 py-2 text-sm text-[#173543]"
       />
       <div className="flex flex-wrap gap-2">
         <button
           onClick={() => onReview(row.id, "approved", notes)}
-          className="rounded-full bg-[#14b8a6] px-4 py-2 text-xs font-semibold text-white transition hover:opacity-95"
+          className="rounded-full bg-[#8f52dc] px-4 py-2 text-xs font-semibold text-white transition hover:opacity-95"
         >
           Approve And Unblock
         </button>

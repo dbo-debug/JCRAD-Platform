@@ -89,10 +89,10 @@ export default function CopackPage() {
 
       <PatternAccent />
 
-      <section className="rounded-2xl border border-[#dbe9ef] bg-white p-5 md:p-7">
+      <section className="rounded-2xl border border-[#eadff1] bg-white p-5 md:p-7">
         <div className="grid gap-3 md:grid-cols-3">
           {VALUE_PROPOSITION.map((point) => (
-            <div key={point} className="rounded-xl border border-[#dbe9ef] bg-[#f5fbfd] px-4 py-3 text-sm font-medium text-[#26485a]">
+            <div key={point} className="rounded-xl border border-[#eadff1] bg-[#f5fbfd] px-4 py-3 text-sm font-medium text-[#26485a]">
               {point}
             </div>
           ))}
@@ -108,7 +108,7 @@ export default function CopackPage() {
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           {SUPPORT_AREAS.map((item) => (
-            <Card key={item.title} className="border border-[#dbe9ef] bg-white p-5 text-[#153447] shadow-sm">
+            <Card key={item.title} className="border border-[#eadff1] bg-white p-5 text-[#153447] shadow-sm">
               <h3 className="text-lg font-semibold">{item.title}</h3>
               <p className="mt-2 text-sm text-[#4a6575]">{item.body}</p>
             </Card>
@@ -116,11 +116,11 @@ export default function CopackPage() {
         </div>
       </section>
 
-      <section className="rounded-2xl border border-[#dbe9ef] bg-white p-6 md:p-8">
+      <section className="rounded-2xl border border-[#eadff1] bg-white p-6 md:p-8">
         <h2 className="text-2xl font-semibold text-[#13303f] md:text-3xl">How copack moves from idea to shelf</h2>
         <div className="mt-5 grid gap-4 md:grid-cols-3">
           {WORKFLOW_STEPS.map((step) => (
-            <Card key={step.title} className="border border-[#dbe9ef] bg-[#f8fcfd] p-5">
+            <Card key={step.title} className="border border-[#eadff1] bg-[#f8fcfd] p-5">
               <h3 className="text-base font-semibold text-[#173847]">{step.title}</h3>
               <p className="mt-2 text-sm text-[#4a6575]">{step.body}</p>
             </Card>
@@ -129,14 +129,14 @@ export default function CopackPage() {
       </section>
 
       <section className="grid gap-4 md:grid-cols-2">
-        <div className="overflow-hidden rounded-2xl border border-[#dbe9ef] bg-[#102330]">
+        <div className="overflow-hidden rounded-2xl border border-[#eadff1] bg-[#102330]">
           <img
             src="/site-pics/copacking1.jpg"
             alt="Copack production at JC RAD Inc."
             className="h-full min-h-[280px] w-full object-cover opacity-85"
           />
         </div>
-        <div className="rounded-2xl border border-[#dbe9ef] bg-white p-6 md:p-8">
+        <div className="rounded-2xl border border-[#eadff1] bg-white p-6 md:p-8">
           <h2 className="text-2xl font-semibold text-[#13303f] md:text-3xl">Built for house brands</h2>
           <p className="mt-3 text-sm text-[#4a6575]">
             JC RAD Inc. helps dispensaries and operators launch practical house-brand products without unnecessary complexity.
@@ -157,12 +157,12 @@ export default function CopackPage() {
         </div>
         <div className="grid gap-4 md:grid-cols-3">
           {PRODUCT_LAUNCHES.map((launch) => (
-            <Card key={launch.title} className="border border-[#dbe9ef] bg-white p-5">
+            <Card key={launch.title} className="border border-[#eadff1] bg-white p-5">
               <h3 className="text-base font-semibold text-[#173847]">{launch.title}</h3>
               <ul className="mt-3 space-y-2 text-sm text-[#4a6575]">
                 {launch.points.map((point) => (
                   <li key={point} className="flex items-start gap-2">
-                    <span className="mt-1 h-1.5 w-1.5 rounded-full bg-[#14b8a6]" aria-hidden />
+                    <span className="mt-1 h-1.5 w-1.5 rounded-full bg-[#8f52dc]" aria-hidden />
                     <span>{point}</span>
                   </li>
                 ))}
@@ -176,7 +176,7 @@ export default function CopackPage() {
         <h2 className="text-2xl font-semibold text-[#13303f] md:text-3xl">Why operators use JC RAD Inc.</h2>
         <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
           {OPERATOR_REASONS.map((item) => (
-            <div key={item} className="rounded-xl border border-[#dbe9ef] bg-white px-4 py-3 text-sm font-medium text-[#234353]">
+            <div key={item} className="rounded-xl border border-[#eadff1] bg-white px-4 py-3 text-sm font-medium text-[#234353]">
               {item}
             </div>
           ))}
@@ -184,7 +184,7 @@ export default function CopackPage() {
       </section>
 
       <section className="grid gap-4 md:grid-cols-2">
-        <div className="rounded-2xl border border-[#dbe9ef] bg-white p-6 md:p-7">
+        <div className="rounded-2xl border border-[#eadff1] bg-white p-6 md:p-7">
           <h2 className="text-2xl font-semibold text-[#13303f]">Scope your next product launch</h2>
           <p className="mt-2 text-sm text-[#4a6575]">
             Build a realistic production plan around format, packaging, and launch timing before committing capital.
@@ -192,25 +192,25 @@ export default function CopackPage() {
           <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
             <Link
               href="/menu"
-              className="inline-flex items-center justify-center rounded-full bg-[#14b8a6] px-5 py-3 text-sm font-semibold text-white transition hover:opacity-95"
+              className="inline-flex items-center justify-center rounded-full bg-[#8f52dc] px-5 py-3 text-sm font-semibold text-white transition hover:opacity-95"
             >
               View Menu
             </Link>
             <Link
               href="/signup"
-              className="inline-flex items-center justify-center rounded-full border border-[#cfe0e7] bg-white px-5 py-3 text-sm font-semibold text-[#2b4756] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
+              className="inline-flex items-center justify-center rounded-full border border-[#decee9] bg-white px-5 py-3 text-sm font-semibold text-[#2b4756] transition hover:border-[#8f52dc] hover:text-[#6f32b5]"
             >
               Create Account
             </Link>
             <Link
               href="/contact?intent=call"
-              className="inline-flex items-center justify-center rounded-full border border-[#cfe0e7] bg-white px-5 py-3 text-sm font-semibold text-[#2b4756] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
+              className="inline-flex items-center justify-center rounded-full border border-[#decee9] bg-white px-5 py-3 text-sm font-semibold text-[#2b4756] transition hover:border-[#8f52dc] hover:text-[#6f32b5]"
             >
               Book a Call
             </Link>
           </div>
         </div>
-        <div className="rounded-2xl border border-[#dbe9ef] bg-[linear-gradient(180deg,#effaf9_0%,#e8f7fb_100%)] p-6 md:p-7">
+        <div className="rounded-2xl border border-[#eadff1] bg-[linear-gradient(180deg,#effaf9_0%,#e8f7fb_100%)] p-6 md:p-7">
           <h3 className="text-xl font-semibold text-[#123646]">Production-first execution</h3>
           <p className="mt-2 text-sm text-[#416273]">
             JC RAD Inc. is structured around practical launches: clear assumptions, disciplined packaging strategy, and formats built for reorder velocity.

@@ -173,7 +173,7 @@ export default function RouteRunner({ customers, routeRepOptions, territoryOptio
 
   return (
     <div className="space-y-5">
-      <section className="rounded-[28px] border border-[#d8e6ee] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbfd_100%)] p-5 shadow-[0_24px_60px_rgba(16,42,67,0.08)] lg:px-6">
+      <section className="rounded-[28px] border border-[#d8e6ee] bg-[linear-gradient(180deg,#ffffff_0%,#fdf7fb_100%)] p-5 shadow-[0_24px_60px_rgba(16,42,67,0.08)] lg:px-6">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div className="max-w-[780px]">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6c8797]">Field Queue Mode</p>
@@ -186,7 +186,7 @@ export default function RouteRunner({ customers, routeRepOptions, territoryOptio
                 : "This is the broad route-scoped field queue, not a saved route in progress. Use it to work rep-assigned stops, capture outcomes, and clean up follow-up when you are not running a specific saved route."}
             </p>
           </div>
-          <div className="rounded-2xl border border-[#dbe8ef] bg-white/85 p-4 text-sm text-[#506877] shadow-sm">
+          <div className="rounded-2xl border border-[#e9def1] bg-white/85 p-4 text-sm text-[#506877] shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7d95a3]">Execution Scope</p>
             <p className="mt-1 text-lg font-semibold text-[#173543]">{currentRepLabel}</p>
             <div className="mt-3 grid gap-2">
@@ -212,13 +212,13 @@ export default function RouteRunner({ customers, routeRepOptions, territoryOptio
         </div>
       </section>
 
-      <section className="rounded-[28px] border border-[#dbe8ef] bg-white p-5 shadow-[0_12px_32px_rgba(16,42,67,0.06)] lg:px-6">
+      <section className="rounded-[28px] border border-[#e9def1] bg-white p-5 shadow-[0_12px_32px_rgba(16,42,67,0.06)] lg:px-6">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Execution Controls</p>
             <p className="mt-1 text-sm text-[#5c7483]">Tune the field queue by rep, day, territory, and stop readiness before opening a stop card.</p>
           </div>
-          <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4f6877]">
+          <span className="rounded-full border border-[#e5d8ef] bg-[#fcf7fd] px-3 py-1.5 text-sm text-[#4f6877]">
             {viewMode === "map" ? "Map view active" : "List view active"}
           </span>
         </div>
@@ -229,7 +229,7 @@ export default function RouteRunner({ customers, routeRepOptions, territoryOptio
               value={search}
               onChange={(event) => startTransition(() => setSearch(event.target.value))}
               placeholder="Search account, contact, phone, email"
-              className="rounded-2xl border border-[#cedde6] bg-[#fbfdfe] px-4 py-3 text-sm text-[#173543] outline-none transition focus:border-[#14b8a6] focus:bg-white"
+              className="rounded-2xl border border-[#cedde6] bg-[#fffafd] px-4 py-3 text-sm text-[#173543] outline-none transition focus:border-[#8f52dc] focus:bg-white"
             />
           </label>
 
@@ -239,7 +239,7 @@ export default function RouteRunner({ customers, routeRepOptions, territoryOptio
               <select
                 value={scope}
                 onChange={(event) => startTransition(() => setScope(event.target.value as "mine" | "all"))}
-                className="rounded-2xl border border-[#cedde6] bg-[#fbfdfe] px-4 py-3 text-sm text-[#173543] outline-none transition focus:border-[#14b8a6] focus:bg-white"
+                className="rounded-2xl border border-[#cedde6] bg-[#fffafd] px-4 py-3 text-sm text-[#173543] outline-none transition focus:border-[#8f52dc] focus:bg-white"
               >
                 <option value="mine">Assigned to me</option>
                 <option value="all">All reps</option>
@@ -287,7 +287,7 @@ export default function RouteRunner({ customers, routeRepOptions, territoryOptio
               { value: "follow_up_needed", label: "Follow-Up Needed" },
             ]}
           />
-          <div className="inline-flex rounded-full border border-[#d0dde5] bg-white p-1">
+          <div className="inline-flex rounded-full border border-[#decfe8] bg-white p-1">
             <button
               type="button"
               onClick={() => startTransition(() => setViewMode("list"))}
@@ -305,7 +305,7 @@ export default function RouteRunner({ customers, routeRepOptions, territoryOptio
           </div>
           <Link
             href="/workspace/routes"
-            className="inline-flex rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543] lg:ml-auto"
+            className="inline-flex rounded-full border border-[#decfe8] bg-white px-3 py-1.5 text-sm text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543] lg:ml-auto"
           >
             Back to Planner
           </Link>
@@ -324,13 +324,13 @@ export default function RouteRunner({ customers, routeRepOptions, territoryOptio
       ) : null}
 
       <section className={viewMode === "map" ? "hidden" : "space-y-4"}>
-        <div className="rounded-2xl border border-[#dbe8ef] bg-white p-4 shadow-[0_12px_32px_rgba(16,42,67,0.05)]">
+        <div className="rounded-2xl border border-[#e9def1] bg-white p-4 shadow-[0_12px_32px_rgba(16,42,67,0.05)]">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Runner Flow</p>
           <p className="mt-1 text-sm text-[#5c7483]">Work territory sections in order, open the next stop card, capture the outcome, then move to the next account in sequence.</p>
         </div>
 
         {territorySections.length > 0 ? (
-          <nav className="rounded-[24px] border border-[#dbe8ef] bg-white p-4 shadow-[0_12px_32px_rgba(16,42,67,0.05)]">
+          <nav className="rounded-[24px] border border-[#e9def1] bg-white p-4 shadow-[0_12px_32px_rgba(16,42,67,0.05)]">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Territory Jump</p>
@@ -341,7 +341,7 @@ export default function RouteRunner({ customers, routeRepOptions, territoryOptio
                   <a
                     key={territory.territoryKey}
                     href={`#runner-territory-${territory.territoryKey}`}
-                    className="rounded-full border border-[#d5e1e8] bg-[#f8fbfc] px-3 py-1.5 text-sm text-[#4a6575] transition hover:bg-white hover:text-[#173543]"
+                    className="rounded-full border border-[#d5e1e8] bg-[#fcf7fd] px-3 py-1.5 text-sm text-[#4a6575] transition hover:bg-white hover:text-[#173543]"
                   >
                     {territory.label} ({territory.accountCount})
                   </a>
@@ -355,7 +355,7 @@ export default function RouteRunner({ customers, routeRepOptions, territoryOptio
           <section
             key={territory.territoryKey}
             id={`runner-territory-${territory.territoryKey}`}
-            className="rounded-[28px] border border-[#dbe8ef] bg-white p-5 shadow-[0_12px_32px_rgba(16,42,67,0.06)]"
+            className="rounded-[28px] border border-[#e9def1] bg-white p-5 shadow-[0_12px_32px_rgba(16,42,67,0.06)]"
           >
             <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
               <div>
@@ -390,7 +390,7 @@ export default function RouteRunner({ customers, routeRepOptions, territoryOptio
         ))}
 
         {visibleCustomers.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-[#d3e1e8] bg-[#f9fcfd] px-4 py-6 text-sm text-[#5d7685]">
+          <div className="rounded-xl border border-dashed border-[#d3e1e8] bg-[#fdf8fd] px-4 py-6 text-sm text-[#5d7685]">
             No route stops match the current runner filters.
           </div>
         ) : null}
@@ -406,7 +406,7 @@ function SelectFilter({ label, value, onChange, options }: { label: string; valu
       <select
         value={value}
         onChange={(event) => startTransition(() => onChange(event.target.value))}
-        className="rounded-2xl border border-[#cedde6] bg-[#fbfdfe] px-4 py-3 text-sm text-[#173543] outline-none transition focus:border-[#14b8a6] focus:bg-white"
+        className="rounded-2xl border border-[#cedde6] bg-[#fffafd] px-4 py-3 text-sm text-[#173543] outline-none transition focus:border-[#8f52dc] focus:bg-white"
       >
         <option value="all">All</option>
         {options.map((option) => (
@@ -430,7 +430,7 @@ function MetricLine({ label, value }: { label: string; value: string }) {
 
 function MiniMetric({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-2xl border border-[#dbe8ef] bg-[#f8fbfc] px-3 py-2 text-sm">
+    <div className="rounded-2xl border border-[#e9def1] bg-[#fcf7fd] px-3 py-2 text-sm">
       <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7d95a3]">{label}</p>
       <p className="mt-1 text-lg font-semibold text-[#173543]">{value}</p>
     </div>
@@ -447,10 +447,10 @@ function TerritoryOwnerPill({ ownerState, ownerLabel }: { ownerState: "owned" | 
 function InlinePill({ label, tone }: { label: string; tone: "neutral" | "warn" | "ok" }) {
   const toneClass =
     tone === "ok"
-      ? "border-[#bde8e4] bg-[#e9fbf9] text-[#0f766e]"
+      ? "border-[#e8d7f7] bg-[#fcf3ff] text-[#6f32b5]"
       : tone === "warn"
         ? "border-[#f1ddad] bg-[#fff9eb] text-[#9a6b00]"
-        : "border-[#d7e6ed] bg-[#f8fbfc] text-[#4f6877]";
+        : "border-[#e5d8ef] bg-[#fcf7fd] text-[#4f6877]";
 
   return (
     <span
@@ -607,7 +607,7 @@ function RouteStopCard({ customer }: { customer: CustomerSummary }) {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <Link href={`/workspace/customers/${customer.id}`} className="text-lg font-semibold text-[#173543] transition hover:text-[#0f766e]">
+            <Link href={`/workspace/customers/${customer.id}`} className="text-lg font-semibold text-[#173543] transition hover:text-[#6f32b5]">
               {customer.name}
             </Link>
             <span className={["rounded-full border px-2.5 py-1 text-xs font-semibold", visitStatusChipClass(customer.visitStatus)].join(" ")}>
@@ -656,16 +656,16 @@ function RouteStopCard({ customer }: { customer: CustomerSummary }) {
           >
             Build Estimate
           </Link>
-          <Link href={`/workspace/customers/${customer.id}`} className="rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm font-medium text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543]">
+          <Link href={`/workspace/customers/${customer.id}`} className="rounded-full border border-[#decfe8] bg-white px-3 py-1.5 text-sm font-medium text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543]">
             Open account
           </Link>
           {phoneHref ? (
-            <a href={phoneHref} className="rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm font-medium text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543]">
+            <a href={phoneHref} className="rounded-full border border-[#decfe8] bg-white px-3 py-1.5 text-sm font-medium text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543]">
               Call contact
             </a>
           ) : null}
           {emailHref ? (
-            <a href={emailHref} className="rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm font-medium text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543]">
+            <a href={emailHref} className="rounded-full border border-[#decfe8] bg-white px-3 py-1.5 text-sm font-medium text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543]">
               Email contact
             </a>
           ) : null}
@@ -673,7 +673,7 @@ function RouteStopCard({ customer }: { customer: CustomerSummary }) {
       </div>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-[1.2fr_0.9fr]">
-        <section className="rounded-2xl border border-[#e1ebf1] bg-[#fbfdfe] p-4">
+        <section className="rounded-2xl border border-[#e1ebf1] bg-[#fffafd] p-4">
           <h3 className="text-sm font-semibold text-[#173543]">Visit Actions</h3>
           <div className="mt-3 flex flex-wrap gap-2">
             {VISIT_OUTCOMES.map((outcome) => (
@@ -690,7 +690,7 @@ function RouteStopCard({ customer }: { customer: CustomerSummary }) {
           </div>
           <div className="mt-2 flex flex-wrap gap-2 text-xs text-[#5b7382]">
             {VISIT_OUTCOMES.map((outcome) => (
-              <span key={outcome.key} className="rounded-full border border-[#d7e6ed] bg-white px-2 py-1">
+              <span key={outcome.key} className="rounded-full border border-[#e5d8ef] bg-white px-2 py-1">
                 {outcome.label}: {outcome.nextVisitDays === null ? "keeps due date" : `${outcome.nextVisitDays}d follow-up`}
               </span>
             ))}
@@ -738,7 +738,7 @@ function RouteStopCard({ customer }: { customer: CustomerSummary }) {
               type="button"
               onClick={() => void runAction("visit", `Visited ${customer.name}`)}
               disabled={busyAction !== null}
-              className="rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+              className="rounded-full bg-[#8f52dc] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
             >
               {busyAction === "visit" ? "Saving..." : "Mark visited"}
             </button>
@@ -746,17 +746,17 @@ function RouteStopCard({ customer }: { customer: CustomerSummary }) {
               type="button"
               onClick={() => void runAction("log", `Logged visit update for ${customer.name}`)}
               disabled={busyAction !== null}
-              className="rounded-full border border-[#cfdde5] bg-white px-4 py-2 text-sm font-semibold text-[#24404d] disabled:opacity-60"
+              className="rounded-full border border-[#ddcfe8] bg-white px-4 py-2 text-sm font-semibold text-[#24404d] disabled:opacity-60"
             >
               {busyAction === "log" ? "Saving..." : "Log visit activity"}
             </button>
           </div>
         </section>
 
-        <section className="rounded-2xl border border-[#e1ebf1] bg-[#fbfdfe] p-4">
+        <section className="rounded-2xl border border-[#e1ebf1] bg-[#fffafd] p-4">
           <h3 className="text-sm font-semibold text-[#173543]">Follow-up Task</h3>
           <label className="mt-3 flex items-center gap-2 text-sm text-[#4b6676]">
-            <input type="checkbox" checked={autoCreateTask} onChange={(event) => setAutoCreateTask(event.target.checked)} className="h-4 w-4 rounded border-[#cfdde6] text-[#14b8a6]" />
+            <input type="checkbox" checked={autoCreateTask} onChange={(event) => setAutoCreateTask(event.target.checked)} className="h-4 w-4 rounded border-[#ddcfe9] text-[#8f52dc]" />
             <span>Create task on next outcome</span>
           </label>
           <label className="mt-3 grid gap-1 text-sm text-[#4b6676]">
@@ -782,7 +782,7 @@ function RouteStopCard({ customer }: { customer: CustomerSummary }) {
               type="button"
               onClick={() => void createFollowUpTask()}
               disabled={busyAction !== null}
-              className="rounded-full border border-[#cfdde5] bg-white px-4 py-2 text-sm font-semibold text-[#24404d] disabled:opacity-60"
+              className="rounded-full border border-[#ddcfe8] bg-white px-4 py-2 text-sm font-semibold text-[#24404d] disabled:opacity-60"
             >
               {busyAction === "task" ? "Saving..." : "Create follow-up task"}
             </button>

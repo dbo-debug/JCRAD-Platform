@@ -403,7 +403,7 @@ export default function PackagingSkuForm({
     }
   }
 
-  const thumbnailPreview = localPreviewUrl || String(form.thumbnail_url || "").trim() || "/brand/PRIMARY.png";
+  const thumbnailPreview = localPreviewUrl || String(form.thumbnail_url || "").trim() || "/brand/motley-on-white.png";
 
   return (
     <form onSubmit={onSubmit} className="space-y-5 rounded-xl border border-[var(--surface-border)] bg-white p-5 shadow-sm">
@@ -411,7 +411,7 @@ export default function PackagingSkuForm({
         <label className="grid gap-1">
           <span className="text-sm text-[#4f6877]">Name</span>
           <input
-            className="rounded border border-[#cfdde5] bg-white px-3 py-2 text-sm text-[#173543]"
+            className="rounded border border-[#ddcfe8] bg-white px-3 py-2 text-sm text-[#173543]"
             value={form.name}
             onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
             required
@@ -421,7 +421,7 @@ export default function PackagingSkuForm({
         <label className="grid gap-1">
           <span className="text-sm text-[#4f6877]">Primary Family</span>
           <select
-            className="rounded border border-[#cfdde5] bg-white px-3 py-2 text-sm text-[#173543]"
+            className="rounded border border-[#ddcfe8] bg-white px-3 py-2 text-sm text-[#173543]"
             value={form.applies_to}
             onChange={(e) => setForm((prev) => ({ ...prev, applies_to: e.target.value as AppliesTo }))}
           >
@@ -434,7 +434,7 @@ export default function PackagingSkuForm({
 
         <div className="grid gap-2 md:col-span-2">
           <span className="text-sm text-[#4f6877]">Compatibility Contexts</span>
-          <div className="flex flex-wrap gap-3 rounded border border-[#dbe9ef] bg-[#f6fbfd] px-3 py-2 text-sm text-[#2f4a59]">
+          <div className="flex flex-wrap gap-3 rounded border border-[#eadff1] bg-[#fdf7fb] px-3 py-2 text-sm text-[#2f4a59]">
             {PACKAGING_COMPATIBILITY_CONTEXTS.map((context) => {
               const checked = form.applies_to_contexts.includes(context);
               const disabled = context === form.applies_to;
@@ -460,7 +460,7 @@ export default function PackagingSkuForm({
         <label className="grid gap-1">
           <span className="text-sm text-[#4f6877]">Packaging Type</span>
           <select
-            className="rounded border border-[#cfdde5] bg-white px-3 py-2 text-sm text-[#173543]"
+            className="rounded border border-[#ddcfe8] bg-white px-3 py-2 text-sm text-[#173543]"
             value={form.packaging_type}
             onChange={(e) => setForm((prev) => ({ ...prev, packaging_type: e.target.value as PackagingType }))}
             disabled={form.applies_to === "pre_roll" || form.applies_to === "concentrate"}
@@ -485,7 +485,7 @@ export default function PackagingSkuForm({
               type="number"
               min={0}
               step="0.01"
-              className="rounded border border-[#cfdde5] bg-white px-3 py-2 text-sm text-[#173543]"
+              className="rounded border border-[#ddcfe8] bg-white px-3 py-2 text-sm text-[#173543]"
               value={form.size_grams}
               onChange={(e) => setForm((prev) => ({ ...prev, size_grams: e.target.value }))}
               required={requiresOperationalSize(form.packaging_type, form.applies_to)}
@@ -506,7 +506,7 @@ export default function PackagingSkuForm({
                 type="number"
                 min={1}
                 step="1"
-                className="rounded border border-[#cfdde5] bg-white px-3 py-2 text-sm text-[#173543]"
+                className="rounded border border-[#ddcfe8] bg-white px-3 py-2 text-sm text-[#173543]"
                 value={form.pack_qty}
                 onChange={(e) => setForm((prev) => ({ ...prev, pack_qty: e.target.value }))}
                 required
@@ -516,7 +516,7 @@ export default function PackagingSkuForm({
 
             <div className="grid gap-1">
               <span className="text-sm text-[#4f6877]">Pre-Roll Pack Type</span>
-              <div className="flex flex-wrap gap-4 rounded border border-[#dbe9ef] bg-[#f6fbfd] px-3 py-2 text-sm text-[#2f4a59]">
+              <div className="flex flex-wrap gap-4 rounded border border-[#eadff1] bg-[#fdf7fb] px-3 py-2 text-sm text-[#2f4a59]">
                 <label className="inline-flex items-center gap-2">
                   <input
                     type="radio"
@@ -545,7 +545,7 @@ export default function PackagingSkuForm({
             <label className="grid gap-1">
               <span className="text-sm text-[#4f6877]">Vape Device (optional)</span>
               <input
-                className="rounded border border-[#cfdde5] bg-white px-3 py-2 text-sm text-[#173543]"
+                className="rounded border border-[#ddcfe8] bg-white px-3 py-2 text-sm text-[#173543]"
                 value={form.vape_device}
                 onChange={(e) => setForm((prev) => ({ ...prev, vape_device: e.target.value }))}
                 placeholder="510_cart, all_in_one..."
@@ -555,7 +555,7 @@ export default function PackagingSkuForm({
             <label className="grid gap-1">
               <span className="text-sm text-[#4f6877]">Vape Fill Grams</span>
               <select
-                className="rounded border border-[#cfdde5] bg-white px-3 py-2 text-sm text-[#173543]"
+                className="rounded border border-[#ddcfe8] bg-white px-3 py-2 text-sm text-[#173543]"
                 value={form.vape_fill_grams}
                 onChange={(e) => setForm((prev) => ({ ...prev, vape_fill_grams: e.target.value }))}
                 required
@@ -574,7 +574,7 @@ export default function PackagingSkuForm({
             type="number"
             min={0}
             step="0.01"
-            className="rounded border border-[#cfdde5] bg-white px-3 py-2 text-sm text-[#173543]"
+            className="rounded border border-[#ddcfe8] bg-white px-3 py-2 text-sm text-[#173543]"
             value={form.unit_cost}
             onChange={(e) => setForm((prev) => ({ ...prev, unit_cost: e.target.value }))}
             required
@@ -587,7 +587,7 @@ export default function PackagingSkuForm({
             type="number"
             min={0}
             step="0.01"
-            className="rounded border border-[#cfdde5] bg-white px-3 py-2 text-sm text-[#173543]"
+            className="rounded border border-[#ddcfe8] bg-white px-3 py-2 text-sm text-[#173543]"
             value={form.sell_price}
             onChange={(e) => setForm((prev) => ({ ...prev, sell_price: e.target.value }))}
           />
@@ -600,7 +600,7 @@ export default function PackagingSkuForm({
             type="number"
             min={0}
             step="0.01"
-            className="rounded border border-[#cfdde5] bg-white px-3 py-2 text-sm text-[#173543]"
+            className="rounded border border-[#ddcfe8] bg-white px-3 py-2 text-sm text-[#173543]"
             value={form.inventory_qty}
             onChange={(e) => setForm((prev) => ({ ...prev, inventory_qty: e.target.value }))}
             required
@@ -619,7 +619,7 @@ export default function PackagingSkuForm({
         </label>
       </div>
 
-      <div className="space-y-4 rounded-lg border border-[#dbe9ef] bg-[#f9fcfd] p-4">
+      <div className="space-y-4 rounded-lg border border-[#eadff1] bg-[#fdf8fd] p-4">
         <div>
           <h3 className="text-sm font-semibold text-[#173543]">Thumbnail</h3>
           <p className="mt-1 text-xs text-[#5b7382]">
@@ -631,27 +631,27 @@ export default function PackagingSkuForm({
         <img
           src={thumbnailPreview}
           alt={`${form.name || "Packaging SKU"} thumbnail`}
-          className="h-40 w-40 rounded-md border border-[#dbe9ef] object-cover"
+          className="h-40 w-40 rounded-md border border-[#eadff1] object-cover"
         />
         <div className="grid gap-2">
           <input
             type="file"
             accept="image/*"
             onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-            className="rounded border border-[#cfdde5] bg-white px-3 py-2 text-sm text-[#173543]"
+            className="rounded border border-[#ddcfe8] bg-white px-3 py-2 text-sm text-[#173543]"
           />
           {initialValues.id ? (
             <button
               type="button"
               onClick={onUploadThumbnail}
               disabled={uploading || !selectedFile}
-              className="w-fit rounded bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95 disabled:opacity-60"
+              className="w-fit rounded bg-[#8f52dc] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95 disabled:opacity-60"
             >
               {uploading ? "Uploading..." : "Upload Thumbnail"}
             </button>
           ) : null}
           {uploadError ? <p className="text-sm text-[#991b1b]">{uploadError}</p> : null}
-          {uploadSuccess ? <p className="text-sm text-[#0f766e]">{uploadSuccess}</p> : null}
+          {uploadSuccess ? <p className="text-sm text-[#6f32b5]">{uploadSuccess}</p> : null}
         </div>
       </div>
 
@@ -660,7 +660,7 @@ export default function PackagingSkuForm({
       <button
         type="submit"
         disabled={busy}
-        className="rounded bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95 disabled:opacity-60"
+        className="rounded bg-[#8f52dc] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95 disabled:opacity-60"
       >
         {busy ? "Saving..." : mode === "new" ? "Create Packaging SKU" : "Save Changes"}
       </button>

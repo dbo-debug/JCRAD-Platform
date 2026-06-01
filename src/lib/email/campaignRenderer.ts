@@ -26,7 +26,7 @@ function escapeHtml(value: string) {
 }
 
 function renderButton(label: string, url: string, tone: "primary" | "secondary") {
-  const background = tone === "primary" ? "#173543" : "#f4f9fc";
+  const background = tone === "primary" ? "#173543" : "#fcf5fb";
   const foreground = tone === "primary" ? "#ffffff" : "#173543";
   const border = tone === "primary" ? "#173543" : "#cfe0e8";
 
@@ -112,10 +112,10 @@ export function renderCampaignEmail(input: CampaignRenderInput) {
                     <div style="font-style:italic;">${escapeHtml(signatureLines[2])}</div>
                     <div style="font-style:italic;">${escapeHtml(signatureLines[3])}</div>
                     <div style="padding-top:10px;font-style:italic;">
-                      <a href="${escapeHtml(resourceLines[0].url)}" style="color:#0f766e;text-decoration:none;font-weight:700;">${escapeHtml(resourceLines[0].label)}</a>
+                      <a href="${escapeHtml(resourceLines[0].url)}" style="color:#6f32b5;text-decoration:none;font-weight:700;">${escapeHtml(resourceLines[0].label)}</a>
                     </div>
                     <div style="padding-top:4px;font-style:italic;">
-                      <a href="${escapeHtml(resourceLines[1].url)}" style="color:#0f766e;text-decoration:none;font-weight:700;">${escapeHtml(resourceLines[1].label)}</a>
+                      <a href="${escapeHtml(resourceLines[1].url)}" style="color:#6f32b5;text-decoration:none;font-weight:700;">${escapeHtml(resourceLines[1].label)}</a>
                     </div>
                   </td>
                 </tr>

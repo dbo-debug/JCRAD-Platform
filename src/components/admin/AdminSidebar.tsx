@@ -24,8 +24,11 @@ export default function AdminSidebar() {
 
   return (
     <aside className="w-64 border-r border-[var(--surface-border)] bg-white px-4 py-6">
-      <Link href="/admin" className="mb-6 inline-flex items-center gap-2 rounded-xl border border-[#d7e6ed] bg-[#f7fbfd] px-2 py-1.5 shadow-sm">
-        <img src="/brand/BLACK.png" alt="JC RAD Inc." className="h-8 w-auto" />
+      <Link
+        href="/admin"
+        className="mb-6 inline-flex h-14 w-32 items-center justify-center overflow-hidden rounded-2xl border border-[#eadff1] bg-white p-1 shadow-sm"
+      >
+        <img src="/brand/motley-on-white.png" alt="Motley Terpz" className="h-full w-full object-contain" />
       </Link>
       <p className="mb-4 text-xs font-semibold uppercase tracking-[0.12em] text-[#7a93a2]">Admin Navigation</p>
 
@@ -39,7 +42,7 @@ export default function AdminSidebar() {
               className={[
                 "block rounded-md px-3 py-2 text-sm font-medium transition-colors",
                 item.subItem ? "ml-4 text-xs" : "",
-                active ? "bg-[#e9fbf9] text-[#0f766e]" : "text-[#4a6575] hover:bg-[#f4f9fc] hover:text-[#173543]",
+                active ? "bg-[#fcf3ff] text-[#6f32b5]" : "text-[#4a6575] hover:bg-[#fcf5fb] hover:text-[#173543]",
               ].join(" ")}
             >
               {item.label}

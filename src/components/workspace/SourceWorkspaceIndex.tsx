@@ -66,8 +66,8 @@ function chipClass(value: string | null | undefined, kind: "status" | "stage" | 
 
   if (kind === "task") {
     if (normalized === "overdue") return "border-[#f1ddad] bg-[#fff9eb] text-[#9a6b00]";
-    if (normalized === "open") return "border-[#bde8e4] bg-[#e9fbf9] text-[#0f766e]";
-    return "border-[#d7e6ed] bg-[#f8fbfc] text-[#4f6877]";
+    if (normalized === "open") return "border-[#e8d7f7] bg-[#fcf3ff] text-[#6f32b5]";
+    return "border-[#e5d8ef] bg-[#fcf7fd] text-[#4f6877]";
   }
 
   if (kind === "status") {
@@ -85,17 +85,17 @@ function chipClass(value: string | null | undefined, kind: "status" | "stage" | 
     if (normalized === "closed") return "border-[#ded8d8] bg-[#f5f1f1] text-[#665a5a]";
   }
 
-  return "border-[#d7e6ed] bg-[#f8fbfc] text-[#4a6575]";
+  return "border-[#e5d8ef] bg-[#fcf7fd] text-[#4a6575]";
 }
 
 function denseButtonClass(tone: "primary" | "secondary" = "secondary") {
   return tone === "primary"
     ? "inline-flex h-9 items-center justify-center rounded-full bg-[#173543] px-3.5 text-sm font-semibold text-white transition hover:bg-[#0f2a35]"
-    : "inline-flex h-9 items-center justify-center rounded-full border border-[#d0dde5] bg-white px-3.5 text-sm font-medium text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543]";
+    : "inline-flex h-9 items-center justify-center rounded-full border border-[#decfe8] bg-white px-3.5 text-sm font-medium text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543]";
 }
 
 function toolbarSelectClass() {
-  return "h-9 min-w-0 rounded-full border border-[#cedde6] bg-[#fbfdfe] px-3 text-sm text-[#173543] outline-none transition focus:border-[#14b8a6] focus:bg-white";
+  return "h-9 min-w-0 rounded-full border border-[#cedde6] bg-[#fffafd] px-3 text-sm text-[#173543] outline-none transition focus:border-[#8f52dc] focus:bg-white";
 }
 
 function getSearchText(source: SourceSummary) {
@@ -215,7 +215,7 @@ export default function SourceWorkspaceIndex({ sources, initialFilters }: Source
 
   return (
     <section className="space-y-4">
-      <div className="rounded-[28px] border border-[#d7e6ed] bg-white p-4 shadow-[0_16px_40px_rgba(15,42,53,0.08)]">
+      <div className="rounded-[28px] border border-[#e5d8ef] bg-white p-4 shadow-[0_16px_40px_rgba(15,42,53,0.08)]">
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
@@ -282,7 +282,7 @@ export default function SourceWorkspaceIndex({ sources, initialFilters }: Source
               value={draftSearch}
               onChange={(event) => setDraftSearch(event.target.value)}
               placeholder="Search sources, contacts, notes, categories"
-              className="h-9 w-full rounded-full border border-[#cedde6] bg-[#fbfdfe] px-3.5 text-sm text-[#173543] outline-none transition focus:border-[#14b8a6] focus:bg-white"
+              className="h-9 w-full rounded-full border border-[#cedde6] bg-[#fffafd] px-3.5 text-sm text-[#173543] outline-none transition focus:border-[#8f52dc] focus:bg-white"
             />
             <button type="submit" className={denseButtonClass("primary")}>
               Search
@@ -395,11 +395,11 @@ export default function SourceWorkspaceIndex({ sources, initialFilters }: Source
           return (
             <article
               key={source.id}
-              className="group rounded-[28px] border border-[#dbe9ef] bg-white p-5 shadow-[0_14px_35px_rgba(16,42,67,0.06)] transition hover:-translate-y-0.5 hover:border-[#b7d6e3] hover:shadow-[0_20px_48px_rgba(16,42,67,0.1)]"
+              className="group rounded-[28px] border border-[#eadff1] bg-white p-5 shadow-[0_14px_35px_rgba(16,42,67,0.06)] transition hover:-translate-y-0.5 hover:border-[#b7d6e3] hover:shadow-[0_20px_48px_rgba(16,42,67,0.1)]"
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <Link href={`/workspace/sources/${source.id}`} className="text-lg font-semibold text-[#173543] transition hover:text-[#0f766e]">
+                  <Link href={`/workspace/sources/${source.id}`} className="text-lg font-semibold text-[#173543] transition hover:text-[#6f32b5]">
                     {source.name}
                   </Link>
                   <p className="mt-1 text-sm text-[#4a6575]">
@@ -429,7 +429,7 @@ export default function SourceWorkspaceIndex({ sources, initialFilters }: Source
               </div>
 
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-2xl border border-[#e4eef3] bg-[#f9fcfd] p-3">
+                <div className="rounded-2xl border border-[#e4eef3] bg-[#fdf8fd] p-3">
                   <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#6c8796]">Primary Contact</p>
                   <p className="mt-1 text-sm font-medium text-[#173543]">{source.contactName || "Not set"}</p>
                   <p className="mt-1 text-sm text-[#4a6575]">
@@ -443,7 +443,7 @@ export default function SourceWorkspaceIndex({ sources, initialFilters }: Source
                   </p>
                 </div>
 
-                <div className="rounded-2xl border border-[#e4eef3] bg-[#f9fcfd] p-3">
+                <div className="rounded-2xl border border-[#e4eef3] bg-[#fdf8fd] p-3">
                   <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#6c8796]">Owner</p>
                   <p className="mt-1 text-sm font-medium text-[#173543]">{source.assignedBuyerName || "Unassigned"}</p>
                   <p className="mt-1 text-sm text-[#4a6575]">{source.assignedBuyerEmail || "No buyer mapped"}</p>
@@ -460,7 +460,7 @@ export default function SourceWorkspaceIndex({ sources, initialFilters }: Source
                 <span className={["rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em]", chipClass(followUp.tone, "task")].join(" ")}>
                   {followUp.label}
                 </span>
-                <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#4f6877]">
+                <span className="rounded-full border border-[#e5d8ef] bg-[#fcf7fd] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#4f6877]">
                   Last Active {formatDate(source.lastActivityAt)}
                 </span>
                 {source.supplyCategories.slice(0, 2).map((category) => (
@@ -480,14 +480,14 @@ export default function SourceWorkspaceIndex({ sources, initialFilters }: Source
                   {emailHref ? (
                     <a
                       href={emailHref}
-                      className="inline-flex h-9 items-center justify-center rounded-full border border-[#d0dde5] bg-white px-3.5 text-sm font-medium text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543]"
+                      className="inline-flex h-9 items-center justify-center rounded-full border border-[#decfe8] bg-white px-3.5 text-sm font-medium text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543]"
                     >
                       Email
                     </a>
                   ) : null}
                   <Link
                     href={`/workspace/sources/${source.id}`}
-                    className="inline-flex h-9 items-center justify-center rounded-full border border-[#14b8a6] bg-[#effcf9] px-3.5 text-sm font-semibold text-[#0f766e] transition hover:bg-[#dff8f2]"
+                    className="inline-flex h-9 items-center justify-center rounded-full border border-[#8f52dc] bg-[#fcf5ff] px-3.5 text-sm font-semibold text-[#6f32b5] transition hover:bg-[#dff8f2]"
                   >
                     Open Account
                   </Link>
@@ -499,7 +499,7 @@ export default function SourceWorkspaceIndex({ sources, initialFilters }: Source
       </div>
 
       {filteredSources.length === 0 ? (
-        <div className="rounded-[28px] border border-dashed border-[#cfdde6] bg-[#f9fcfd] px-6 py-10 text-center">
+        <div className="rounded-[28px] border border-dashed border-[#ddcfe9] bg-[#fdf8fd] px-6 py-10 text-center">
           <p className="text-lg font-semibold text-[#173543]">No sources match the current filters.</p>
           <p className="mt-2 text-sm text-[#5c7483]">Adjust the source type, stage, status, buyer, or follow-up filters to widen the view.</p>
         </div>

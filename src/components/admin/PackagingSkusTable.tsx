@@ -155,14 +155,14 @@ export default function PackagingSkusTable() {
         action={
           <Link
             href="/admin/catalog/packaging/new"
-            className="inline-flex items-center rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95"
+            className="inline-flex items-center rounded-full bg-[#8f52dc] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95"
           >
             + Add Packaging
           </Link>
         }
       />
 
-      <div className="mb-4 flex flex-wrap gap-2 rounded-lg border border-[#dbe9ef] bg-[#f6fbfd] p-2 text-sm">
+      <div className="mb-4 flex flex-wrap gap-2 rounded-lg border border-[#eadff1] bg-[#fdf7fb] p-2 text-sm">
         {FILTER_TABS.map((tab) => {
           const active = tab === selectedFilter;
           return (
@@ -172,7 +172,7 @@ export default function PackagingSkusTable() {
               onClick={() => setSelectedFilter(tab)}
               className={[
                 "rounded px-3 py-1.5 transition-colors",
-                active ? "bg-[#14b8a6] text-white" : "bg-transparent text-[#5b7382] hover:text-[#173543]",
+                active ? "bg-[#8f52dc] text-white" : "bg-transparent text-[#5b7382] hover:text-[#173543]",
               ].join(" ")}
             >
               {tab}
@@ -185,14 +185,14 @@ export default function PackagingSkusTable() {
       {error ? <p className="mb-4 text-sm text-[#991b1b]">{error}</p> : null}
 
       {!loading && !error && !hasRows ? (
-        <div className="flex min-h-[280px] flex-col items-center justify-center rounded-lg border border-[#dbe9ef] bg-white text-center">
+        <div className="flex min-h-[280px] flex-col items-center justify-center rounded-lg border border-[#eadff1] bg-white text-center">
           <p className="text-lg text-[#173543]">No packaging SKUs yet.</p>
           <p className="mt-2 text-sm text-[#5b7382]">Click &ldquo;Add Packaging&rdquo; to create one.</p>
         </div>
       ) : hasRows ? (
-        <div className="overflow-x-auto rounded-lg border border-[#dbe9ef] bg-white">
+        <div className="overflow-x-auto rounded-lg border border-[#eadff1] bg-white">
           <table className="min-w-full text-left text-sm text-[#173543]">
-            <thead className="border-b border-[#dbe9ef] text-[#5b7382]">
+            <thead className="border-b border-[#eadff1] text-[#5b7382]">
               <tr>
                 <th className="px-4 py-3 font-medium">Thumbnail</th>
                 <th className="px-4 py-3 font-medium">Name</th>
@@ -212,14 +212,14 @@ export default function PackagingSkusTable() {
                 const thumbnailSrc = String(row.thumbnail_url || "").trim();
                 const imageSrc = thumbnailSrc
                   ? `${thumbnailSrc}${thumbnailSrc.includes("?") ? "&" : "?"}t=${encodeURIComponent(String(row.id || ""))}`
-                  : "/brand/PRIMARY.png";
+                  : "/brand/motley-on-white.png";
                 return (
                   <tr key={row.id} className="border-b border-[#eef3f6] last:border-b-0">
                     <td className="px-4 py-3">
                       <img
                         src={imageSrc}
                         alt={`${row.name || "Packaging"} thumbnail`}
-                        className="h-14 w-14 rounded-md border border-[#dbe9ef] object-cover"
+                        className="h-14 w-14 rounded-md border border-[#eadff1] object-cover"
                       />
                     </td>
                     <td className="px-4 py-3">{row.name || "Untitled"}</td>
@@ -233,7 +233,7 @@ export default function PackagingSkusTable() {
                       <span
                         className={[
                           "rounded px-2 py-1 text-xs font-semibold",
-                          active ? "bg-[#14b8a6] text-white" : "bg-[#e6edf2] text-[#4f6877]",
+                          active ? "bg-[#8f52dc] text-white" : "bg-[#e6edf2] text-[#4f6877]",
                         ].join(" ")}
                       >
                         {active ? "Active" : "Inactive"}
@@ -243,7 +243,7 @@ export default function PackagingSkusTable() {
                       <div className="flex flex-wrap gap-2">
                         <Link
                           href={`/admin/catalog/packaging/${row.id}/edit`}
-                          className="rounded border border-[#cfdde5] px-2.5 py-1 text-xs text-[#4f6877] hover:text-[#173543]"
+                          className="rounded border border-[#ddcfe8] px-2.5 py-1 text-xs text-[#4f6877] hover:text-[#173543]"
                         >
                           Edit
                         </Link>
@@ -251,7 +251,7 @@ export default function PackagingSkusTable() {
                           type="button"
                           disabled={mutatingId === row.id}
                           onClick={() => openActionModal(active ? "deactivate" : "restore", row)}
-                          className="rounded border border-[#cfdde5] px-2.5 py-1 text-xs text-[#4f6877] hover:text-[#173543] disabled:opacity-60"
+                          className="rounded border border-[#ddcfe8] px-2.5 py-1 text-xs text-[#4f6877] hover:text-[#173543] disabled:opacity-60"
                         >
                           {mutatingId === row.id ? "Saving..." : active ? "Deactivate" : "Restore"}
                         </button>
@@ -267,7 +267,7 @@ export default function PackagingSkusTable() {
 
       {pendingAction ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
-          <div className="w-full max-w-md rounded-lg border border-[#dbe9ef] bg-white p-5 shadow-sm">
+          <div className="w-full max-w-md rounded-lg border border-[#eadff1] bg-white p-5 shadow-sm">
             <h2 className="text-lg font-semibold text-[#173543]">
               {pendingAction.type === "deactivate" ? "Deactivate packaging SKU?" : "Restore packaging SKU?"}
             </h2>
@@ -282,7 +282,7 @@ export default function PackagingSkusTable() {
                 type="button"
                 onClick={closeActionModal}
                 disabled={!!mutatingId}
-                className="rounded border border-[#cfdde5] px-3 py-1.5 text-xs text-[#4f6877] hover:text-[#173543] disabled:opacity-60"
+                className="rounded border border-[#ddcfe8] px-3 py-1.5 text-xs text-[#4f6877] hover:text-[#173543] disabled:opacity-60"
               >
                 Cancel
               </button>
@@ -290,7 +290,7 @@ export default function PackagingSkusTable() {
                 type="button"
                 onClick={() => void confirmAction()}
                 disabled={!!mutatingId}
-                className="rounded bg-[#14b8a6] px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-95 disabled:opacity-60"
+                className="rounded bg-[#8f52dc] px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-95 disabled:opacity-60"
               >
                 {mutatingId ? "Saving..." : pendingAction.type === "deactivate" ? "Deactivate" : "Restore"}
               </button>

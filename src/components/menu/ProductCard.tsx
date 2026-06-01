@@ -164,7 +164,7 @@ export default function ProductCard({ item, onAdd }: ProductCardProps) {
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#f9fbfc] to-[#eef3f6]">
             <img
-              src="/brand/BLACK.png"
+              src="/brand/motley-on-white.png"
               alt=""
               aria-hidden="true"
               loading="lazy"
@@ -190,7 +190,7 @@ export default function ProductCard({ item, onAdd }: ProductCardProps) {
         ) : null}
         {hasVideo ? (
           <div className="pointer-events-none absolute right-2 top-2 inline-flex items-center gap-1 rounded-full border border-[#d6e4eb] bg-white/90 px-2 py-0.5 text-[11px] font-semibold text-[#31596d] shadow-sm">
-            <span className="inline-block h-2 w-2 rounded-full bg-[#14b8a6]" />
+            <span className="inline-block h-2 w-2 rounded-full bg-[#8f52dc]" />
             Video
           </div>
         ) : null}
@@ -200,13 +200,13 @@ export default function ProductCard({ item, onAdd }: ProductCardProps) {
         <h3 className="line-clamp-2 min-h-[2.8rem] text-sm font-semibold text-[#1f2f3b]">{item.title}</h3>
 
         <div className="flex flex-wrap gap-1.5">
-          <span className="rounded-full border border-[#14b8a6]/30 bg-[#14b8a6]/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#0f766e]">
+          <span className="rounded-full border border-[#8f52dc]/30 bg-[#8f52dc]/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#6f32b5]">
             {item.categoryLabel}
           </span>
           {item.badges.map((badge, index) => (
             <span
               key={`${item.id}-${badge.label}-${index}`}
-              className="rounded-full border border-[#d4e0e7] bg-[#fbfdfe] px-2 py-0.5 text-[11px] text-[#5b7382]"
+              className="rounded-full border border-[#d4e0e7] bg-[#fffafd] px-2 py-0.5 text-[11px] text-[#5b7382]"
             >
               {badge.label}
             </span>
@@ -221,7 +221,7 @@ export default function ProductCard({ item, onAdd }: ProductCardProps) {
         </div>
 
         {item.copackConfig ? (
-          <div className="space-y-2 rounded-xl border border-[#dbe6ed] bg-[#f9fcfe] p-2.5">
+          <div className="space-y-2 rounded-xl border border-[#e8ddf0] bg-[#f9fcfe] p-2.5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="inline-flex rounded-full border border-[#d3dde4] bg-white p-1 text-[11px]">
                 {item.copackConfig.allowedModes.map((modeOption) => (
@@ -232,7 +232,7 @@ export default function ProductCard({ item, onAdd }: ProductCardProps) {
                     className={[
                       "rounded-full px-2.5 py-1 font-semibold transition",
                       item.copackConfig?.mode === modeOption
-                        ? "bg-[#14b8a6] text-white"
+                        ? "bg-[#8f52dc] text-white"
                         : "text-[#4e6473] hover:text-[#22333f]",
                     ].join(" ")}
                   >
@@ -243,7 +243,7 @@ export default function ProductCard({ item, onAdd }: ProductCardProps) {
               <button
                 type="button"
                 onClick={() => item.copackConfig?.onExpandedChange(!item.copackConfig?.expanded)}
-                className="rounded-full border border-[#cfdde5] bg-white px-2.5 py-1 text-[11px] font-semibold text-[#2f4a59] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
+                className="rounded-full border border-[#ddcfe8] bg-white px-2.5 py-1 text-[11px] font-semibold text-[#2f4a59] transition hover:border-[#8f52dc] hover:text-[#6f32b5]"
               >
                 {item.copackConfig.expanded ? "Hide details" : "Details"}
               </button>
@@ -272,7 +272,7 @@ export default function ProductCard({ item, onAdd }: ProductCardProps) {
                             ? item.copackConfig?.onStartingWeightGramsChange(Number(e.target.value))
                             : item.copackConfig?.onStartingWeightLbsChange(Number(e.target.value))
                       }
-                      className="rounded-lg border border-[#cfdde5] bg-white px-2 py-1.5 text-[11px] text-[#1f2937]"
+                      className="rounded-lg border border-[#ddcfe8] bg-white px-2 py-1.5 text-[11px] text-[#1f2937]"
                     />
                     {item.copackConfig.minimumOrderLabel ? (
                       <span className="text-[11px] text-[#6a8392]">{item.copackConfig.minimumOrderLabel}</span>
@@ -293,7 +293,7 @@ export default function ProductCard({ item, onAdd }: ProductCardProps) {
                               ? item.copackConfig?.onStartingWeightLbsChange(Number(e.target.value))
                               : item.copackConfig?.onStartingWeightGramsChange(Number(e.target.value))
                           }
-                          className="rounded-lg border border-[#cfdde5] bg-white px-2 py-1.5 text-[11px] text-[#1f2937]"
+                          className="rounded-lg border border-[#ddcfe8] bg-white px-2 py-1.5 text-[11px] text-[#1f2937]"
                         />
                       </label>
                       <label className="grid gap-1">
@@ -301,7 +301,7 @@ export default function ProductCard({ item, onAdd }: ProductCardProps) {
                         <select
                           value={item.copackConfig.unitSize}
                           onChange={(e) => item.copackConfig?.onUnitSizeChange(e.target.value)}
-                          className="rounded-lg border border-[#cfdde5] bg-white px-2 py-1.5 text-[11px] text-[#1f2937]"
+                          className="rounded-lg border border-[#ddcfe8] bg-white px-2 py-1.5 text-[11px] text-[#1f2937]"
                         >
                           {item.copackConfig.unitSizeOptions.map((size) => (
                             <option key={size} value={size}>{size}</option>
@@ -309,7 +309,7 @@ export default function ProductCard({ item, onAdd }: ProductCardProps) {
                         </select>
                       </label>
                     </div>
-                    <div className="rounded-lg border border-[#dbe6ed] bg-white px-2 py-1.5 text-[11px] text-[#355060]">
+                    <div className="rounded-lg border border-[#e8ddf0] bg-white px-2 py-1.5 text-[11px] text-[#355060]">
                       {item.copackConfig.expectedRangeLabel}
                     </div>
                     {item.copackConfig.expectedDisclaimer ? (
@@ -317,12 +317,12 @@ export default function ProductCard({ item, onAdd }: ProductCardProps) {
                     ) : null}
                     {showInternalInfusionSection ? (
                       <div className="space-y-2">
-                        <div className="space-y-1.5 rounded-lg border border-[#dbe6ed] bg-white px-2 py-2">
+                        <div className="space-y-1.5 rounded-lg border border-[#e8ddf0] bg-white px-2 py-2">
                           <span className="font-medium">Internal Infusion (dry only)</span>
                           <select
                             value={item.copackConfig.internalInfusionProductId}
                             onChange={(e) => item.copackConfig?.onInternalInfusionProductChange(e.target.value)}
-                            className="w-full rounded-lg border border-[#cfdde5] bg-white px-2 py-1.5 text-[11px] text-[#1f2937]"
+                            className="w-full rounded-lg border border-[#ddcfe8] bg-white px-2 py-1.5 text-[11px] text-[#1f2937]"
                           >
                             <option value="">None</option>
                             {item.copackConfig.internalInfusionOptions.map((option) => (
@@ -332,13 +332,13 @@ export default function ProductCard({ item, onAdd }: ProductCardProps) {
                         </div>
 
                         {showExternalInfusionSection ? (
-                          <div className="space-y-1.5 rounded-lg border border-[#dbe6ed] bg-white px-2 py-2">
+                          <div className="space-y-1.5 rounded-lg border border-[#e8ddf0] bg-white px-2 py-2">
                             <span className="font-medium">External Infusion (liquid + dry)</span>
                             <div className="grid grid-cols-2 gap-2">
                               <select
                                 value={item.copackConfig.externalLiquidProductId}
                                 onChange={(e) => item.copackConfig?.onExternalLiquidProductChange(e.target.value)}
-                                className="w-full rounded-lg border border-[#cfdde5] bg-white px-2 py-1.5 text-[11px] text-[#1f2937]"
+                                className="w-full rounded-lg border border-[#ddcfe8] bg-white px-2 py-1.5 text-[11px] text-[#1f2937]"
                               >
                                 <option value="">Liquid: None</option>
                                 {item.copackConfig.externalLiquidOptions.map((option) => (
@@ -348,7 +348,7 @@ export default function ProductCard({ item, onAdd }: ProductCardProps) {
                               <select
                                 value={item.copackConfig.externalDryProductId}
                                 onChange={(e) => item.copackConfig?.onExternalDryProductChange(e.target.value)}
-                                className="w-full rounded-lg border border-[#cfdde5] bg-white px-2 py-1.5 text-[11px] text-[#1f2937]"
+                                className="w-full rounded-lg border border-[#ddcfe8] bg-white px-2 py-1.5 text-[11px] text-[#1f2937]"
                               >
                                 <option value="">Dry: None</option>
                                 {item.copackConfig.externalDryOptions.map((option) => (
@@ -372,7 +372,7 @@ export default function ProductCard({ item, onAdd }: ProductCardProps) {
                           type="checkbox"
                           checked={item.copackConfig.showAdvancedUnits}
                           onChange={(e) => item.copackConfig?.onShowAdvancedUnitsChange(e.target.checked)}
-                          className="h-3.5 w-3.5 rounded border-[#cfdde5] text-[#14b8a6] focus:ring-[#14b8a6]"
+                          className="h-3.5 w-3.5 rounded border-[#ddcfe8] text-[#8f52dc] focus:ring-[#8f52dc]"
                         />
                         Advanced target units (optional)
                       </label>
@@ -382,7 +382,7 @@ export default function ProductCard({ item, onAdd }: ProductCardProps) {
                           min={1}
                           value={item.copackConfig.advancedTargetUnits}
                           onChange={(e) => item.copackConfig?.onAdvancedTargetUnitsChange(Number(e.target.value))}
-                          className="w-full rounded-lg border border-[#cfdde5] bg-white px-2 py-1.5 text-[11px] text-[#1f2937]"
+                          className="w-full rounded-lg border border-[#ddcfe8] bg-white px-2 py-1.5 text-[11px] text-[#1f2937]"
                         />
                       ) : null}
                     </div>
@@ -394,7 +394,7 @@ export default function ProductCard({ item, onAdd }: ProductCardProps) {
                           <select
                             value={item.copackConfig.preRollPackQty}
                             onChange={(e) => item.copackConfig?.onPreRollPackQtyChange(Number(e.target.value))}
-                            className="rounded-lg border border-[#cfdde5] bg-white px-2 py-1.5 text-[11px] text-[#1f2937]"
+                            className="rounded-lg border border-[#ddcfe8] bg-white px-2 py-1.5 text-[11px] text-[#1f2937]"
                           >
                             <option value={1}>1</option>
                             <option value={5}>5</option>
@@ -405,14 +405,14 @@ export default function ProductCard({ item, onAdd }: ProductCardProps) {
 
                     <div className="space-y-1.5">
                       <span className="font-medium">Packaging provider</span>
-                      <div className="inline-flex rounded-full border border-[#cfdde5] bg-white p-1">
+                      <div className="inline-flex rounded-full border border-[#ddcfe8] bg-white p-1">
                         <button
                           type="button"
                           onClick={() => item.copackConfig?.onPackagingModeChange("jcrad")}
                           className={[
                             "rounded-full px-2.5 py-1 font-semibold transition",
                             item.copackConfig.packagingMode === "jcrad"
-                              ? "bg-[#14b8a6] text-white"
+                              ? "bg-[#8f52dc] text-white"
                               : "text-[#4e6473]",
                           ].join(" ")}
                         >
@@ -441,7 +441,7 @@ export default function ProductCard({ item, onAdd }: ProductCardProps) {
                           <select
                             value={item.copackConfig.packagingSkuId}
                             onChange={(e) => item.copackConfig?.onPackagingSkuChange(e.target.value)}
-                            className="rounded-lg border border-[#cfdde5] bg-white px-2 py-1.5 text-[11px] text-[#1f2937]"
+                            className="rounded-lg border border-[#ddcfe8] bg-white px-2 py-1.5 text-[11px] text-[#1f2937]"
                           >
                             <option value="">Select</option>
                             {item.copackConfig.packagingOptions.map((option) => (
@@ -455,7 +455,7 @@ export default function ProductCard({ item, onAdd }: ProductCardProps) {
                             <select
                               value={item.copackConfig.secondaryPackagingSkuId}
                               onChange={(e) => item.copackConfig?.onSecondaryPackagingSkuChange(e.target.value)}
-                              className="rounded-lg border border-[#cfdde5] bg-white px-2 py-1.5 text-[11px] text-[#1f2937]"
+                              className="rounded-lg border border-[#ddcfe8] bg-white px-2 py-1.5 text-[11px] text-[#1f2937]"
                             >
                               <option value="">Select</option>
                               {item.copackConfig.secondaryBagOptions.map((option) => (
@@ -466,14 +466,14 @@ export default function ProductCard({ item, onAdd }: ProductCardProps) {
                         ) : null}
                       </>
                     ) : (
-                      <div className="min-w-0 space-y-2 overflow-hidden rounded-lg border border-[#dbe6ed] bg-[#f9fcfe] p-2">
+                      <div className="min-w-0 space-y-2 overflow-hidden rounded-lg border border-[#e8ddf0] bg-[#f9fcfe] p-2">
                         <div className="grid gap-1">
                           <span className="font-medium text-[#2f4a59]">Front artwork</span>
                           <input
                             type="file"
                             accept="image/*,.pdf"
                             onChange={(e) => item.copackConfig?.onFrontFileChange(e.target.files?.[0] || null)}
-                            className="block w-full min-w-0 max-w-full rounded-lg border border-[#cfdde5] bg-white px-2 py-1.5 text-[11px] text-[#1f2937] file:mr-2 file:max-w-full file:overflow-hidden file:text-ellipsis file:whitespace-nowrap"
+                            className="block w-full min-w-0 max-w-full rounded-lg border border-[#ddcfe8] bg-white px-2 py-1.5 text-[11px] text-[#1f2937] file:mr-2 file:max-w-full file:overflow-hidden file:text-ellipsis file:whitespace-nowrap"
                           />
                           {item.copackConfig.frontFileName ? (
                             <span className="block max-w-full truncate text-[10px] text-[#5b7382]" title={item.copackConfig.frontFileName}>
@@ -487,7 +487,7 @@ export default function ProductCard({ item, onAdd }: ProductCardProps) {
                             type="file"
                             accept="image/*,.pdf"
                             onChange={(e) => item.copackConfig?.onBackFileChange(e.target.files?.[0] || null)}
-                            className="block w-full min-w-0 max-w-full rounded-lg border border-[#cfdde5] bg-white px-2 py-1.5 text-[11px] text-[#1f2937] file:mr-2 file:max-w-full file:overflow-hidden file:text-ellipsis file:whitespace-nowrap"
+                            className="block w-full min-w-0 max-w-full rounded-lg border border-[#ddcfe8] bg-white px-2 py-1.5 text-[11px] text-[#1f2937] file:mr-2 file:max-w-full file:overflow-hidden file:text-ellipsis file:whitespace-nowrap"
                           />
                           {item.copackConfig.backFileName ? (
                             <span className="block max-w-full truncate text-[10px] text-[#5b7382]" title={item.copackConfig.backFileName}>
@@ -506,7 +506,7 @@ export default function ProductCard({ item, onAdd }: ProductCardProps) {
                       <input
                         value={item.copackConfig.notes}
                         onChange={(e) => item.copackConfig?.onNotesChange(e.target.value)}
-                        className="rounded-lg border border-[#cfdde5] bg-white px-2 py-1.5 text-[11px] text-[#1f2937]"
+                        className="rounded-lg border border-[#ddcfe8] bg-white px-2 py-1.5 text-[11px] text-[#1f2937]"
                       />
                     </label>
                   </>
@@ -521,14 +521,14 @@ export default function ProductCard({ item, onAdd }: ProductCardProps) {
             type="button"
             onClick={onAdd}
             disabled={item.addDisabled || item.addLoading || hasOnlyOneExternalSelection}
-            className="flex-1 rounded-full bg-[#14b8a6] px-3 py-2 text-xs font-bold text-white transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-55"
+            className="flex-1 rounded-full bg-[#8f52dc] px-3 py-2 text-xs font-bold text-white transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-55"
           >
             {item.addLoading ? (item.isEditing ? "Saving..." : "Adding...") : item.addButtonLabel || "Add to Estimate"}
           </button>
         </div>
 
         {item.isEditing ? (
-          <div className="text-[11px] font-medium text-[#0f766e]">
+          <div className="text-[11px] font-medium text-[#6f32b5]">
             Editing this estimate line from the cart.
           </div>
         ) : null}

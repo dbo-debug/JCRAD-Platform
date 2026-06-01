@@ -183,7 +183,7 @@ export default function SavedRouteRunner({ route }: SavedRouteRunnerProps) {
 
   return (
     <div className="space-y-5">
-      <section className="rounded-[28px] border border-[#d8e6ee] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbfd_100%)] p-5 shadow-[0_24px_60px_rgba(16,42,67,0.08)] lg:px-6">
+      <section className="rounded-[28px] border border-[#d8e6ee] bg-[linear-gradient(180deg,#ffffff_0%,#fdf7fb_100%)] p-5 shadow-[0_24px_60px_rgba(16,42,67,0.08)] lg:px-6">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div className="max-w-[760px]">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6c8797]">Field Execution Cockpit</p>
@@ -216,7 +216,7 @@ export default function SavedRouteRunner({ route }: SavedRouteRunnerProps) {
                   type="button"
                   onClick={() => void updateRouteStatus("in_progress")}
                   disabled={routeBusy !== null}
-                  className="rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95 disabled:opacity-60"
+                  className="rounded-full bg-[#8f52dc] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95 disabled:opacity-60"
                 >
                   {routeBusy === "start" ? "Starting..." : "Start Route"}
                 </button>
@@ -226,7 +226,7 @@ export default function SavedRouteRunner({ route }: SavedRouteRunnerProps) {
                   type="button"
                   onClick={() => void updateRouteStatus("completed")}
                   disabled={routeBusy !== null}
-                  className="rounded-full border border-[#d0dde5] bg-white px-4 py-2 text-sm font-semibold text-[#24404d] transition hover:border-[#14b8a6] hover:text-[#0f766e] disabled:opacity-60"
+                  className="rounded-full border border-[#decfe8] bg-white px-4 py-2 text-sm font-semibold text-[#24404d] transition hover:border-[#8f52dc] hover:text-[#6f32b5] disabled:opacity-60"
                 >
                   {routeBusy === "complete" ? "Completing..." : "Complete Route"}
                 </button>
@@ -234,7 +234,7 @@ export default function SavedRouteRunner({ route }: SavedRouteRunnerProps) {
             </div>
             {routeMessage ? <p className="mt-2 text-sm text-[#4f6877]">{routeMessage}</p> : null}
           </div>
-          <div className="grid w-full gap-2 rounded-2xl border border-[#dbe8ef] bg-white/90 p-4 text-sm text-[#506877] shadow-sm sm:max-w-[360px]">
+          <div className="grid w-full gap-2 rounded-2xl border border-[#e9def1] bg-white/90 p-4 text-sm text-[#506877] shadow-sm sm:max-w-[360px]">
             <MetricLine label="Start Time" value={route.plannedStartTime || "Not set"} />
             <MetricLine label="Drive Minutes" value={String(route.estimatedDriveMinutes || 0)} />
             <MetricLine label="Visit Minutes" value={String(route.estimatedVisitMinutes || 0)} />
@@ -379,7 +379,7 @@ function SavedRouteStopCard({ stop, stage }: { stop: SavedRouteStop; stage: "nex
     ? "rounded-[28px] border border-[#b8dfda] bg-[linear-gradient(180deg,#ffffff_0%,#f2fbf8_100%)] p-5 shadow-[0_18px_48px_rgba(16,42,67,0.08)]"
     : isSecondaryStop
       ? "rounded-[24px] border border-[#d9e7ee] bg-white p-4 shadow-[0_14px_40px_rgba(16,42,67,0.05)] lg:p-5"
-      : "rounded-[24px] border border-[#e2ebf0] bg-[#fbfdfe] p-4 shadow-[0_10px_28px_rgba(16,42,67,0.04)] lg:p-5";
+      : "rounded-[24px] border border-[#e2ebf0] bg-[#fffafd] p-4 shadow-[0_10px_28px_rgba(16,42,67,0.04)] lg:p-5";
 
   async function updateRouteStop(stopStatus: "visited" | "skipped" | "ready") {
     const res = await fetch(`/api/workspace/routes/stops/${stop.id}`, {
@@ -540,9 +540,9 @@ function SavedRouteStopCard({ stop, stage }: { stop: SavedRouteStop; stage: "nex
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            {isNextStop ? <span className="rounded-full border border-[#bde8e4] bg-[#e9fbf9] px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#0f766e]">Work now</span> : null}
-            <span className="rounded-full border border-[#d7e6ed] bg-[#f8fbfc] px-2.5 py-1 text-xs font-semibold text-[#496574]">Stop {stop.stopOrder}</span>
-            <Link href={`/workspace/customers/${customer.id}`} className="text-lg font-semibold text-[#173543] transition hover:text-[#0f766e]">
+            {isNextStop ? <span className="rounded-full border border-[#e8d7f7] bg-[#fcf3ff] px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#6f32b5]">Work now</span> : null}
+            <span className="rounded-full border border-[#e5d8ef] bg-[#fcf7fd] px-2.5 py-1 text-xs font-semibold text-[#496574]">Stop {stop.stopOrder}</span>
+            <Link href={`/workspace/customers/${customer.id}`} className="text-lg font-semibold text-[#173543] transition hover:text-[#6f32b5]">
               {customer.name}
             </Link>
             <span className={["rounded-full border px-2.5 py-1 text-xs font-semibold", visitStatusChipClass(customer.visitStatus)].join(" ")}>
@@ -551,7 +551,7 @@ function SavedRouteStopCard({ stop, stage }: { stop: SavedRouteStop; stage: "nex
             <span className={["rounded-full border px-2.5 py-1 text-xs font-semibold", priorityChipClass(customer.routePriority)].join(" ")}>
               Priority {customer.routePriority ?? "None"}
             </span>
-            <span className="rounded-full border border-[#d7e6ed] bg-white px-2.5 py-1 text-xs font-semibold text-[#496574]">{titleCase(stop.stopStatus)}</span>
+            <span className="rounded-full border border-[#e5d8ef] bg-white px-2.5 py-1 text-xs font-semibold text-[#496574]">{titleCase(stop.stopStatus)}</span>
           </div>
           <p className="mt-2 text-sm text-[#5a7483]">
             {titleCase(customer.routeDay, "No route day")} • Territory {customer.territoryCode || "Unassigned"} • Rep {customer.assignedRouteRepName || "Unassigned"}
@@ -596,16 +596,16 @@ function SavedRouteStopCard({ stop, stage }: { stop: SavedRouteStop; stage: "nex
           >
             Build Estimate
           </Link>
-          <Link href={`/workspace/customers/${customer.id}`} className="rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm font-medium text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543]">
+          <Link href={`/workspace/customers/${customer.id}`} className="rounded-full border border-[#decfe8] bg-white px-3 py-1.5 text-sm font-medium text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543]">
             Open account
           </Link>
           {phoneHref ? (
-            <a href={phoneHref} className="rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm font-medium text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543]">
+            <a href={phoneHref} className="rounded-full border border-[#decfe8] bg-white px-3 py-1.5 text-sm font-medium text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543]">
               Call contact
             </a>
           ) : null}
           {emailHref ? (
-            <a href={emailHref} className="rounded-full border border-[#d0dde5] bg-white px-3 py-1.5 text-sm font-medium text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543]">
+            <a href={emailHref} className="rounded-full border border-[#decfe8] bg-white px-3 py-1.5 text-sm font-medium text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543]">
               Email contact
             </a>
           ) : null}
@@ -613,7 +613,7 @@ function SavedRouteStopCard({ stop, stage }: { stop: SavedRouteStop; stage: "nex
       </div>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-[1.2fr_0.9fr]">
-        <section className="rounded-2xl border border-[#e1ebf1] bg-[#fbfdfe] p-4">
+        <section className="rounded-2xl border border-[#e1ebf1] bg-[#fffafd] p-4">
           <h3 className="text-sm font-semibold text-[#173543]">{isNextStop ? "Record Stop Outcome" : "Stop Outcome"}</h3>
           <p className="mt-1 text-sm text-[#5c7483]">
             {isNextStop
@@ -639,7 +639,7 @@ function SavedRouteStopCard({ stop, stage }: { stop: SavedRouteStop; stage: "nex
               <select
                 value={visitStatus}
                 onChange={(event) => setVisitStatus(event.target.value)}
-                className="rounded-2xl border border-[#cedde6] bg-white px-4 py-3 text-sm text-[#173543] outline-none transition focus:border-[#14b8a6]"
+                className="rounded-2xl border border-[#cedde6] bg-white px-4 py-3 text-sm text-[#173543] outline-none transition focus:border-[#8f52dc]"
               >
                 <option value="visited">Visited</option>
                 <option value="due">Due</option>
@@ -654,7 +654,7 @@ function SavedRouteStopCard({ stop, stage }: { stop: SavedRouteStop; stage: "nex
                 type="date"
                 value={nextVisitDueAt}
                 onChange={(event) => setNextVisitDueAt(event.target.value)}
-                className="rounded-2xl border border-[#cedde6] bg-white px-4 py-3 text-sm text-[#173543] outline-none transition focus:border-[#14b8a6]"
+                className="rounded-2xl border border-[#cedde6] bg-white px-4 py-3 text-sm text-[#173543] outline-none transition focus:border-[#8f52dc]"
               />
             </label>
           </div>
@@ -665,14 +665,14 @@ function SavedRouteStopCard({ stop, stage }: { stop: SavedRouteStop; stage: "nex
               onChange={(event) => setVisitNotes(event.target.value)}
               rows={3}
               placeholder="Quick notes from the stop"
-              className="rounded-2xl border border-[#cedde6] bg-white px-4 py-3 text-sm text-[#173543] outline-none transition focus:border-[#14b8a6]"
+              className="rounded-2xl border border-[#cedde6] bg-white px-4 py-3 text-sm text-[#173543] outline-none transition focus:border-[#8f52dc]"
             />
           </label>
           <div className="mt-3 flex flex-wrap gap-2">
             <button type="button" onClick={() => void runAction("visit", `Completed visit at ${customer.name}`)} disabled={busyAction !== null} className="rounded-full bg-[#173543] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
               {busyAction === "visit" ? "Saving..." : "Mark Visited"}
             </button>
-            <button type="button" onClick={() => void runAction("log", `Logged route activity at ${customer.name}`)} disabled={busyAction !== null} className="rounded-full border border-[#d0dde5] bg-white px-4 py-2 text-sm font-semibold text-[#42606f] disabled:opacity-60">
+            <button type="button" onClick={() => void runAction("log", `Logged route activity at ${customer.name}`)} disabled={busyAction !== null} className="rounded-full border border-[#decfe8] bg-white px-4 py-2 text-sm font-semibold text-[#42606f] disabled:opacity-60">
               Log Activity
             </button>
             <button type="button" onClick={() => void markSkipped()} disabled={busyAction !== null} className="rounded-full border border-[#f2d1d1] bg-white px-4 py-2 text-sm font-semibold text-[#9a3d3d] disabled:opacity-60">
@@ -681,11 +681,11 @@ function SavedRouteStopCard({ stop, stage }: { stop: SavedRouteStop; stage: "nex
           </div>
         </section>
 
-        <section className="rounded-2xl border border-[#e1ebf1] bg-[#fbfdfe] p-4">
+        <section className="rounded-2xl border border-[#e1ebf1] bg-[#fffafd] p-4">
           <h3 className="text-sm font-semibold text-[#173543]">{isNextStop ? "Next Follow-Up" : "Follow-Up Task"}</h3>
           <p className="mt-1 text-sm text-[#5c7483]">Create the next explicit action for this account if the stop needs more work after today.</p>
           <label className="mt-3 inline-flex items-center gap-2 text-sm text-[#4b6676]">
-            <input type="checkbox" checked={autoCreateTask} onChange={(event) => setAutoCreateTask(event.target.checked)} className="h-4 w-4 accent-[#14b8a6]" />
+            <input type="checkbox" checked={autoCreateTask} onChange={(event) => setAutoCreateTask(event.target.checked)} className="h-4 w-4 accent-[#8f52dc]" />
             Auto-create a task after outcome
           </label>
           <label className="mt-3 grid gap-1 text-sm text-[#4b6676]">
@@ -694,7 +694,7 @@ function SavedRouteStopCard({ stop, stage }: { stop: SavedRouteStop; stage: "nex
               value={taskTitle}
               onChange={(event) => setTaskTitle(event.target.value)}
               placeholder={`Follow up with ${customer.name}`}
-              className="rounded-2xl border border-[#cedde6] bg-white px-4 py-3 text-sm text-[#173543] outline-none transition focus:border-[#14b8a6]"
+              className="rounded-2xl border border-[#cedde6] bg-white px-4 py-3 text-sm text-[#173543] outline-none transition focus:border-[#8f52dc]"
             />
           </label>
           <label className="mt-3 grid gap-1 text-sm text-[#4b6676]">
@@ -703,10 +703,10 @@ function SavedRouteStopCard({ stop, stage }: { stop: SavedRouteStop; stage: "nex
               type="date"
               value={taskDueDate}
               onChange={(event) => setTaskDueDate(event.target.value)}
-              className="rounded-2xl border border-[#cedde6] bg-white px-4 py-3 text-sm text-[#173543] outline-none transition focus:border-[#14b8a6]"
+              className="rounded-2xl border border-[#cedde6] bg-white px-4 py-3 text-sm text-[#173543] outline-none transition focus:border-[#8f52dc]"
             />
           </label>
-          <button type="button" onClick={() => void createFollowUpTask()} disabled={busyAction !== null} className="mt-3 rounded-full border border-[#d0dde5] bg-white px-4 py-2 text-sm font-semibold text-[#42606f] disabled:opacity-60">
+          <button type="button" onClick={() => void createFollowUpTask()} disabled={busyAction !== null} className="mt-3 rounded-full border border-[#decfe8] bg-white px-4 py-2 text-sm font-semibold text-[#42606f] disabled:opacity-60">
             {busyAction === "task" ? "Saving..." : "Create Task"}
           </button>
           {statusMessage ? <p className="mt-3 text-sm text-[#35505d]">{statusMessage}</p> : null}
@@ -742,10 +742,10 @@ function ProgressCard({
 }) {
   const toneClass =
     tone === "ok"
-      ? "border-[#bde8e4] bg-[#effcf9]"
+      ? "border-[#e8d7f7] bg-[#fcf5ff]"
       : tone === "warn"
         ? "border-[#f1ddad] bg-[#fffaf0]"
-        : "border-[#dbe8ef] bg-white";
+        : "border-[#e9def1] bg-white";
 
   return (
     <div className={["rounded-2xl border p-4 shadow-sm", toneClass].join(" ")}>
@@ -758,7 +758,7 @@ function ProgressCard({
 
 function RunnerInfo({ title, lines }: { title: string; lines: string[] }) {
   return (
-    <div className="rounded-2xl border border-[#dbe8ef] bg-white p-3">
+    <div className="rounded-2xl border border-[#e9def1] bg-white p-3">
       <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7d95a3]">{title}</p>
       <div className="mt-2 space-y-1 text-sm text-[#56717f]">
         {lines.map((line) => (

@@ -82,11 +82,11 @@ export default async function WorkspaceCustomersPage({
 
 function ModeCard({ label, title, detail, href }: { label: string; title: string; detail: string; href: string }) {
   return (
-    <Link href={href} className="rounded-[24px] border border-[#d7e6ed] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbfd_100%)] p-5 shadow-[0_12px_30px_rgba(16,42,67,0.06)] transition hover:border-[#14b8a6] hover:bg-white">
+    <Link href={href} className="rounded-[24px] border border-[#e5d8ef] bg-[linear-gradient(180deg,#ffffff_0%,#fdf7fb_100%)] p-5 shadow-[0_12px_30px_rgba(16,42,67,0.06)] transition hover:border-[#8f52dc] hover:bg-white">
       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#617d8c]">{label}</p>
       <p className="mt-2 text-xl font-semibold text-[#173543]">{title}</p>
       <p className="mt-2 text-sm text-[#5c7483]">{detail}</p>
-      <p className="mt-3 text-xs font-semibold uppercase tracking-[0.08em] text-[#0f766e]">Open mode</p>
+      <p className="mt-3 text-xs font-semibold uppercase tracking-[0.08em] text-[#6f32b5]">Open mode</p>
     </Link>
   );
 }
@@ -97,13 +97,13 @@ function HeaderActions({ isAdmin }: { isAdmin: boolean }) {
       {isAdmin ? <CustomerGeocodeBatchButton /> : null}
       <Link
         href="/workspace/customers/import"
-        className="inline-flex rounded-full border border-[#b9d5df] bg-white px-4 py-2 text-sm font-semibold text-[#21414d] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
+        className="inline-flex rounded-full border border-[#ddc6ea] bg-white px-4 py-2 text-sm font-semibold text-[#21414d] transition hover:border-[#8f52dc] hover:text-[#6f32b5]"
       >
         Import Activity
       </Link>
       <Link
         href="/workspace/customers/import"
-        className="inline-flex rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95"
+        className="inline-flex rounded-full bg-[#8f52dc] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95"
       >
         New Import
       </Link>

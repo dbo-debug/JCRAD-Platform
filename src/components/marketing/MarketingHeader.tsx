@@ -29,15 +29,15 @@ export default function MarketingHeader({ isAuthenticated, dashboardHref = "/das
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-[#d9e7ee] bg-white/90 backdrop-blur">
+    <header className="sticky top-0 z-50 border-b border-[#eadff1] bg-white/90 backdrop-blur">
       <div className="mx-auto flex h-20 w-full max-w-7xl items-center justify-between px-4 md:px-6">
         <Link href="/" className="inline-flex items-center gap-3" onClick={() => setMobileOpen(false)}>
-          <div className="rounded-xl border border-[#d7e6ed] bg-[#f7fbfd] p-1 shadow-sm">
-            <Image src="/brand/BLACK.png" alt="JC RAD Inc." width={64} height={64} className="h-14 w-auto md:h-16" />
+          <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-xl border border-[#eadff1] bg-white p-1 shadow-sm md:h-[72px] md:w-[72px]">
+            <Image src="/brand/motley-on-white.png" alt="Motley Terpz" width={72} height={72} className="h-full w-full object-contain" />
           </div>
           <div className="hidden sm:block">
-            <div className="text-sm font-semibold tracking-[0.04em] text-[#173543]">JC RAD Inc.</div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0f766e]">Wholesale + Copack</div>
+            <div className="text-sm font-semibold tracking-[0.04em] text-[#173543]">Motley Terpz</div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#d49d10]">Wholesale + Copack</div>
           </div>
         </Link>
 
@@ -48,7 +48,7 @@ export default function MarketingHeader({ isAuthenticated, dashboardHref = "/das
               href={item.href}
               className={[
                 "text-sm font-medium transition-colors",
-                isActive(pathname, item.href) ? "text-[#0f766e]" : "text-[#3d5a6a] hover:text-[#173543]",
+                isActive(pathname, item.href) ? "text-[#6f32b5]" : "text-[#3d5a6a] hover:text-[#173543]",
               ].join(" ")}
             >
               {item.label}
@@ -59,7 +59,7 @@ export default function MarketingHeader({ isAuthenticated, dashboardHref = "/das
         <div className="flex items-center gap-2">
           <Link
             href="/menu"
-            className="hidden rounded-full border border-[#cfe0e7] bg-white px-4 py-2 text-sm font-semibold text-[#2b4756] transition hover:border-[#14b8a6] hover:text-[#0f766e] md:inline-flex"
+            className="hidden rounded-full border border-[#decee9] bg-white px-4 py-2 text-sm font-semibold text-[#2b4756] transition hover:border-[#8f52dc] hover:text-[#6f32b5] md:inline-flex"
           >
             View Menu
           </Link>
@@ -67,13 +67,13 @@ export default function MarketingHeader({ isAuthenticated, dashboardHref = "/das
             <>
               <Link
                 href="/signup"
-                className="hidden rounded-full border border-[#cfe0e7] bg-white px-4 py-2 text-sm font-semibold text-[#2b4756] transition hover:border-[#14b8a6] hover:text-[#0f766e] md:inline-flex"
+                className="hidden rounded-full border border-[#decee9] bg-white px-4 py-2 text-sm font-semibold text-[#2b4756] transition hover:border-[#8f52dc] hover:text-[#6f32b5] md:inline-flex"
               >
                 Create Account
               </Link>
               <Link
                 href="/login"
-                className="hidden rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95 md:inline-flex"
+                className="hidden rounded-full bg-[#8f52dc] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95 md:inline-flex"
               >
                 Login
               </Link>
@@ -82,14 +82,14 @@ export default function MarketingHeader({ isAuthenticated, dashboardHref = "/das
             <>
               <Link
                 href={dashboardHref}
-                className="hidden rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95 md:inline-flex"
+                className="hidden rounded-full bg-[#8f52dc] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95 md:inline-flex"
               >
                 Dashboard
               </Link>
               <form action="/auth/logout" method="post" className="hidden md:block">
                 <button
                   type="submit"
-                  className="rounded-full border border-[#cfe0e7] bg-white px-4 py-2 text-sm font-semibold text-[#2b4756] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
+                  className="rounded-full border border-[#decee9] bg-white px-4 py-2 text-sm font-semibold text-[#2b4756] transition hover:border-[#8f52dc] hover:text-[#6f32b5]"
                 >
                   Logout
                 </button>
@@ -100,7 +100,7 @@ export default function MarketingHeader({ isAuthenticated, dashboardHref = "/das
             type="button"
             aria-label="Open navigation"
             onClick={() => setMobileOpen((prev) => !prev)}
-            className="inline-flex rounded-lg border border-[#d5e3ea] bg-white p-2 text-[#234353] md:hidden"
+            className="inline-flex rounded-lg border border-[#e4d7ed] bg-white p-2 text-[#234353] md:hidden"
           >
             <span className="block h-0.5 w-5 bg-current" />
             <span className="mt-1 block h-0.5 w-5 bg-current" />
@@ -110,7 +110,7 @@ export default function MarketingHeader({ isAuthenticated, dashboardHref = "/das
       </div>
 
       {mobileOpen ? (
-        <div className="border-t border-[#deebf1] bg-white px-4 py-3 md:hidden">
+        <div className="border-t border-[#efe2f5] bg-white px-4 py-3 md:hidden">
           <nav className="grid gap-1">
             {NAV_LINKS.map((item) => (
               <Link
@@ -120,8 +120,8 @@ export default function MarketingHeader({ isAuthenticated, dashboardHref = "/das
                 className={[
                   "rounded-lg px-3 py-2 text-sm font-medium",
                   isActive(pathname, item.href)
-                    ? "bg-[#e9fbf9] text-[#0f766e]"
-                    : "text-[#3d5a6a] hover:bg-[#f4f9fc]",
+                    ? "bg-[#fcf3ff] text-[#6f32b5]"
+                    : "text-[#3d5a6a] hover:bg-[#fcf5fb]",
                 ].join(" ")}
               >
                 {item.label}
@@ -130,7 +130,7 @@ export default function MarketingHeader({ isAuthenticated, dashboardHref = "/das
             <Link
               href="/menu"
               onClick={() => setMobileOpen(false)}
-              className="mt-2 inline-flex justify-center rounded-full border border-[#cfe0e7] bg-white px-4 py-2 text-sm font-semibold text-[#2b4756]"
+              className="mt-2 inline-flex justify-center rounded-full border border-[#decee9] bg-white px-4 py-2 text-sm font-semibold text-[#2b4756]"
             >
               View Menu
             </Link>
@@ -139,14 +139,14 @@ export default function MarketingHeader({ isAuthenticated, dashboardHref = "/das
                 <Link
                   href="/signup"
                   onClick={() => setMobileOpen(false)}
-                  className="mt-2 inline-flex justify-center rounded-full border border-[#cfe0e7] bg-white px-4 py-2 text-sm font-semibold text-[#2b4756]"
+                  className="mt-2 inline-flex justify-center rounded-full border border-[#decee9] bg-white px-4 py-2 text-sm font-semibold text-[#2b4756]"
                 >
                   Create Account
                 </Link>
                 <Link
                   href="/login"
                   onClick={() => setMobileOpen(false)}
-                  className="mt-2 inline-flex justify-center rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white"
+                  className="mt-2 inline-flex justify-center rounded-full bg-[#8f52dc] px-4 py-2 text-sm font-semibold text-white"
                 >
                   Login
                 </Link>
@@ -156,14 +156,14 @@ export default function MarketingHeader({ isAuthenticated, dashboardHref = "/das
                 <Link
                   href={dashboardHref}
                   onClick={() => setMobileOpen(false)}
-                  className="mt-2 inline-flex justify-center rounded-full bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white"
+                  className="mt-2 inline-flex justify-center rounded-full bg-[#8f52dc] px-4 py-2 text-sm font-semibold text-white"
                 >
                   Dashboard
                 </Link>
                 <form action="/auth/logout" method="post" className="mt-2">
                   <button
                     type="submit"
-                    className="w-full rounded-full border border-[#cfe0e7] bg-white px-4 py-2 text-sm font-semibold text-[#2b4756]"
+                    className="w-full rounded-full border border-[#decee9] bg-white px-4 py-2 text-sm font-semibold text-[#2b4756]"
                   >
                     Logout
                   </button>

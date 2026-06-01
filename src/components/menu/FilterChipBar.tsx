@@ -23,7 +23,7 @@ export default function FilterChipBar({ groups, onClear }: FilterChipBarProps) {
           <button
             type="button"
             onClick={onClear}
-            className="rounded-full border border-[#cfdde5] px-2.5 py-1 text-[11px] font-semibold text-[#4e6877] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
+            className="rounded-full border border-[#ddcfe8] px-2.5 py-1 text-[11px] font-semibold text-[#4e6877] transition hover:border-[#8f52dc] hover:text-[#6f32b5]"
           >
             Clear
           </button>
@@ -45,8 +45,8 @@ export default function FilterChipBar({ groups, onClear }: FilterChipBarProps) {
                     className={[
                       "rounded-full border px-3 py-1 text-xs font-semibold transition",
                       active
-                        ? "border-[#14b8a6] bg-gradient-to-r from-[#14b8a6]/15 to-[#22c55e]/15 text-[#0f766e]"
-                        : "border-[#d4e0e7] bg-[#fbfdfe] text-[#4e6674] hover:border-[#14b8a6]/60 hover:text-[#0f766e]",
+                        ? "border-[#8f52dc] bg-gradient-to-r from-[#8f52dc]/15 to-[#22c55e]/15 text-[#6f32b5]"
+                        : "border-[#d4e0e7] bg-[#fffafd] text-[#4e6674] hover:border-[#8f52dc]/60 hover:text-[#6f32b5]",
                     ].join(" ")}
                   >
                     {option}

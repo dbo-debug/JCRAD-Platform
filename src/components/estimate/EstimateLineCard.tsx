@@ -38,7 +38,7 @@ export default function EstimateLineCard({
 
   return (
     <article
-      className={`estimate-break-avoid estimate-card rounded-2xl border border-[#dbe6ed] bg-white px-3 py-2.5 shadow-[0_14px_24px_-24px_rgba(16,24,40,0.45)] ${className}`}
+      className={`estimate-break-avoid estimate-card rounded-2xl border border-[#e8ddf0] bg-white px-3 py-2.5 shadow-[0_14px_24px_-24px_rgba(16,24,40,0.45)] ${className}`}
       data-line-key={lineKey}
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -48,7 +48,7 @@ export default function EstimateLineCard({
             {tags.map((tag) => (
               <span
                 key={`${lineKey}-${tag}`}
-                className="rounded-full border border-[#bfe5e0] bg-[#ecfbf8] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.05em] text-[#0f766e]"
+                className="rounded-full border border-[#ead8f7] bg-[#fdf4ff] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.05em] text-[#6f32b5]"
               >
                 {tag}
               </span>
@@ -75,7 +75,7 @@ export default function EstimateLineCard({
         <button
           type="button"
           onClick={onToggle}
-          className="rounded-full border border-[#cfe0e8] px-2.5 py-1 text-[11px] font-semibold text-[#2f4a59] transition hover:border-[#14b8a6] hover:text-[#0f766e]"
+          className="rounded-full border border-[#cfe0e8] px-2.5 py-1 text-[11px] font-semibold text-[#2f4a59] transition hover:border-[#8f52dc] hover:text-[#6f32b5]"
         >
           {expanded ? "Hide breakdown" : "Show breakdown"}
         </button>

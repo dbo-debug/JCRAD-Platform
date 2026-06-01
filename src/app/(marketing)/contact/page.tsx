@@ -36,8 +36,8 @@ export default function ContactPage() {
             <ContactForm />
           </Suspense>
 
-          <Card className="border border-[#dbe9ef] bg-[#f9fcfd] p-5 text-[#234353]">
-            <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-[#0f766e]">Response expectation</h3>
+          <Card className="border border-[#eadff1] bg-[#fdf8fd] p-5 text-[#234353]">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-[#6f32b5]">Response expectation</h3>
             <p className="mt-2 text-sm text-[#4a6575]">
               Initial responses focus on feasibility, required inputs, and the most practical next action for your team.
             </p>
@@ -45,7 +45,7 @@ export default function ContactPage() {
         </div>
 
         <div className="space-y-4">
-          <Card className="border border-[#dbe9ef] bg-white p-6 text-[#153447] shadow-sm">
+          <Card className="border border-[#eadff1] bg-white p-6 text-[#153447] shadow-sm">
             <h2 className="text-lg font-semibold text-[#13303f]">What to include</h2>
             <ul className="mt-4 space-y-3 text-sm text-[#4a6575]">
               <li>Product categories and preferred formats</li>
@@ -56,7 +56,7 @@ export default function ContactPage() {
           </Card>
 
           <Card className="border border-[#d3e8ea] bg-[#edf9f7] p-6 text-[#234353]">
-            <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-[#0f766e]">Helpful prep checklist</h3>
+            <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-[#6f32b5]">Helpful prep checklist</h3>
             <ul className="mt-3 space-y-2 text-sm text-[#3f6274]">
               <li>Decide top 1-2 launch categories first</li>
               <li>Estimate realistic first-run unit counts</li>

@@ -16,9 +16,9 @@ type FormState = {
 };
 
 const INPUT_CLASS =
-  "min-h-[56px] w-full rounded-[24px] border border-[#cfe0e8] bg-white px-4 text-base text-[#173543] outline-none transition focus:border-[#14b8a6]";
+  "min-h-[56px] w-full rounded-[24px] border border-[#cfe0e8] bg-white px-4 text-base text-[#173543] outline-none transition focus:border-[#8f52dc]";
 const TEXTAREA_CLASS =
-  "w-full rounded-[24px] border border-[#cfe0e8] bg-white px-4 py-4 text-base text-[#173543] outline-none transition focus:border-[#14b8a6]";
+  "w-full rounded-[24px] border border-[#cfe0e8] bg-white px-4 py-4 text-base text-[#173543] outline-none transition focus:border-[#8f52dc]";
 
 function buildInitialForm(): FormState {
   return {
@@ -78,12 +78,12 @@ export default function QuickAddSourceClient() {
 
   return (
     <section className="mx-auto max-w-xl">
-      <div className="rounded-[32px] border border-[#d5e4eb] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbfd_100%)] p-5 shadow-[0_18px_45px_rgba(16,42,67,0.08)] sm:p-7">
+      <div className="rounded-[32px] border border-[#d5e4eb] bg-[linear-gradient(180deg,#ffffff_0%,#fdf7fb_100%)] p-5 shadow-[0_18px_45px_rgba(16,42,67,0.08)] sm:p-7">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Procurement Capture</p>
           <h2 className="mt-1 text-2xl font-semibold text-[#173543]">Quick Add Source</h2>
           <p className="mt-2 text-sm text-[#5b7382]">Minimal supplier intake. Save the source fast, then continue working from the full source record.</p>
-          <p className="mt-3 inline-flex rounded-full border border-[#d7e6ed] bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-[#5b7382]">
+          <p className="mt-3 inline-flex rounded-full border border-[#e5d8ef] bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-[#5b7382]">
             Low-friction create
           </p>
         </div>
@@ -117,7 +117,7 @@ export default function QuickAddSourceClient() {
             />
           </Field>
 
-          <details className="rounded-[24px] border border-[#d7e6ed] bg-[#f8fbfc] px-4 py-3" open>
+          <details className="rounded-[24px] border border-[#e5d8ef] bg-[#fcf7fd] px-4 py-3" open>
             <summary className="cursor-pointer list-none text-sm font-semibold text-[#173543]">
               Contact and follow-up
               <span className="ml-2 text-xs font-medium uppercase tracking-[0.12em] text-[#7891a0]">Optional</span>
@@ -194,7 +194,7 @@ export default function QuickAddSourceClient() {
             <button
               type="submit"
               disabled={submitting}
-              className="min-h-[58px] w-full rounded-full bg-[#14b8a6] px-5 py-3 text-base font-semibold text-white transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+              className="min-h-[58px] w-full rounded-full bg-[#8f52dc] px-5 py-3 text-base font-semibold text-white transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {submitting ? "Saving Source..." : "Save Source"}
             </button>
@@ -218,7 +218,7 @@ function Field({
     <label className="block space-y-2.5">
       <span className="text-sm font-semibold text-[#173543]">
         {label}
-        {required ? <span className="ml-1 text-[#0f766e]">*</span> : null}
+        {required ? <span className="ml-1 text-[#6f32b5]">*</span> : null}
       </span>
       {children}
     </label>
