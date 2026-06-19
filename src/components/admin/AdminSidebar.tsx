@@ -14,9 +14,11 @@ const NAV_ITEMS: ReadonlyArray<{ label: string; href: string; subItem?: boolean 
   { label: "Settings", href: "/admin/settings" },
 ];
 
-function isActive(pathname: string, href: string): boolean {
-  if (href === "/admin") return pathname === "/admin";
-  return pathname.startsWith(href);
+function isActive(pathname: string | null, href: string): boolean {
+  const currentPath = String(pathname || "").trim();
+  if (!currentPath) return href === "/admin";
+  if (href === "/admin") return currentPath === "/admin";
+  return currentPath.startsWith(href);
 }
 
 export default function AdminSidebar() {

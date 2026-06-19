@@ -54,10 +54,12 @@ const NAV_SECTIONS: NavSection[] = [
   },
 ];
 
-function isActive(pathname: string, href: string) {
-  if (href === "/admin") return pathname === "/admin";
-  if (href === "/workspace/routes/run") return pathname.startsWith("/workspace/routes/run");
-  return pathname === href || pathname.startsWith(`${href}/`);
+function isActive(pathname: string | null, href: string) {
+  const currentPath = String(pathname || "").trim();
+  if (!currentPath) return href === "/admin";
+  if (href === "/admin") return currentPath === "/admin";
+  if (href === "/workspace/routes/run") return currentPath.startsWith("/workspace/routes/run");
+  return currentPath === href || currentPath.startsWith(`${href}/`);
 }
 
 export default function InternalSidebar({ role }: InternalSidebarProps) {

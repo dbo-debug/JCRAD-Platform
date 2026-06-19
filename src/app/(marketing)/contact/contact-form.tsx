@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
@@ -21,7 +21,7 @@ function parseIntent(value: string | null): Intent {
   return "general";
 }
 
-export default function ContactForm() {
+function ContactFormContent() {
   const searchParams = useSearchParams();
   const initialIntent = parseIntent(searchParams.get("intent"));
 
@@ -103,5 +103,13 @@ export default function ContactForm() {
         </Button>
       </form>
     </Card>
+  );
+}
+
+export default function ContactForm() {
+  return (
+    <Suspense fallback={null}>
+      <ContactFormContent />
+    </Suspense>
   );
 }

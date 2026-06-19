@@ -12,6 +12,7 @@ const NAV_ITEMS = [
 
 export default function WorkspaceSidebar() {
   const pathname = usePathname();
+  const currentPath = String(pathname || "").trim();
 
   return (
     <aside className="w-64 border-r border-[var(--surface-border)] bg-white px-4 py-6">
@@ -25,7 +26,7 @@ export default function WorkspaceSidebar() {
 
       <nav className="space-y-1">
         {NAV_ITEMS.map((item) => {
-          const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+          const active = currentPath ? currentPath === item.href || currentPath.startsWith(`${item.href}/`) : item.href === "/workspace/customers";
           return (
             <Link
               key={item.href}

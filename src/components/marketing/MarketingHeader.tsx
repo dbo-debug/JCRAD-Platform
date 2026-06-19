@@ -19,9 +19,11 @@ type MarketingHeaderProps = {
   dashboardHref?: string;
 };
 
-function isActive(pathname: string, href: string): boolean {
-  if (href === "/") return pathname === "/";
-  return pathname === href || pathname.startsWith(`${href}/`);
+function isActive(pathname: string | null, href: string): boolean {
+  const currentPath = String(pathname || "").trim();
+  if (!currentPath) return href === "/";
+  if (href === "/") return currentPath === "/";
+  return currentPath === href || currentPath.startsWith(`${href}/`);
 }
 
 export default function MarketingHeader({ isAuthenticated, dashboardHref = "/dashboard" }: MarketingHeaderProps) {

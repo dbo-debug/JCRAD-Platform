@@ -13,6 +13,7 @@ type HeaderProps = {
 export default function Header({ isAuthenticated, dashboardHref = "/dashboard" }: HeaderProps) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const currentPath = String(pathname || "").trim();
   const navLinks = [
     { href: "/", label: "Home" },
     { href: "/copack", label: "Copack" },
@@ -21,7 +22,10 @@ export default function Header({ isAuthenticated, dashboardHref = "/dashboard" }
     { href: "/about", label: "About" },
     { href: "/contact", label: "Contact" },
   ] as const;
-  const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`));
+  const isActive = (href: string) => {
+    if (!currentPath) return href === "/";
+    return href === "/" ? currentPath === "/" : currentPath === href || currentPath.startsWith(`${href}/`);
+  };
 
   return (
     <header className="sticky top-0 z-50 border-b border-[#eadff1] bg-white/90 backdrop-blur">
