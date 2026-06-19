@@ -27,10 +27,10 @@ function AgeGateContent() {
   }
 
   return (
-    <main className="min-h-screen bg-[linear-gradient(180deg,#fdf7fb_0%,#eef5f8_100%)] px-4 py-10 text-[#1c2f3a]">
+    <main className="min-h-screen bg-[linear-gradient(180deg,#f4fbfd_0%,#eaf4f8_100%)] px-4 py-10 text-[#1c2f3a]">
       <div className="mx-auto flex min-h-[80vh] max-w-2xl items-center justify-center">
         <section className="w-full rounded-2xl border border-[#d9e7ee] bg-white p-8 shadow-[0_20px_40px_-26px_rgba(16,24,40,0.45)] md:p-10">
-          <div className="mb-5 inline-flex rounded-full border border-[#e8d7f7] bg-[#fcf3ff] px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#6f32b5]">
+          <div className="mb-5 inline-flex rounded-full border border-[#cfe6ea] bg-[#eef9fb] px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#0d6f7a]">
             Age Verification
           </div>
 
@@ -41,14 +41,14 @@ function AgeGateContent() {
             <button
               type="button"
               onClick={confirmAge}
-              className="inline-flex items-center justify-center rounded-full bg-[#8f52dc] px-5 py-3 text-sm font-semibold text-white transition hover:opacity-95"
+              className="inline-flex items-center justify-center rounded-full bg-[#0d6f7a] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#0a5d66]"
             >
               Yes, I am 21+
             </button>
             <button
               type="button"
               onClick={exitSite}
-              className="inline-flex items-center justify-center rounded-full border border-[#ddcfe8] bg-white px-5 py-3 text-sm font-semibold text-[#2d4756] transition hover:border-[#9fb7c4]"
+              className="inline-flex items-center justify-center rounded-full border border-[#cfe0e8] bg-white px-5 py-3 text-sm font-semibold text-[#2d4756] transition hover:border-[#88aab8]"
             >
               Exit
             </button>

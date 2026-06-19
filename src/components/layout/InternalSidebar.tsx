@@ -75,7 +75,7 @@ export default function InternalSidebar({ role }: InternalSidebarProps) {
         href="/admin"
         className="mb-6 inline-flex h-14 w-32 items-center justify-center overflow-hidden rounded-2xl border border-[#eadff1] bg-white p-1 shadow-sm"
       >
-        <img src="/brand/motley-on-white.png" alt="Motley Terpz" className="h-full w-full object-contain" />
+        <img src="/brand/PRIMARY.png" alt="JC RAD Inc." className="h-full w-full object-contain" />
       </Link>
 
       <div className="space-y-5">
@@ -92,7 +92,7 @@ export default function InternalSidebar({ role }: InternalSidebarProps) {
                     href={item.href}
                     className={[
                       "block rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                      active ? "bg-[#fcf3ff] text-[#6f32b5]" : "text-[#4a6575] hover:bg-[#fcf5fb] hover:text-[#173543]",
+                      active ? "bg-[#eef9fb] text-[#0d6f7a]" : "text-[#4a6575] hover:bg-[#f4fbfd] hover:text-[#173543]",
                     ].join(" ")}
                   >
                     {label}

@@ -40,7 +40,7 @@ export default function MarketingHero({
           </div>
           {brandMarkSrc ? (
             <div className="hidden self-center justify-self-end md:block">
-              <img src={brandMarkSrc} alt="Motley Terpz" className="h-auto w-[320px]" />
+              <img src={brandMarkSrc} alt="JC RAD Inc." className="h-auto w-[320px]" />
             </div>
           ) : null}
         </div>
@@ -50,7 +50,7 @@ export default function MarketingHero({
 
   return (
     <section className="rounded-3xl border border-[#eadff1] bg-white p-6 md:p-10">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#6f32b5]">{eyebrow}</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0d6f7a]">{eyebrow}</p>
       <h1 className="mt-2 text-3xl font-semibold text-[#13303f] md:text-4xl">{title}</h1>
       <p className="mt-3 max-w-3xl text-[#4a6575]">{subtitle}</p>
     </section>

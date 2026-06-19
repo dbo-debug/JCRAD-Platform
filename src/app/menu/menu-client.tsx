@@ -1659,8 +1659,8 @@ export default function MenuClient({
 
   const branding = (
     <div className="flex items-center gap-4">
-      <img src="/brand/greyscale.png" alt="Motley Terpz" className="h-12 w-auto" />
-      <div className="hidden sm:block text-sm text-[#2f4654]">Wholesale • Copack • Fast turnaround</div>
+      <img src="/brand/PRIMARY.png" alt="JC RAD Inc." className="h-12 w-auto" />
+      <div className="hidden sm:block text-sm text-[#2f4654]">Wholesale • Copack • Production support</div>
     </div>
   );
   const requestSamplesHref = "/marketing/contact";
