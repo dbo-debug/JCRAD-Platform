@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 export default function MarketingLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,#f3fbff_0%,#fdf7fb_35%,#ffffff_80%)] text-[#173543]">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,#eef8fb_0%,#f6fbfd_38%,#ffffff_82%)] text-[#173543]">
       <main className="mx-auto w-full max-w-7xl px-4 py-8 md:px-6 md:py-12">{children}</main>
     </div>
   );
