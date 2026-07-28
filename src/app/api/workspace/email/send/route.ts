@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getStaffContext } from "@/lib/getStaffContext";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendLoggedOutboundEmail } from "@/lib/email/outbound";
+import { getCrmCommunicationsEmailStatus } from "@/lib/email/crmEmailIdentities";
 
 type EmailRecipientInput = {
   customer_id?: unknown;
@@ -86,6 +87,11 @@ async function lookupCustomerContactMap(contactIds: string[]) {
 export async function POST(request: Request) {
   const staff = await getStaffContext();
   if (!staff) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const senderStatus = await getCrmCommunicationsEmailStatus(staff.userId);
+  if (!senderStatus.ok) {
+    return NextResponse.json({ error: senderStatus.error }, { status: 400 });
+  }
 
   const body = await request.json().catch(() => ({}));
   const subject = asText(body.subject);

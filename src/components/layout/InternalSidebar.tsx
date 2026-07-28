@@ -3,15 +3,9 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-type InternalSidebarProps = {
-  role: "admin" | "sales";
-};
-
 type NavItem = {
   label: string;
-  salesLabel?: string;
   href: string;
-  adminOnly?: boolean;
 };
 
 type NavSection = {
@@ -21,9 +15,8 @@ type NavSection = {
 
 const NAV_SECTIONS: NavSection[] = [
   {
-    label: "Command",
+    label: "CRM",
     items: [
-      { label: "Command Center", salesLabel: "My Day", href: "/admin" },
       { label: "Customers", href: "/workspace/customers" },
       { label: "Sources", href: "/workspace/sources" },
       { label: "Quick Add Lead", href: "/workspace/events/quick-add" },
@@ -41,38 +34,23 @@ const NAV_SECTIONS: NavSection[] = [
       { label: "Customer Import", href: "/workspace/customers/import" },
     ],
   },
-  {
-    label: "Business",
-    items: [
-      { label: "Orders", href: "/admin/orders", adminOnly: true },
-      { label: "Menu", href: "/menu" },
-      { label: "Packaging", href: "/admin/catalog/packaging", adminOnly: true },
-      { label: "Packaging Reviews", href: "/admin/packaging/submissions", adminOnly: true },
-      { label: "Catalog", href: "/admin/catalog", adminOnly: true },
-      { label: "Settings", href: "/admin/settings", adminOnly: true },
-    ],
-  },
 ];
 
 function isActive(pathname: string | null, href: string) {
   const currentPath = String(pathname || "").trim();
-  if (!currentPath) return href === "/admin";
-  if (href === "/admin") return currentPath === "/admin";
+  if (!currentPath) return href === "/workspace/customers";
   if (href === "/workspace/routes/run") return currentPath.startsWith("/workspace/routes/run");
   return currentPath === href || currentPath.startsWith(`${href}/`);
 }
 
-export default function InternalSidebar({ role }: InternalSidebarProps) {
+export default function InternalSidebar() {
   const pathname = usePathname();
-  const visibleSections = NAV_SECTIONS.map((section) => ({
-    ...section,
-    items: section.items.filter((item) => !item.adminOnly || role === "admin"),
-  })).filter((section) => section.items.length > 0);
+  const visibleSections = NAV_SECTIONS;
 
   return (
     <aside className="w-72 border-r border-[var(--surface-border)] bg-white px-4 py-6">
       <Link
-        href="/admin"
+        href="/workspace/customers"
         className="mb-6 inline-flex h-14 w-32 items-center justify-center overflow-hidden rounded-2xl border border-[#eadff1] bg-white p-1 shadow-sm"
       >
         <img src="/brand/PRIMARY.png" alt="JC RAD Inc." className="h-full w-full object-contain" />
@@ -85,7 +63,6 @@ export default function InternalSidebar({ role }: InternalSidebarProps) {
             <nav className="space-y-1">
               {section.items.map((item) => {
                 const active = isActive(pathname, item.href);
-                const label = role === "sales" && item.salesLabel ? item.salesLabel : item.label;
                 return (
                   <Link
                     key={item.href}
@@ -95,7 +72,7 @@ export default function InternalSidebar({ role }: InternalSidebarProps) {
                       active ? "bg-[#eef9fb] text-[#0d6f7a]" : "text-[#4a6575] hover:bg-[#f4fbfd] hover:text-[#173543]",
                     ].join(" ")}
                   >
-                    {label}
+                    {item.label}
                   </Link>
                 );
               })}

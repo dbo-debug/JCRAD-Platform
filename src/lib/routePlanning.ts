@@ -6,13 +6,7 @@ import {
 } from "@/lib/googleRouteServices";
 import { getBusinessTimeParts, parseBusinessDateTime } from "@/lib/businessTime";
 import { loadSegmentBuilderSettings } from "@/lib/segmentBuilderSettings";
-
-export const JC_RAD_HQ = {
-  name: "JC RAD HQ",
-  address: "1055 E. Cesar Chavez Ave, Los Angeles, CA 90033",
-  latitude: 34.04536,
-  longitude: -118.2355,
-};
+import { JC_RAD_HQ } from "@/lib/routeConstants";
 
 const DEFAULT_VISIT_MINUTES = 30;
 const DEFAULT_LUNCH_MINUTES = 30;

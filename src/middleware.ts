@@ -4,6 +4,24 @@ import { NextResponse, type NextRequest } from "next/server";
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
+  const isEstimatorPath =
+    pathname === "/estimate" ||
+    pathname.startsWith("/estimate/") ||
+    pathname === "/dashboard" ||
+    pathname.startsWith("/api/estimate/") ||
+    pathname.startsWith("/api/workspace/estimates/") ||
+    pathname === "/api/production/finalize-line";
+
+  if (isEstimatorPath) {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "Estimator is temporarily disabled." }, { status: 410 });
+    }
+    const homeUrl = request.nextUrl.clone();
+    homeUrl.pathname = "/";
+    homeUrl.search = "";
+    return NextResponse.redirect(homeUrl);
+  }
+
   // Site-wide age gate:
   // If age verification cookie is missing, redirect to /age-gate for all
   // non-exempt paths. This runs before auth checks.
@@ -17,6 +35,10 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/images") ||
     pathname.startsWith("/assets") ||
     pathname === "/login" ||
+    pathname === "/crm" ||
+    pathname.startsWith("/crm/") ||
+    pathname.startsWith("/workspace") ||
+    pathname.startsWith("/admin") ||
     pathname.startsWith("/auth/");
 
   const hasAgeVerification = request.cookies.get("age_verified")?.value === "true";
@@ -57,39 +79,24 @@ export async function middleware(request: NextRequest) {
   if (pathname.startsWith("/admin")) {
     if (!user) {
       const loginUrl = request.nextUrl.clone();
-      loginUrl.pathname = "/login";
+      loginUrl.pathname = "/crm/login";
       loginUrl.searchParams.set("returnTo", `${request.nextUrl.pathname}${request.nextUrl.search}`);
       return NextResponse.redirect(loginUrl);
     }
-
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    const role = String(profile?.role || "").trim().toLowerCase();
-    const isStaff = role === "admin" || role === "sales";
-
-    if (!isStaff) {
-      const dashboardUrl = request.nextUrl.clone();
-      dashboardUrl.pathname = "/dashboard";
-      dashboardUrl.search = "";
-      return NextResponse.redirect(dashboardUrl);
-    }
-
-    if (role !== "admin" && pathname !== "/admin") {
-      const commandCenterUrl = request.nextUrl.clone();
-      commandCenterUrl.pathname = "/admin";
-      commandCenterUrl.search = "";
-      return NextResponse.redirect(commandCenterUrl);
-    }
-
-    return response;
+    const crmUrl = request.nextUrl.clone();
+    crmUrl.pathname = "/workspace/customers";
+    crmUrl.search = "";
+    return NextResponse.redirect(crmUrl);
   }
 
-  // Keep the existing Supabase auth behavior limited to /portal paths only.
-  // Other routes should continue without portal auth enforcement.
+  if (pathname.startsWith("/workspace") && !user) {
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = "/crm/login";
+    loginUrl.searchParams.set("returnTo", `${request.nextUrl.pathname}${request.nextUrl.search}`);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  // Keep the existing customer Supabase auth behavior limited to /portal paths.
   if (!pathname.startsWith("/portal")) {
     return response;
   }

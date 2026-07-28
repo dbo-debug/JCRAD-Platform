@@ -29,7 +29,7 @@ export default async function WorkspaceEmailsPage({
     <div className="mx-auto w-full max-w-[1560px] space-y-6">
       <AdminPageHeader
         title="Emails"
-        description="Internal small-batch flyer outreach for weekly area pushes, promo sends, and image-led rep introductions. Customer-detail email stays in place for account-specific reminders and follow-up."
+        description="Use an authorized CRM email for account communication, route follow-up, and automation-ready outreach."
       />
       <EmailsWorkspace campaigns={data.campaigns} selectedCampaign={data.selectedCampaign} recipientOptions={data.recipientOptions} />
     </div>

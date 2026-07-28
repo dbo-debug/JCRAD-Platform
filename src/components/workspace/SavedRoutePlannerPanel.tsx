@@ -9,7 +9,7 @@ import type { PendingRouteStop } from "@/lib/routeStopQueue";
 import type { RouteRepOption, SavedRouteSummary, TerritoryOption } from "@/lib/routeWorkspace";
 import PlannedRoutePreviewMap from "@/components/workspace/PlannedRoutePreviewMap";
 import { formatBusinessDateTime, formatBusinessDateTimeLong } from "@/lib/businessTime";
-import { JC_RAD_HQ } from "@/lib/routePlanning";
+import { JC_RAD_HQ } from "@/lib/routeConstants";
 import { getRouteEligibilityReason, isRouteEligibleCustomer } from "@/lib/routeEligibility";
 import { syncGeneratedRouteName } from "@/lib/routeNames";
 

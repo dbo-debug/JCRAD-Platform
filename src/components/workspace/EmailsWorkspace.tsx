@@ -8,6 +8,7 @@ import type {
   EmailCampaignSummary,
   EmailRecipientOption,
 } from "@/lib/emailCampaignWorkspace";
+import EmailIdentitySetup from "@/components/workspace/EmailIdentitySetup";
 
 type EmailsWorkspaceProps = {
   campaigns: EmailCampaignSummary[];
@@ -443,22 +444,9 @@ export default function EmailsWorkspace(props: EmailsWorkspaceProps) {
           </div>
         </div>
 
-        <div className="rounded-[24px] border border-[#e9def1] bg-white p-4 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#7891a0]">Mailbox</p>
-          <p className="mt-2 text-sm text-[#173543]">
-            {gmailStatus.loading
-              ? "Checking Gmail connection..."
-              : gmailStatus.connected
-                ? `Connected as ${gmailStatus.gmailEmail}`
-                : gmailStatus.error || "Connect Google before sending."}
-          </p>
-          <a
-            href={`/api/workspace/email/oauth/start?returnTo=${encodeURIComponent(pathname + (selectedCampaignId ? `?campaign=${selectedCampaignId}` : ""))}`}
-            className="mt-3 inline-flex rounded-full border border-[#ddcfe9] bg-white px-3 py-1.5 text-sm font-semibold text-[#21424d] transition hover:border-[#8f52dc] hover:text-[#6f32b5]"
-          >
-            {gmailStatus.connected ? "Reconnect Google" : "Connect Google"}
-          </a>
-        </div>
+        <EmailIdentitySetup
+          returnTo={pathname + (selectedCampaignId ? `?campaign=${encodeURIComponent(selectedCampaignId)}` : "")}
+        />
       </aside>
 
       <div className="space-y-6">

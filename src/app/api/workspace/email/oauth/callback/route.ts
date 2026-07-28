@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { exchangeGoogleCodeForTokens, fetchGoogleUserEmail, getGoogleOAuthConfig, upsertGmailConnection } from "@/lib/email/gmail";
+import { syncCrmEmailIdentityFromGmail } from "@/lib/email/crmEmailIdentities";
 
 const GMAIL_OAUTH_STATE_COOKIE = "jcrad_gmail_oauth_state";
 const GMAIL_OAUTH_RETURN_TO_COOKIE = "jcrad_gmail_oauth_return_to";
@@ -78,7 +79,7 @@ export async function GET(request: Request) {
   try {
     const tokens = await exchangeGoogleCodeForTokens(code);
     const gmailEmail = await fetchGoogleUserEmail(tokens.accessToken);
-    await upsertGmailConnection({
+    const connection = await upsertGmailConnection({
       userId: authData.user.id,
       gmailEmail,
       accessToken: tokens.accessToken,
@@ -86,6 +87,13 @@ export async function GET(request: Request) {
       expiryAt: tokens.expiryAt,
       scopes: tokens.scopes,
     });
+    if (connection?.id) {
+      await syncCrmEmailIdentityFromGmail({
+        userId: authData.user.id,
+        email: gmailEmail,
+        gmailConnectionId: connection.id,
+      });
+    }
 
     setStatusCookie(response, `connected:${gmailEmail}`);
     return response;

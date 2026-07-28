@@ -11,13 +11,13 @@ type AdminLayoutProps = {
 };
 
 export default async function AdminLayout({ children }: AdminLayoutProps) {
-  const staff = await requireStaff();
+  await requireStaff();
 
   return (
     <SurfaceShell>
-      <Header isAuthenticated dashboardHref="/admin" />
+      <Header isAuthenticated dashboardHref="/workspace/customers" />
       <div className="flex min-h-[calc(100vh-5rem)]">
-        <InternalSidebar role={staff.role} />
+        <InternalSidebar />
         <section className="flex-1 bg-[var(--surface-card)] p-8 text-[var(--text)]">{children}</section>
       </div>
     </SurfaceShell>

@@ -2,10 +2,10 @@ import { requireAdmin } from "@/lib/requireAdmin";
 import ProductsAdminClient from "../products/products-admin-client";
 
 export default async function AdminCatalogMediaPage(props: {
-  searchParams?: Record<string, string | string[] | undefined> | Promise<Record<string, string | string[] | undefined>>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   await requireAdmin();
-  await Promise.resolve(props.searchParams ?? {});
+  await props.searchParams;
 
   return (
     <div style={{ padding: 24 }}>

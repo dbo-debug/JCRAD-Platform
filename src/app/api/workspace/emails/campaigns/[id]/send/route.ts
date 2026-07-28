@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { renderCampaignEmail } from "@/lib/email/campaignRenderer";
-import { getGmailConnectionStatus, sendGmailMessage } from "@/lib/email/gmail";
+import { sendGmailMessage } from "@/lib/email/gmail";
+import { getCrmCommunicationsEmailStatus } from "@/lib/email/crmEmailIdentities";
 import { sendLoggedOutboundEmail } from "@/lib/email/outbound";
 import { loadManagedCampaign } from "@/lib/emailCampaigns";
 import { getStaffContext } from "@/lib/getStaffContext";
@@ -72,7 +73,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     return NextResponse.json({ error: message }, { status: message === "Forbidden" ? 403 : 404 });
   }
 
-  const gmailStatus = await getGmailConnectionStatus(staff.userId);
+  const gmailStatus = await getCrmCommunicationsEmailStatus(staff.userId);
   if (!gmailStatus.ok) {
     return NextResponse.json({ error: gmailStatus.error }, { status: 400 });
   }
