@@ -8,6 +8,53 @@ import { createAdminClient } from "@/lib/supabase/admin";
 export const dynamic = "force-dynamic";
 
 type Row = Record<string, unknown>;
+type DashboardQueryError = {
+  code?: unknown;
+  message?: unknown;
+  details?: unknown;
+  hint?: unknown;
+};
+type DashboardQueryResult = {
+  data: Row[] | null;
+  error: DashboardQueryError | null;
+};
+
+const CUSTOMER_ACTIVITY_ID_CHUNK_SIZE = 100;
+
+function logDashboardQueryError(label: string, table: string, error: DashboardQueryError) {
+  console.error("[workspace/sales] dashboard query failed", {
+    query_label: label,
+    table_name: table,
+    code: error.code ?? null,
+    message: error.message ?? null,
+    details: error.details ?? null,
+    hint: error.hint ?? null,
+  });
+}
+
+async function loadCustomerActivity(
+  admin: ReturnType<typeof createAdminClient>,
+  customerIds: string[],
+): Promise<DashboardQueryResult> {
+  const rows: Row[] = [];
+
+  for (let offset = 0; offset < customerIds.length; offset += CUSTOMER_ACTIVITY_ID_CHUNK_SIZE) {
+    const customerIdChunk = customerIds.slice(offset, offset + CUSTOMER_ACTIVITY_ID_CHUNK_SIZE);
+    const result = await admin
+      .from("customer_activity")
+      .select("id, customer_id, activity_type, occurred_at, created_at")
+      .in("customer_id", customerIdChunk)
+      .limit(5000);
+
+    if (result.error) {
+      return { data: null, error: result.error as DashboardQueryError };
+    }
+
+    rows.push(...((result.data || []) as Row[]));
+  }
+
+  return { data: rows, error: null };
+}
 
 function number(value: unknown) {
   const result = Number(value);
@@ -38,18 +85,59 @@ export default async function NamelessSalesDashboardPage({
   const admin = createAdminClient();
   const { customers } = await loadCustomerWorkspaceIndex();
   const customerIds = customers.map((customer) => customer.id);
-  const [opportunitiesRes, samplesRes, ordersRes, activitiesRes, routeOutcomesRes] = await Promise.all([
-    admin.from("retail_opportunities").select("*").eq("workspace_key", NAMELESS_WORKSPACE_KEY).limit(5000),
-    admin.from("retail_samples").select("*").eq("workspace_key", NAMELESS_WORKSPACE_KEY).limit(5000),
-    admin.from("retail_sales_orders").select("*").eq("workspace_key", NAMELESS_WORKSPACE_KEY).limit(5000),
-    customerIds.length > 0
-      ? admin.from("customer_activity").select("id, customer_id, activity_type, occurred_at, created_at").in("customer_id", customerIds).limit(5000)
-      : Promise.resolve({ data: [] as Row[], error: null }),
-    admin.from("route_stop_sales_outcomes").select("*").eq("workspace_key", NAMELESS_WORKSPACE_KEY).limit(5000),
-  ]);
+  const querySpecs = [
+    {
+      label: "retail_opportunities",
+      table: "retail_opportunities",
+      run: async () => admin.from("retail_opportunities").select("*").eq("workspace_key", NAMELESS_WORKSPACE_KEY).limit(5000),
+    },
+    {
+      label: "retail_samples",
+      table: "retail_samples",
+      run: async () => admin.from("retail_samples").select("*").eq("workspace_key", NAMELESS_WORKSPACE_KEY).limit(5000),
+    },
+    {
+      label: "retail_sales_orders",
+      table: "retail_sales_orders",
+      run: async () => admin.from("retail_sales_orders").select("*").eq("workspace_key", NAMELESS_WORKSPACE_KEY).limit(5000),
+    },
+    {
+      label: "customer_activity",
+      table: "customer_activity",
+      run: async () => loadCustomerActivity(admin, customerIds),
+    },
+    {
+      label: "route_stop_sales_outcomes",
+      table: "route_stop_sales_outcomes",
+      run: async () => admin.from("route_stop_sales_outcomes").select("*").eq("workspace_key", NAMELESS_WORKSPACE_KEY).limit(5000),
+    },
+  ] as const;
+  const queryResults = await Promise.all(
+    querySpecs.map(async (query) => ({
+      label: query.label,
+      table: query.table,
+      result: (await query.run()) as DashboardQueryResult,
+    })),
+  );
 
-  const error = [opportunitiesRes, samplesRes, ordersRes, activitiesRes, routeOutcomesRes].find((result) => result.error)?.error;
-  if (error) throw new Error(error.message);
+  const failedQueries = queryResults.filter(({ result }) => result.error);
+  for (const { label, table, result } of failedQueries) {
+    logDashboardQueryError(label, table, result.error as DashboardQueryError);
+  }
+  if (failedQueries.length > 0) {
+    const failureSummary = failedQueries
+      .map(({ label, result }) => `${label}: ${String(result.error?.message || "Unknown query error")}`)
+      .join("; ");
+    throw new Error(`Sales dashboard query failure — ${failureSummary}`);
+  }
+
+  const [
+    { result: opportunitiesRes },
+    { result: samplesRes },
+    { result: ordersRes },
+    { result: activitiesRes },
+    { result: routeOutcomesRes },
+  ] = queryResults;
 
   const opportunities = (opportunitiesRes.data || []) as Row[];
   const samples = (samplesRes.data || []) as Row[];
