@@ -1,8 +1,42 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+const STATIC_FILE_EXTENSION =
+  /\.(?:png|jpe?g|gif|webp|svg|ico|css|js|map|woff2?|ttf)$/i;
+
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
+
+  const isProtectedApplicationPath =
+    pathname === "/workspace" ||
+    pathname.startsWith("/workspace/") ||
+    pathname === "/admin" ||
+    pathname.startsWith("/admin/") ||
+    pathname === "/portal" ||
+    pathname.startsWith("/portal/") ||
+    pathname === "/auth" ||
+    pathname.startsWith("/auth/") ||
+    pathname === "/api" ||
+    pathname.startsWith("/api/") ||
+    pathname === "/estimate" ||
+    pathname.startsWith("/estimate/") ||
+    pathname === "/dashboard" ||
+    pathname.startsWith("/dashboard/") ||
+    pathname === "/menu" ||
+    pathname.startsWith("/menu/");
+
+  const isPublicStaticAsset =
+    pathname.startsWith("/_next/static/") ||
+    pathname.startsWith("/_next/image/") ||
+    pathname.startsWith("/brand/") ||
+    pathname === "/favicon.ico" ||
+    pathname === "/robots.txt" ||
+    pathname === "/sitemap.xml" ||
+    (!isProtectedApplicationPath && STATIC_FILE_EXTENSION.test(pathname));
+
+  if (isPublicStaticAsset) {
+    return NextResponse.next();
+  }
 
   const isEstimatorPath =
     pathname === "/estimate" ||
