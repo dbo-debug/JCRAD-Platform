@@ -22,10 +22,10 @@ type SourceDetailManagerProps = {
   staffOptions: StaffOption[];
 };
 
-const sectionClass = "rounded-2xl border border-[#eadff1] bg-white p-4 shadow-sm";
-const inputClass = "rounded-lg border border-[#ddcfe9] bg-white px-3 py-2 text-sm text-[#1f2d3a]";
+const sectionClass = "rounded-2xl border border-[#deded8] bg-white p-4 shadow-sm";
+const inputClass = "rounded-lg border border-[#deded8] bg-white px-3 py-2 text-sm text-[#1f2d3a]";
 const sourcingPromptClass =
-  "rounded-full border border-[#e5d8ef] bg-[#fcf7fd] px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-[#355564] transition hover:border-[#8f52dc] hover:bg-[#fcf5ff] hover:text-[#6f32b5]";
+  "rounded-full border border-[#deded8] bg-[#f7f7f4] px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-[#355564] transition hover:border-[#1b1b1a] hover:bg-[#f7f7f4] hover:text-[#1b1b1a]";
 
 const ACTIVITY_PROMPTS = [
   {
@@ -221,19 +221,19 @@ export default function SourceDetailManager(props: SourceDetailManagerProps) {
   return (
     <div className="space-y-3">
       {error ? <p className="rounded-xl border border-[#f1d1d1] bg-[#fff5f5] px-3 py-2 text-sm text-[#991b1b]">{error}</p> : null}
-      {success ? <p className="rounded-xl border border-[#bfe8df] bg-[#effcf8] px-3 py-2 text-sm text-[#6f32b5]">{success}</p> : null}
+      {success ? <p className="rounded-xl border border-[#bfe8df] bg-[#effcf8] px-3 py-2 text-sm text-[#1b1b1a]">{success}</p> : null}
 
       <section id="source-log-activity" className={sectionClass}>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-base font-semibold text-[#173543]">Log Sourcing Activity</h2>
+            <h2 className="text-base font-semibold text-[#181817]">Log Sourcing Activity</h2>
             <p className="mt-1 text-sm text-[#5c7483]">Capture supplier conversations, cannabinoid leads, pricing movement, and the next concrete step from the account page.</p>
           </div>
           <button
             type="button"
             onClick={() => void createActivity()}
             disabled={activityBusy}
-            className="rounded-full bg-[#8f52dc] px-3.5 py-1.5 text-sm font-semibold text-white disabled:opacity-60"
+            className="rounded-full bg-[#1b1b1a] px-3.5 py-1.5 text-sm font-semibold text-white disabled:opacity-60"
           >
             {activityBusy ? "Saving..." : "Log Activity"}
           </button>
@@ -300,14 +300,14 @@ export default function SourceDetailManager(props: SourceDetailManagerProps) {
       <section id="source-create-task" className={sectionClass}>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-base font-semibold text-[#173543]">Create Follow-Up</h2>
+            <h2 className="text-base font-semibold text-[#181817]">Create Follow-Up</h2>
             <p className="mt-1 text-sm text-[#5c7483]">Turn the sourcing note into an explicit owner, due date, and next action without leaving the account.</p>
           </div>
           <button
             type="button"
             onClick={() => void createTask()}
             disabled={taskBusy}
-            className="rounded-full bg-[#173543] px-3.5 py-1.5 text-sm font-semibold text-white disabled:opacity-60"
+            className="rounded-full bg-[#181817] px-3.5 py-1.5 text-sm font-semibold text-white disabled:opacity-60"
           >
             {taskBusy ? "Saving..." : "Create Task"}
           </button>
@@ -349,14 +349,14 @@ export default function SourceDetailManager(props: SourceDetailManagerProps) {
       <section id="source-profile" className={sectionClass}>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-base font-semibold text-[#173543]">Source Profile</h2>
+            <h2 className="text-base font-semibold text-[#181817]">Source Profile</h2>
             <p className="mt-1 text-sm text-[#5c7483]">Keep supplier profile, contact data, stage, and evergreen sourcing notes current.</p>
           </div>
           <button
             type="button"
             onClick={() => void saveProfile()}
             disabled={profileBusy}
-            className="rounded-full border border-[#decfe8] bg-white px-3.5 py-1.5 text-sm font-semibold text-[#173543] disabled:opacity-60"
+            className="rounded-full border border-[#deded8] bg-white px-3.5 py-1.5 text-sm font-semibold text-[#181817] disabled:opacity-60"
           >
             {profileBusy ? "Saving..." : "Save Profile"}
           </button>

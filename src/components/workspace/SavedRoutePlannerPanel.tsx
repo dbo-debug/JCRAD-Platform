@@ -111,11 +111,11 @@ function parseStartTimeMinutes(value: string) {
 function scheduleFlagBadgeClass(flag: DraftStop["scheduleFlag"]) {
   if (flag === "overtime") return "border-[#f3c6c6] bg-[#fff3f3] text-[#a33a3a]";
   if (flag === "tight") return "border-[#f2ddb0] bg-[#fff9ea] text-[#9a640a]";
-  return "border-[#cfe8e4] bg-[#effaf7] text-[#6f32b5]";
+  return "border-[#cfe8e4] bg-[#effaf7] text-[#1b1b1a]";
 }
 
 function lockBadgeClass(locked: boolean) {
-  return locked ? "border-[#d7d2f4] bg-[#f7f4ff] text-[#5f4aa5]" : "border-[#e5d8ef] bg-white text-[#607b89]";
+  return locked ? "border-[#d7d2f4] bg-[#f7f4ff] text-[#5f4aa5]" : "border-[#deded8] bg-white text-[#607b89]";
 }
 
 function routeStatusTone(args: { fitsWithinShift: boolean; previewNeedsRefresh: boolean; overtimeApproved: boolean }) {
@@ -141,7 +141,7 @@ function routeStatusTone(args: { fitsWithinShift: boolean; previewNeedsRefresh: 
   }
   return {
     label: "Ready To Save",
-    className: "border-[#cfe8e4] bg-[#effaf7] text-[#6f32b5]",
+    className: "border-[#cfe8e4] bg-[#effaf7] text-[#1b1b1a]",
     detail: "Preview is current and the route fits within shift.",
   };
 }
@@ -172,9 +172,9 @@ function deriveRouteTerritoryCode(stops: DraftStop[], explicitTerritoryCode: str
 }
 
 function stageCardClass(tone: "intake" | "build" | "handoff" = "build") {
-  if (tone === "intake") return "border-[#d9e7ee] bg-[linear-gradient(180deg,#ffffff_0%,#fdf7fb_100%)]";
-  if (tone === "handoff") return "border-[#e5d8ef] bg-[linear-gradient(180deg,#fbfdff_0%,#f5f9fc_100%)]";
-  return "border-[#e9def1] bg-white";
+  if (tone === "intake") return "border-[#d9e7ee] bg-[linear-gradient(180deg,#ffffff_0%,#f7f7f4_100%)]";
+  if (tone === "handoff") return "border-[#deded8] bg-[linear-gradient(180deg,#fbfdff_0%,#f5f9fc_100%)]";
+  return "border-[#deded8] bg-white";
 }
 
 export default function SavedRoutePlannerPanel({
@@ -714,16 +714,16 @@ export default function SavedRoutePlannerPanel({
   }
 
   return (
-    <section className="rounded-[28px] border border-[#d8e6ee] bg-[linear-gradient(180deg,#ffffff_0%,#fdf7fb_100%)] p-5 shadow-[0_24px_60px_rgba(16,42,67,0.08)] lg:px-6">
+    <section className="rounded-[28px] border border-[#d8e6ee] bg-[linear-gradient(180deg,#ffffff_0%,#f7f7f4_100%)] p-5 shadow-[0_24px_60px_rgba(16,42,67,0.08)] lg:px-6">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div className="max-w-[820px]">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6c8797]">Route Workflow</p>
-          <h2 className="mt-2 text-2xl font-semibold text-[#173543]">Stage stops, build the draft, then hand off saved routes to execution</h2>
+          <h2 className="mt-2 text-2xl font-semibold text-[#181817]">Stage stops, build the draft, then hand off saved routes to execution</h2>
           <p className="mt-2 text-sm text-[#5c7483]">
             The page now reads in order: intake from pending stops, active draft building, then saved-route handoff for editing and runner execution.
           </p>
         </div>
-        <div className="grid w-full gap-2 rounded-2xl border border-[#e9def1] bg-white/90 p-4 text-sm text-[#506877] shadow-sm sm:max-w-[340px]">
+        <div className="grid w-full gap-2 rounded-2xl border border-[#deded8] bg-white/90 p-4 text-sm text-[#506877] shadow-sm sm:max-w-[340px]">
           <MetricLine label="Pending Stops" value={String(pendingStops.length)} />
           <MetricLine label="Route-Available" value={String(routeReadyPendingStops.length)} />
           <MetricLine label="Draft Stops" value={String(draftStops.length)} />
@@ -735,17 +735,17 @@ export default function SavedRoutePlannerPanel({
       <div className="mt-5 grid gap-4 lg:grid-cols-3">
         <div className={["rounded-[22px] border p-4 shadow-sm", stageCardClass("intake")].join(" ")}>
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#7891a0]">Step 1</p>
-          <h3 className="mt-2 text-lg font-semibold text-[#173543]">Pending Stops</h3>
+          <h3 className="mt-2 text-lg font-semibold text-[#181817]">Pending Stops</h3>
           <p className="mt-1 text-sm text-[#5c7483]">This is the intake queue from Customers. Clean up anything blocked, then stage stop candidates for draft generation.</p>
         </div>
         <div className={["rounded-[22px] border p-4 shadow-sm", stageCardClass("build")].join(" ")}>
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#7891a0]">Step 2</p>
-          <h3 className="mt-2 text-lg font-semibold text-[#173543]">Draft Route</h3>
+          <h3 className="mt-2 text-lg font-semibold text-[#181817]">Draft Route</h3>
           <p className="mt-1 text-sm text-[#5c7483]">This is the active build surface for timing, sequencing, assignment, and save readiness.</p>
         </div>
         <div className={["rounded-[22px] border p-4 shadow-sm", stageCardClass("handoff")].join(" ")}>
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#7891a0]">Step 3</p>
-          <h3 className="mt-2 text-lg font-semibold text-[#173543]">Saved Routes</h3>
+          <h3 className="mt-2 text-lg font-semibold text-[#181817]">Saved Routes</h3>
           <p className="mt-1 text-sm text-[#5c7483]">These are already planned operational records, ready for edit, reassignment, runner handoff, or execution.</p>
         </div>
       </div>
@@ -755,7 +755,7 @@ export default function SavedRoutePlannerPanel({
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Step 1 • Pending Stop Intake</p>
-              <h3 className="mt-1 text-lg font-semibold text-[#173543]">{pendingStops.length} queued stop candidates</h3>
+              <h3 className="mt-1 text-lg font-semibold text-[#181817]">{pendingStops.length} queued stop candidates</h3>
               <p className="mt-1 text-sm text-[#5c7483]">This rep-scoped staging area is the bridge from customer route prep into route drafting. Build from this queue first when possible.</p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -763,7 +763,7 @@ export default function SavedRoutePlannerPanel({
                 type="button"
                 onClick={() => startTransition(generatePendingDraft)}
                 disabled={busy !== null || routeReadyPendingStops.length === 0}
-                className="rounded-full bg-[#173543] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#0f2a35] disabled:opacity-60"
+                className="rounded-full bg-[#181817] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#0f2a35] disabled:opacity-60"
               >
                 {busy === "generate_pending" ? "Building Draft..." : "Build Draft From Pending Stops"}
               </button>
@@ -779,28 +779,28 @@ export default function SavedRoutePlannerPanel({
           </div>
 
           <div className="mt-4 flex flex-wrap gap-2 text-sm text-[#4f6877]">
-            <span className="rounded-full border border-[#e5d8ef] bg-[#fcf7fd] px-3 py-1.5">Route-ready now {routeReadyPendingStops.length}</span>
+            <span className="rounded-full border border-[#deded8] bg-[#f7f7f4] px-3 py-1.5">Route-ready now {routeReadyPendingStops.length}</span>
             {pendingStops.length > routeReadyPendingStops.length ? (
               <span className="rounded-full border border-[#f2ddb0] bg-[#fff9ea] px-3 py-1.5 text-[#9a640a]">
                 Prep in Customers {pendingStops.length - routeReadyPendingStops.length}
               </span>
             ) : null}
-            <span className="rounded-full border border-[#e5d8ef] bg-[#fcf7fd] px-3 py-1.5">Max stops/day {normalizedMaxStops}</span>
+            <span className="rounded-full border border-[#deded8] bg-[#f7f7f4] px-3 py-1.5">Max stops/day {normalizedMaxStops}</span>
           </div>
 
           <div className="mt-4 space-y-2.5">
             {pendingStops.map((stop) => {
               const isEligible = isRouteEligibleCustomer(stop.customer);
               return (
-                <div key={stop.id} className="rounded-2xl border border-[#e9def1] bg-[#fffafd] px-3 py-3">
+                <div key={stop.id} className="rounded-2xl border border-[#deded8] bg-[#fafaf8] px-3 py-3">
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-semibold text-[#173543]">{stop.customer.name}</p>
+                        <p className="font-semibold text-[#181817]">{stop.customer.name}</p>
                         <span
                           className={[
                             "rounded-full border px-2.5 py-1 text-[11px] font-semibold",
-                            isEligible ? "border-[#cfe8e4] bg-[#effaf7] text-[#6f32b5]" : "border-[#f2ddb0] bg-[#fff9ea] text-[#9a640a]",
+                            isEligible ? "border-[#cfe8e4] bg-[#effaf7] text-[#1b1b1a]" : "border-[#f2ddb0] bg-[#fff9ea] text-[#9a640a]",
                           ].join(" ")}
                           title={!isEligible ? readinessReasonLabel(getRouteEligibilityReason(stop.customer)) : undefined}
                         >
@@ -812,7 +812,7 @@ export default function SavedRoutePlannerPanel({
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <Link href={`/workspace/customers/${stop.customer.id}`} className="rounded-full border border-[#decfe8] bg-white px-3 py-1.5 text-sm text-[#42606f]">
+                      <Link href={`/workspace/customers/${stop.customer.id}`} className="rounded-full border border-[#deded8] bg-white px-3 py-1.5 text-sm text-[#42606f]">
                         Open Account
                       </Link>
                       <button
@@ -830,7 +830,7 @@ export default function SavedRoutePlannerPanel({
             })}
 
             {pendingStops.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-[#ddcfe9] bg-[#fffafd] px-4 py-10 text-center text-sm text-[#5c7483]">
+              <div className="rounded-2xl border border-dashed border-[#deded8] bg-[#fafaf8] px-4 py-10 text-center text-sm text-[#5c7483]">
                 Add customers to pending stops from the Customers workspace to start building a saved route.
               </div>
             ) : null}
@@ -840,22 +840,22 @@ export default function SavedRoutePlannerPanel({
         <section className={["rounded-[24px] border p-4 shadow-sm", stageCardClass("build")].join(" ")}>
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Step 2 • Draft Route Setup</p>
-            <h3 className="mt-1 text-lg font-semibold text-[#173543]">Set the draft frame, then build the active route</h3>
+            <h3 className="mt-1 text-lg font-semibold text-[#181817]">Set the draft frame, then build the active route</h3>
           </div>
 
-          <div className="mt-4 rounded-[22px] border border-[#e9def1] bg-[linear-gradient(180deg,#f8fcfd_0%,#f3f8fa_100%)] p-4">
+          <div className="mt-4 rounded-[22px] border border-[#deded8] bg-[linear-gradient(180deg,#f8fcfd_0%,#f3f8fa_100%)] p-4">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7d95a3]">Leave Time</p>
                 <p className="mt-1 text-sm text-[#5c7483]">Departure time from HQ drives the draft route timeline, lunch placement, and return calculations.</p>
               </div>
-              <div className="flex items-center gap-3 rounded-2xl border border-[#e9def1] bg-white px-4 py-3">
-                <span className="text-sm font-semibold text-[#173543]">Leave JC RAD HQ</span>
+              <div className="flex items-center gap-3 rounded-2xl border border-[#deded8] bg-white px-4 py-3">
+                <span className="text-sm font-semibold text-[#181817]">Leave JC RAD HQ</span>
                 <input
                   type="time"
                   value={startTime}
                   onChange={(event) => setStartTime(event.target.value)}
-                  className="rounded-xl border border-[#cedde6] bg-white px-3 py-2 text-sm font-semibold text-[#173543] outline-none transition focus:border-[#8f52dc]"
+                  className="rounded-xl border border-[#cedde6] bg-white px-3 py-2 text-sm font-semibold text-[#181817] outline-none transition focus:border-[#1b1b1a]"
                 />
               </div>
             </div>
@@ -881,17 +881,17 @@ export default function SavedRoutePlannerPanel({
               onChange={(event) => setNotes(event.target.value)}
               rows={3}
               placeholder="Optional route notes"
-              className="rounded-2xl border border-[#cedde6] bg-white px-4 py-3 text-sm text-[#173543] outline-none transition focus:border-[#8f52dc]"
+              className="rounded-2xl border border-[#cedde6] bg-white px-4 py-3 text-sm text-[#181817] outline-none transition focus:border-[#1b1b1a]"
             />
           </label>
 
           <div className="mt-4 flex flex-wrap gap-2 text-sm text-[#4f6877]">
-            <span className="rounded-full border border-[#e5d8ef] bg-[#fcf7fd] px-3 py-1.5">Origin {JC_RAD_HQ.name}</span>
-            <span className="rounded-full border border-[#e5d8ef] bg-[#fcf7fd] px-3 py-1.5">Start {toTimeLabel(parseStartTimeMinutes(startTime))}</span>
-            <span className="rounded-full border border-[#e5d8ef] bg-[#fcf7fd] px-3 py-1.5">Route territory {derivedRouteTerritoryCode || "Mixed / optional"}</span>
+            <span className="rounded-full border border-[#deded8] bg-[#f7f7f4] px-3 py-1.5">Origin {JC_RAD_HQ.name}</span>
+            <span className="rounded-full border border-[#deded8] bg-[#f7f7f4] px-3 py-1.5">Start {toTimeLabel(parseStartTimeMinutes(startTime))}</span>
+            <span className="rounded-full border border-[#deded8] bg-[#f7f7f4] px-3 py-1.5">Route territory {derivedRouteTerritoryCode || "Mixed / optional"}</span>
           </div>
 
-          <div className="mt-5 rounded-2xl border border-[#e9def1] bg-[#fffafd] p-4">
+          <div className="mt-5 rounded-2xl border border-[#deded8] bg-[#fafaf8] p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Territory Backup Build</p>
@@ -901,7 +901,7 @@ export default function SavedRoutePlannerPanel({
                 type="button"
                 onClick={() => startTransition(generateTerritoryDraft)}
                 disabled={busy !== null}
-                className="rounded-full border border-[#decfe8] bg-white px-4 py-2.5 text-sm font-semibold text-[#21424d] transition hover:border-[#8f52dc] hover:text-[#6f32b5] disabled:opacity-60"
+                className="rounded-full border border-[#deded8] bg-white px-4 py-2.5 text-sm font-semibold text-[#21424d] transition hover:border-[#1b1b1a] hover:text-[#1b1b1a] disabled:opacity-60"
               >
                 {busy === "generate_territory" ? "Building Draft..." : "Build Draft From Territory"}
               </button>
@@ -939,17 +939,17 @@ export default function SavedRoutePlannerPanel({
               }}
             />
           ) : (
-            <section className="rounded-[24px] border border-dashed border-[#ddcfe9] bg-[#fffafd] px-4 py-14 text-center text-sm text-[#5c7483]">
+            <section className="rounded-[24px] border border-dashed border-[#deded8] bg-[#fafaf8] px-4 py-14 text-center text-sm text-[#5c7483]">
               Build a pending-stop or territory route preview to open the map workspace.
             </section>
           )}
 
           <section className={["rounded-[24px] border p-4 shadow-sm", stageCardClass("build")].join(" ")}>
-            <div className="rounded-[22px] border border-[#e9def1] bg-[linear-gradient(180deg,#f8fcfd_0%,#f3f8fa_100%)] p-4">
+            <div className="rounded-[22px] border border-[#deded8] bg-[linear-gradient(180deg,#f8fcfd_0%,#f3f8fa_100%)] p-4">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Step 2 • Draft Route Review</p>
-                  <h3 className="mt-1 text-xl font-semibold text-[#173543]">
+                  <h3 className="mt-1 text-xl font-semibold text-[#181817]">
                     {draftStops.length > 0 ? `${draftStops.length} stops in the active draft route` : "No active draft route yet"}
                   </h3>
                   <p className="mt-1 text-sm text-[#5c7483]">
@@ -959,10 +959,10 @@ export default function SavedRoutePlannerPanel({
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <span className={["rounded-full border px-3 py-1.5 text-sm font-semibold", draftPlan ? topLevelRouteStatus.className : "border-[#e5d8ef] bg-[#fcf7fd] text-[#4f6877]"].join(" ")}>
+                  <span className={["rounded-full border px-3 py-1.5 text-sm font-semibold", draftPlan ? topLevelRouteStatus.className : "border-[#deded8] bg-[#f7f7f4] text-[#4f6877]"].join(" ")}>
                     {draftPlan ? topLevelRouteStatus.label : "Awaiting Preview"}
                   </span>
-                  <span className="rounded-full border border-[#e5d8ef] bg-white px-3 py-1.5 text-sm text-[#4f6877]">
+                  <span className="rounded-full border border-[#deded8] bg-white px-3 py-1.5 text-sm text-[#4f6877]">
                     Start {draftPlan ? formatCompactDateTime(draftPlan.shiftStartTime) : toTimeLabel(parseStartTimeMinutes(startTime))}
                   </span>
                 </div>
@@ -976,10 +976,10 @@ export default function SavedRoutePlannerPanel({
               </div>
 
               <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
-                <span className="rounded-full border border-[#e5d8ef] bg-white px-3 py-1.5 text-[#4f6877]">
+                <span className="rounded-full border border-[#deded8] bg-white px-3 py-1.5 text-[#4f6877]">
                   Lunch {draftPlan?.lunchBlock ? `${draftPlan.lunchBlock.minutes} min` : "Not scheduled"}
                 </span>
-                <span className="rounded-full border border-[#e5d8ef] bg-white px-3 py-1.5 text-[#4f6877]">
+                <span className="rounded-full border border-[#deded8] bg-white px-3 py-1.5 text-[#4f6877]">
                   Overtime {draftPlan && !draftPlan.fitsWithinShift ? `${draftPlan.overtimeMinutes} min` : "0 min"}
                 </span>
                 <span className="text-sm text-[#5c7483]">{draftPlan ? topLevelRouteStatus.detail : "Build a route to unlock final review actions."}</span>
@@ -989,7 +989,7 @@ export default function SavedRoutePlannerPanel({
             <div className="mt-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Decision Actions</p>
-                <h4 className="mt-1 text-lg font-semibold text-[#173543]">Choose the path that gets this route into a savable state</h4>
+                <h4 className="mt-1 text-lg font-semibold text-[#181817]">Choose the path that gets this route into a savable state</h4>
                 <p className="mt-1 text-sm text-[#5c7483]">Trim stops, re-optimize after manual edits, or explicitly approve overtime for this local finalization session.</p>
                 {draftPlan?.warning ? <p className="mt-1 text-sm text-[#946200]">{draftPlan.warning}</p> : null}
                 {previewNeedsRefresh ? <p className="mt-1 text-sm text-[#946200]">Preview is stale after manual order changes. Re-optimize before saving.</p> : null}
@@ -999,7 +999,7 @@ export default function SavedRoutePlannerPanel({
                   </p>
                 ) : null}
               </div>
-              <div className="grid min-w-[260px] gap-2 rounded-2xl border border-[#e9def1] bg-[#fffafd] p-3 text-sm">
+              <div className="grid min-w-[260px] gap-2 rounded-2xl border border-[#deded8] bg-[#fafaf8] p-3 text-sm">
                 <MetricLine label="Save Status" value={!draftPlan ? "Locked" : saveBlocked ? "Blocked" : "Ready"} />
                 <MetricLine label="Selected Stop" value={selectedPreviewStop ? `${selectedPreviewStop.stopOrder}` : "None"} />
                 <MetricLine label="Route Provider" value={draftPlan ? (draftPlan.provider === "google" ? "Google" : "Fallback") : "Not set"} />
@@ -1032,14 +1032,14 @@ export default function SavedRoutePlannerPanel({
               </div>
             ) : null}
 
-            <div className="mt-5 rounded-[22px] border border-[#e9def1] bg-[#fffafd] p-4">
+            <div className="mt-5 rounded-[22px] border border-[#deded8] bg-[#fafaf8] p-4">
               <div className="flex flex-col gap-4">
                 <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
                   <button
                     type="button"
                     onClick={() => setOvertimeApproved((current) => !current)}
                     disabled={busy !== null || !draftPlan || draftPlan.fitsWithinShift || previewNeedsRefresh}
-                    className="rounded-2xl border border-[#decfe8] bg-white px-4 py-3 text-sm font-semibold text-[#21424d] transition hover:border-[#8f52dc] hover:text-[#6f32b5] disabled:opacity-60"
+                    className="rounded-2xl border border-[#deded8] bg-white px-4 py-3 text-sm font-semibold text-[#21424d] transition hover:border-[#1b1b1a] hover:text-[#1b1b1a] disabled:opacity-60"
                   >
                     {overtimeApproved ? "Overtime Approved" : "Approve Overtime"}
                   </button>
@@ -1047,7 +1047,7 @@ export default function SavedRoutePlannerPanel({
                     type="button"
                     onClick={() => removeDraftStop(draftStops[draftStops.length - 1]?.customerId || "")}
                     disabled={busy !== null || draftStops.length === 0}
-                    className="rounded-2xl border border-[#decfe8] bg-white px-4 py-3 text-sm font-semibold text-[#21424d] transition hover:border-[#8f52dc] hover:text-[#6f32b5] disabled:opacity-60"
+                    className="rounded-2xl border border-[#deded8] bg-white px-4 py-3 text-sm font-semibold text-[#21424d] transition hover:border-[#1b1b1a] hover:text-[#1b1b1a] disabled:opacity-60"
                   >
                     Remove Last Stop
                   </button>
@@ -1055,7 +1055,7 @@ export default function SavedRoutePlannerPanel({
                     type="button"
                     onClick={() => (selectedPreviewStop ? removeDraftStop(selectedPreviewStop.customerId) : undefined)}
                     disabled={busy !== null || !selectedPreviewStop}
-                    className="rounded-2xl border border-[#decfe8] bg-white px-4 py-3 text-sm font-semibold text-[#21424d] transition hover:border-[#8f52dc] hover:text-[#6f32b5] disabled:opacity-60"
+                    className="rounded-2xl border border-[#deded8] bg-white px-4 py-3 text-sm font-semibold text-[#21424d] transition hover:border-[#1b1b1a] hover:text-[#1b1b1a] disabled:opacity-60"
                   >
                     {selectedPreviewStop ? `Remove Selected Stop (#${selectedPreviewStop.stopOrder})` : "Remove Selected Stop"}
                   </button>
@@ -1063,7 +1063,7 @@ export default function SavedRoutePlannerPanel({
                     type="button"
                     onClick={() => void reoptimizeDraft(draftStops, draftSource || "pending", "Re-optimized current draft route.")}
                     disabled={busy !== null || draftStops.length === 0}
-                    className="rounded-2xl border border-[#decfe8] bg-white px-4 py-3 text-sm font-semibold text-[#21424d] transition hover:border-[#8f52dc] hover:text-[#6f32b5] disabled:opacity-60"
+                    className="rounded-2xl border border-[#deded8] bg-white px-4 py-3 text-sm font-semibold text-[#21424d] transition hover:border-[#1b1b1a] hover:text-[#1b1b1a] disabled:opacity-60"
                   >
                     {busy === "reoptimize" ? "Re-optimizing..." : "Re-Optimize Route"}
                   </button>
@@ -1072,7 +1072,7 @@ export default function SavedRoutePlannerPanel({
                 <div className="flex flex-col gap-3 rounded-2xl border border-[#d9e7ee] bg-white p-4 lg:flex-row lg:items-center lg:justify-between">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7d95a3]">Save Decision</p>
-                    <p className="mt-1 text-lg font-semibold text-[#173543]">{!draftPlan ? "Route not ready" : saveBlocked ? "Save is blocked" : "Route can be saved"}</p>
+                    <p className="mt-1 text-lg font-semibold text-[#181817]">{!draftPlan ? "Route not ready" : saveBlocked ? "Save is blocked" : "Route can be saved"}</p>
                     <p className="mt-1 text-sm text-[#5c7483]">
                       {previewNeedsRefresh
                         ? "Manual order edits require re-optimization before save."
@@ -1087,7 +1087,7 @@ export default function SavedRoutePlannerPanel({
                     disabled={busy !== null || draftStops.length === 0 || !draftPlan || saveBlocked}
                     className={[
                       "rounded-full px-5 py-3 text-sm font-semibold text-white transition disabled:opacity-60",
-                      saveBlocked ? "bg-[#9fb6c0]" : "bg-[#8f52dc] hover:opacity-95",
+                      saveBlocked ? "bg-[#9fb6c0]" : "bg-[#1b1b1a] hover:opacity-95",
                     ].join(" ")}
                   >
                     {busy === "save" ? "Saving..." : "Save And Hand Off Route"}
@@ -1102,11 +1102,11 @@ export default function SavedRoutePlannerPanel({
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Step 2 • Draft Route Itinerary</p>
-              <h3 className="mt-1 text-lg font-semibold text-[#173543]">{draftStops.length > 0 ? "Primary draft-route control surface" : "No draft stops yet"}</h3>
+              <h3 className="mt-1 text-lg font-semibold text-[#181817]">{draftStops.length > 0 ? "Primary draft-route control surface" : "No draft stops yet"}</h3>
               <p className="mt-1 text-sm text-[#5c7483]">Reorder and remove here. Lunch and the final HQ return are separate itinerary blocks so this draft can hand forward into the route runner cleanly.</p>
             </div>
             {draftPlan ? (
-              <span className="rounded-full border border-[#e5d8ef] bg-[#fcf7fd] px-3 py-1.5 text-sm text-[#4f6877]">
+              <span className="rounded-full border border-[#deded8] bg-[#f7f7f4] px-3 py-1.5 text-sm text-[#4f6877]">
                 {draftPlan.provider === "google" ? "Google" : "Fallback"} • {draftPlan.orderedStops.length} stops
               </span>
             ) : null}
@@ -1143,14 +1143,14 @@ export default function SavedRoutePlannerPanel({
                         ? "border-[#f3c6c6] bg-[#fff6f6]"
                         : stop.scheduleFlag === "tight"
                           ? "border-[#f2ddb0] bg-[#fffdf6]"
-                          : "border-[#e9def1] bg-[#fffafd]",
+                          : "border-[#deded8] bg-[#fafaf8]",
                     ].join(" ")}
                   >
                     <div className="flex flex-col gap-2.5">
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
                           <div className="flex flex-wrap items-center gap-2">
-                            <p className="rounded-full border border-[#e5d8ef] bg-white px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#607b89]">Stop {index + 1}</p>
+                            <p className="rounded-full border border-[#deded8] bg-white px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#607b89]">Stop {index + 1}</p>
                             <span className={["rounded-full border px-2.5 py-1 text-xs font-semibold", scheduleFlagBadgeClass(stop.scheduleFlag)].join(" ")}>
                               {stop.scheduleFlag.replace("_", " ")}
                             </span>
@@ -1161,7 +1161,7 @@ export default function SavedRoutePlannerPanel({
                               <span className="rounded-full border border-[#f3c6c6] bg-[#fff1f1] px-2.5 py-1 text-xs font-semibold text-[#a33a3a]">First overtime stop</span>
                             ) : null}
                           </div>
-                          <p className="mt-1 font-semibold text-[#173543]">{stop.customerName}</p>
+                          <p className="mt-1 font-semibold text-[#181817]">{stop.customerName}</p>
                           <div className="mt-2 grid gap-1 text-sm text-[#5c7483]">
                             <p>Arrive {formatDateTime(stop.plannedArrivalTime)} • Depart {formatDateTime(stop.plannedDepartureTime)}</p>
                             <p>Drive {stop.estimatedDriveMinutesFromPrevious} min • Visit {stop.estimatedVisitMinutes} min • Distance {(stop.legDistanceMeters / 1609.34).toFixed(1)} mi</p>
@@ -1175,19 +1175,19 @@ export default function SavedRoutePlannerPanel({
                               "rounded-full border px-3 py-1.5 text-sm transition",
                               stop.locked
                                 ? "border-[#d7d2f4] bg-[#f7f4ff] text-[#5f4aa5] hover:bg-[#f1ecff]"
-                                : "border-[#decfe8] bg-white text-[#42606f] hover:border-[#8f52dc] hover:text-[#6f32b5]",
+                                : "border-[#deded8] bg-white text-[#42606f] hover:border-[#1b1b1a] hover:text-[#1b1b1a]",
                             ].join(" ")}
                           >
                             {stop.locked ? "Unlock" : "Lock Stop"}
                           </button>
-                          <button type="button" onClick={() => moveStop(index, -1)} disabled={index === 0} className="rounded-full border border-[#decfe8] bg-white px-3 py-1.5 text-sm text-[#42606f] transition hover:border-[#8f52dc] hover:text-[#6f32b5] disabled:opacity-60">
+                          <button type="button" onClick={() => moveStop(index, -1)} disabled={index === 0} className="rounded-full border border-[#deded8] bg-white px-3 py-1.5 text-sm text-[#42606f] transition hover:border-[#1b1b1a] hover:text-[#1b1b1a] disabled:opacity-60">
                             Up
                           </button>
                           <button
                             type="button"
                             onClick={() => moveStop(index, 1)}
                             disabled={index === draftStops.length - 1}
-                            className="rounded-full border border-[#decfe8] bg-white px-3 py-1.5 text-sm text-[#42606f] transition hover:border-[#8f52dc] hover:text-[#6f32b5] disabled:opacity-60"
+                            className="rounded-full border border-[#deded8] bg-white px-3 py-1.5 text-sm text-[#42606f] transition hover:border-[#1b1b1a] hover:text-[#1b1b1a] disabled:opacity-60"
                           >
                             Down
                           </button>
@@ -1207,10 +1207,10 @@ export default function SavedRoutePlannerPanel({
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="rounded-full border border-[#e5d8ef] bg-white px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#607b89]">Return</p>
-                      <span className="rounded-full border border-[#e5d8ef] bg-white px-2.5 py-1 text-xs font-semibold text-[#355966]">HQ</span>
+                      <p className="rounded-full border border-[#deded8] bg-white px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#607b89]">Return</p>
+                      <span className="rounded-full border border-[#deded8] bg-white px-2.5 py-1 text-xs font-semibold text-[#355966]">HQ</span>
                     </div>
-                    <p className="mt-1 font-semibold text-[#173543]">{JC_RAD_HQ.name}</p>
+                    <p className="mt-1 font-semibold text-[#181817]">{JC_RAD_HQ.name}</p>
                     <p className="mt-2 text-sm text-[#5c7483]">
                       Final drive {draftPlan.returnDriveMinutes} min • ETA {formatDateTime(draftPlan.projectedReturnTime)}
                     </p>
@@ -1221,7 +1221,7 @@ export default function SavedRoutePlannerPanel({
             ) : null}
 
             {draftStops.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-[#ddcfe9] bg-[#fffafd] px-4 py-10 text-center text-sm text-[#5c7483]">
+              <div className="rounded-2xl border border-dashed border-[#deded8] bg-[#fafaf8] px-4 py-10 text-center text-sm text-[#5c7483]">
                 Build a draft route first to review the optimized stop order and schedule.
               </div>
             ) : null}
@@ -1232,17 +1232,17 @@ export default function SavedRoutePlannerPanel({
       <section className={["mt-5 rounded-[24px] border p-4 shadow-sm", stageCardClass("handoff")].join(" ")}>
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Step 3 • Saved Route Handoff</p>
-          <h3 className="mt-1 text-lg font-semibold text-[#173543]">Saved routes ready for edit, reassignment, runner handoff, or execution</h3>
+          <h3 className="mt-1 text-lg font-semibold text-[#181817]">Saved routes ready for edit, reassignment, runner handoff, or execution</h3>
           <p className="mt-1 text-sm text-[#5c7483]">These are already planned operational records. Use them after drafting, not as part of the same active build surface.</p>
         </div>
 
         <div className="mt-4 space-y-3">
           {savedRoutesState.map((route) => (
-            <div key={route.id} className="rounded-2xl border border-[#e9def1] bg-white p-3">
+            <div key={route.id} className="rounded-2xl border border-[#deded8] bg-white p-3">
               <div className="flex flex-col gap-2">
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="font-semibold text-[#173543]">{route.name}</p>
-                  <span className="rounded-full border border-[#e5d8ef] bg-[#fffafd] px-2.5 py-1 text-xs font-semibold text-[#496574]">{route.status}</span>
+                  <p className="font-semibold text-[#181817]">{route.name}</p>
+                  <span className="rounded-full border border-[#deded8] bg-[#fafaf8] px-2.5 py-1 text-xs font-semibold text-[#496574]">{route.status}</span>
                 </div>
                 <p className="text-sm text-[#5c7483]">
                   {route.routeDate || "No date"} • {route.assignedUserLabel || "Unassigned rep"} • {route.stopCount} stops
@@ -1253,7 +1253,7 @@ export default function SavedRoutePlannerPanel({
                   {route.notes ? <span title={route.notes}>Notes saved</span> : null}
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Link href={`/workspace/routes/run?routeId=${route.id}`} className="rounded-full bg-[#173543] px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-[#0f2a35]">
+                  <Link href={`/workspace/routes/run?routeId=${route.id}`} className="rounded-full bg-[#181817] px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-[#0f2a35]">
                     Run Route
                   </Link>
                   {staffRole === "admin" ? (
@@ -1261,7 +1261,7 @@ export default function SavedRoutePlannerPanel({
                       type="button"
                       onClick={() => startEditingRoute(route)}
                       disabled={busy !== null || routeActionById[route.id] === "edit"}
-                      className="rounded-full border border-[#decfe8] bg-white px-3 py-1.5 text-sm font-semibold text-[#24404d] transition hover:border-[#8f52dc] hover:text-[#6f32b5] disabled:opacity-60"
+                      className="rounded-full border border-[#deded8] bg-white px-3 py-1.5 text-sm font-semibold text-[#24404d] transition hover:border-[#1b1b1a] hover:text-[#1b1b1a] disabled:opacity-60"
                     >
                       Edit Handoff
                     </button>
@@ -1278,7 +1278,7 @@ export default function SavedRoutePlannerPanel({
                   ) : null}
                 </div>
                 {staffRole === "admin" && editingRouteId === route.id && editingRouteDraft ? (
-                  <div className="mt-3 rounded-2xl border border-[#e9def1] bg-[#fffafd] p-3">
+                  <div className="mt-3 rounded-2xl border border-[#deded8] bg-[#fafaf8] p-3">
                     <div className="grid gap-3 md:grid-cols-2">
                       <PlannerSelect
                         label="Assigned Rep"
@@ -1313,7 +1313,7 @@ export default function SavedRoutePlannerPanel({
                         value={editingRouteDraft.notes}
                         onChange={(event) => setEditingRouteDraft((current) => (current ? { ...current, notes: event.target.value } : current))}
                         rows={3}
-                        className="rounded-2xl border border-[#cedde6] bg-white px-4 py-3 text-sm text-[#173543] outline-none transition focus:border-[#8f52dc]"
+                        className="rounded-2xl border border-[#cedde6] bg-white px-4 py-3 text-sm text-[#181817] outline-none transition focus:border-[#1b1b1a]"
                       />
                     </label>
                     <div className="mt-3 flex flex-wrap gap-2">
@@ -1321,7 +1321,7 @@ export default function SavedRoutePlannerPanel({
                         type="button"
                         onClick={() => void saveEditedRoute()}
                         disabled={routeActionById[route.id] === "edit"}
-                        className="rounded-full bg-[#173543] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#0f2a35] disabled:opacity-60"
+                        className="rounded-full bg-[#181817] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#0f2a35] disabled:opacity-60"
                       >
                         {routeActionById[route.id] === "edit" ? "Saving..." : "Save Handoff Changes"}
                       </button>
@@ -1329,7 +1329,7 @@ export default function SavedRoutePlannerPanel({
                         type="button"
                         onClick={cancelEditingRoute}
                         disabled={routeActionById[route.id] === "edit"}
-                        className="rounded-full border border-[#decfe8] bg-white px-4 py-2 text-sm font-semibold text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543] disabled:opacity-60"
+                        className="rounded-full border border-[#deded8] bg-white px-4 py-2 text-sm font-semibold text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#181817] disabled:opacity-60"
                       >
                         Cancel
                       </button>
@@ -1341,7 +1341,7 @@ export default function SavedRoutePlannerPanel({
           ))}
 
           {savedRoutesState.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-[#ddcfe9] bg-white px-4 py-10 text-center text-sm text-[#5c7483]">
+            <div className="rounded-2xl border border-dashed border-[#deded8] bg-white px-4 py-10 text-center text-sm text-[#5c7483]">
               No saved routes yet.
             </div>
           ) : null}
@@ -1371,7 +1371,7 @@ function PlannerSelect({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         disabled={disabled}
-        className="rounded-2xl border border-[#cedde6] bg-white px-4 py-3 text-sm text-[#173543] outline-none transition focus:border-[#8f52dc] disabled:opacity-60"
+        className="rounded-2xl border border-[#cedde6] bg-white px-4 py-3 text-sm text-[#181817] outline-none transition focus:border-[#1b1b1a] disabled:opacity-60"
       >
         <option value="">Select</option>
         {options.map((option) => (
@@ -1408,7 +1408,7 @@ function PlannerInput({
         onChange={(event) => onChange(event.target.value)}
         min={min}
         max={max}
-        className="rounded-2xl border border-[#cedde6] bg-white px-4 py-3 text-sm text-[#173543] outline-none transition focus:border-[#8f52dc]"
+        className="rounded-2xl border border-[#cedde6] bg-white px-4 py-3 text-sm text-[#181817] outline-none transition focus:border-[#1b1b1a]"
       />
     </label>
   );
@@ -1418,16 +1418,16 @@ function MetricLine({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-3">
       <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7d95a3]">{label}</span>
-      <span className="text-base font-semibold text-[#173543]">{value}</span>
+      <span className="text-base font-semibold text-[#181817]">{value}</span>
     </div>
   );
 }
 
 function SummaryCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-[#e9def1] bg-[#fffafd] p-3">
+    <div className="rounded-2xl border border-[#deded8] bg-[#fafaf8] p-3">
       <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7d95a3]">{label}</p>
-      <p className="mt-1 text-base font-semibold text-[#173543]">{value}</p>
+      <p className="mt-1 text-base font-semibold text-[#181817]">{value}</p>
     </div>
   );
 }

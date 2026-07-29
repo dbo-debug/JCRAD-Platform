@@ -230,11 +230,11 @@ export default async function NamelessSalesDashboardPage({
   return (
     <div className="mx-auto w-full max-w-[1520px] space-y-6">
       <AdminPageHeader
-        title="Nameless Sales Dashboard"
-        description="Focused retail pipeline, field execution, order movement, and estimated 5% commission. Commission figures are operational estimates, not guaranteed income."
+        title="Dashboard"
+        description="Today’s retail pipeline, field execution, order movement, and operational commission view."
       />
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section aria-label="Sales work metrics" className="grid grid-cols-2 gap-3 lg:grid-cols-3 2xl:grid-cols-4">
         <DashboardCard label="Follow-ups due today" value={String(dueToday)} href="/workspace/customers?taskState=has_open_task&sort=activity_desc" />
         <DashboardCard label="Overdue follow-ups" value={String(overdue)} href="/workspace/customers?taskState=overdue_task&sort=activity_desc" tone="warn" />
         <DashboardCard label="Meetings this week" value={String(meetingsThisWeek)} href="/workspace/customers?stage=meeting_scheduled" />
@@ -251,45 +251,49 @@ export default async function NamelessSalesDashboardPage({
 
       <section className="grid gap-5 xl:grid-cols-2">
         <div className="rounded-[24px] border border-[#d8e6ed] bg-white p-5 shadow-sm">
-          <h2 className="text-lg font-semibold text-[#173543]">Opportunities by stage</h2>
+          <h2 className="text-lg font-semibold text-[#181817]">Opportunities by stage</h2>
           <div className="mt-4 grid gap-2 sm:grid-cols-2">
             {[...stageCounts.entries()].filter(([, count]) => count > 0).map(([stage, count]) => (
-              <Link key={stage} href={`/workspace/customers?stage=${encodeURIComponent(stage)}`} className="flex min-h-11 items-center justify-between rounded-xl border border-[#d8e6ed] px-3 text-sm hover:border-[#0d6f7a]">
+              <Link key={stage} href={`/workspace/customers?stage=${encodeURIComponent(stage)}`} className="flex min-h-11 items-center justify-between rounded-xl border border-[#d8e6ed] px-3 text-sm hover:border-[#405d6b]">
                 <span>{labelize(stage)}</span><strong>{count}</strong>
               </Link>
             ))}
-            {opportunities.length === 0 ? <p className="text-sm text-[#6d8593]">No opportunities yet.</p> : null}
+            {opportunities.length === 0 ? (
+              <p className="rounded-lg bg-[var(--workspace-surface-muted)] p-4 text-sm text-[var(--workspace-muted)] sm:col-span-2">
+                No opportunities yet. Qualify a retail account to begin the stage view.
+              </p>
+            ) : null}
           </div>
         </div>
 
         <div className="rounded-[24px] border border-[#d8e6ed] bg-white p-5 shadow-sm">
-          <h2 className="text-lg font-semibold text-[#173543]">Route performance</h2>
+          <h2 className="text-lg font-semibold text-[#181817]">Route performance</h2>
           <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
             <MiniMetric label="Completed" value={routeMetrics.completed} />
             <MiniMetric label="Buyers reached" value={routeMetrics.buyers} />
             <MiniMetric label="Samples" value={routeMetrics.samples} />
             <MiniMetric label="Follow-ups" value={routeMetrics.followUps} />
           </div>
-          <Link href="/workspace/routes/run" className="mt-4 inline-flex min-h-11 items-center rounded-full bg-[#173543] px-5 text-sm font-semibold text-white">Open Route Runner</Link>
+          <Link href="/workspace/routes/run" className="mt-4 inline-flex min-h-11 items-center rounded-full bg-[#181817] px-5 text-sm font-semibold text-white">Open Route Runner</Link>
         </div>
       </section>
 
       <section id="commission" className="scroll-mt-24 rounded-[24px] border border-[#d8e6ed] bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-[#173543]">Commission by date range</h2>
+            <h2 className="text-lg font-semibold text-[#181817]">Commission by date range</h2>
             <p className="mt-1 text-sm text-[#6d8593]">Operational estimates only; not guaranteed income.</p>
           </div>
           <form className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
-            <label className="grid gap-1 text-xs font-semibold uppercase tracking-wide text-[#6d8593]">From<input name="commissionFrom" type="date" defaultValue={commissionFrom} className="min-h-11 rounded-xl border border-[#d8e6ed] px-3 text-sm text-[#173543]" /></label>
-            <label className="grid gap-1 text-xs font-semibold uppercase tracking-wide text-[#6d8593]">To<input name="commissionTo" type="date" defaultValue={commissionTo} className="min-h-11 rounded-xl border border-[#d8e6ed] px-3 text-sm text-[#173543]" /></label>
-            <button className="min-h-11 self-end rounded-full bg-[#173543] px-5 text-sm font-semibold text-white">Apply</button>
+            <label className="grid gap-1 text-xs font-semibold uppercase tracking-wide text-[#6d8593]">From<input name="commissionFrom" type="date" defaultValue={commissionFrom} className="min-h-11 rounded-xl border border-[#d8e6ed] px-3 text-sm text-[#181817]" /></label>
+            <label className="grid gap-1 text-xs font-semibold uppercase tracking-wide text-[#6d8593]">To<input name="commissionTo" type="date" defaultValue={commissionTo} className="min-h-11 rounded-xl border border-[#d8e6ed] px-3 text-sm text-[#181817]" /></label>
+            <button className="min-h-11 self-end rounded-full bg-[#181817] px-5 text-sm font-semibold text-white">Apply</button>
           </form>
         </div>
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
           {[...commissionByAccount.values()].map((account) => (
-            <Link key={account.customerId} href={`/workspace/customers/${account.customerId}#nameless-sales-workspace`} className="rounded-2xl border border-[#d8e6ed] bg-[#f7fbfc] p-4 hover:border-[#0d6f7a]">
-              <p className="font-semibold text-[#173543]">{account.name}</p>
+            <Link key={account.customerId} href={`/workspace/customers/${account.customerId}#nameless-sales-workspace`} className="rounded-2xl border border-[#d8e6ed] bg-[#f7fbfc] p-4 hover:border-[#405d6b]">
+              <p className="font-semibold text-[#181817]">{account.name}</p>
               <p className="mt-1 text-sm text-[#5c7483]">Commissionable {currency(account.sales)} • Estimated {currency(account.commission)}</p>
             </Link>
           ))}
@@ -321,9 +325,9 @@ export default async function NamelessSalesDashboardPage({
 }
 
 function DashboardCard({ label, value, href, tone = "default", helper }: { label: string; value: string; href: string; tone?: "default" | "warn"; helper?: string }) {
-  return <Link href={href} className={["rounded-2xl border p-4 shadow-sm transition hover:-translate-y-0.5", tone === "warn" ? "border-[#f1ddad] bg-[#fffaf0]" : "border-[#d8e6ed] bg-white"].join(" ")}><p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#6d8593]">{label}</p><p className="mt-2 text-2xl font-semibold text-[#173543]">{value}</p>{helper ? <p className="mt-1 text-xs text-[#9a6b00]">{helper}</p> : null}</Link>;
+  return <Link href={href} className={["min-h-24 rounded-[var(--workspace-radius)] border p-3.5 shadow-sm transition hover:border-[var(--workspace-border-strong)] hover:bg-[var(--workspace-elevated)]", tone === "warn" ? "border-amber-200 bg-amber-50/70" : "border-[var(--workspace-border)] bg-white"].join(" ")}><p className="text-xs font-medium leading-4 text-[var(--workspace-muted)]">{label}</p><p className="mt-1.5 text-xl font-semibold tracking-[-0.02em] text-[var(--workspace-text)]">{value}</p>{helper ? <p className="mt-1 text-xs text-[var(--workspace-warning)]">{helper}</p> : null}</Link>;
 }
 
 function MiniMetric({ label, value }: { label: string; value: number }) {
-  return <div className="rounded-xl bg-[#f4fafc] px-3 py-3 text-center"><p className="text-2xl font-semibold text-[#173543]">{value}</p><p className="mt-1 text-xs text-[#6d8593]">{label}</p></div>;
+  return <div className="rounded-lg bg-[var(--workspace-surface-muted)] px-3 py-3 text-center"><p className="text-xl font-semibold text-[var(--workspace-text)]">{value}</p><p className="mt-1 text-xs text-[var(--workspace-muted)]">{label}</p></div>;
 }

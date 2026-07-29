@@ -12,7 +12,7 @@ import {
 type ContactOption = { id: string; name: string; email: string | null; title: string | null };
 
 const inputClass =
-  "min-h-11 w-full rounded-xl border border-[#d6e4ea] bg-white px-3 py-2.5 text-sm text-[#173543] outline-none focus:border-[#0d6f7a] focus:ring-2 focus:ring-[#0d6f7a]/15";
+  "min-h-11 w-full rounded-xl border border-[#d6e4ea] bg-white px-3 py-2.5 text-sm text-[#181817] outline-none focus:border-[#405d6b] focus:ring-2 focus:ring-[#405d6b]/15";
 const cardClass = "rounded-[24px] border border-[#d8e6ed] bg-white p-4 shadow-sm sm:p-5";
 
 function labelize(value: unknown) {
@@ -289,20 +289,20 @@ export default function RetailSalesPanel({
   return (
     <section id="nameless-sales-workspace" className="scroll-mt-24 space-y-5">
       <div className="rounded-[28px] border border-[#bfe8df] bg-[linear-gradient(135deg,#effcf8_0%,#ffffff_70%)] p-5 shadow-sm sm:p-6">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#0d6f7a]">Nameless Genetics Retail Sales</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#405d6b]">Nameless Genetics Retail Sales</p>
         <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h2 className="text-2xl font-semibold text-[#173543]">Account sales workspace</h2>
+            <h2 className="text-2xl font-semibold text-[#181817]">Account sales workspace</h2>
             <p className="mt-1 text-sm text-[#5c7483]">Opportunities, buyer activity, samples, orders, and estimated commission stay attached to this retail account.</p>
           </div>
-          <span className="rounded-full border border-[#bfe8df] bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-[#0d6f7a]">
+          <span className="rounded-full border border-[#bfe8df] bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-[#405d6b]">
             {labelize(data.account.ownershipStatus)}
           </span>
         </div>
       </div>
 
       {error ? <p role="alert" className="rounded-xl border border-[#f1d1d1] bg-[#fff5f5] px-4 py-3 text-sm text-[#991b1b]">{error}</p> : null}
-      {message ? <p className="rounded-xl border border-[#bfe8df] bg-[#effcf8] px-4 py-3 text-sm text-[#0d6f7a]">{message}</p> : null}
+      {message ? <p className="rounded-xl border border-[#bfe8df] bg-[#effcf8] px-4 py-3 text-sm text-[#405d6b]">{message}</p> : null}
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Metric label="Commissionable this month" value={currency(data.commission.commissionableSalesThisMonth)} />
@@ -312,7 +312,7 @@ export default function RetailSalesPanel({
       </div>
 
       <details className={cardClass}>
-        <summary className="cursor-pointer text-lg font-semibold text-[#173543]">Retail account profile</summary>
+        <summary className="cursor-pointer text-lg font-semibold text-[#181817]">Retail account profile</summary>
         <form onSubmit={saveProfile} className="mt-5 grid gap-4 md:grid-cols-2">
           <Field label="DBA / store name"><input required value={profile.dbaName} onChange={(e) => setProfile((current) => ({ ...current, dbaName: e.target.value }))} className={inputClass} /></Field>
           <Field label="Legal business name"><input value={profile.legalBusinessName} onChange={(e) => setProfile((current) => ({ ...current, legalBusinessName: e.target.value }))} className={inputClass} /></Field>
@@ -324,12 +324,12 @@ export default function RetailSalesPanel({
           <Field label="Number of locations"><input type="number" min="1" value={profile.numberOfLocations} onChange={(e) => setProfile((current) => ({ ...current, numberOfLocations: e.target.value }))} className={inputClass} /></Field>
           <Field label="Current brands carried" className="md:col-span-2"><input value={profile.currentBrands} onChange={(e) => setProfile((current) => ({ ...current, currentBrands: e.target.value }))} placeholder="Comma separated" className={inputClass} /></Field>
           <Field label="Lead source" className="md:col-span-2"><input value={profile.leadSource} onChange={(e) => setProfile((current) => ({ ...current, leadSource: e.target.value }))} className={inputClass} /></Field>
-          <button disabled={busy !== null} className="min-h-12 rounded-full bg-[#173543] px-5 py-3 font-semibold text-white disabled:opacity-50 md:col-span-2">{busy === "update_profile" ? "Saving..." : "Save Retail Profile"}</button>
+          <button disabled={busy !== null} className="min-h-12 rounded-full bg-[#181817] px-5 py-3 font-semibold text-white disabled:opacity-50 md:col-span-2">{busy === "update_profile" ? "Saving..." : "Save Retail Profile"}</button>
         </form>
       </details>
 
       <details className={cardClass} open>
-        <summary className="cursor-pointer text-lg font-semibold text-[#173543]">Ownership and commission protection</summary>
+        <summary className="cursor-pointer text-lg font-semibold text-[#181817]">Ownership and commission protection</summary>
         <form onSubmit={saveOwnership} className="mt-5 grid gap-4 md:grid-cols-2">
           <Field label="Ownership status"><select value={ownership.status} onChange={(e) => setOwnership((current) => ({ ...current, status: e.target.value }))} className={inputClass}>{ACCOUNT_OWNERSHIP_OPTIONS.map((option) => <option key={option} value={option}>{labelize(option)}</option>)}</select></Field>
           <Field label="Commission rate"><div className="relative"><input type="number" min="0" max="100" step="0.01" value={ownership.rate} disabled={!canVerifyOwnership} onChange={(e) => setOwnership((current) => ({ ...current, rate: e.target.value }))} className={inputClass} /><span className="absolute right-3 top-3 text-sm text-[#5c7483]">%</span></div></Field>
@@ -338,13 +338,13 @@ export default function RetailSalesPanel({
           <label className="flex min-h-11 items-center gap-3 rounded-xl border border-[#d6e4ea] px-3 text-sm text-[#355160]"><input type="checkbox" checked={ownership.eligible} onChange={(e) => setOwnership((current) => ({ ...current, eligible: e.target.checked }))} className="h-5 w-5" />Eligible for commission</label>
           {canVerifyOwnership ? <label className="flex min-h-11 items-center gap-3 rounded-xl border border-[#d6e4ea] px-3 text-sm text-[#355160]"><input type="checkbox" checked={ownership.markVerified} onChange={(e) => setOwnership((current) => ({ ...current, markVerified: e.target.checked }))} className="h-5 w-5" />Verify ownership now</label> : null}
           <Field label="Ownership notes" className="md:col-span-2"><textarea rows={3} value={ownership.notes} onChange={(e) => setOwnership((current) => ({ ...current, notes: e.target.value }))} className={inputClass} /></Field>
-          <button disabled={busy !== null} className="min-h-12 rounded-full bg-[#173543] px-5 py-3 font-semibold text-white disabled:opacity-50 md:col-span-2">{busy === "update_ownership" ? "Saving..." : "Save Ownership"}</button>
+          <button disabled={busy !== null} className="min-h-12 rounded-full bg-[#181817] px-5 py-3 font-semibold text-white disabled:opacity-50 md:col-span-2">{busy === "update_ownership" ? "Saving..." : "Save Ownership"}</button>
         </form>
       </details>
 
       <div className="grid gap-5 2xl:grid-cols-2">
         <details id="nameless-opportunity" className={`${cardClass} scroll-mt-24`} open>
-          <summary className="cursor-pointer text-lg font-semibold text-[#173543]">Create opportunity</summary>
+          <summary className="cursor-pointer text-lg font-semibold text-[#181817]">Create opportunity</summary>
           <form onSubmit={createOpportunity} className="mt-5 grid gap-3 sm:grid-cols-2">
             <Field label="Opportunity name" className="sm:col-span-2"><input required value={opportunity.name} onChange={(e) => setOpportunity((current) => ({ ...current, name: e.target.value }))} className={inputClass} /></Field>
             <ContactSelect contacts={contacts} value={opportunity.contactId} onChange={(value) => setOpportunity((current) => ({ ...current, contactId: value }))} />
@@ -356,12 +356,12 @@ export default function RetailSalesPanel({
             <Field label="Next action" className="sm:col-span-2"><input value={opportunity.nextAction} onChange={(e) => setOpportunity((current) => ({ ...current, nextAction: e.target.value }))} className={inputClass} /></Field>
             <fieldset className="sm:col-span-2"><legend className="text-sm font-semibold text-[#355160]">Product interest</legend><div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">{PRODUCT_INTEREST_OPTIONS.map((product) => <label key={product} className="flex min-h-11 items-center gap-2 rounded-xl border border-[#d6e4ea] px-3 text-sm"><input type="checkbox" checked={opportunity.products.includes(product)} onChange={() => setOpportunity((current) => ({ ...current, products: current.products.includes(product) ? current.products.filter((item) => item !== product) : [...current.products, product] }))} className="h-4 w-4" />{product}</label>)}</div></fieldset>
             <Field label="Notes" className="sm:col-span-2"><textarea rows={3} value={opportunity.notes} onChange={(e) => setOpportunity((current) => ({ ...current, notes: e.target.value }))} className={inputClass} /></Field>
-            <button disabled={busy !== null} className="min-h-12 rounded-full bg-[#0d6f7a] px-5 py-3 font-semibold text-white disabled:opacity-50 sm:col-span-2">{busy === "create_opportunity" ? "Creating..." : "Create Opportunity"}</button>
+            <button disabled={busy !== null} className="min-h-12 rounded-full bg-[#405d6b] px-5 py-3 font-semibold text-white disabled:opacity-50 sm:col-span-2">{busy === "create_opportunity" ? "Creating..." : "Create Opportunity"}</button>
           </form>
         </details>
 
         <div className={cardClass}>
-          <h3 className="text-lg font-semibold text-[#173543]">Opportunities</h3>
+          <h3 className="text-lg font-semibold text-[#181817]">Opportunities</h3>
           <div className="mt-4 space-y-3">
             {data.opportunities.map((item) => (
               <OpportunityCard key={String(item.id)} item={item} busy={busy} onAdvance={(stage, lostReason) => submit("advance_opportunity", { opportunity_id: item.id, stage, lost_reason: lostReason || null }, "Opportunity advanced.")} />
@@ -373,7 +373,7 @@ export default function RetailSalesPanel({
 
       <div className="grid gap-5 2xl:grid-cols-2">
         <details id="nameless-activity" className={`${cardClass} scroll-mt-24`} open>
-          <summary className="cursor-pointer text-lg font-semibold text-[#173543]">Log activity or meeting</summary>
+          <summary className="cursor-pointer text-lg font-semibold text-[#181817]">Log activity or meeting</summary>
           <form onSubmit={createActivity} className="mt-5 grid gap-3 sm:grid-cols-2">
             <Field label="Activity type"><select value={activity.type} onChange={(e) => setActivity((current) => ({ ...current, type: e.target.value }))} className={inputClass}>{["call","text","email","store_visit","meeting","sample_drop","buyer_feedback","pricing_sent","order_update","internal_note"].map((option) => <option key={option} value={option}>{labelize(option)}</option>)}</select></Field>
             <ContactSelect contacts={contacts} value={activity.contactId} onChange={(value) => setActivity((current) => ({ ...current, contactId: value }))} />
@@ -383,12 +383,12 @@ export default function RetailSalesPanel({
             <Field label="Next action"><input value={activity.nextAction} onChange={(e) => setActivity((current) => ({ ...current, nextAction: e.target.value }))} className={inputClass} /></Field>
             <Field label="Next-action date"><input type="date" value={activity.nextActionDate} onChange={(e) => setActivity((current) => ({ ...current, nextActionDate: e.target.value }))} className={inputClass} /></Field>
             <label className="flex min-h-11 items-center gap-3 rounded-xl border border-[#d6e4ea] px-3 text-sm sm:col-span-2"><input type="checkbox" checked={activity.createTask} onChange={(e) => setActivity((current) => ({ ...current, createTask: e.target.checked }))} className="h-5 w-5" />Create a follow-up task from the next action</label>
-            <button disabled={busy !== null} className="min-h-12 rounded-full bg-[#173543] px-5 py-3 font-semibold text-white disabled:opacity-50 sm:col-span-2">{busy === "create_activity" ? "Saving..." : "Log Activity"}</button>
+            <button disabled={busy !== null} className="min-h-12 rounded-full bg-[#181817] px-5 py-3 font-semibold text-white disabled:opacity-50 sm:col-span-2">{busy === "create_activity" ? "Saving..." : "Log Activity"}</button>
           </form>
         </details>
 
         <details id="nameless-samples" className={`${cardClass} scroll-mt-24`} open>
-          <summary className="cursor-pointer text-lg font-semibold text-[#173543]">Record samples</summary>
+          <summary className="cursor-pointer text-lg font-semibold text-[#181817]">Record samples</summary>
           <form onSubmit={createSample} className="mt-5 grid gap-3 sm:grid-cols-2">
             <ContactSelect contacts={contacts} value={sample.contactId} onChange={(value) => setSample((current) => ({ ...current, contactId: value }))} />
             <OpportunitySelect opportunities={data.opportunities} value={sample.opportunityId} onChange={(value) => setSample((current) => ({ ...current, opportunityId: value }))} />
@@ -403,14 +403,14 @@ export default function RetailSalesPanel({
             <Field label="Follow-up date"><input type="date" value={sample.followUpDate} onChange={(e) => setSample((current) => ({ ...current, followUpDate: e.target.value }))} className={inputClass} /></Field>
             <Field label="Outcome"><select value={sample.outcome} onChange={(e) => setSample((current) => ({ ...current, outcome: e.target.value }))} className={inputClass}>{["pending","positive","neutral","negative","more_samples_requested","pricing_requested","order_expected","no_response"].map((option) => <option key={option} value={option}>{labelize(option)}</option>)}</select></Field>
             <Field label="Buyer feedback" className="sm:col-span-2"><textarea rows={3} value={sample.feedback} onChange={(e) => setSample((current) => ({ ...current, feedback: e.target.value }))} className={inputClass} /></Field>
-            <button disabled={busy !== null} className="min-h-12 rounded-full bg-[#0d6f7a] px-5 py-3 font-semibold text-white disabled:opacity-50 sm:col-span-2">{busy === "create_sample" ? "Saving..." : sample.deliveredAt ? "Record Sample Drop" : "Record Sample Request"}</button>
+            <button disabled={busy !== null} className="min-h-12 rounded-full bg-[#405d6b] px-5 py-3 font-semibold text-white disabled:opacity-50 sm:col-span-2">{busy === "create_sample" ? "Saving..." : sample.deliveredAt ? "Record Sample Drop" : "Record Sample Request"}</button>
           </form>
         </details>
       </div>
 
       <div className="grid gap-5 2xl:grid-cols-2">
         <details className={cardClass} open>
-          <summary className="cursor-pointer text-lg font-semibold text-[#173543]">Record order and estimated commission</summary>
+          <summary className="cursor-pointer text-lg font-semibold text-[#181817]">Record order and estimated commission</summary>
           <p className="mt-2 text-sm text-[#9a6b00]">Commission is an operational estimate and is not guaranteed income.</p>
           <form onSubmit={createOrder} className="mt-5 grid gap-3 sm:grid-cols-2">
             <OpportunitySelect opportunities={data.opportunities} value={order.opportunityId} onChange={(value) => setOrder((current) => ({ ...current, opportunityId: value }))} />
@@ -428,14 +428,14 @@ export default function RetailSalesPanel({
             <Field label="Commission status"><select value={order.commissionStatus} onChange={(e) => setOrder((current) => ({ ...current, commissionStatus: e.target.value }))} className={inputClass}>{["estimated","awaiting_invoice","awaiting_customer_payment","eligible","approved","paid","disputed","not_eligible"].map((option) => <option key={option} value={option}>{labelize(option)}</option>)}</select></Field>
             <Field label="Commission paid date"><input type="date" value={order.commissionPaidAt} onChange={(e) => setOrder((current) => ({ ...current, commissionPaidAt: e.target.value }))} className={inputClass} /></Field>
             <Field label="Notes" className="sm:col-span-2"><textarea rows={3} value={order.notes} onChange={(e) => setOrder((current) => ({ ...current, notes: e.target.value }))} className={inputClass} /></Field>
-            <button disabled={busy !== null} className="min-h-12 rounded-full bg-[#173543] px-5 py-3 font-semibold text-white disabled:opacity-50 sm:col-span-2">{busy === "create_order" ? "Calculating..." : "Record Order & Commission"}</button>
+            <button disabled={busy !== null} className="min-h-12 rounded-full bg-[#181817] px-5 py-3 font-semibold text-white disabled:opacity-50 sm:col-span-2">{busy === "create_order" ? "Calculating..." : "Record Order & Commission"}</button>
           </form>
         </details>
 
         <div className={cardClass}>
-          <h3 className="text-lg font-semibold text-[#173543]">Orders and commission</h3>
+          <h3 className="text-lg font-semibold text-[#181817]">Orders and commission</h3>
           <div className="mt-4 space-y-3">
-            {data.orders.map((item) => <div key={String(item.id)} className="rounded-2xl border border-[#d8e6ed] bg-[#f7fbfc] p-4"><div className="flex flex-wrap items-center justify-between gap-2"><p className="font-semibold text-[#173543]">{text(item, "order_number") || `Order ${String(item.id).slice(0, 8)}`}</p><span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold uppercase text-[#0d6f7a]">{labelize(item.commission_status)}</span></div><p className="mt-2 text-sm text-[#4f6877]">Commissionable {currency(item.commissionable_sales)} • Estimated commission {currency(item.estimated_commission)}</p><p className="mt-1 text-xs text-[#9a6b00]">Estimate only; not guaranteed income.</p></div>)}
+            {data.orders.map((item) => <div key={String(item.id)} className="rounded-2xl border border-[#d8e6ed] bg-[#f7fbfc] p-4"><div className="flex flex-wrap items-center justify-between gap-2"><p className="font-semibold text-[#181817]">{text(item, "order_number") || `Order ${String(item.id).slice(0, 8)}`}</p><span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold uppercase text-[#405d6b]">{labelize(item.commission_status)}</span></div><p className="mt-2 text-sm text-[#4f6877]">Commissionable {currency(item.commissionable_sales)} • Estimated commission {currency(item.estimated_commission)}</p><p className="mt-1 text-xs text-[#9a6b00]">Estimate only; not guaranteed income.</p></div>)}
             {data.orders.length === 0 ? <Empty label="No retail orders yet." /> : null}
           </div>
         </div>
@@ -447,7 +447,7 @@ export default function RetailSalesPanel({
 function OpportunityCard({ item, busy, onAdvance }: { item: Record<string, unknown>; busy: string | null; onAdvance: (stage: string, lostReason: string) => Promise<boolean> }) {
   const [stage, setStage] = useState(String(item.stage || "new_prospect"));
   const [lostReason, setLostReason] = useState(String(item.lost_reason || ""));
-  return <div className="rounded-2xl border border-[#d8e6ed] bg-[#f7fbfc] p-4"><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="font-semibold text-[#173543]">{text(item, "name")}</p><p className="mt-1 text-sm text-[#5c7483]">{currency(item.estimated_order_value)} • {Number(item.probability || 0)}% probability</p></div><span className="rounded-full border border-[#bfe8df] bg-white px-2.5 py-1 text-xs font-semibold uppercase text-[#0d6f7a]">{labelize(item.stage)}</span></div><div className="mt-3 flex flex-col gap-2 sm:flex-row"><select value={stage} onChange={(e) => setStage(e.target.value)} className={inputClass}>{OPPORTUNITY_STAGE_OPTIONS.map((option) => <option key={option} value={option}>{labelize(option)}</option>)}</select><button type="button" disabled={busy !== null || stage === item.stage} onClick={() => void onAdvance(stage, lostReason)} className="min-h-11 shrink-0 rounded-full border border-[#0d6f7a] bg-white px-4 text-sm font-semibold text-[#0d6f7a] disabled:opacity-40">Advance</button></div>{stage === "lost" || stage === "not_qualified" ? <input value={lostReason} onChange={(event) => setLostReason(event.target.value)} placeholder="Lost / not-qualified reason" className={`${inputClass} mt-2`} /> : null}</div>;
+  return <div className="rounded-2xl border border-[#d8e6ed] bg-[#f7fbfc] p-4"><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="font-semibold text-[#181817]">{text(item, "name")}</p><p className="mt-1 text-sm text-[#5c7483]">{currency(item.estimated_order_value)} • {Number(item.probability || 0)}% probability</p></div><span className="rounded-full border border-[#bfe8df] bg-white px-2.5 py-1 text-xs font-semibold uppercase text-[#405d6b]">{labelize(item.stage)}</span></div><div className="mt-3 flex flex-col gap-2 sm:flex-row"><select value={stage} onChange={(e) => setStage(e.target.value)} className={inputClass}>{OPPORTUNITY_STAGE_OPTIONS.map((option) => <option key={option} value={option}>{labelize(option)}</option>)}</select><button type="button" disabled={busy !== null || stage === item.stage} onClick={() => void onAdvance(stage, lostReason)} className="min-h-11 shrink-0 rounded-full border border-[#405d6b] bg-white px-4 text-sm font-semibold text-[#405d6b] disabled:opacity-40">Advance</button></div>{stage === "lost" || stage === "not_qualified" ? <input value={lostReason} onChange={(event) => setLostReason(event.target.value)} placeholder="Lost / not-qualified reason" className={`${inputClass} mt-2`} /> : null}</div>;
 }
 
 function ContactSelect({ contacts, value, onChange }: { contacts: ContactOption[]; value: string; onChange: (value: string) => void }) {
@@ -459,7 +459,7 @@ function OpportunitySelect({ opportunities, value, onChange }: { opportunities: 
 }
 
 function Metric({ label, value, helper }: { label: string; value: string; helper?: string }) {
-  return <div className="rounded-2xl border border-[#d8e6ed] bg-white p-4 shadow-sm"><p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#6d8593]">{label}</p><p className="mt-2 text-2xl font-semibold text-[#173543]">{value}</p>{helper ? <p className="mt-1 text-xs text-[#9a6b00]">{helper}</p> : null}</div>;
+  return <div className="rounded-2xl border border-[#d8e6ed] bg-white p-4 shadow-sm"><p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#6d8593]">{label}</p><p className="mt-2 text-2xl font-semibold text-[#181817]">{value}</p>{helper ? <p className="mt-1 text-xs text-[#9a6b00]">{helper}</p> : null}</div>;
 }
 
 function Empty({ label }: { label: string }) {

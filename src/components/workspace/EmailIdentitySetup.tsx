@@ -69,7 +69,7 @@ export default function EmailIdentitySetup({ returnTo }: { returnTo: string }) {
   }
 
   return (
-    <div className="rounded-[24px] border border-[#e9def1] bg-white p-4 shadow-sm">
+    <div className="rounded-[24px] border border-[#deded8] bg-white p-4 shadow-sm">
       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#7891a0]">Insert Email</p>
       <p className="mt-2 text-sm text-[#5c7483]">
         Add the sender address the CRM should use for direct communication and future automations.
@@ -81,7 +81,7 @@ export default function EmailIdentitySetup({ returnTo }: { returnTo: string }) {
           value={displayName}
           onChange={(event) => setDisplayName(event.target.value)}
           placeholder="Sender name"
-          className="w-full rounded-lg border border-[#ddcfe9] bg-white px-3 py-2 text-sm text-[#1f2d3a]"
+          className="w-full rounded-lg border border-[#deded8] bg-white px-3 py-2 text-sm text-[#1f2d3a]"
         />
         <input
           type="email"
@@ -89,28 +89,28 @@ export default function EmailIdentitySetup({ returnTo }: { returnTo: string }) {
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           placeholder="name@company.com"
-          className="w-full rounded-lg border border-[#ddcfe9] bg-white px-3 py-2 text-sm text-[#1f2d3a]"
+          className="w-full rounded-lg border border-[#deded8] bg-white px-3 py-2 text-sm text-[#1f2d3a]"
         />
         <label className="flex items-start gap-2 text-sm text-[#4f6877]">
           <input
             type="checkbox"
             checked={useForAutomations}
             onChange={(event) => setUseForAutomations(event.target.checked)}
-            className="mt-0.5 h-4 w-4 rounded border-[#ddcfe9] text-[#8f52dc]"
+            className="mt-0.5 h-4 w-4 rounded border-[#deded8] text-[#1b1b1a]"
           />
           <span>Allow this address to be selected by CRM automations.</span>
         </label>
         <button
           type="submit"
           disabled={busy}
-          className="w-full rounded-full bg-[#173543] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+          className="w-full rounded-full bg-[#181817] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
         >
           {busy ? "Saving..." : "Save Communication Email"}
         </button>
       </form>
 
       {error ? <p className="mt-3 text-sm text-[#991b1b]">{error}</p> : null}
-      {message ? <p className="mt-3 text-sm text-[#0d6f7a]">{message}</p> : null}
+      {message ? <p className="mt-3 text-sm text-[#405d6b]">{message}</p> : null}
 
       <div className="mt-4 space-y-2">
         {identities.map((identity) => {
@@ -118,10 +118,10 @@ export default function EmailIdentitySetup({ returnTo }: { returnTo: string }) {
             Boolean(identity.verifiedAt) &&
             identity.email.toLowerCase() === String(connectedEmail || "").toLowerCase();
           return (
-            <div key={identity.id} className="rounded-2xl border border-[#e9def1] bg-[#fdf8fd] px-3 py-3">
-              <p className="truncate text-sm font-semibold text-[#173543]">{identity.email}</p>
+            <div key={identity.id} className="rounded-2xl border border-[#deded8] bg-[#f7f7f4] px-3 py-3">
+              <p className="truncate text-sm font-semibold text-[#181817]">{identity.email}</p>
               {identity.displayName ? <p className="mt-1 text-xs text-[#5c7483]">{identity.displayName}</p> : null}
-              <p className={["mt-2 text-xs font-semibold", ready ? "text-[#0d6f7a]" : "text-[#9a6b00]"].join(" ")}>
+              <p className={["mt-2 text-xs font-semibold", ready ? "text-[#405d6b]" : "text-[#9a6b00]"].join(" ")}>
                 {ready ? "Ready for communications" : "Authorization required"}
               </p>
               <p className="mt-1 text-xs text-[#6d8593]">
@@ -138,7 +138,7 @@ export default function EmailIdentitySetup({ returnTo }: { returnTo: string }) {
 
       <a
         href={`/api/workspace/email/oauth/start?returnTo=${encodeURIComponent(returnTo)}`}
-        className="mt-4 inline-flex rounded-full border border-[#ddcfe9] bg-white px-3 py-1.5 text-sm font-semibold text-[#21424d] transition hover:border-[#8f52dc] hover:text-[#6f32b5]"
+        className="mt-4 inline-flex rounded-full border border-[#deded8] bg-white px-3 py-1.5 text-sm font-semibold text-[#21424d] transition hover:border-[#1b1b1a] hover:text-[#1b1b1a]"
       >
         {connectedEmail ? "Reconnect Google Mailbox" : "Authorize Google Mailbox"}
       </a>

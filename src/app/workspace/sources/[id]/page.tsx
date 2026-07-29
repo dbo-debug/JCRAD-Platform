@@ -61,7 +61,7 @@ export default async function WorkspaceSourceDetailPage({ params }: { params: Pr
         action={
           <Link
             href="/workspace/sources"
-            className="inline-flex rounded-full border border-[#ddcfe8] px-4 py-2 text-sm font-semibold text-[#24404d] transition hover:border-[#8f52dc] hover:text-[#6f32b5]"
+            className="inline-flex rounded-full border border-[#ddcfe8] px-4 py-2 text-sm font-semibold text-[#24404d] transition hover:border-[#1b1b1a] hover:text-[#1b1b1a]"
           >
             Back to Sources
           </Link>
@@ -160,10 +160,10 @@ export default async function WorkspaceSourceDetailPage({ params }: { params: Pr
         <Panel title="Open and Recent Tasks">
           <div className="space-y-2.5">
             {detail.tasks.map((task) => (
-              <div key={task.id} className="rounded-xl border border-[#eadff1] bg-[#fdf8fd] px-3 py-2.5">
+              <div key={task.id} className="rounded-xl border border-[#deded8] bg-[#f7f7f4] px-3 py-2.5">
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="font-semibold text-[#173543]">{task.title}</p>
-                  <span className="rounded-full border border-[#e5d8ef] bg-white px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#4f6877]">
+                  <p className="font-semibold text-[#181817]">{task.title}</p>
+                  <span className="rounded-full border border-[#deded8] bg-white px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#4f6877]">
                     {task.status}
                   </span>
                   {task.priority !== null ? (
@@ -188,7 +188,7 @@ export default async function WorkspaceSourceDetailPage({ params }: { params: Pr
 
         <Panel title="Source Notes">
           {detail.source.notes ? (
-            <p className="whitespace-pre-wrap text-sm text-[#173543]">{detail.source.notes}</p>
+            <p className="whitespace-pre-wrap text-sm text-[#181817]">{detail.source.notes}</p>
           ) : (
             <EmptyState label="No source notes saved yet." />
           )}
@@ -200,9 +200,9 @@ export default async function WorkspaceSourceDetailPage({ params }: { params: Pr
 
 function SummaryCard({ label, value, helper }: { label: string; value: string; helper?: string }) {
   return (
-    <div className="rounded-2xl border border-[#eadff1] bg-white p-4 shadow-sm">
+    <div className="rounded-2xl border border-[#deded8] bg-white p-4 shadow-sm">
       <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#5d7685]">{label}</p>
-      <p className="mt-1.5 text-base font-semibold text-[#173543]">{value}</p>
+      <p className="mt-1.5 text-base font-semibold text-[#181817]">{value}</p>
       {helper ? <p className="mt-1 text-sm text-[#4a6575]">{helper}</p> : null}
     </div>
   );
@@ -217,10 +217,10 @@ function HeaderBadge({
 }) {
   const toneClass =
     tone === "ok"
-      ? "border-[#e8d7f7] bg-[#fcf3ff] text-[#6f32b5]"
+      ? "border-[#d9ddd9] bg-[#f7f7f4] text-[#1b1b1a]"
       : tone === "warn"
         ? "border-[#f1ddad] bg-[#fff9eb] text-[#9a6b00]"
-        : "border-[#e5d8ef] bg-[#fcf7fd] text-[#4f6877]";
+        : "border-[#deded8] bg-[#f7f7f4] text-[#4f6877]";
 
   return <span className={["rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em]", toneClass].join(" ")}>{label}</span>;
 }
@@ -242,8 +242,8 @@ function ActivityCard({
   const followUpOn = typeof item.details?.follow_up_on === "string" ? item.details.follow_up_on.trim() : "";
 
   return (
-    <div className="rounded-xl border border-[#eadff1] bg-[#fdf8fd] px-3 py-2.5">
-      <p className="font-semibold text-[#173543]">{item.summary}</p>
+    <div className="rounded-xl border border-[#deded8] bg-[#f7f7f4] px-3 py-2.5">
+      <p className="font-semibold text-[#181817]">{item.summary}</p>
       <p className="mt-1 text-sm text-[#4a6575]">
         {item.actorName || "System"} • {formatDate(item.createdAt)}
       </p>
@@ -258,15 +258,15 @@ function ActivityCard({
 
 function Panel({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="rounded-2xl border border-[#eadff1] bg-white p-4 shadow-sm">
-      <h2 className="text-base font-semibold text-[#173543]">{title}</h2>
+    <section className="rounded-2xl border border-[#deded8] bg-white p-4 shadow-sm">
+      <h2 className="text-base font-semibold text-[#181817]">{title}</h2>
       <div className="mt-3">{children}</div>
     </section>
   );
 }
 
 function EmptyState({ label }: { label: string }) {
-  return <div className="rounded-xl border border-dashed border-[#d3e1e8] bg-[#fdf8fd] px-3 py-4 text-sm text-[#5d7685]">{label}</div>;
+  return <div className="rounded-xl border border-dashed border-[#d3e1e8] bg-[#f7f7f4] px-3 py-4 text-sm text-[#5d7685]">{label}</div>;
 }
 
 function WorkflowCue({
@@ -281,26 +281,26 @@ function WorkflowCue({
   ctaLabel: string;
 }) {
   return (
-    <a href={href} className="rounded-xl border border-[#eadff1] bg-[#fdf8fd] px-3 py-3 transition hover:border-[#8f52dc] hover:bg-white">
-      <p className="font-semibold text-[#173543]">{title}</p>
+    <a href={href} className="rounded-xl border border-[#deded8] bg-[#f7f7f4] px-3 py-3 transition hover:border-[#1b1b1a] hover:bg-white">
+      <p className="font-semibold text-[#181817]">{title}</p>
       <p className="mt-1 text-sm text-[#5b7382]">{description}</p>
-      <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6f32b5]">{ctaLabel}</p>
+      <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#1b1b1a]">{ctaLabel}</p>
     </a>
   );
 }
 
 function SnapshotRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-[#eadff1] bg-[#fdf8fd] px-3 py-2.5">
+    <div className="rounded-xl border border-[#deded8] bg-[#f7f7f4] px-3 py-2.5">
       <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#5d7685]">{label}</p>
-      <p className="mt-1 text-sm font-semibold text-[#173543]">{value}</p>
+      <p className="mt-1 text-sm font-semibold text-[#181817]">{value}</p>
     </div>
   );
 }
 
 function DetailPill({ label, value }: { label: string; value: string }) {
   return (
-    <div className="mt-2 rounded-lg border border-[#eadff1] bg-white px-3 py-2">
+    <div className="mt-2 rounded-lg border border-[#deded8] bg-white px-3 py-2">
       <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#5d7685]">{label}</p>
       <p className="mt-1 text-sm text-[#4a6575]">{value}</p>
     </div>

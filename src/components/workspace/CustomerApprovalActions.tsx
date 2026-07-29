@@ -67,8 +67,8 @@ export default function CustomerApprovalActions({ customerId, approvalStatus }: 
               className={[
                 "inline-flex rounded-full border px-3 py-1.5 text-xs font-semibold transition",
                 selected
-                  ? "border-[#8f52dc] bg-[#fcf3ff] text-[#6f32b5]"
-                  : "border-[#cfdce4] text-[#24404d] hover:border-[#8f52dc] hover:text-[#6f32b5]",
+                  ? "border-[#1b1b1a] bg-[#f7f7f4] text-[#1b1b1a]"
+                  : "border-[#cfdce4] text-[#24404d] hover:border-[#1b1b1a] hover:text-[#1b1b1a]",
                 (Boolean(busyStatus) || selected) ? "cursor-not-allowed opacity-60" : "",
               ].join(" ")}
             >

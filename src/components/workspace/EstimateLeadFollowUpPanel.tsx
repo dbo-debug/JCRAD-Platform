@@ -42,8 +42,8 @@ function formatMoney(value: number | null): string {
 
 function statusTone(value: string, packagingPending: boolean): string {
   if (packagingPending) return "border-[#f1ddad] bg-[#fff9eb] text-[#9a6b00]";
-  if (value === "converted") return "border-[#e8d7f7] bg-[#fcf3ff] text-[#6f32b5]";
-  return "border-[#e5d8ef] bg-[#fcf7fd] text-[#4f6877]";
+  if (value === "converted") return "border-[#d9ddd9] bg-[#f7f7f4] text-[#1b1b1a]";
+  return "border-[#deded8] bg-[#f7f7f4] text-[#4f6877]";
 }
 
 export default async function EstimateLeadFollowUpPanel({
@@ -74,16 +74,16 @@ export default async function EstimateLeadFollowUpPanel({
   );
 
   return (
-    <section className="rounded-[24px] border border-[#eadff1] bg-white p-4 shadow-sm">
+    <section className="rounded-[24px] border border-[#deded8] bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Estimate Follow-Up</p>
-          <h2 className="mt-1 text-lg font-semibold text-[#173543]">{title}</h2>
+          <h2 className="mt-1 text-lg font-semibold text-[#181817]">{title}</h2>
           <p className="mt-1 text-sm text-[#5b7382]">{description}</p>
         </div>
         <Link
           href="/estimate"
-          className="rounded-full border border-[#decfe8] bg-white px-3 py-1.5 text-sm text-[#42606f] transition hover:border-[#8f52dc] hover:text-[#6f32b5]"
+          className="rounded-full border border-[#deded8] bg-white px-3 py-1.5 text-sm text-[#42606f] transition hover:border-[#1b1b1a] hover:text-[#1b1b1a]"
         >
           Open Estimate Workspace
         </Link>
@@ -99,13 +99,13 @@ export default async function EstimateLeadFollowUpPanel({
             return (
               <div
                 key={row.id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#eadff1] bg-[#fffafd] px-3 py-3 text-sm"
+                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#deded8] bg-[#fafaf8] px-3 py-3 text-sm"
               >
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7891a0]">
                     {row.packaging_review_pending ? "Estimate Blocked By Packaging" : "Estimate Needs Follow-Up"}
                   </p>
-                  <p className="font-semibold text-[#173543]">
+                  <p className="font-semibold text-[#181817]">
                     {String(row.customer_name || row.customer_email || "Estimate")} • #{row.id.slice(0, 8)}
                   </p>
                   <p className="text-xs text-[#5b7382]">
@@ -127,14 +127,14 @@ export default async function EstimateLeadFollowUpPanel({
                   {hasResolvedCustomer ? (
                     <Link
                       href={`/workspace/customers/${encodeURIComponent(row.resolvedCustomer!.customerId)}`}
-                      className="rounded-full border border-[#cfdce4] px-2 py-1 text-xs font-semibold text-[#294452] hover:border-[#8f52dc] hover:text-[#6f32b5]"
+                      className="rounded-full border border-[#cfdce4] px-2 py-1 text-xs font-semibold text-[#294452] hover:border-[#1b1b1a] hover:text-[#1b1b1a]"
                     >
                       Open account
                     </Link>
                   ) : null}
                   <Link
                     href={`/estimate/${encodeURIComponent(row.id)}/print`}
-                    className="rounded-full border border-[#cfdce4] px-2 py-1 text-xs font-semibold text-[#294452] hover:border-[#8f52dc] hover:text-[#6f32b5]"
+                    className="rounded-full border border-[#cfdce4] px-2 py-1 text-xs font-semibold text-[#294452] hover:border-[#1b1b1a] hover:text-[#1b1b1a]"
                   >
                     Open estimate
                   </Link>
@@ -142,7 +142,7 @@ export default async function EstimateLeadFollowUpPanel({
                     <input type="hidden" name="estimate_id" value={row.id} />
                     <button
                       type="submit"
-                      className="rounded-full border border-[#c7ddd7] bg-[#fcf5ff] px-2 py-1 text-xs font-semibold text-[#6f32b5] hover:border-[#8f52dc]"
+                      className="rounded-full border border-[#c7ddd7] bg-[#f7f7f4] px-2 py-1 text-xs font-semibold text-[#1b1b1a] hover:border-[#1b1b1a]"
                     >
                       {hasResolvedCustomer ? "Refresh account follow-up" : "Create lead and follow-up"}
                     </button>

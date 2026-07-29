@@ -52,9 +52,9 @@ const INTEREST_OPTIONS = [
 ];
 
 const INPUT_CLASS =
-  "min-h-[56px] w-full rounded-[24px] border border-[#cfe0e8] bg-white px-4 text-base text-[#173543] outline-none transition focus:border-[#8f52dc]";
+  "min-h-[56px] w-full rounded-[24px] border border-[#cfe0e8] bg-white px-4 text-base text-[#181817] outline-none transition focus:border-[#1b1b1a]";
 const TEXTAREA_CLASS =
-  "w-full rounded-[24px] border border-[#cfe0e8] bg-white px-4 py-4 text-base text-[#173543] outline-none transition focus:border-[#8f52dc]";
+  "w-full rounded-[24px] border border-[#cfe0e8] bg-white px-4 py-4 text-base text-[#181817] outline-none transition focus:border-[#1b1b1a]";
 
 function buildInitialForm(currentUserId: string): FormState {
   return {
@@ -149,13 +149,13 @@ export default function QuickAddLeadClient(props: QuickAddLeadClientProps) {
       <section className="mx-auto max-w-xl rounded-[28px] border border-[#cfe1e8] bg-white p-5 shadow-[0_18px_45px_rgba(16,42,67,0.08)] sm:p-7">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6f32b5]">Lead Captured</p>
-            <h2 className="mt-1 text-2xl font-semibold text-[#173543]">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#1b1b1a]">Lead Captured</p>
+            <h2 className="mt-1 text-2xl font-semibold text-[#181817]">
               {result.action === "created" ? "New CRM lead saved" : "Existing account updated"}
             </h2>
             <p className="mt-2 text-sm text-[#5b7382]">{smsStatusMessage(result.sms)}</p>
           </div>
-          <span className="rounded-full border border-[#e8d7f7] bg-[#fcf3ff] px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#6f32b5]">
+          <span className="rounded-full border border-[#d9ddd9] bg-[#f7f7f4] px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#1b1b1a]">
             Hall of Flowers
           </span>
         </div>
@@ -164,30 +164,30 @@ export default function QuickAddLeadClient(props: QuickAddLeadClientProps) {
           <button
             type="button"
             onClick={resetForm}
-            className="min-h-[56px] w-full rounded-full bg-[#8f52dc] px-4 py-3 text-base font-semibold text-white transition hover:opacity-95"
+            className="min-h-[56px] w-full rounded-full bg-[#1b1b1a] px-4 py-3 text-base font-semibold text-white transition hover:opacity-95"
           >
             Add Another Lead
           </button>
           <div className="grid gap-3 sm:grid-cols-2">
             <Link
               href={`/workspace/customers/${result.customerId}`}
-              className="min-h-[52px] rounded-full border border-[#c7dce5] bg-white px-4 py-3 text-center text-sm font-semibold text-[#23414e] transition hover:border-[#8f52dc] hover:text-[#6f32b5]"
+              className="min-h-[52px] rounded-full border border-[#c7dce5] bg-white px-4 py-3 text-center text-sm font-semibold text-[#23414e] transition hover:border-[#1b1b1a] hover:text-[#1b1b1a]"
             >
               Open Customer
             </Link>
             <button
               type="button"
               onClick={handleCopyLink}
-              className="min-h-[52px] rounded-full border border-[#c7dce5] bg-[#fcf7fd] px-4 py-3 text-sm font-semibold text-[#23414e] transition hover:border-[#8f52dc] hover:text-[#6f32b5]"
+              className="min-h-[52px] rounded-full border border-[#c7dce5] bg-[#f7f7f4] px-4 py-3 text-sm font-semibold text-[#23414e] transition hover:border-[#1b1b1a] hover:text-[#1b1b1a]"
             >
               {copied ? "Start Link Copied" : "Copy Direct Link"}
             </button>
           </div>
         </div>
 
-        <div className="mt-5 rounded-2xl border border-[#e5d8ef] bg-[#fcf7fd] p-4">
+        <div className="mt-5 rounded-2xl border border-[#deded8] bg-[#f7f7f4] p-4">
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#6e8796]">Public handoff link</p>
-          <p className="mt-1 break-all text-sm text-[#173543]">{props.startLink}</p>
+          <p className="mt-1 break-all text-sm text-[#181817]">{props.startLink}</p>
         </div>
       </section>
     );
@@ -195,12 +195,12 @@ export default function QuickAddLeadClient(props: QuickAddLeadClientProps) {
 
   return (
     <section className="mx-auto max-w-xl">
-      <div className="rounded-[32px] border border-[#d5e4eb] bg-[linear-gradient(180deg,#ffffff_0%,#fdf7fb_100%)] p-5 shadow-[0_18px_45px_rgba(16,42,67,0.08)] sm:p-7">
+      <div className="rounded-[32px] border border-[#d5e4eb] bg-[linear-gradient(180deg,#ffffff_0%,#f7f7f4_100%)] p-5 shadow-[0_18px_45px_rgba(16,42,67,0.08)] sm:p-7">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Event Capture</p>
-          <h2 className="mt-1 text-2xl font-semibold text-[#173543]">Quick Add Lead</h2>
+          <h2 className="mt-1 text-2xl font-semibold text-[#181817]">Quick Add Lead</h2>
           <p className="mt-2 text-sm text-[#5b7382]">Fast booth handoff form. Keep it simple, save the lead, then text the start link.</p>
-          <p className="mt-3 inline-flex rounded-full border border-[#e5d8ef] bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-[#5b7382]">
+          <p className="mt-3 inline-flex rounded-full border border-[#deded8] bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-[#5b7382]">
             {completionSeconds}
           </p>
         </div>
@@ -272,8 +272,8 @@ export default function QuickAddLeadClient(props: QuickAddLeadClientProps) {
             />
           </Field>
 
-          <details className="rounded-[24px] border border-[#e5d8ef] bg-[#fcf7fd] px-4 py-3">
-            <summary className="cursor-pointer list-none text-sm font-semibold text-[#173543]">
+          <details className="rounded-[24px] border border-[#deded8] bg-[#f7f7f4] px-4 py-3">
+            <summary className="cursor-pointer list-none text-sm font-semibold text-[#181817]">
               More options
               <span className="ml-2 text-xs font-medium uppercase tracking-[0.12em] text-[#7891a0]">Optional</span>
             </summary>
@@ -304,16 +304,16 @@ export default function QuickAddLeadClient(props: QuickAddLeadClientProps) {
                 </Field>
               ) : null}
 
-              <label className="flex items-center justify-between gap-4 rounded-[24px] border border-[#e5d8ef] bg-white px-4 py-4">
+              <label className="flex items-center justify-between gap-4 rounded-[24px] border border-[#deded8] bg-white px-4 py-4">
                 <div>
-                  <p className="text-sm font-semibold text-[#173543]">Hot Lead</p>
+                  <p className="text-sm font-semibold text-[#181817]">Hot Lead</p>
                   <p className="text-xs text-[#5b7382]">Creates a follow-up task automatically for this event lead.</p>
                 </div>
                 <input
                   type="checkbox"
                   checked={form.hotLead}
                   onChange={(event) => setForm((current) => ({ ...current, hotLead: event.target.checked }))}
-                  className="h-6 w-6 rounded border-[#b4ccd8] text-[#8f52dc] focus:ring-[#8f52dc]"
+                  className="h-6 w-6 rounded border-[#b4ccd8] text-[#1b1b1a] focus:ring-[#1b1b1a]"
                 />
               </label>
             </div>
@@ -325,7 +325,7 @@ export default function QuickAddLeadClient(props: QuickAddLeadClientProps) {
             <button
               type="submit"
               disabled={submitting}
-              className="min-h-[58px] w-full rounded-full bg-[#8f52dc] px-5 py-3 text-base font-semibold text-white transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+              className="min-h-[58px] w-full rounded-full bg-[#1b1b1a] px-5 py-3 text-base font-semibold text-white transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {submitting ? "Saving Lead..." : "Save Lead + Send SMS"}
             </button>
@@ -350,9 +350,9 @@ function Field({
 }) {
   return (
     <label className="block space-y-2.5">
-      <span className="text-sm font-semibold text-[#173543]">
+      <span className="text-sm font-semibold text-[#181817]">
         {label}
-        {required ? <span className="ml-1 text-[#6f32b5]">*</span> : null}
+        {required ? <span className="ml-1 text-[#1b1b1a]">*</span> : null}
       </span>
       {children}
     </label>

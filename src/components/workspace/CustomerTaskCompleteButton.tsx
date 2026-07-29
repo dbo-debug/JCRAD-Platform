@@ -45,15 +45,15 @@ export default function CustomerTaskCompleteButton({
 
   if (expanded) {
     return (
-      <div className="w-full rounded-2xl border border-[#eadff1] bg-[#fdf8fd] p-3">
-        <p className="text-sm font-semibold text-[#173543]">Complete task</p>
+      <div className="w-full rounded-2xl border border-[#deded8] bg-[#f7f7f4] p-3">
+        <p className="text-sm font-semibold text-[#181817]">Complete task</p>
         <p className="mt-1 text-xs text-[#5d7685]">Add a short outcome note if you want it captured in the account timeline.</p>
         <textarea
           value={note}
           onChange={(event) => setNote(event.target.value)}
           rows={3}
           placeholder="Spoke with Tony, asked me to send pricing"
-          className="mt-3 w-full rounded-lg border border-[#ddcfe9] bg-white px-3 py-2 text-sm text-[#1f2d3a]"
+          className="mt-3 w-full rounded-lg border border-[#deded8] bg-white px-3 py-2 text-sm text-[#1f2d3a]"
         />
         {error ? <p className="mt-2 text-sm text-[#991b1b]">{error}</p> : null}
         <div className="mt-3 flex flex-wrap gap-2">
@@ -61,7 +61,7 @@ export default function CustomerTaskCompleteButton({
             type="button"
             onClick={() => void handleComplete(note)}
             disabled={busy || !note.trim()}
-            className="rounded-full border border-[#e8d7f7] bg-[#fcf5ff] px-3 py-1.5 text-sm font-semibold text-[#6f32b5] transition hover:border-[#8f52dc] hover:text-[#0c6f66] disabled:opacity-60"
+            className="rounded-full border border-[#d9ddd9] bg-[#f7f7f4] px-3 py-1.5 text-sm font-semibold text-[#1b1b1a] transition hover:border-[#1b1b1a] hover:text-[#0c6f66] disabled:opacity-60"
           >
             {busy ? "Completing..." : "Complete & Save Note"}
           </button>
@@ -69,7 +69,7 @@ export default function CustomerTaskCompleteButton({
             type="button"
             onClick={() => void handleComplete(null)}
             disabled={busy}
-            className="rounded-full border border-[#decfe8] bg-white px-3 py-1.5 text-sm font-semibold text-[#24404d] transition hover:border-[#8f52dc] hover:text-[#6f32b5] disabled:opacity-60"
+            className="rounded-full border border-[#deded8] bg-white px-3 py-1.5 text-sm font-semibold text-[#24404d] transition hover:border-[#1b1b1a] hover:text-[#1b1b1a] disabled:opacity-60"
           >
             Complete Without Note
           </button>
@@ -81,7 +81,7 @@ export default function CustomerTaskCompleteButton({
               setError(null);
             }}
             disabled={busy}
-            className="rounded-full border border-[#decfe8] bg-white px-3 py-1.5 text-sm font-semibold text-[#5d7685] transition hover:border-[#c3d5df] hover:text-[#24404d] disabled:opacity-60"
+            className="rounded-full border border-[#deded8] bg-white px-3 py-1.5 text-sm font-semibold text-[#5d7685] transition hover:border-[#c3d5df] hover:text-[#24404d] disabled:opacity-60"
           >
             Cancel
           </button>
@@ -98,7 +98,7 @@ export default function CustomerTaskCompleteButton({
         setError(null);
       }}
       disabled={busy}
-      className="rounded-full border border-[#e8d7f7] bg-[#fcf5ff] px-3 py-1.5 text-sm font-semibold text-[#6f32b5] transition hover:border-[#8f52dc] hover:text-[#0c6f66] disabled:opacity-60"
+      className="rounded-full border border-[#d9ddd9] bg-[#f7f7f4] px-3 py-1.5 text-sm font-semibold text-[#1b1b1a] transition hover:border-[#1b1b1a] hover:text-[#0c6f66] disabled:opacity-60"
     >
       Complete
     </button>

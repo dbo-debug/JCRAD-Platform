@@ -1,94 +1,120 @@
 "use client";
 
-import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import Link from "next/link";
+import { usePathname, useSearchParams } from "next/navigation";
 
 type NavItem = {
   label: string;
   href: string;
+  match: "dashboard" | "accounts" | "sales" | "emails" | "tasks" | "routes" | "runner";
 };
 
-type NavSection = {
-  label: string;
-  items: NavItem[];
-};
-
-const NAV_SECTIONS: NavSection[] = [
+const PRIMARY_NAV: NavItem[] = [
+  { label: "Dashboard", href: "/workspace/sales", match: "dashboard" },
+  { label: "Retail Accounts", href: "/workspace/customers", match: "accounts" },
   {
-    label: "CRM",
-    items: [
-      { label: "Sales Dashboard", href: "/workspace/sales" },
-      { label: "Customers", href: "/workspace/customers" },
-      { label: "Sources", href: "/workspace/sources" },
-      { label: "Quick Add Lead", href: "/workspace/events/quick-add" },
-      { label: "Quick Add Source", href: "/workspace/sources/quick-add" },
-      { label: "Segment Builder", href: "/workspace/segments" },
-      { label: "Emails", href: "/workspace/emails" },
-      { label: "Tasks", href: "/workspace/tasks" },
-    ],
+    label: "Sales",
+    href: "/workspace/customers?savedView=pipeline&organizeBy=stage&sort=activity_desc",
+    match: "sales",
   },
-  {
-    label: "Field Ops",
-    items: [
-      { label: "Routes", href: "/workspace/routes" },
-      { label: "Route Runner", href: "/workspace/routes/run" },
-      { label: "Customer Import", href: "/workspace/customers/import" },
-    ],
-  },
+  { label: "Communications", href: "/workspace/emails", match: "emails" },
+  { label: "Tasks", href: "/workspace/tasks", match: "tasks" },
+  { label: "Routes", href: "/workspace/routes", match: "routes" },
+  { label: "Route Runner", href: "/workspace/routes/run", match: "runner" },
 ];
 
-function isActive(pathname: string | null, href: string) {
-  const currentPath = String(pathname || "").trim();
-  if (!currentPath) return href === "/workspace/customers";
-  if (href === "/workspace/routes/run") return currentPath.startsWith("/workspace/routes/run");
-  return currentPath === href || currentPath.startsWith(`${href}/`);
+function itemIsActive(pathname: string, savedView: string | null, item: NavItem) {
+  if (item.match === "dashboard") return pathname === "/workspace/sales";
+  if (item.match === "accounts") {
+    return pathname.startsWith("/workspace/customers") && savedView !== "pipeline";
+  }
+  if (item.match === "sales") {
+    return pathname === "/workspace/customers" && savedView === "pipeline";
+  }
+  if (item.match === "emails") return pathname.startsWith("/workspace/emails");
+  if (item.match === "tasks") return pathname.startsWith("/workspace/tasks");
+  if (item.match === "runner") return pathname.startsWith("/workspace/routes/run");
+  return pathname === "/workspace/routes";
+}
+
+function WorkspaceNav({ mobile = false }: { mobile?: boolean }) {
+  const pathname = String(usePathname() || "");
+  const searchParams = useSearchParams();
+  const savedView = searchParams.get("savedView");
+
+  return (
+    <nav aria-label="Workspace navigation" className={mobile ? "grid gap-1 sm:grid-cols-2" : "space-y-1"}>
+      {PRIMARY_NAV.map((item) => {
+        const active = itemIsActive(pathname, savedView, item);
+        return (
+          <Link
+            key={item.label}
+            href={item.href}
+            aria-current={active ? "page" : undefined}
+            className={[
+              "flex min-h-11 items-center rounded-lg px-3 text-sm font-medium transition",
+              active
+                ? mobile
+                  ? "bg-[var(--workspace-primary)] text-white"
+                  : "bg-white text-black shadow-sm"
+                : mobile
+                  ? "text-[var(--workspace-text-secondary)] hover:bg-[var(--workspace-surface-muted)] hover:text-black"
+                  : "text-[var(--workspace-sidebar-muted)] hover:bg-white/10 hover:text-white",
+            ].join(" ")}
+          >
+            {item.label}
+          </Link>
+        );
+      })}
+    </nav>
+  );
 }
 
 export default function InternalSidebar() {
-  const pathname = usePathname();
-  const visibleSections = NAV_SECTIONS;
-
   return (
-    <aside className="w-full border-b border-[var(--surface-border)] bg-white px-4 py-4 lg:w-72 lg:flex-none lg:border-b-0 lg:border-r lg:py-6">
-      <div className="flex items-center gap-3 lg:block">
-        <Link
-          href="/workspace/customers"
-          className="inline-flex h-14 w-28 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#eadff1] bg-white p-1 shadow-sm lg:mb-6 lg:w-32"
-        >
-          <Image src="/brand/PRIMARY.png" alt="JC RAD Inc." width={128} height={56} className="h-full w-full object-contain" />
-        </Link>
-        <div className="min-w-0 flex-1 rounded-2xl border border-[#bfe8df] bg-[#effcf8] px-3 py-3 lg:mb-6">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#0d6f7a]">Active Workspace</p>
-          <p className="mt-1 truncate text-sm font-semibold text-[#173543]">Nameless Genetics</p>
-          <p className="mt-0.5 text-xs text-[#4f6877]">Retail Sales CRM</p>
-        </div>
+    <>
+      <div className="sticky top-16 z-40 border-b border-[var(--workspace-border)] bg-white px-4 py-3 lg:hidden">
+        <details>
+          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between rounded-lg border border-[var(--workspace-border)] bg-[var(--workspace-surface-muted)] px-3 text-sm font-semibold">
+            Workspace navigation
+            <span aria-hidden="true" className="text-lg leading-none">+</span>
+          </summary>
+          <div className="pt-2">
+            <WorkspaceNav mobile />
+          </div>
+        </details>
       </div>
 
-      <div className="mt-4 flex gap-6 overflow-x-auto pb-1 lg:mt-0 lg:block lg:space-y-5 lg:overflow-visible lg:pb-0">
-        {visibleSections.map((section) => (
-          <div key={section.label} className="min-w-max lg:min-w-0">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-[#7a93a2]">{section.label}</p>
-            <nav className="flex gap-1 lg:block lg:space-y-1">
-              {section.items.map((item) => {
-                const active = isActive(pathname, item.href);
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={[
-                      "block min-h-11 whitespace-nowrap rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
-                      active ? "bg-[#eef9fb] text-[#0d6f7a]" : "text-[#4a6575] hover:bg-[#f4fbfd] hover:text-[#173543]",
-                    ].join(" ")}
-                  >
-                    {item.label}
-                  </Link>
-                );
-              })}
-            </nav>
-          </div>
-        ))}
-      </div>
-    </aside>
+      <aside className="hidden w-64 flex-none border-r border-black bg-[var(--workspace-sidebar)] px-4 py-6 lg:flex lg:flex-col">
+        <Link
+          href="/workspace/sales"
+          className="mb-7 flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-3 transition hover:bg-white/10"
+        >
+          <Image
+            src="/brand/nameless/nameless-monogram-white-on-black.png"
+            alt=""
+            width={48}
+            height={48}
+            className="h-11 w-11 rounded-lg object-cover"
+          />
+          <span>
+            <span className="block text-sm font-semibold text-white">Nameless Genetics</span>
+            <span className="mt-0.5 block text-xs text-[var(--workspace-sidebar-muted)]">Retail Sales CRM</span>
+          </span>
+        </Link>
+
+        <WorkspaceNav />
+
+        <div className="mt-auto border-t border-white/10 pt-4">
+          <Link
+            href="/workspace/customers/import"
+            className="flex min-h-11 items-center rounded-lg px-3 text-sm font-medium text-[var(--workspace-sidebar-muted)] transition hover:bg-white/10 hover:text-white"
+          >
+            Account import
+          </Link>
+        </div>
+      </aside>
+    </>
   );
 }
