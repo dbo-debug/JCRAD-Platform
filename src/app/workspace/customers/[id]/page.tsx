@@ -5,7 +5,9 @@ import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import CustomerDetailManager from "@/components/workspace/CustomerDetailManager";
 import LocalDateTime from "@/components/workspace/LocalDateTime";
 import CustomerTaskCompleteButton from "@/components/workspace/CustomerTaskCompleteButton";
+import RetailSalesPanel from "@/components/workspace/RetailSalesPanel";
 import { loadCustomerWorkspaceDetail } from "@/lib/customerWorkspace";
+import { loadRetailSalesAccountData } from "@/lib/retailSalesWorkspace";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatTerritoryOptionLabel, loadTerritories } from "@/lib/territories";
 import { requireStaff } from "@/lib/requireStaff";
@@ -89,6 +91,8 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
   const { id } = await params;
   const detail = await loadCustomerWorkspaceDetail(id);
   if (!detail) notFound();
+  const retailSalesData = await loadRetailSalesAccountData(id);
+  if (!retailSalesData) notFound();
 
   const supabase = createAdminClient();
   const [salesProfilesRes, authUsersRes, territories] = await Promise.all([
@@ -225,6 +229,18 @@ export default async function WorkspaceCustomerDetailPage({ params }: { params: 
         primaryContact={primaryContact}
         contacts={detail.contacts}
         website={detail.customer.website}
+      />
+
+      <RetailSalesPanel
+        customerId={detail.customer.id}
+        contacts={detail.contacts.map((contact) => ({
+          id: contact.id,
+          name: contact.name,
+          email: contact.email,
+          title: contact.title,
+        }))}
+        data={retailSalesData}
+        canVerifyOwnership={staff.role === "admin"}
       />
 
       <section className="grid gap-3 2xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.9fr)]">

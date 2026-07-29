@@ -3,6 +3,7 @@ import { buildPlannedRoute } from "@/lib/routePlanning";
 import { getStaffContext } from "@/lib/getStaffContext";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isRouteEligibleCustomer } from "@/lib/routeEligibility";
+import { NAMELESS_WORKSPACE_KEY } from "@/lib/namelessWorkspace";
 
 function asText(value: unknown): string | null {
   const text = String(value || "").trim();
@@ -67,7 +68,7 @@ export async function POST(req: Request) {
   const supabase = createAdminClient();
   const { data: customerRows, error: customerError } = await supabase
     .from("customers")
-    .select("id, address_1, city, state, postal_code, latitude, longitude, geocode_status")
+    .select("id, workspace_key, address_1, city, state, postal_code, latitude, longitude, geocode_status")
     .in("id", customerIds);
 
   if (customerError) {
@@ -77,6 +78,8 @@ export async function POST(req: Request) {
   const eligibleCustomerIds = new Set(
     ((customerRows || []) as Array<Record<string, unknown>>)
       .filter((row) => {
+        const workspaceKey = String(row.workspace_key || "").trim().toLowerCase();
+        if (workspaceKey && workspaceKey !== NAMELESS_WORKSPACE_KEY) return false;
         return isRouteEligibleCustomer({
           address1: asText(row.address_1),
           city: asText(row.city),

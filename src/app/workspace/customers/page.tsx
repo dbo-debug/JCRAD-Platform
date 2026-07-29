@@ -27,8 +27,8 @@ export default async function WorkspaceCustomersPage({
   return (
     <div className="mx-auto w-full max-w-[1520px] space-y-6">
       <AdminPageHeader
-        title="Customers"
-        description="Workflow-first customer workspace for daily follow-up, segmentation, and route prep. Google Sheets imports feed this system, but CRM records are now the source of truth."
+        title="Nameless Retail Accounts"
+        description="Dedicated California retail prospecting, buyer follow-up, samples, opportunities, routes, orders, and commission tracking for Nameless Genetics only."
         action={<HeaderActions isAdmin={staff.role === "admin"} />}
       />
 
@@ -94,6 +94,12 @@ function ModeCard({ label, title, detail, href }: { label: string; title: string
 function HeaderActions({ isAdmin }: { isAdmin: boolean }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
+      <Link
+        href="/workspace/customers/new"
+        className="inline-flex min-h-11 items-center rounded-full bg-[#173543] px-5 py-2 text-sm font-semibold text-white transition hover:bg-[#0d6f7a]"
+      >
+        Add Retail Shop
+      </Link>
       {isAdmin ? <CustomerGeocodeBatchButton /> : null}
       <Link
         href="/workspace/customers/import"

@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSheetValues } from "@/lib/googleSheets";
+import { NAMELESS_WORKSPACE_KEY } from "@/lib/namelessWorkspace";
 
 type GenericRow = Record<string, unknown>;
 
@@ -338,6 +339,8 @@ async function loadCustomerState() {
 
   const customerById = new Map<string, CustomerSnapshot>();
   for (const row of (customersRes.data || []) as GenericRow[]) {
+    const workspaceKey = String(row.workspace_key || "").trim().toLowerCase();
+    if (workspaceKey && workspaceKey !== NAMELESS_WORKSPACE_KEY) continue;
     const id = String(row.id || "");
     customerById.set(id, {
       id,
@@ -424,6 +427,7 @@ function resolveCustomerMatch(parsed: ParsedRow, indexes: ReturnType<typeof buil
 
 function buildCustomerPatch(parsed: ParsedRow, assignmentUserId: string | null) {
   return {
+    workspace_key: NAMELESS_WORKSPACE_KEY,
     company_name: parsed.storeName,
     address_1: parsed.address1,
     city: parsed.city,

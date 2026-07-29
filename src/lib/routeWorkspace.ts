@@ -58,6 +58,19 @@ export type SavedRouteStop = {
   locked: boolean;
   stopStatus: string;
   notes: string | null;
+  salesOutcome: {
+    fieldStatus: "planned" | "visited" | "skipped" | "closed" | "rescheduled";
+    buyerPresent: boolean;
+    buyerReached: boolean;
+    meetingScheduled: boolean;
+    samplesDelivered: boolean;
+    salesMaterialsDelivered: boolean;
+    followUpCreated: boolean;
+    opportunityAdvanced: boolean;
+    orderGenerated: boolean;
+    visitNotes: string | null;
+    rescheduledFor: string | null;
+  } | null;
   customer: CustomerSummary;
 };
 
@@ -226,7 +239,7 @@ export async function loadSavedRouteDetail(routeId: string, staff?: StaffContext
   if (!id) return null;
 
   const supabase = createAdminClient();
-  const [routeRes, stopsRes, routeRepOptions, customerIndex] = await Promise.all([
+  const [routeRes, stopsRes, outcomesRes, routeRepOptions, customerIndex] = await Promise.all([
     supabase
       .from("routes")
       .select(
@@ -241,12 +254,18 @@ export async function loadSavedRouteDetail(routeId: string, staff?: StaffContext
       )
       .eq("route_id", id)
       .order("stop_order", { ascending: true }),
+    supabase
+      .from("route_stop_sales_outcomes")
+      .select(
+        "route_stop_id, field_status, buyer_present, buyer_reached, meeting_scheduled, samples_delivered, sales_materials_delivered, follow_up_created, opportunity_advanced, order_generated, visit_notes, rescheduled_for"
+      ),
     loadRouteRepOptions(),
     loadCustomerWorkspaceIndex(),
   ]);
 
   if (routeRes.error) throw new Error(routeRes.error.message);
   if (stopsRes.error) throw new Error(stopsRes.error.message);
+  if (outcomesRes.error) throw new Error(outcomesRes.error.message);
 
   const routeRow = routeRes.data as Record<string, unknown> | null;
   if (!routeRow) return null;
@@ -263,6 +282,30 @@ export async function loadSavedRouteDetail(routeId: string, staff?: StaffContext
 
   const routeRepLabelMap = new Map(routeRepOptions.map((option) => [option.userId, option.label]));
   const customerById = new Map(customerIndex.customers.map((customer) => [customer.id, customer]));
+  const outcomeByStopId = new Map(
+    ((outcomesRes.data || []) as Array<Record<string, unknown>>)
+      .map((row) => {
+        const routeStopId = asText(row.route_stop_id);
+        if (!routeStopId) return null;
+        return [
+          routeStopId,
+          {
+            fieldStatus: (asText(row.field_status) || "planned") as NonNullable<SavedRouteStop["salesOutcome"]>["fieldStatus"],
+            buyerPresent: row.buyer_present === true,
+            buyerReached: row.buyer_reached === true,
+            meetingScheduled: row.meeting_scheduled === true,
+            samplesDelivered: row.samples_delivered === true,
+            salesMaterialsDelivered: row.sales_materials_delivered === true,
+            followUpCreated: row.follow_up_created === true,
+            opportunityAdvanced: row.opportunity_advanced === true,
+            orderGenerated: row.order_generated === true,
+            visitNotes: asText(row.visit_notes),
+            rescheduledFor: asText(row.rescheduled_for),
+          },
+        ] as const;
+      })
+      .filter((row): row is NonNullable<typeof row> => Boolean(row))
+  );
 
   const stops = ((stopsRes.data || []) as Array<Record<string, unknown>>)
     .map((row) => {
@@ -286,6 +329,7 @@ export async function loadSavedRouteDetail(routeId: string, staff?: StaffContext
         locked: row.locked === true,
         stopStatus: asText(row.stop_status) || "planned",
         notes: asText(row.notes),
+        salesOutcome: outcomeByStopId.get(stopId) || null,
         customer,
       } satisfies SavedRouteStop;
     })

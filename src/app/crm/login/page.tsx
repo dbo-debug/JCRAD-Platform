@@ -33,7 +33,7 @@ export default async function CrmLoginPage({
           </div>
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0d6f7a]">Private Access</p>
-            <p className="mt-1 font-semibold text-[#173543]">JC RAD Route CRM</p>
+            <p className="mt-1 font-semibold text-[#173543]">Nameless Genetics Retail Sales</p>
           </div>
         </div>
 

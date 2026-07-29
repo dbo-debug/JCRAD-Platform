@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { normalizeCustomerApprovalStatus } from "@/lib/customerApproval";
+import { NAMELESS_WORKSPACE_KEY } from "@/lib/namelessWorkspace";
 
 type GenericRow = Record<string, unknown>;
 type AuthUser = { id: string; email: string | null };
@@ -9,6 +10,20 @@ const WORKSPACE_BATCH_SIZE = 500;
 export type CustomerSummary = {
   id: string;
   name: string;
+  workspaceKey: string | null;
+  legalBusinessName: string | null;
+  dbaName: string | null;
+  licenseNumber: string | null;
+  licenseType: string | null;
+  licenseStatus: string | null;
+  instagram: string | null;
+  distributor: string | null;
+  numberOfLocations: number;
+  currentBrandsCarried: string[];
+  leadSource: string | null;
+  ownershipStatus: string;
+  commissionEligible: boolean;
+  commissionRate: number;
   approvalStatus: string;
   archivedAt: string | null;
   status: string;
@@ -174,7 +189,11 @@ type WorkspaceSummaryBuildArgs = {
 
 function isCustomerWorkspaceRecord(customer: GenericRow) {
   const recordKind = normalizeText(customer.record_kind);
-  return !recordKind || recordKind === "customer";
+  const workspaceKey = normalizeText(customer.workspace_key);
+  return (
+    (!recordKind || recordKind === "customer") &&
+    (!workspaceKey || workspaceKey === NAMELESS_WORKSPACE_KEY)
+  );
 }
 
 function isArchivedCustomerRecord(customer: GenericRow) {
@@ -858,6 +877,22 @@ function buildCustomerSummary({
   return {
     id: customerId,
     name: getCustomerName(customer),
+    workspaceKey: firstText(customer.workspace_key),
+    legalBusinessName: firstText(customer.legal_business_name),
+    dbaName: firstText(customer.dba_name),
+    licenseNumber: firstText(customer.license_number),
+    licenseType: firstText(customer.license_type),
+    licenseStatus: firstText(customer.license_status),
+    instagram: firstText(customer.instagram),
+    distributor: firstText(customer.distributor),
+    numberOfLocations: Math.max(1, firstNumber(customer.number_of_locations) || 1),
+    currentBrandsCarried: Array.isArray(customer.current_brands_carried)
+      ? customer.current_brands_carried.map((value) => String(value || "").trim()).filter(Boolean)
+      : [],
+    leadSource: firstText(customer.lead_source, customer.source),
+    ownershipStatus: firstText(customer.ownership_status) || "unverified",
+    commissionEligible: customer.commission_eligible === true,
+    commissionRate: firstNumber(customer.commission_rate) ?? 0.05,
     approvalStatus: getCustomerApprovalStatus(customer),
     archivedAt: firstText(customer.archived_at),
     status: getCustomerStatus(customer),

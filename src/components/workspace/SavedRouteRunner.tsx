@@ -122,18 +122,14 @@ function stageSectionLabel(stage: "next" | "upcoming" | "completed" | "skipped")
   return "Skipped Stops";
 }
 
-function buildEstimateMenuHref(args: {
-  customerId: string;
-  routeId: string;
-  stopId?: string | null;
-}) {
-  const params = new URLSearchParams({
-    from: "route_runner",
-    customerId: args.customerId,
-    routeId: args.routeId,
-  });
-  if (args.stopId) params.set("stopId", args.stopId);
-  return `/menu?${params.toString()}`;
+function buildMapsHref(customer: SavedRouteStop["customer"]) {
+  const address = [customer.address1, customer.city, customer.state, customer.postalCode].filter(Boolean).join(", ");
+  const query =
+    address ||
+    (customer.latitude !== null && customer.longitude !== null
+      ? `${customer.latitude},${customer.longitude}`
+      : "");
+  return query ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}` : null;
 }
 
 export default function SavedRouteRunner({ route }: SavedRouteRunnerProps) {
@@ -155,6 +151,14 @@ export default function SavedRouteRunner({ route }: SavedRouteRunnerProps) {
   const upcomingStops = route.stops.filter((stop) => getStopStage(stop, nextPendingStopId) === "upcoming");
   const completedStops = route.stops.filter((stop) => getStopStage(stop, nextPendingStopId) === "completed");
   const skippedStops = route.stops.filter((stop) => getStopStage(stop, nextPendingStopId) === "skipped");
+  const routeMetrics = {
+    buyersReached: route.stops.filter((stop) => stop.salesOutcome?.buyerReached).length,
+    meetingsScheduled: route.stops.filter((stop) => stop.salesOutcome?.meetingScheduled).length,
+    samplesDelivered: route.stops.filter((stop) => stop.salesOutcome?.samplesDelivered).length,
+    followUpsCreated: route.stops.filter((stop) => stop.salesOutcome?.followUpCreated).length,
+    opportunitiesAdvanced: route.stops.filter((stop) => stop.salesOutcome?.opportunityAdvanced).length,
+    ordersGenerated: route.stops.filter((stop) => stop.salesOutcome?.orderGenerated).length,
+  };
 
   async function updateRouteStatus(nextStatus: "in_progress" | "completed") {
     setRouteBusy(nextStatus === "in_progress" ? "start" : "complete");
@@ -201,14 +205,10 @@ export default function SavedRouteRunner({ route }: SavedRouteRunnerProps) {
             <div className="mt-3 flex flex-wrap gap-2">
               {nextStop ? (
                 <Link
-                  href={buildEstimateMenuHref({
-                    customerId: nextStop.customer.id,
-                    routeId: route.id,
-                    stopId: nextStop.id,
-                  })}
+                  href={`/workspace/customers/${nextStop.customer.id}`}
                   className="rounded-full bg-[#173543] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#0f2a35]"
                 >
-                  Build Estimate
+                  Open Next Account
                 </Link>
               ) : null}
               {routeStatus !== "in_progress" && routeStatus !== "completed" ? (
@@ -251,6 +251,17 @@ export default function SavedRouteRunner({ route }: SavedRouteRunnerProps) {
         </div>
       </section>
 
+      <section aria-label="Route summary" className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-8">
+        <ProgressCard label="Planned" value={String(route.stops.length)} detail="Route stops" />
+        <ProgressCard label="Completed" value={String(progress.visitedCount)} detail="Visited" tone="ok" />
+        <ProgressCard label="Buyers reached" value={String(routeMetrics.buyersReached)} detail="Confirmed contacts" />
+        <ProgressCard label="Meetings" value={String(routeMetrics.meetingsScheduled)} detail="Scheduled" />
+        <ProgressCard label="Samples" value={String(routeMetrics.samplesDelivered)} detail="Delivered" />
+        <ProgressCard label="Follow-ups" value={String(routeMetrics.followUpsCreated)} detail="Created" />
+        <ProgressCard label="Advanced" value={String(routeMetrics.opportunitiesAdvanced)} detail="Opportunities" />
+        <ProgressCard label="Orders" value={String(routeMetrics.ordersGenerated)} detail="Generated" />
+      </section>
+
       <section className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.7fr)]">
         <div className="rounded-[28px] border border-[#cfe5e8] bg-[linear-gradient(180deg,#173543_0%,#1d4658_100%)] p-5 text-white shadow-[0_16px_40px_rgba(16,42,67,0.16)]">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#9fd9d2]">What To Work Next</p>
@@ -269,14 +280,10 @@ export default function SavedRouteRunner({ route }: SavedRouteRunnerProps) {
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <Link
-                  href={buildEstimateMenuHref({
-                    customerId: nextStop.customer.id,
-                    routeId: route.id,
-                    stopId: nextStop.id,
-                  })}
+                  href={`/workspace/customers/${nextStop.customer.id}#nameless-sales-workspace`}
                   className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-[#173543] transition hover:bg-[#eef7f6]"
                 >
-                  Build Estimate
+                  Sales Actions
                 </Link>
                 <span className="rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#eefbfc]">
                   {nextStop.customer.visitStatus ? titleCase(nextStop.customer.visitStatus) : "No visit status"}
@@ -356,7 +363,7 @@ export default function SavedRouteRunner({ route }: SavedRouteRunnerProps) {
 
 function SavedRouteStopCard({ stop, stage }: { stop: SavedRouteStop; stage: "next" | "upcoming" | "completed" | "skipped" }) {
   const router = useRouter();
-  const [busyAction, setBusyAction] = useState<"visit" | "log" | "task" | "outcome" | null>(null);
+  const [busyAction, setBusyAction] = useState<"visit" | "log" | "task" | "outcome" | "field" | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [visitStatus, setVisitStatus] = useState(stop.customer.visitStatus || "visited");
@@ -365,11 +372,24 @@ function SavedRouteStopCard({ stop, stage }: { stop: SavedRouteStop; stage: "nex
   const [taskTitle, setTaskTitle] = useState("");
   const [taskDueDate, setTaskDueDate] = useState("");
   const [autoCreateTask, setAutoCreateTask] = useState(false);
+  const [fieldStatus, setFieldStatus] = useState<"planned" | "visited" | "skipped" | "closed" | "rescheduled">(
+    stop.salesOutcome?.fieldStatus || (stop.stopStatus === "visited" ? "visited" : stop.stopStatus === "skipped" ? "skipped" : "planned")
+  );
+  const [buyerPresent, setBuyerPresent] = useState(stop.salesOutcome?.buyerPresent || false);
+  const [buyerReached, setBuyerReached] = useState(stop.salesOutcome?.buyerReached || false);
+  const [meetingScheduled, setMeetingScheduled] = useState(stop.salesOutcome?.meetingScheduled || false);
+  const [samplesDelivered, setSamplesDelivered] = useState(stop.salesOutcome?.samplesDelivered || false);
+  const [salesMaterialsDelivered, setSalesMaterialsDelivered] = useState(stop.salesOutcome?.salesMaterialsDelivered || false);
+  const [followUpCreated, setFollowUpCreated] = useState(stop.salesOutcome?.followUpCreated || false);
+  const [opportunityAdvanced, setOpportunityAdvanced] = useState(stop.salesOutcome?.opportunityAdvanced || false);
+  const [orderGenerated, setOrderGenerated] = useState(stop.salesOutcome?.orderGenerated || false);
+  const [rescheduledFor, setRescheduledFor] = useState(stop.salesOutcome?.rescheduledFor || "");
 
   const customer = stop.customer;
   const primaryContact = customer.primaryContacts[0] || null;
   const emailHref = normalizeMailtoHref(primaryContact?.email || customer.primaryContactEmail);
   const phoneHref = normalizeTelHref(primaryContact?.phone || customer.mainPhone);
+  const mapsHref = buildMapsHref(customer);
   const actualVisitMs = toMs(customer.lastVisitAt);
   const plannedArrivalMs = toMs(stop.plannedArrivalTime);
   const stopDeltaMinutes = actualVisitMs !== null && plannedArrivalMs !== null ? Math.round((actualVisitMs - plannedArrivalMs) / 60000) : null;
@@ -381,13 +401,26 @@ function SavedRouteStopCard({ stop, stage }: { stop: SavedRouteStop; stage: "nex
       ? "rounded-[24px] border border-[#d9e7ee] bg-white p-4 shadow-[0_14px_40px_rgba(16,42,67,0.05)] lg:p-5"
       : "rounded-[24px] border border-[#e2ebf0] bg-[#fffafd] p-4 shadow-[0_10px_28px_rgba(16,42,67,0.04)] lg:p-5";
 
-  async function updateRouteStop(stopStatus: "visited" | "skipped" | "ready") {
+  async function updateRouteStop(
+    stopStatus: "visited" | "skipped" | "ready",
+    outcomeOverrides: { followUpCreated?: boolean } = {}
+  ) {
     const res = await fetch(`/api/workspace/routes/stops/${stop.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         stop_status: stopStatus,
+        field_status: fieldStatus,
         notes: visitNotes || null,
+        buyer_present: buyerPresent,
+        buyer_reached: buyerReached,
+        meeting_scheduled: meetingScheduled,
+        samples_delivered: samplesDelivered,
+        sales_materials_delivered: salesMaterialsDelivered,
+        follow_up_created: outcomeOverrides.followUpCreated ?? followUpCreated,
+        opportunity_advanced: opportunityAdvanced,
+        order_generated: orderGenerated,
+        rescheduled_for: fieldStatus === "rescheduled" ? rescheduledFor || null : null,
       }),
     });
     const json = await parseJsonSafe(res);
@@ -488,6 +521,11 @@ function SavedRouteStopCard({ stop, stage }: { stop: SavedRouteStop; stage: "nex
       );
       if (autoCreateTask) {
         await submitTask({ title: taskTitle || defaultTaskTitle, dueDate: outcomeDueDate || (outcome.nextVisitDays !== null ? addDaysDateValue(outcome.nextVisitDays) : null) });
+        setFollowUpCreated(true);
+        await updateRouteStop(
+          outcome.key === "no_answer" || outcome.key === "unavailable" ? "ready" : "visited",
+          { followUpCreated: true }
+        );
         setStatusMessage(`${outcome.label} recorded and follow-up task created.`);
       }
       setVisitStatus(outcome.visitStatus);
@@ -510,6 +548,10 @@ function SavedRouteStopCard({ stop, stage }: { stop: SavedRouteStop; stage: "nex
 
     try {
       await submitTask();
+      setFollowUpCreated(true);
+      await updateRouteStop(stop.stopStatus === "visited" ? "visited" : stop.stopStatus === "skipped" ? "skipped" : "ready", {
+        followUpCreated: true,
+      });
       setStatusMessage("Follow-up task created.");
       router.refresh();
     } catch (err) {
@@ -527,6 +569,22 @@ function SavedRouteStopCard({ stop, stage }: { stop: SavedRouteStop; stage: "nex
     try {
       await updateRouteStop("skipped");
       setStatusMessage("Stop marked skipped.");
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function saveFieldOutcome() {
+    setBusyAction("field");
+    setError(null);
+    setStatusMessage(null);
+    try {
+      const mappedStatus = fieldStatus === "visited" ? "visited" : fieldStatus === "planned" ? "ready" : "skipped";
+      await updateRouteStop(mappedStatus);
+      setStatusMessage("Field outcome saved.");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
@@ -586,18 +644,19 @@ function SavedRouteStopCard({ stop, stage }: { stop: SavedRouteStop; stage: "nex
         </div>
 
         <div className="flex flex-wrap gap-2 lg:w-[240px] lg:flex-none lg:justify-end">
-          <Link
-            href={buildEstimateMenuHref({
-              customerId: customer.id,
-              routeId: stop.routeId,
-              stopId: stop.id,
-            })}
-            className="rounded-full bg-[#173543] px-3 py-1.5 text-sm font-medium text-white transition hover:bg-[#0f2a35]"
-          >
-            Build Estimate
-          </Link>
+          {mapsHref ? (
+            <a href={mapsHref} target="_blank" rel="noreferrer" className="rounded-full bg-[#173543] px-3 py-1.5 text-sm font-medium text-white transition hover:bg-[#0f2a35]">
+              Open directions
+            </a>
+          ) : null}
           <Link href={`/workspace/customers/${customer.id}`} className="rounded-full border border-[#decfe8] bg-white px-3 py-1.5 text-sm font-medium text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543]">
             Open account
+          </Link>
+          <Link href={`/workspace/customers/${customer.id}#nameless-activity`} className="rounded-full border border-[#bfe8df] bg-[#effcf8] px-3 py-1.5 text-sm font-medium text-[#0d6f7a] transition hover:border-[#0d6f7a]">
+            Schedule meeting
+          </Link>
+          <Link href={`/workspace/customers/${customer.id}#nameless-samples`} className="rounded-full border border-[#bfe8df] bg-[#effcf8] px-3 py-1.5 text-sm font-medium text-[#0d6f7a] transition hover:border-[#0d6f7a]">
+            Record sample
           </Link>
           {phoneHref ? (
             <a href={phoneHref} className="rounded-full border border-[#decfe8] bg-white px-3 py-1.5 text-sm font-medium text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543]">
@@ -668,7 +727,33 @@ function SavedRouteStopCard({ stop, stage }: { stop: SavedRouteStop; stage: "nex
               className="rounded-2xl border border-[#cedde6] bg-white px-4 py-3 text-sm text-[#173543] outline-none transition focus:border-[#8f52dc]"
             />
           </label>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <label className="grid gap-1 text-sm text-[#4b6676]">
+              <span>Field stop status</span>
+              <select value={fieldStatus} onChange={(event) => setFieldStatus(event.target.value as typeof fieldStatus)} className="min-h-12 rounded-2xl border border-[#cedde6] bg-white px-4 py-3 text-sm text-[#173543]">
+                <option value="planned">Planned</option>
+                <option value="visited">Visited</option>
+                <option value="skipped">Skipped</option>
+                <option value="closed">Store closed</option>
+                <option value="rescheduled">Rescheduled</option>
+              </select>
+            </label>
+            {fieldStatus === "rescheduled" ? <label className="grid gap-1 text-sm text-[#4b6676]"><span>Rescheduled for</span><input type="date" value={rescheduledFor} onChange={(event) => setRescheduledFor(event.target.value)} className="min-h-12 rounded-2xl border border-[#cedde6] bg-white px-4 py-3 text-sm text-[#173543]" /></label> : null}
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <OutcomeCheck label="Buyer present" checked={buyerPresent} onChange={setBuyerPresent} />
+            <OutcomeCheck label="Buyer reached" checked={buyerReached} onChange={setBuyerReached} />
+            <OutcomeCheck label="Meeting scheduled" checked={meetingScheduled} onChange={setMeetingScheduled} />
+            <OutcomeCheck label="Samples delivered" checked={samplesDelivered} onChange={setSamplesDelivered} />
+            <OutcomeCheck label="Sales materials delivered" checked={salesMaterialsDelivered} onChange={setSalesMaterialsDelivered} />
+            <OutcomeCheck label="Follow-up created" checked={followUpCreated} onChange={setFollowUpCreated} />
+            <OutcomeCheck label="Opportunity advanced" checked={opportunityAdvanced} onChange={setOpportunityAdvanced} />
+            <OutcomeCheck label="Order generated" checked={orderGenerated} onChange={setOrderGenerated} />
+          </div>
           <div className="mt-3 flex flex-wrap gap-2">
+            <button type="button" onClick={() => void saveFieldOutcome()} disabled={busyAction !== null} className="min-h-11 rounded-full bg-[#0d6f7a] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+              {busyAction === "field" ? "Saving..." : "Save Field Outcome"}
+            </button>
             <button type="button" onClick={() => void runAction("visit", `Completed visit at ${customer.name}`)} disabled={busyAction !== null} className="rounded-full bg-[#173543] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
               {busyAction === "visit" ? "Saving..." : "Mark Visited"}
             </button>
@@ -775,5 +860,14 @@ function MetricLine({ label, value }: { label: string; value: string }) {
       <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7d95a3]">{label}</span>
       <span className="text-base font-semibold text-[#173543]">{value}</span>
     </div>
+  );
+}
+
+function OutcomeCheck({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
+  return (
+    <label className="flex min-h-12 items-center gap-2 rounded-xl border border-[#d8e6ed] bg-white px-3 text-sm text-[#355160]">
+      <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="h-5 w-5" />
+      <span>{label}</span>
+    </label>
   );
 }

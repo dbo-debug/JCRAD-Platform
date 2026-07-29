@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { NAMELESS_WORKSPACE_KEY } from "@/lib/namelessWorkspace";
 
 type GenericRow = Record<string, unknown>;
 
@@ -245,7 +246,7 @@ export async function loadEmailWorkspaceData(args: {
 
   const [campaignsRes, customersRes, contactsRes] = await Promise.all([
     campaignQuery,
-    admin.from("customers").select("id, company_name, primary_contact_email, primary_contact_name, archived_at").order("company_name", { ascending: true }).limit(5000),
+    admin.from("customers").select("id, workspace_key, company_name, primary_contact_email, primary_contact_name, archived_at").order("company_name", { ascending: true }).limit(5000),
     admin.from("customer_contacts").select("id, customer_id, name, email, is_primary").order("name", { ascending: true }).limit(5000),
   ]);
 
@@ -253,6 +254,14 @@ export async function loadEmailWorkspaceData(args: {
   if (customersRes.error) throw new Error(customersRes.error.message);
   if (contactsRes.error) throw new Error(contactsRes.error.message);
 
+  const allowedCustomers = ((customersRes.data || []) as GenericRow[]).filter((customer) => {
+    const workspaceKey = String(customer.workspace_key || "").trim().toLowerCase();
+    return !workspaceKey || workspaceKey === NAMELESS_WORKSPACE_KEY;
+  });
+  const allowedCustomerIds = new Set(allowedCustomers.map((customer) => String(customer.id || "")).filter(Boolean));
+  const allowedContacts = ((contactsRes.data || []) as GenericRow[]).filter((contact) =>
+    allowedCustomerIds.has(String(contact.customer_id || ""))
+  );
   const campaignRows = (campaignsRes.data || []) as GenericRow[];
   const visibleCampaignIds = campaignRows.map((row) => String(row.id || "")).filter(Boolean);
 
@@ -288,8 +297,8 @@ export async function loadEmailWorkspaceData(args: {
         )
       : null,
     recipientOptions: buildRecipientOptions(
-      (customersRes.data || []) as GenericRow[],
-      (contactsRes.data || []) as GenericRow[]
+      allowedCustomers,
+      allowedContacts
     ),
   };
 }

@@ -10,11 +10,31 @@ export async function middleware(request: NextRequest) {
     pathname === "/dashboard" ||
     pathname.startsWith("/api/estimate/") ||
     pathname.startsWith("/api/workspace/estimates/") ||
+    pathname.startsWith("/api/admin/estimate-lines/") ||
+    pathname === "/api/settings/yields" ||
     pathname === "/api/production/finalize-line";
+  const isDisabledCatalogPath =
+    pathname === "/menu" ||
+    pathname.startsWith("/menu/") ||
+    pathname.startsWith("/api/admin/catalog-items") ||
+    pathname.startsWith("/api/admin/offers") ||
+    pathname.startsWith("/api/admin/packaging") ||
+    pathname.startsWith("/api/admin/product") ||
+    pathname === "/api/admin/settings/estimator" ||
+    pathname === "/api/admin/settings/pricing" ||
+    pathname === "/api/admin/settings/yields" ||
+    pathname.startsWith("/api/admin/upload-variant-media") ||
+    pathname.startsWith("/api/admin/variant-media") ||
+    pathname.startsWith("/api/variant-media") ||
+    pathname.startsWith("/api/packaging") ||
+    pathname.startsWith("/api/order/");
 
-  if (isEstimatorPath) {
+  if (isEstimatorPath || isDisabledCatalogPath) {
     if (pathname.startsWith("/api/")) {
-      return NextResponse.json({ error: "Estimator is temporarily disabled." }, { status: 410 });
+      return NextResponse.json(
+        { error: isEstimatorPath ? "Estimator is temporarily disabled." : "Catalog functionality is temporarily disabled." },
+        { status: 410 }
+      );
     }
     const homeUrl = request.nextUrl.clone();
     homeUrl.pathname = "/";

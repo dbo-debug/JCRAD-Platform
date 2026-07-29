@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getStaffContext } from "@/lib/getStaffContext";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { filterNamelessCustomerIds } from "@/lib/namelessCustomerAccess";
 
 function asIdArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
@@ -18,6 +19,10 @@ export async function POST(req: Request) {
   }
 
   const archived = body.archived === true;
+  const allowedCustomerIds = await filterNamelessCustomerIds(customerIds);
+  if (allowedCustomerIds.size !== customerIds.length) {
+    return NextResponse.json({ error: "One or more accounts are outside the Nameless workspace." }, { status: 400 });
+  }
   const timestamp = new Date().toISOString();
   const supabase = createAdminClient();
   const { data, error } = await supabase

@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStaffContext } from "@/lib/getStaffContext";
+import { isNamelessCustomer } from "@/lib/namelessCustomerAccess";
 
 export async function POST(req: Request, context: { params: Promise<{ id: string }> }) {
   const staff = await getStaffContext();
   if (!staff) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { id } = await context.params;
+  if (!(await isNamelessCustomer(id))) return NextResponse.json({ error: "Customer not found" }, { status: 404 });
   const body = await req.json().catch(() => ({}));
   const note = String(body.note || "").trim();
   if (!note) return NextResponse.json({ error: "note required" }, { status: 400 });
