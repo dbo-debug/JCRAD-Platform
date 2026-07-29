@@ -15,7 +15,7 @@ as $$
     select 1
     from public.profiles
     where profiles.id = auth.uid()
-      and lower(profiles.role) in ('admin', 'sales')
+      and pg_catalog.lower(pg_catalog.btrim(profiles.role)) in ('admin', 'sales')
   );
 $$;
 
@@ -30,7 +30,7 @@ as $$
     select 1
     from public.profiles
     where profiles.id = auth.uid()
-      and lower(profiles.role) = 'admin'
+      and pg_catalog.lower(pg_catalog.btrim(profiles.role)) = 'admin'
   );
 $$;
 
@@ -250,8 +250,9 @@ create policy "CRM staff and owners select estimates 20260728"
   using (
     public.is_crm_staff_rls_20260728()
     or (
-      coalesce(auth.jwt() ->> 'email', '') <> ''
-      and lower(coalesce(customer_email, '')) = lower(auth.jwt() ->> 'email')
+      pg_catalog.btrim(coalesce(auth.jwt() ->> 'email', '')) <> ''
+      and pg_catalog.lower(pg_catalog.btrim(coalesce(customer_email, '')))
+        = pg_catalog.lower(pg_catalog.btrim(coalesce(auth.jwt() ->> 'email', '')))
     )
   );
 
@@ -266,8 +267,9 @@ create policy "CRM staff and owners select packaging submissions 20260728"
   using (
     public.is_crm_staff_rls_20260728()
     or (
-      coalesce(auth.jwt() ->> 'email', '') <> ''
-      and lower(coalesce(customer_email, '')) = lower(auth.jwt() ->> 'email')
+      pg_catalog.btrim(coalesce(auth.jwt() ->> 'email', '')) <> ''
+      and pg_catalog.lower(pg_catalog.btrim(coalesce(customer_email, '')))
+        = pg_catalog.lower(pg_catalog.btrim(coalesce(auth.jwt() ->> 'email', '')))
     )
   );
 
