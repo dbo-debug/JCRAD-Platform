@@ -16,7 +16,7 @@ export default async function WorkspaceCustomersPage({
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const [staff, { customers, metrics }, { territoryOptions, routeRepOptions }, params] = await Promise.all([
+  const [staff, { customers }, { territoryOptions, routeRepOptions }, params] = await Promise.all([
     requireStaff(),
     loadCustomerWorkspaceIndex({ includeArchived: true }),
     loadRouteReferenceData(),
@@ -27,31 +27,10 @@ export default async function WorkspaceCustomersPage({
   return (
     <div className="mx-auto w-full max-w-[1520px] space-y-6">
       <AdminPageHeader
-        title="Customers"
-        description="Workflow-first customer workspace for daily follow-up, segmentation, and route prep. Google Sheets imports feed this system, but CRM records are now the source of truth."
+        title="Retail Accounts"
+        description="Work buyer follow-up, pipeline movement, territory coverage, and route preparation from one account workspace."
         action={<HeaderActions isAdmin={staff.role === "admin"} />}
       />
-
-      <section className="grid gap-4 lg:grid-cols-3">
-        <ModeCard
-          label="Work Queue"
-          title="Follow-up and movement"
-          detail={`${metrics.totalCustomers} total accounts • ${pendingStops.length} pending stops in play`}
-          href="/workspace/customers?taskState=overdue_task&sort=activity_desc"
-        />
-        <ModeCard
-          label="Segment Builder"
-          title="Target and organize"
-          detail={`${metrics.totalContacts} contacts • ${metrics.customersWithContacts} accounts with contact coverage`}
-          href="/workspace/customers?savedView=pipeline&organizeBy=stage&sort=activity_desc"
-        />
-        <ModeCard
-          label="Route Prep"
-          title="Prep the field queue"
-          detail={`${metrics.missingPrimaryContact} missing primary contacts • territory grouping, map cleanup, and pending stop staging`}
-          href="/workspace/customers?organizeBy=territory&sort=activity_desc"
-        />
-      </section>
       <CustomerWorkspaceIndex
         customers={customers}
         initialPendingStops={pendingStops}
@@ -80,33 +59,32 @@ export default async function WorkspaceCustomersPage({
   );
 }
 
-function ModeCard({ label, title, detail, href }: { label: string; title: string; detail: string; href: string }) {
-  return (
-    <Link href={href} className="rounded-[24px] border border-[#e5d8ef] bg-[linear-gradient(180deg,#ffffff_0%,#fdf7fb_100%)] p-5 shadow-[0_12px_30px_rgba(16,42,67,0.06)] transition hover:border-[#8f52dc] hover:bg-white">
-      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#617d8c]">{label}</p>
-      <p className="mt-2 text-xl font-semibold text-[#173543]">{title}</p>
-      <p className="mt-2 text-sm text-[#5c7483]">{detail}</p>
-      <p className="mt-3 text-xs font-semibold uppercase tracking-[0.08em] text-[#6f32b5]">Open mode</p>
-    </Link>
-  );
-}
-
 function HeaderActions({ isAdmin }: { isAdmin: boolean }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {isAdmin ? <CustomerGeocodeBatchButton /> : null}
       <Link
-        href="/workspace/customers/import"
-        className="inline-flex rounded-full border border-[#ddc6ea] bg-white px-4 py-2 text-sm font-semibold text-[#21414d] transition hover:border-[#8f52dc] hover:text-[#6f32b5]"
+        href="/workspace/customers/new"
+        className="inline-flex min-h-11 items-center rounded-lg bg-[var(--workspace-primary)] px-5 py-2 text-sm font-semibold text-white transition hover:bg-black"
       >
-        Import Activity
+        Add Retail Shop
       </Link>
       <Link
         href="/workspace/customers/import"
-        className="inline-flex rounded-full bg-[#8f52dc] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95"
+        className="inline-flex min-h-11 items-center rounded-lg border border-[var(--workspace-border-strong)] bg-white px-4 py-2 text-sm font-semibold text-[var(--workspace-text)] transition hover:bg-[var(--workspace-surface-muted)]"
       >
-        New Import
+        Import
       </Link>
+      {isAdmin ? (
+        <details className="relative">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center rounded-lg border border-[var(--workspace-border)] bg-white px-4 text-sm font-semibold text-[var(--workspace-text-secondary)] transition hover:bg-[var(--workspace-surface-muted)]">
+            More
+          </summary>
+          <div className="absolute right-0 z-40 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-[var(--workspace-border)] bg-white p-3 shadow-[var(--workspace-shadow)]">
+            <p className="mb-2 text-xs font-semibold text-[var(--workspace-muted)]">Geocoding utilities</p>
+            <CustomerGeocodeBatchButton />
+          </div>
+        </details>
+      ) : null}
     </div>
   );
 }

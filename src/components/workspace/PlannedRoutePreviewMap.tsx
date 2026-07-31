@@ -277,14 +277,14 @@ export default function PlannedRoutePreviewMap({
   }
 
   return (
-    <section className="rounded-[28px] border border-[#e9def1] bg-white p-5 shadow-[0_12px_32px_rgba(16,42,67,0.06)] lg:px-6">
+    <section className="rounded-[28px] border border-[#deded8] bg-white p-5 shadow-[0_12px_32px_rgba(16,42,67,0.06)] lg:px-6">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6c8797]">{title}</p>
-          <h3 className="mt-2 text-2xl font-semibold text-[#173543]">Finalized route preview with origin, ordered stops, and pathing</h3>
+          <h3 className="mt-2 text-2xl font-semibold text-[#181817]">Finalized route preview with origin, ordered stops, and pathing</h3>
           <p className="mt-2 max-w-3xl text-sm text-[#5c7483]">{description}</p>
         </div>
-        <div className="grid gap-2 rounded-2xl border border-[#e9def1] bg-[#fffafd] p-4 text-sm text-[#506877] shadow-sm sm:min-w-[220px]">
+        <div className="grid gap-2 rounded-2xl border border-[#deded8] bg-[#fafaf8] p-4 text-sm text-[#506877] shadow-sm sm:min-w-[220px]">
           <MapMetric label="Mapped Stops" value={String(withCoords.length)} />
           <MapMetric label="No Coords" value={String(withoutCoords.length)} />
           <MapMetric label="Provider" value={plannedRoute.provider === "google" ? "Google" : "Fallback"} />
@@ -293,7 +293,7 @@ export default function PlannedRoutePreviewMap({
       </div>
 
       {withCoords.length === 0 ? (
-        <div className="mt-5 rounded-2xl border border-dashed border-[#d3e1e8] bg-[#fdf8fd] px-4 py-8 text-sm text-[#5d7685]">
+        <div className="mt-5 rounded-2xl border border-dashed border-[#d3e1e8] bg-[#f7f7f4] px-4 py-8 text-sm text-[#5d7685]">
           {emptyLabel}
         </div>
       ) : (
@@ -314,13 +314,13 @@ export default function PlannedRoutePreviewMap({
             )}
 
             {orderedProjectedStops.length > 0 ? (
-              <div className="rounded-[24px] border border-[#e9def1] bg-[#fffafd] p-4 shadow-sm">
+              <div className="rounded-[24px] border border-[#deded8] bg-[#fafaf8] p-4 shadow-sm">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <h4 className="text-sm font-semibold uppercase tracking-[0.12em] text-[#6f8897]">Stop Strip</h4>
                     <p className="mt-1 text-sm text-[#5d7685]">Use the strip for quick route navigation. Detailed control stays in the itinerary.</p>
                   </div>
-                  <span className="rounded-full border border-[#e5d8ef] bg-white px-2.5 py-1 text-xs font-semibold text-[#4f6877]">{orderedProjectedStops.length} stops</span>
+                  <span className="rounded-full border border-[#deded8] bg-white px-2.5 py-1 text-xs font-semibold text-[#4f6877]">{orderedProjectedStops.length} stops</span>
                 </div>
                 <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
                   {orderedProjectedStops.map((stop, index) => {
@@ -333,12 +333,12 @@ export default function PlannedRoutePreviewMap({
                         className={[
                           "min-w-[160px] rounded-2xl border px-3 py-3 text-left transition",
                           isActive
-                            ? "border-[#173543] bg-[#173543] text-white shadow-[0_10px_24px_rgba(16,42,67,0.16)]"
-                            : "border-[#e9def1] bg-white text-[#173543] hover:border-[#8f52dc] hover:bg-[#f5fbfa]",
+                            ? "border-[#181817] bg-[#181817] text-white shadow-[0_10px_24px_rgba(16,42,67,0.16)]"
+                            : "border-[#deded8] bg-white text-[#181817] hover:border-[#1b1b1a] hover:bg-[#f5fbfa]",
                         ].join(" ")}
                       >
                         <div className="flex items-center justify-between gap-2">
-                          <span className={["rounded-full px-2 py-1 text-[11px] font-semibold", isActive ? "bg-white/16 text-white" : "bg-[#effaf7] text-[#6f32b5]"].join(" ")}>
+                          <span className={["rounded-full px-2 py-1 text-[11px] font-semibold", isActive ? "bg-white/16 text-white" : "bg-[#effaf7] text-[#1b1b1a]"].join(" ")}>
                             Stop {index + 1}
                           </span>
                           <span className={["rounded-full border px-2 py-1 text-[11px] font-semibold", isActive ? "border-white/20 text-white" : visitStatusChipClass(stop.customer.visitStatus)].join(" ")}>
@@ -367,18 +367,18 @@ export default function PlannedRoutePreviewMap({
             ) : null}
 
             {selectedStop ? (
-              <div className="rounded-[24px] border border-[#e9def1] bg-[#fffafd] p-4 shadow-sm">
+              <div className="rounded-[24px] border border-[#deded8] bg-[#fafaf8] p-4 shadow-sm">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <h4 className="text-base font-semibold text-[#173543]">Focused Stop</h4>
+                      <h4 className="text-base font-semibold text-[#181817]">Focused Stop</h4>
                       {selectedOrderIndex >= 0 ? (
-                        <span className="rounded-full border border-[#cfe8e4] bg-[#effaf7] px-2.5 py-1 text-xs font-semibold text-[#6f32b5]">
+                        <span className="rounded-full border border-[#cfe8e4] bg-[#effaf7] px-2.5 py-1 text-xs font-semibold text-[#1b1b1a]">
                           Stop {selectedOrderIndex + 1}
                         </span>
                       ) : null}
                     </div>
-                    <p className="mt-1 text-sm font-semibold text-[#173543]">{selectedStop.customer.name}</p>
+                    <p className="mt-1 text-sm font-semibold text-[#181817]">{selectedStop.customer.name}</p>
                     <p className="mt-1 text-sm text-[#58717f]">
                       {selectedStop.customer.territoryCode || "Unassigned"} • {plannedRoute.provider === "google" ? "Google route" : "Fallback route"}
                     </p>
@@ -405,11 +405,11 @@ export default function PlannedRoutePreviewMap({
                   </p>
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <Link href={`/workspace/customers/${selectedStop.customer.id}`} className="rounded-full bg-[#173543] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#0f2a35]">
+                  <Link href={`/workspace/customers/${selectedStop.customer.id}`} className="rounded-full bg-[#181817] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#0f2a35]">
                     Open Account
                   </Link>
                   {secondaryActionLabel && secondaryActionHref ? (
-                    <Link href={secondaryActionHref(selectedStop.customer.id)} className="rounded-full border border-[#ddcfe9] bg-white px-4 py-2 text-sm font-semibold text-[#24404d] transition hover:border-[#8f52dc] hover:text-[#6f32b5]">
+                    <Link href={secondaryActionHref(selectedStop.customer.id)} className="rounded-full border border-[#deded8] bg-white px-4 py-2 text-sm font-semibold text-[#24404d] transition hover:border-[#1b1b1a] hover:text-[#1b1b1a]">
                       {secondaryActionLabel}
                     </Link>
                   ) : null}
@@ -417,17 +417,17 @@ export default function PlannedRoutePreviewMap({
               </div>
             ) : null}
 
-            <div className="rounded-[24px] border border-[#e9def1] bg-white p-4 shadow-sm">
+            <div className="rounded-[24px] border border-[#deded8] bg-white p-4 shadow-sm">
               <div className="flex items-center justify-between gap-3">
                 <h4 className="text-sm font-semibold uppercase tracking-[0.12em] text-[#6f8897]">Stops Without Coordinates</h4>
-                <span className="rounded-full border border-[#e5d8ef] bg-[#fcf7fd] px-2.5 py-1 text-xs font-semibold text-[#4f6877]">
+                <span className="rounded-full border border-[#deded8] bg-[#f7f7f4] px-2.5 py-1 text-xs font-semibold text-[#4f6877]">
                   {withoutCoords.length}
                 </span>
               </div>
               <div className="mt-3 space-y-2">
                 {withoutCoords.slice(0, 6).map((customer) => (
-                  <div key={customer.id} className="rounded-xl border border-[#e1ebf1] bg-[#fffafd] px-3 py-2 text-sm text-[#4f6877]">
-                    <p className="font-semibold text-[#173543]">{customer.name}</p>
+                  <div key={customer.id} className="rounded-xl border border-[#e1ebf1] bg-[#fafaf8] px-3 py-2 text-sm text-[#4f6877]">
+                    <p className="font-semibold text-[#181817]">{customer.name}</p>
                     <p className="mt-1">Territory {customer.territoryCode || "Unassigned"} • {customer.city || "No city"}</p>
                   </div>
                 ))}
@@ -452,7 +452,7 @@ function ProjectedRouteMap(args: {
   onSelectCustomer: (customerId: string) => void;
 }) {
   return (
-    <div className="relative overflow-hidden rounded-[24px] border border-[#e9def1] bg-[linear-gradient(180deg,#fdf7fb_0%,#ecf7fa_100%)] shadow-sm">
+    <div className="relative overflow-hidden rounded-[24px] border border-[#deded8] bg-[linear-gradient(180deg,#f7f7f4_0%,#ecf7fa_100%)] shadow-sm">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_18%,rgba(20,184,166,0.14),transparent_26%),radial-gradient(circle_at_68%_30%,rgba(23,53,67,0.1),transparent_24%),linear-gradient(180deg,rgba(255,255,255,0.45),rgba(255,255,255,0))]" />
       <div className="pointer-events-none absolute inset-y-0 left-[22%] w-px bg-white/80" />
       <div className="pointer-events-none absolute inset-y-0 left-[46%] w-px bg-white/60" />
@@ -470,7 +470,7 @@ function ProjectedRouteMap(args: {
       <div className="relative aspect-[1.7/1] min-h-[520px]">
         {args.svgPath ? (
           <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="pointer-events-none absolute inset-0 h-full w-full">
-            <path d={args.svgPath} fill="none" stroke={args.plannedRoute.polyline ? "#173543" : "#8f52dc"} strokeWidth={args.plannedRoute.polyline ? 1.2 : 0.9} strokeDasharray={args.plannedRoute.polyline ? undefined : "2.5 2.5"} strokeLinecap="round" strokeLinejoin="round" opacity={0.9} />
+            <path d={args.svgPath} fill="none" stroke={args.plannedRoute.polyline ? "#181817" : "#1b1b1a"} strokeWidth={args.plannedRoute.polyline ? 1.2 : 0.9} strokeDasharray={args.plannedRoute.polyline ? undefined : "2.5 2.5"} strokeLinecap="round" strokeLinejoin="round" opacity={0.9} />
           </svg>
         ) : null}
 
@@ -491,7 +491,7 @@ function ProjectedRouteMap(args: {
               onClick={() => args.onSelectCustomer(stop.customer.id)}
               className={[
                 "absolute -translate-x-1/2 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full border-2 border-white text-[11px] font-bold text-white shadow-[0_8px_20px_rgba(16,42,67,0.22)] transition",
-                isSelected ? "z-20 scale-125 bg-[#173543]" : "z-10 bg-[#8f52dc] hover:scale-110",
+                isSelected ? "z-20 scale-125 bg-[#181817]" : "z-10 bg-[#1b1b1a] hover:scale-110",
               ].join(" ")}
               style={{ left: `${stop.x}%`, top: `${stop.y}%` }}
               aria-label={`Open stop summary for ${stop.customer.name}`}
@@ -584,7 +584,7 @@ function GooglePlannedRouteMap(args: {
     polylineRef.current = new googleMaps.Polyline({
       map,
       path,
-      strokeColor: plannedRoute.polyline ? "#173543" : "#8f52dc",
+      strokeColor: plannedRoute.polyline ? "#181817" : "#1b1b1a",
       strokeOpacity: 0.92,
       strokeWeight: plannedRoute.polyline ? 5 : 4,
       icons: plannedRoute.polyline
@@ -620,7 +620,7 @@ function GooglePlannedRouteMap(args: {
       marker.setIcon({
         path: googleMaps.SymbolPath.CIRCLE,
         scale: isSelected ? 16 : 13,
-        fillColor: isSelected ? "#173543" : "#8f52dc",
+        fillColor: isSelected ? "#181817" : "#1b1b1a",
         fillOpacity: 1,
         strokeColor: "#ffffff",
         strokeWeight: 2,
@@ -637,7 +637,7 @@ function GooglePlannedRouteMap(args: {
   }, []);
 
   return (
-    <div className="relative overflow-hidden rounded-[24px] border border-[#e9def1] bg-[linear-gradient(180deg,#fdf7fb_0%,#ecf7fa_100%)] shadow-sm">
+    <div className="relative overflow-hidden rounded-[24px] border border-[#deded8] bg-[linear-gradient(180deg,#f7f7f4_0%,#ecf7fa_100%)] shadow-sm">
       <div className="pointer-events-none absolute inset-0 z-10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0))]" />
       <div ref={mapRef} className="aspect-[1.7/1] min-h-[520px] w-full" />
     </div>
@@ -648,7 +648,7 @@ function MapMetric({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-3">
       <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7d95a3]">{label}</span>
-      <span className="text-base font-semibold text-[#173543]">{value}</span>
+      <span className="text-base font-semibold text-[#181817]">{value}</span>
     </div>
   );
 }

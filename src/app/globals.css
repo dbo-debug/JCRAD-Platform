@@ -41,6 +41,29 @@
   --ring: 222.2 84% 4.9%;
 
   --radius: 0.75rem;
+
+  --workspace-bg: #f4f4f1;
+  --workspace-sidebar: #111110;
+  --workspace-sidebar-muted: #a6a6a0;
+  --workspace-surface: #ffffff;
+  --workspace-surface-muted: #f7f7f4;
+  --workspace-elevated: #fcfcfa;
+  --workspace-text: #181817;
+  --workspace-text-secondary: #50504c;
+  --workspace-muted: #71716b;
+  --workspace-border: #deded8;
+  --workspace-border-strong: #c8c8c0;
+  --workspace-primary: #1b1b1a;
+  --workspace-primary-hover: #000000;
+  --workspace-focus: #52524d;
+  --workspace-success: #276749;
+  --workspace-warning: #9a6700;
+  --workspace-error: #b42318;
+  --workspace-info: #405d6b;
+  --workspace-radius-sm: 0.625rem;
+  --workspace-radius: 0.875rem;
+  --workspace-radius-lg: 1.125rem;
+  --workspace-shadow: 0 10px 28px rgba(17, 17, 16, 0.06);
 }
 
 /* Tailwind v4 theme tokens mapping */
@@ -88,4 +111,41 @@ body {
     radial-gradient(circle at top, #eef8fb 0%, #f6fbfd 36%, #ffffff 84%),
     var(--surface-bg);
   color: var(--text);
+}
+
+/* Nameless Genetics private workspace */
+.workspace-theme {
+  --workspace-bg: #f4f4f1;
+  --workspace-sidebar: #111110;
+  --workspace-sidebar-muted: #a6a6a0;
+  --workspace-surface: #ffffff;
+  --workspace-surface-muted: #f7f7f4;
+  --workspace-elevated: #fcfcfa;
+  --workspace-text: #181817;
+  --workspace-text-secondary: #50504c;
+  --workspace-muted: #71716b;
+  --workspace-border: #deded8;
+  --workspace-border-strong: #c8c8c0;
+  --workspace-primary: #1b1b1a;
+  --workspace-primary-hover: #000000;
+  --workspace-focus: #52524d;
+  --workspace-success: #276749;
+  --workspace-warning: #9a6700;
+  --workspace-error: #b42318;
+  --workspace-info: #405d6b;
+  --workspace-radius-sm: 0.625rem;
+  --workspace-radius: 0.875rem;
+  --workspace-radius-lg: 1.125rem;
+  --workspace-shadow: 0 10px 28px rgba(17, 17, 16, 0.06);
+  background: var(--workspace-bg);
+  color: var(--workspace-text);
+}
+
+.workspace-theme :where(a, button, input, select, textarea):focus-visible {
+  outline: 2px solid var(--workspace-focus);
+  outline-offset: 2px;
+}
+
+.workspace-theme :where(button, a) {
+  -webkit-tap-highlight-color: transparent;
 }

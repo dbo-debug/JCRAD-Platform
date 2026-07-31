@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStaffContext } from "@/lib/getStaffContext";
 import { syncGeneratedRouteName } from "@/lib/routeNames";
+import { filterNamelessCustomerIds } from "@/lib/namelessCustomerAccess";
 
 function asText(value: unknown): string | null {
   const text = String(value || "").trim();
@@ -77,6 +78,10 @@ export async function POST(req: Request) {
 
   if (normalizedStops.length === 0) {
     return NextResponse.json({ error: "Add at least one valid stop before saving a route" }, { status: 400 });
+  }
+  const allowedCustomerIds = await filterNamelessCustomerIds(normalizedStops.map((stop) => stop.customer_id));
+  if (normalizedStops.some((stop) => !allowedCustomerIds.has(stop.customer_id))) {
+    return NextResponse.json({ error: "One or more route stops are outside the Nameless workspace." }, { status: 400 });
   }
 
   const supabase = createAdminClient();

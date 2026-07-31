@@ -3,9 +3,11 @@ import { logPlatformEvent } from "@/lib/events/logPlatformEvent";
 import { getStaffContext } from "@/lib/getStaffContext";
 import { buildHallOfFlowersSmsBody, normalizePhoneNumber, sendSms, type SmsSendResult } from "@/lib/sms";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { NAMELESS_WORKSPACE_KEY } from "@/lib/namelessWorkspace";
 
 type CustomerRow = {
   id: string;
+  workspace_key: string | null;
   company_name: string | null;
   primary_contact_email: string | null;
   main_phone: string | null;
@@ -76,7 +78,7 @@ async function findExistingCustomer(args: {
   if (args.email) {
     const [contactRes, customerRes] = await Promise.all([
       supabase.from("customer_contacts").select("customer_id").ilike("email", args.email),
-      supabase.from("customers").select("id").ilike("primary_contact_email", args.email),
+      supabase.from("customers").select("id, workspace_key").ilike("primary_contact_email", args.email),
     ]);
     if (contactRes.error) throw new Error(contactRes.error.message);
     if (customerRes.error) throw new Error(customerRes.error.message);
@@ -94,7 +96,7 @@ async function findExistingCustomer(args: {
   for (const phone of phoneCandidates) {
     const [contactRes, customerRes] = await Promise.all([
       supabase.from("customer_contacts").select("customer_id").eq("phone", phone),
-      supabase.from("customers").select("id").eq("main_phone", phone),
+      supabase.from("customers").select("id, workspace_key").eq("main_phone", phone),
     ]);
     if (contactRes.error) throw new Error(contactRes.error.message);
     if (customerRes.error) throw new Error(customerRes.error.message);
@@ -110,7 +112,10 @@ async function findExistingCustomer(args: {
 
   const normalizedCompanyName = normalizeName(args.companyName);
   if (normalizedCompanyName) {
-    const { data, error } = await supabase.from("customers").select("id, company_name").ilike("company_name", args.companyName);
+    const { data, error } = await supabase
+      .from("customers")
+      .select("id, workspace_key, company_name")
+      .ilike("company_name", args.companyName);
     if (error) throw new Error(error.message);
     for (const row of data || []) {
       if (normalizeName(asText(row.company_name)) === normalizedCompanyName) {
@@ -124,11 +129,14 @@ async function findExistingCustomer(args: {
   const customerId = [...matchIds][0];
   const { data, error } = await supabase
     .from("customers")
-    .select("id, company_name, primary_contact_email, main_phone, city, source, import_notes, assigned_sales_user_id")
+    .select("id, workspace_key, company_name, primary_contact_email, main_phone, city, source, import_notes, assigned_sales_user_id")
     .eq("id", customerId)
     .maybeSingle();
   if (error) throw new Error(error.message);
-  return (data as CustomerRow | null) || null;
+  const row = (data as CustomerRow | null) || null;
+  const workspaceKey = String(row?.workspace_key || "").trim().toLowerCase();
+  if (workspaceKey && workspaceKey !== NAMELESS_WORKSPACE_KEY) return null;
+  return row;
 }
 
 async function upsertPrimaryContact(args: {
@@ -240,6 +248,7 @@ export async function POST(req: Request) {
       const { data, error } = await supabase
         .from("customers")
         .insert({
+          workspace_key: NAMELESS_WORKSPACE_KEY,
           company_name: companyName,
           primary_contact_email: email,
           main_phone: mobilePhone,

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "Coming Back Soon",
@@ -17,6 +18,15 @@ export default function HomePage() {
           Coming back soon...
         </h1>
       </div>
+
+      <Link
+        href="/crm/login"
+        aria-label="Open CRM login"
+        title=""
+        className="fixed bottom-0 right-0 z-50 h-14 w-14 opacity-0"
+      >
+        <span className="sr-only">Open CRM login</span>
+      </Link>
     </section>
   );
 }

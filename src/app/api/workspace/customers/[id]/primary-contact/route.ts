@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStaffContext } from "@/lib/getStaffContext";
+import { isNamelessCustomer } from "@/lib/namelessCustomerAccess";
 
 function asText(value: unknown): string | null {
   const text = String(value || "").trim();
@@ -12,6 +13,7 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
   if (!staff) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { id } = await context.params;
+  if (!(await isNamelessCustomer(id))) return NextResponse.json({ error: "Customer not found" }, { status: 404 });
   const body = await req.json().catch(() => ({}));
 
   const contactId = asText(body.contact_id);

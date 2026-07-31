@@ -117,16 +117,16 @@ export default function RoutePlannerIndex({ customers, routeRepOptions, territor
 
   return (
     <div className="space-y-5">
-      <section className="rounded-[28px] border border-[#d8e6ee] bg-[linear-gradient(180deg,#ffffff_0%,#fdf7fb_100%)] p-5 shadow-[0_24px_60px_rgba(16,42,67,0.08)] lg:px-6">
+      <section className="rounded-[28px] border border-[#d8e6ee] bg-[linear-gradient(180deg,#ffffff_0%,#f7f7f4_100%)] p-5 shadow-[0_24px_60px_rgba(16,42,67,0.08)] lg:px-6">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div className="max-w-[780px]">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6c8797]">Route Planning</p>
-            <h2 className="mt-2 text-2xl font-semibold text-[#173543]">Operational stop list for field coverage, rep assignment, and visit cadence</h2>
+            <h2 className="mt-2 text-2xl font-semibold text-[#181817]">Operational stop list for field coverage, rep assignment, and visit cadence</h2>
             <p className="mt-2 max-w-3xl text-sm text-[#5c7483]">
               Filter by territory, assigned rep, visit state, and priority. This planner stays focused on route-available, geocoded stops so route generation starts from the eligible set.
             </p>
           </div>
-          <div className="grid w-full gap-3 rounded-2xl border border-[#e9def1] bg-white/85 p-4 shadow-sm sm:max-w-[320px] xl:w-[320px] xl:flex-none">
+          <div className="grid w-full gap-3 rounded-2xl border border-[#deded8] bg-white/85 p-4 shadow-sm sm:max-w-[320px] xl:w-[320px] xl:flex-none">
             <MetricLine label="Eligible Stops" value={String(visibleCustomers.length)} />
             <MetricLine label="Due Today" value={String(stats.dueToday)} />
             <MetricLine label="Visited Today" value={String(stats.visitedToday)} />
@@ -136,7 +136,7 @@ export default function RoutePlannerIndex({ customers, routeRepOptions, territor
         </div>
       </section>
 
-      <section className="rounded-[28px] border border-[#e9def1] bg-white p-5 shadow-[0_12px_32px_rgba(16,42,67,0.06)] lg:px-6">
+      <section className="rounded-[28px] border border-[#deded8] bg-white p-5 shadow-[0_12px_32px_rgba(16,42,67,0.06)] lg:px-6">
         <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-[minmax(0,1.4fr)_repeat(4,minmax(0,0.9fr))]">
           <label className="grid gap-1 text-sm text-[#4b6676]">
             <span className="font-medium">Search stops</span>
@@ -144,7 +144,7 @@ export default function RoutePlannerIndex({ customers, routeRepOptions, territor
               value={search}
               onChange={(event) => startTransition(() => setSearch(event.target.value))}
               placeholder="Search account, contact, territory, rep"
-              className="rounded-2xl border border-[#cedde6] bg-[#fffafd] px-4 py-3 text-sm text-[#173543] outline-none transition focus:border-[#8f52dc] focus:bg-white"
+              className="rounded-2xl border border-[#cedde6] bg-[#fafaf8] px-4 py-3 text-sm text-[#181817] outline-none transition focus:border-[#1b1b1a] focus:bg-white"
             />
           </label>
 
@@ -175,25 +175,25 @@ export default function RoutePlannerIndex({ customers, routeRepOptions, territor
               { value: "follow_up_needed", label: "Follow-Up Needed" },
             ]}
           />
-          <div className="inline-flex rounded-full border border-[#decfe8] bg-white p-1">
+          <div className="inline-flex rounded-full border border-[#deded8] bg-white p-1">
             <button
               type="button"
               onClick={() => startTransition(() => setViewMode("list"))}
-              className={["rounded-full px-3 py-1.5 text-sm font-semibold transition", viewMode === "list" ? "bg-[#173543] text-white" : "text-[#7891a0] hover:text-[#173543]"].join(" ")}
+              className={["rounded-full px-3 py-1.5 text-sm font-semibold transition", viewMode === "list" ? "bg-[#181817] text-white" : "text-[#7891a0] hover:text-[#181817]"].join(" ")}
             >
               List
             </button>
             <button
               type="button"
               onClick={() => startTransition(() => setViewMode("map"))}
-              className={["rounded-full px-3 py-1.5 text-sm font-semibold transition", viewMode === "map" ? "bg-[#173543] text-white" : "text-[#7891a0] hover:text-[#173543]"].join(" ")}
+              className={["rounded-full px-3 py-1.5 text-sm font-semibold transition", viewMode === "map" ? "bg-[#181817] text-white" : "text-[#7891a0] hover:text-[#181817]"].join(" ")}
             >
               Map
             </button>
           </div>
           <Link
             href="/workspace/routes/run"
-            className="inline-flex rounded-full bg-[#8f52dc] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95"
+            className="inline-flex rounded-full bg-[#1b1b1a] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95"
           >
             Open Route Runner
           </Link>
@@ -210,7 +210,7 @@ export default function RoutePlannerIndex({ customers, routeRepOptions, territor
                 setTerritoryFocus("all");
               });
             }}
-            className="rounded-full border border-[#decfe8] bg-white px-3 py-1.5 text-sm text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543]"
+            className="rounded-full border border-[#deded8] bg-white px-3 py-1.5 text-sm text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#181817]"
           >
             Reset filters
           </button>
@@ -230,14 +230,14 @@ export default function RoutePlannerIndex({ customers, routeRepOptions, territor
 
       <section className={viewMode === "map" ? "hidden" : "space-y-5"}>
         {territorySections.length > 0 ? (
-          <nav className="rounded-[24px] border border-[#e9def1] bg-white p-4 shadow-[0_12px_32px_rgba(16,42,67,0.05)]">
+          <nav className="rounded-[24px] border border-[#deded8] bg-white p-4 shadow-[0_12px_32px_rgba(16,42,67,0.05)]">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Territory Jump</p>
             <div className="mt-3 flex flex-wrap gap-2">
               {territorySections.map((territory) => (
                 <a
                   key={territory.territoryKey}
                   href={`#planner-territory-${territory.territoryKey}`}
-                  className="rounded-full border border-[#d5e1e8] bg-[#fcf7fd] px-3 py-1.5 text-sm text-[#4a6575] transition hover:bg-white hover:text-[#173543]"
+                  className="rounded-full border border-[#d5e1e8] bg-[#f7f7f4] px-3 py-1.5 text-sm text-[#4a6575] transition hover:bg-white hover:text-[#181817]"
                 >
                     {territory.label} ({territory.accountCount})
                   </a>
@@ -251,13 +251,13 @@ export default function RoutePlannerIndex({ customers, routeRepOptions, territor
             key={territory.territoryKey}
             id={`planner-territory-${territory.territoryKey}`}
             open={index < 3}
-            className="rounded-[28px] border border-[#e9def1] bg-white p-5 shadow-[0_12px_32px_rgba(16,42,67,0.06)]"
+            className="rounded-[28px] border border-[#deded8] bg-white p-5 shadow-[0_12px_32px_rgba(16,42,67,0.06)]"
           >
             <summary className="cursor-pointer list-none">
               <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Territory</p>
-                  <h3 className="mt-1 text-xl font-semibold text-[#173543]">{territory.label}</h3>
+                  <h3 className="mt-1 text-xl font-semibold text-[#181817]">{territory.label}</h3>
                   <p className="mt-1 text-sm text-[#5b7382]">
                     {territory.territoryKey === "UNASSIGNED" ? "Accounts still need territory assignment." : `${territory.territoryKey} coverage workspace`}
                   </p>
@@ -290,7 +290,7 @@ export default function RoutePlannerIndex({ customers, routeRepOptions, territor
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
-                          <Link href={`/workspace/customers/${customer.id}`} className="text-lg font-semibold text-[#173543] transition hover:text-[#6f32b5]">
+                          <Link href={`/workspace/customers/${customer.id}`} className="text-lg font-semibold text-[#181817] transition hover:text-[#1b1b1a]">
                             {customer.name}
                           </Link>
                           <span className={["rounded-full border px-2.5 py-1 text-xs font-semibold", visitStatusChipClass(customer.visitStatus)].join(" ")}>
@@ -307,7 +307,7 @@ export default function RoutePlannerIndex({ customers, routeRepOptions, territor
 
                       <Link
                         href={`/workspace/routes/run?customerId=${customer.id}`}
-                        className="inline-flex rounded-full border border-[#ddc6ea] bg-white px-3 py-1.5 text-sm font-semibold text-[#21414d] transition hover:border-[#8f52dc] hover:text-[#6f32b5]"
+                        className="inline-flex rounded-full border border-[#deded8] bg-white px-3 py-1.5 text-sm font-semibold text-[#21414d] transition hover:border-[#1b1b1a] hover:text-[#1b1b1a]"
                       >
                         Run Stop
                       </Link>
@@ -331,16 +331,16 @@ export default function RoutePlannerIndex({ customers, routeRepOptions, territor
                     </div>
 
                     <div className="mt-4 flex flex-wrap gap-2 text-sm">
-                      <Link href={`/workspace/customers/${customer.id}`} className="rounded-full border border-[#d5e1e8] bg-[#fcf7fd] px-3 py-1.5 text-[#4a6575] transition hover:bg-white">
+                      <Link href={`/workspace/customers/${customer.id}`} className="rounded-full border border-[#d5e1e8] bg-[#f7f7f4] px-3 py-1.5 text-[#4a6575] transition hover:bg-white">
                         Open account
                       </Link>
                       {phoneHref ? (
-                        <a href={phoneHref} className="rounded-full border border-[#d5e1e8] bg-[#fcf7fd] px-3 py-1.5 text-[#4a6575] transition hover:bg-white">
+                        <a href={phoneHref} className="rounded-full border border-[#d5e1e8] bg-[#f7f7f4] px-3 py-1.5 text-[#4a6575] transition hover:bg-white">
                           Call contact
                         </a>
                       ) : null}
                       {emailHref ? (
-                        <a href={emailHref} className="rounded-full border border-[#d5e1e8] bg-[#fcf7fd] px-3 py-1.5 text-[#4a6575] transition hover:bg-white">
+                        <a href={emailHref} className="rounded-full border border-[#d5e1e8] bg-[#f7f7f4] px-3 py-1.5 text-[#4a6575] transition hover:bg-white">
                           Email contact
                         </a>
                       ) : null}
@@ -353,7 +353,7 @@ export default function RoutePlannerIndex({ customers, routeRepOptions, territor
         ))}
 
         {visibleCustomers.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-[#d3e1e8] bg-[#fdf8fd] px-4 py-6 text-sm text-[#5d7685]">
+          <div className="rounded-xl border border-dashed border-[#d3e1e8] bg-[#f7f7f4] px-4 py-6 text-sm text-[#5d7685]">
             No route-available stops match the current filters.
           </div>
         ) : null}
@@ -372,16 +372,16 @@ function MetricLine({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-3 text-sm text-[#506877]">
       <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7d95a3]">{label}</span>
-      <span className="text-lg font-semibold text-[#173543]">{value}</span>
+      <span className="text-lg font-semibold text-[#181817]">{value}</span>
     </div>
   );
 }
 
 function MiniMetric({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-2xl border border-[#e9def1] bg-[#fcf7fd] px-3 py-2 text-sm">
+    <div className="rounded-2xl border border-[#deded8] bg-[#f7f7f4] px-3 py-2 text-sm">
       <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7d95a3]">{label}</p>
-      <p className="mt-1 text-lg font-semibold text-[#173543]">{value}</p>
+      <p className="mt-1 text-lg font-semibold text-[#181817]">{value}</p>
     </div>
   );
 }
@@ -396,10 +396,10 @@ function TerritoryOwnerPill({ ownerState, ownerLabel }: { ownerState: "owned" | 
 function InlinePill({ label, tone }: { label: string; tone: "neutral" | "warn" | "ok" }) {
   const toneClass =
     tone === "ok"
-      ? "border-[#e8d7f7] bg-[#fcf3ff] text-[#6f32b5]"
+      ? "border-[#d9ddd9] bg-[#f7f7f4] text-[#1b1b1a]"
       : tone === "warn"
         ? "border-[#f1ddad] bg-[#fff9eb] text-[#9a6b00]"
-        : "border-[#e5d8ef] bg-[#fcf7fd] text-[#4f6877]";
+        : "border-[#deded8] bg-[#f7f7f4] text-[#4f6877]";
 
   return (
     <span
@@ -428,7 +428,7 @@ function FilterSelect({
       <select
         value={value}
         onChange={(event) => startTransition(() => onChange(event.target.value))}
-        className="rounded-2xl border border-[#cedde6] bg-[#fffafd] px-4 py-3 text-sm text-[#173543] outline-none transition focus:border-[#8f52dc] focus:bg-white"
+        className="rounded-2xl border border-[#cedde6] bg-[#fafaf8] px-4 py-3 text-sm text-[#181817] outline-none transition focus:border-[#1b1b1a] focus:bg-white"
       >
         <option value="all">All</option>
         {options.map((option) => (
@@ -443,9 +443,9 @@ function FilterSelect({
 
 function InfoBlock({ label, title, lines }: { label: string; title: string; lines: Array<string | null> }) {
   return (
-    <div className="rounded-2xl border border-[#e1ebf1] bg-[#fffafd] p-3">
+    <div className="rounded-2xl border border-[#e1ebf1] bg-[#fafaf8] p-3">
       <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7d95a3]">{label}</p>
-      <p className="mt-1 font-semibold text-[#173543]">{title}</p>
+      <p className="mt-1 font-semibold text-[#181817]">{title}</p>
       <div className="mt-2 space-y-1 text-sm text-[#5a7483]">
         {lines.filter(Boolean).map((line) => (
           <p key={line}>{line}</p>

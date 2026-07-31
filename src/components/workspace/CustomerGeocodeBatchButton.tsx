@@ -58,12 +58,12 @@ export default function CustomerGeocodeBatchButton() {
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="grid gap-2">
       <button
         type="button"
         onClick={() => void runBatch("default")}
         disabled={busyMode !== null}
-        className="inline-flex rounded-full border border-[#ddc6ea] bg-white px-4 py-2 text-sm font-semibold text-[#21414d] transition hover:border-[#8f52dc] hover:text-[#6f32b5] disabled:opacity-60"
+        className="inline-flex min-h-11 items-center justify-center rounded-lg border border-[var(--workspace-border)] bg-white px-4 py-2 text-sm font-semibold text-[var(--workspace-text)] transition hover:bg-[var(--workspace-surface-muted)] disabled:opacity-60"
       >
         {busyMode === "default" ? "Geocoding..." : "Geocode Next 20"}
       </button>
@@ -71,11 +71,11 @@ export default function CustomerGeocodeBatchButton() {
         type="button"
         onClick={() => void runBatch("retry_failed")}
         disabled={busyMode !== null}
-        className="inline-flex rounded-full border border-[#ddc6ea] bg-white px-4 py-2 text-sm font-semibold text-[#21414d] transition hover:border-[#8f52dc] hover:text-[#6f32b5] disabled:opacity-60"
+        className="inline-flex min-h-11 items-center justify-center rounded-lg border border-[var(--workspace-border)] bg-white px-4 py-2 text-sm font-semibold text-[var(--workspace-text)] transition hover:bg-[var(--workspace-surface-muted)] disabled:opacity-60"
       >
         {busyMode === "retry_failed" ? "Retrying..." : "Retry Failed 20"}
       </button>
-      {status ? <p className="text-xs text-[#5b7382]">{status}</p> : null}
+      {status ? <p className="text-xs leading-5 text-[var(--workspace-text-secondary)]">{status}</p> : null}
     </div>
   );
 }

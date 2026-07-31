@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getStaffContext } from "@/lib/getStaffContext";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendLoggedOutboundEmail } from "@/lib/email/outbound";
+import { getCrmCommunicationsEmailStatus } from "@/lib/email/crmEmailIdentities";
+import { filterNamelessCustomerIds } from "@/lib/namelessCustomerAccess";
 
 type EmailRecipientInput = {
   customer_id?: unknown;
@@ -87,6 +89,11 @@ export async function POST(request: Request) {
   const staff = await getStaffContext();
   if (!staff) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
+  const senderStatus = await getCrmCommunicationsEmailStatus(staff.userId);
+  if (!senderStatus.ok) {
+    return NextResponse.json({ error: senderStatus.error }, { status: 400 });
+  }
+
   const body = await request.json().catch(() => ({}));
   const subject = asText(body.subject);
   const bodyText = asText(body.body);
@@ -114,9 +121,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "A single send request can include at most 50 recipients." }, { status: 400 });
   }
 
+  const allowedCustomerIds = await filterNamelessCustomerIds(recipients.map((recipient) => recipient.customerId));
+  if (recipients.some((recipient) => !allowedCustomerIds.has(recipient.customerId))) {
+    return NextResponse.json({ error: "One or more recipients are outside the Nameless retail workspace." }, { status: 403 });
+  }
+
   const contactToCustomerId = await lookupCustomerContactMap(
     recipients.map((recipient) => recipient.contactId).filter((value): value is string => Boolean(value))
   );
+  if (
+    recipients.some(
+      (recipient) =>
+        recipient.contactId &&
+        contactToCustomerId.get(recipient.contactId) !== recipient.customerId
+    )
+  ) {
+    return NextResponse.json({ error: "One or more contacts do not belong to the selected account." }, { status: 400 });
+  }
 
   const results: Array<{
     customerId: string;
@@ -130,7 +151,7 @@ export async function POST(request: Request) {
   }> = [];
 
   for (const recipient of recipients) {
-    const effectiveCustomerId = recipient.contactId ? contactToCustomerId.get(recipient.contactId) || recipient.customerId : recipient.customerId;
+    const effectiveCustomerId = recipient.customerId;
     const bodyHtml = buildSimpleHtmlBody(bodyText);
     const sendResult = await sendLoggedOutboundEmail({
       gmailUserId: staff.userId,

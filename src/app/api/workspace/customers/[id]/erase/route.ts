@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStaffContext } from "@/lib/getStaffContext";
+import { isNamelessCustomer } from "@/lib/namelessCustomerAccess";
 
 type SupabaseLikeError = {
   code?: string | null;
@@ -39,6 +40,7 @@ export async function DELETE(_req: Request, context: { params: Promise<{ id: str
   }
 
   const { id } = await context.params;
+  if (!(await isNamelessCustomer(id))) return NextResponse.json({ error: "Customer not found" }, { status: 404 });
   const customerId = String(id || "").trim();
   if (!customerId) {
     return NextResponse.json({ error: "Customer id required" }, { status: 400 });

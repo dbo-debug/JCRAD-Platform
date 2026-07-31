@@ -215,7 +215,7 @@ function statusChipClass(status: string) {
     case "closed":
       return "border-[#e1d7d3] bg-[#f5f1ef] text-[#6f5b54]";
     default:
-      return "border-[#e5d8ef] bg-[#fcf7fd] text-[#4a6575]";
+      return "border-[#deded8] bg-[#f7f7f4] text-[#4a6575]";
   }
 }
 
@@ -232,7 +232,7 @@ function stageChipClass(stage: string | null) {
     case "closed":
       return "border-[#ded8d8] bg-[#f5f1f1] text-[#665a5a]";
     default:
-      return "border-[#e5d8ef] bg-[#fcf7fd] text-[#4a6575]";
+      return "border-[#deded8] bg-[#f7f7f4] text-[#4a6575]";
   }
 }
 
@@ -311,26 +311,22 @@ function getContactState(customer: CustomerSummary) {
 
 function contactChipClass(customer: CustomerSummary) {
   return customer.hasBeenContacted
-    ? "border-[#e8d7f7] bg-[#fcf3ff] text-[#6f32b5]"
+    ? "border-[#d9ddd9] bg-[#f7f7f4] text-[#1b1b1a]"
     : "border-[#f1ddad] bg-[#fff9eb] text-[#9a6b00]";
 }
 
 function followUpChipClass(customer: CustomerSummary) {
   if (!customer.hasOpenTask) return "border-[#e1d7d3] bg-[#f5f1ef] text-[#6f5b54]";
   if (customer.overdueTaskCount > 0) return "border-[#f1ddad] bg-[#fff9eb] text-[#9a6b00]";
-  return "border-[#e8d7f7] bg-[#fcf3ff] text-[#6f32b5]";
+  return "border-[#d9ddd9] bg-[#f7f7f4] text-[#1b1b1a]";
 }
 
 type WorkspacePresetKey = "all" | "hall_of_flowers" | "hot_leads" | "no_task" | "overdue" | "needs_coordinates" | "archived";
 
 function denseButtonClass(tone: "primary" | "secondary" = "secondary") {
   return tone === "primary"
-    ? "inline-flex h-9 items-center justify-center rounded-full bg-[#6c537f] px-3.5 text-sm font-semibold text-white transition hover:bg-[#785c8d]"
-    : "inline-flex h-9 items-center justify-center rounded-full border border-[#decfe8] bg-white px-3.5 text-sm font-medium text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543]";
-}
-
-function toolbarSelectClass() {
-  return "h-9 min-w-0 rounded-full border border-[#cedde6] bg-[#fffafd] px-3 text-sm text-[#173543] outline-none transition focus:border-[#8f52dc] focus:bg-white";
+    ? "inline-flex h-9 items-center justify-center rounded-full bg-[#1b1b1a] px-3.5 text-sm font-semibold text-white transition hover:bg-[#000000]"
+    : "inline-flex h-9 items-center justify-center rounded-full border border-[#deded8] bg-white px-3.5 text-sm font-medium text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#181817]";
 }
 
 function compareGroupLabels(left: string, right: string) {
@@ -529,15 +525,7 @@ export default function CustomerWorkspaceIndex({
   const [visibleGeocodeStatus, setVisibleGeocodeStatus] = useState<string | null>(null);
   const [showFilteredMap, setShowFilteredMap] = useState(false);
   const [mapSurfaceMode, setMapSurfaceMode] = useState<"visible" | "segment">("visible");
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(
-    Boolean(
-      initialFilters.territory ||
-        initialFilters.owner ||
-        initialFilters.status ||
-        initialFilters.stage ||
-        (initialFilters.orderState && initialFilters.orderState !== "all")
-    )
-  );
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
   const activeCustomers = customers.filter((customer) => !customer.archivedAt);
   const archivedCustomers = customers.filter((customer) => Boolean(customer.archivedAt));
@@ -557,6 +545,15 @@ export default function CustomerWorkspaceIndex({
     }, 180);
     return () => window.clearTimeout(timeout);
   }, [draftSearch]);
+
+  useEffect(() => {
+    if (!showAdvancedFilters) return;
+    const closeOnEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") setShowAdvancedFilters(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [showAdvancedFilters]);
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -663,7 +660,6 @@ export default function CustomerWorkspaceIndex({
   const selectedVisibleCustomers = visibleCustomers.filter((customer) => selectedVisibleCustomerIds.includes(customer.id));
   const selectedSegmentCustomers = customers.filter((customer) => selectedCustomerIdSet.has(customer.id));
   const selectedSegmentVisibleCount = selectedVisibleCustomers.length;
-  const selectedSegmentHiddenCount = Math.max(0, selectedSegmentCustomers.length - selectedSegmentVisibleCount);
   const selectedSegmentPendingCount = selectedSegmentCustomers.filter((customer) => pendingCustomerIdSet.has(customer.id)).length;
   const canAddSelectedToPending = selectedSegmentCustomers.some((customer) => !pendingCustomerIdSet.has(customer.id));
   const canRemoveSelectedFromPending = selectedSegmentPendingCount > 0;
@@ -687,16 +683,6 @@ export default function CustomerWorkspaceIndex({
     needsCoordinates: activeCustomers.filter((customer) => getCoordinateCoverageState(customer) !== "has_coords").length,
     archived: archivedCustomers.length,
   };
-  const advancedFilterCount = [
-    territoryFilter !== "all",
-    statusFilter !== "all",
-    stageFilter !== "all",
-    sourceFilter !== "all",
-    importSourceFilter !== "all",
-    contactCoverage !== "all",
-    orderState !== "all",
-    organizeBy !== "none",
-  ].filter(Boolean).length;
   const workflowMode = getWorkflowMode({
     savedView,
     hotLeadFilter,
@@ -1275,45 +1261,112 @@ export default function CustomerWorkspaceIndex({
     { key: "archived" as const, label: "Archived", count: navCounts.archived },
   ];
 
+  const activeFilterChips: Array<{ key: string; label: string; clear: () => void }> = [];
+  if (searchQuery) activeFilterChips.push({ key: "search", label: `Search: ${searchQuery}`, clear: handleClearSearch });
+  if (savedView !== "all") activeFilterChips.push({ key: "view", label: `View: ${titleCase(savedView)}`, clear: () => setSavedView("all") });
+  if (hotLeadFilter !== "all") activeFilterChips.push({ key: "hot", label: titleCase(hotLeadFilter), clear: () => setHotLeadFilter("all") });
+  if (taskStateFilter !== "all") activeFilterChips.push({ key: "task", label: `Follow-up: ${titleCase(taskStateFilter)}`, clear: () => setTaskStateFilter("all") });
+  if (ownerFilter !== "all") activeFilterChips.push({ key: "owner", label: `Owner: ${ownerFilter}`, clear: () => setOwnerFilter("all") });
+  if (territoryFilter !== "all") activeFilterChips.push({ key: "territory", label: `Territory: ${territoryLabelMap.get(territoryFilter) || territoryFilter}`, clear: () => setTerritoryFilter("all") });
+  if (statusFilter !== "all") activeFilterChips.push({ key: "status", label: `Status: ${titleCase(statusFilter)}`, clear: () => setStatusFilter("all") });
+  if (stageFilter !== "all") activeFilterChips.push({ key: "stage", label: `Stage: ${titleCase(stageFilter)}`, clear: () => setStageFilter("all") });
+  if (sourceFilter !== "all") activeFilterChips.push({ key: "source", label: `Source: ${formatSourceLabel(sourceFilter)}`, clear: () => setSourceFilter("all") });
+  if (importSourceFilter !== "all") activeFilterChips.push({ key: "import", label: `Import: ${formatSourceLabel(importSourceFilter)}`, clear: () => setImportSourceFilter("all") });
+  if (contactCoverage !== "all") activeFilterChips.push({ key: "contacts", label: `Contacts: ${titleCase(contactCoverage)}`, clear: () => setContactCoverage("all") });
+  if (orderState !== "all") activeFilterChips.push({ key: "orders", label: `Orders: ${titleCase(orderState)}`, clear: () => setOrderState("all") });
+  if (organizeBy !== "none") activeFilterChips.push({ key: "group", label: `Group: ${titleCase(organizeBy)}`, clear: () => setOrganizeBy("none") });
+  const visibleFilterChips = activeFilterChips.slice(0, 5);
+  const hiddenFilterChipCount = Math.max(0, activeFilterChips.length - visibleFilterChips.length);
+
+  const queueShortcuts = (
+    <>
+      <p className="text-xs font-semibold text-[var(--workspace-muted)]">Queue shortcuts</p>
+      <div className="mt-3 space-y-2">
+        {viewNavItems.map((item) => {
+          const active =
+            (item.key === "all" && savedView === "all" && sourceFilter === "all" && importSourceFilter === "all" && hotLeadFilter === "all" && taskStateFilter === "all") ||
+            (item.key === "hall_of_flowers" && savedView === "hall_of_flowers" && sourceFilter === "hall_of_flowers") ||
+            (item.key === "hot_leads" && hotLeadFilter === "hot") ||
+            (item.key === "no_task" && taskStateFilter === "no_open_task") ||
+            (item.key === "overdue" && taskStateFilter === "overdue_task") ||
+            (item.key === "needs_coordinates" && savedView === "needs_coordinates") ||
+            (item.key === "archived" && savedView === "archived");
+
+          return (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => {
+                applyWorkspacePreset(item.key);
+                setShowAdvancedFilters(false);
+              }}
+              className={[
+                "flex min-h-11 w-full items-center justify-between rounded-lg border px-3 py-2.5 text-left text-sm transition",
+                active
+                  ? "border-[var(--workspace-primary)] bg-[var(--workspace-primary)] text-white"
+                  : "border-[var(--workspace-border)] bg-white text-[var(--workspace-text-secondary)] hover:bg-[var(--workspace-surface-muted)]",
+              ].join(" ")}
+            >
+              <span className="font-semibold">{item.label}</span>
+              <span className="rounded-full border border-current/20 px-2 py-0.5 text-xs">{item.count}</span>
+            </button>
+          );
+        })}
+      </div>
+    </>
+  );
+
+  const filterControls = (
+    <div className="space-y-5">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <FilterSelect label="Hot lead" value={hotLeadFilter} onChange={(value) => setHotLeadFilter(value as HotLeadFilter)} options={[{ value: "hot", label: "Hot Lead" }, { value: "not_hot", label: "Not Hot" }]} />
+        <FilterSelect label="Follow-up" value={taskStateFilter} onChange={(value) => setTaskStateFilter(value as TaskStateFilter)} options={[{ value: "has_open_task", label: "Has Task" }, { value: "no_open_task", label: "No Task" }, { value: "overdue_task", label: "Overdue" }]} />
+        <FilterSelect label="Owner" value={ownerFilter} onChange={setOwnerFilter} options={owners.map((owner) => ({ value: owner, label: owner }))} />
+        <FilterSelect label="Territory" value={territoryFilter} onChange={setTerritoryFilter} options={territoryOptions} />
+        <FilterSelect label="Status" value={statusFilter} onChange={setStatusFilter} options={statuses.map((status) => ({ value: status, label: titleCase(status) }))} />
+        <FilterSelect label="Pipeline stage" value={stageFilter} onChange={setStageFilter} options={stages.map((stage) => ({ value: stage, label: titleCase(stage) }))} />
+        <FilterSelect label="Source" value={sourceFilter} onChange={setSourceFilter} options={sources.map((source) => ({ value: source, label: formatSourceLabel(source) }))} />
+        <FilterSelect label="Import source" value={importSourceFilter} onChange={setImportSourceFilter} options={importSources.map((source) => ({ value: source, label: formatSourceLabel(source) }))} />
+        <FilterSelect label="Contact coverage" value={contactCoverage} onChange={(value) => setContactCoverage(value as ContactCoverageFilter)} options={[{ value: "has_contacts", label: "Has Contacts" }, { value: "missing_primary", label: "Missing Primary" }, { value: "no_contacts", label: "No Contacts" }]} />
+        <FilterSelect label="Order state" value={orderState} onChange={(value) => setOrderState(value as OrderStateFilter)} options={[{ value: "has_orders", label: "Has Orders" }, { value: "no_orders", label: "No Orders" }]} />
+        <FilterSelect label="Organize by" value={organizeBy} onChange={(value) => setOrganizeBy(value as OrganizeBy)} options={[{ value: "territory", label: "Territory" }, { value: "owner", label: "Owner" }, { value: "stage", label: "Stage" }]} allowAllLabel="None" />
+        <FilterSelect label="Sort" value={sortKey} onChange={(value) => setSortKey(value as SortKey)} options={[{ value: "activity_desc", label: "Recent" }, { value: "name_asc", label: "Name A-Z" }, { value: "name_desc", label: "Name Z-A" }, { value: "orders_desc", label: "Most Orders" }, { value: "owner_asc", label: "Owner A-Z" }]} allowAllLabel={null} />
+      </div>
+
+      <div className="border-t border-[var(--workspace-border)] pt-4">
+        <p className="text-xs font-semibold text-[var(--workspace-muted)]">Selection and administrative utilities</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button type="button" onClick={selectAllVisible} disabled={visibleCustomers.length === 0} className={denseButtonClass()}>
+            {allVisibleSelected ? "All visible in group" : `Select ${visibleCustomers.length} visible`}
+          </button>
+          <button type="button" onClick={clearSelection} disabled={selectedCustomerIds.length === 0} className={denseButtonClass()}>
+            Clear Group
+          </button>
+          {staffRole === "admin" ? (
+            <>
+              <button type="button" onClick={() => void geocodeVisibleResults()} disabled={visibleCustomers.length === 0 || geocodeBusyMode !== null} className={denseButtonClass()}>
+                {geocodeBusyMode === "visible" ? "Geocoding..." : "Geocode Visible"}
+              </button>
+              <button type="button" onClick={() => void geocodeSelectedSegment()} disabled={selectedCustomerIds.length === 0 || geocodeBusyMode !== null} className={denseButtonClass()}>
+                {geocodeBusyMode === "segment" ? "Geocoding..." : "Geocode Segment"}
+              </button>
+              <button type="button" onClick={() => void geocodeVisibleNeedsCoords()} disabled={visibleCustomers.every((customer) => getCoordinateCoverageState(customer) === "has_coords") || geocodeBusyMode !== null} className={denseButtonClass()}>
+                {geocodeBusyMode === "needs_coords" ? "Geocoding..." : "Geocode Needs Coords"}
+              </button>
+            </>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="grid min-w-0 gap-5 xl:grid-cols-[260px_minmax(0,1fr)] 2xl:grid-cols-[280px_minmax(0,1fr)]">
-      <aside className="min-w-0 xl:sticky xl:self-start xl:top-[calc(var(--workspace-header-offset,5rem)+1rem)]">
-        <section className="rounded-[24px] border border-[#d8e6ee] bg-[linear-gradient(180deg,#ffffff_0%,#fdf7fb_100%)] p-4 shadow-[0_10px_22px_rgba(16,42,67,0.06)]">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6c8797]">Queue Shortcuts</p>
-          <div className="mt-3 space-y-2">
-            {viewNavItems.map((item) => {
-              const active =
-                (item.key === "all" &&
-                  savedView === "all" &&
-                  sourceFilter === "all" &&
-                  importSourceFilter === "all" &&
-                  hotLeadFilter === "all" &&
-                  taskStateFilter === "all") ||
-                (item.key === "hall_of_flowers" && savedView === "hall_of_flowers" && sourceFilter === "hall_of_flowers") ||
-                (item.key === "hot_leads" && hotLeadFilter === "hot") ||
-                (item.key === "no_task" && taskStateFilter === "no_open_task") ||
-                (item.key === "overdue" && taskStateFilter === "overdue_task") ||
-                (item.key === "needs_coordinates" && savedView === "needs_coordinates") ||
-                (item.key === "archived" && savedView === "archived");
+    <div className="grid min-w-0 gap-5 min-[1367px]:grid-cols-[260px_minmax(0,1fr)] 2xl:grid-cols-[280px_minmax(0,1fr)]">
+      <aside className="hidden min-w-0 min-[1367px]:sticky min-[1367px]:top-[calc(var(--workspace-header-offset,5rem)+1rem)] min-[1367px]:block min-[1367px]:self-start">
+        <section className="rounded-[var(--workspace-radius-lg)] border border-[var(--workspace-border)] bg-white p-4 shadow-[var(--workspace-shadow)]">
+          {queueShortcuts}
 
-              return (
-                <button
-                  key={item.key}
-                  type="button"
-                  onClick={() => applyWorkspacePreset(item.key)}
-                  className={[
-                    "flex w-full items-center justify-between rounded-2xl border px-3 py-3 text-left text-sm transition",
-                    active ? "border-[#8f52dc] bg-[#fcf5ff] text-[#6f32b5]" : "border-[#e9def1] bg-white text-[#35505d] hover:border-[#97c7c1] hover:bg-[#f4fbfa]",
-                  ].join(" ")}
-                >
-                  <span className="font-semibold">{item.label}</span>
-                  <span className="rounded-full border border-current/15 px-2 py-0.5 text-xs">{item.count}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="mt-4 grid gap-2 rounded-[20px] border border-[#e9def1] bg-white/90 p-3">
+          <div className="mt-4 grid gap-2 rounded-[20px] border border-[#deded8] bg-white/90 p-3">
             {workspaceMetricRows.map((metric) => (
               <MetricLine key={metric.label} label={metric.label} value={metric.value} />
             ))}
@@ -1322,24 +1375,23 @@ export default function CustomerWorkspaceIndex({
       </aside>
 
       <div className="min-w-0 space-y-4">
-        <section className="rounded-[28px] border border-[#d8e6ee] bg-[linear-gradient(180deg,#ffffff_0%,#fdf7fb_100%)] p-5 shadow-[0_12px_28px_rgba(16,42,67,0.07)]">
+        <section className="rounded-[var(--workspace-radius-lg)] border border-[var(--workspace-border)] bg-white p-4 shadow-[var(--workspace-shadow)]">
           <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div className="max-w-[820px]">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6c8797]">{workflowSummary.eyebrow}</p>
-                <h2 className="mt-1 text-xl font-semibold text-[#173543]">{workflowSummary.title}</h2>
-                <p className="mt-1 text-sm text-[#5c7483]">{workflowSummary.description}</p>
-                <p className="mt-2 text-sm text-[#6b8290]">{WORKFLOW_MODE_COPY[workflowMode].helper}</p>
+                <p className="text-xs font-semibold text-[var(--workspace-muted)]">{workflowSummary.eyebrow}</p>
+                <h2 className="mt-1 text-lg font-semibold text-[var(--workspace-text)]">{workflowSummary.title}</h2>
+                <p className="mt-1 text-sm text-[var(--workspace-text-secondary)]">{workflowSummary.description}</p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-full border border-[#e5d8ef] bg-white px-3 py-1.5 text-sm text-[#4f6877]">{visibleCustomers.length} visible</span>
+                <span className="rounded-full border border-[#deded8] bg-white px-3 py-1.5 text-sm text-[#4f6877]">{visibleCustomers.length} visible</span>
                 <span className="rounded-full border border-[#ffd3cf] bg-[#fff2f0] px-3 py-1.5 text-sm text-[#b44b40]">{hotLeadCount} hot</span>
                 <span className="rounded-full border border-[#f1ddad] bg-[#fff9eb] px-3 py-1.5 text-sm text-[#8a5b00]">{overdueVisibleCount} overdue</span>
-                <span className="rounded-full border border-[#e5d8ef] bg-white px-3 py-1.5 text-sm text-[#4f6877]">{visibleMappedCount} mapped</span>
+                <span className="rounded-full border border-[#deded8] bg-white px-3 py-1.5 text-sm text-[#4f6877]">{visibleMappedCount} mapped</span>
               </div>
             </div>
 
-            <div className="grid gap-3 lg:grid-cols-3">
+            <div className="flex flex-wrap gap-2 border-t border-[var(--workspace-border)] pt-3" aria-label="Account workflow mode">
               {(Object.keys(WORKFLOW_MODE_COPY) as WorkflowMode[]).map((mode) => {
                 const active = workflowMode === mode;
                 const copy = WORKFLOW_MODE_COPY[mode];
@@ -1349,13 +1401,13 @@ export default function CustomerWorkspaceIndex({
                     type="button"
                     onClick={() => applyWorkflowMode(mode)}
                     className={[
-                      "rounded-[22px] border px-4 py-4 text-left transition",
-                      active ? "border-[#8f52dc] bg-[#fcf5ff]" : "border-[#e9def1] bg-white hover:border-[#97c7c1] hover:bg-[#fcf7fd]",
+                      "min-h-10 rounded-lg border px-3 py-2 text-sm font-semibold transition",
+                      active
+                        ? "border-[var(--workspace-primary)] bg-[var(--workspace-primary)] text-white"
+                        : "border-[var(--workspace-border)] bg-white text-[var(--workspace-text-secondary)] hover:bg-[var(--workspace-surface-muted)] hover:text-black",
                     ].join(" ")}
                   >
-                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#6c8797]">{copy.label}</p>
-                    <p className="mt-2 text-base font-semibold text-[#173543]">{copy.title}</p>
-                    <p className="mt-1 text-sm text-[#5c7483]">{copy.description}</p>
+                    {copy.label}
                   </button>
                 );
               })}
@@ -1412,7 +1464,7 @@ export default function CustomerWorkspaceIndex({
                 onClick={() => setShowFilteredMap((current) => !current)}
                 className={[
                   "rounded-full border px-3 py-1.5 text-sm font-semibold transition",
-                  showFilteredMap ? "border-[#8f52dc] bg-[#fcf5ff] text-[#6f32b5]" : "border-[#e5d8ef] bg-white text-[#4f6877] hover:border-[#8f52dc]",
+                  showFilteredMap ? "border-[#1b1b1a] bg-[#f7f7f4] text-[#1b1b1a]" : "border-[#deded8] bg-white text-[#4f6877] hover:border-[#1b1b1a]",
                 ].join(" ")}
               >
                 {showFilteredMap ? "Hide Map" : "Open Map Surface"}
@@ -1424,7 +1476,7 @@ export default function CustomerWorkspaceIndex({
                     onClick={() => setMapSurfaceMode("visible")}
                     className={[
                       "rounded-full border px-3 py-1.5 text-sm font-semibold transition",
-                      mapSurfaceMode === "visible" ? "border-[#173543] bg-[#173543] text-white" : "border-[#e5d8ef] bg-white text-[#4f6877] hover:border-[#173543]",
+                      mapSurfaceMode === "visible" ? "border-[#181817] bg-[#181817] text-white" : "border-[#deded8] bg-white text-[#4f6877] hover:border-[#181817]",
                     ].join(" ")}
                   >
                     Map Visible
@@ -1435,7 +1487,7 @@ export default function CustomerWorkspaceIndex({
                     disabled={selectedCustomerIds.length === 0}
                     className={[
                       "rounded-full border px-3 py-1.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50",
-                      mapSurfaceMode === "segment" ? "border-[#173543] bg-[#173543] text-white" : "border-[#e5d8ef] bg-white text-[#4f6877] hover:border-[#173543]",
+                      mapSurfaceMode === "segment" ? "border-[#181817] bg-[#181817] text-white" : "border-[#deded8] bg-white text-[#4f6877] hover:border-[#181817]",
                     ].join(" ")}
                   >
                     Map Working Group
@@ -1446,166 +1498,95 @@ export default function CustomerWorkspaceIndex({
           </div>
         </section>
 
-        <section className={["sticky z-30 space-y-3 rounded-[24px] border border-[#e9def1] bg-white/95 p-3 shadow-[0_10px_22px_rgba(16,42,67,0.08)] backdrop-blur supports-[backdrop-filter]:bg-white/90 xl:px-4 xl:py-4", WORKSPACE_STICKY_TOP_CLASS].join(" ")}>
-          <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">{WORKFLOW_MODE_COPY[workflowMode].label}</p>
-              <p className="mt-1 text-sm text-[#4f6877]">Common filters stay upfront. Broader targeting controls live under advanced filters.</p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <button type="button" onClick={handleClearSearch} className={denseButtonClass()}>
-                Clear Search
+        <section className={["z-30 space-y-3 rounded-[var(--workspace-radius-lg)] border border-[var(--workspace-border)] bg-white/95 p-3 shadow-[var(--workspace-shadow)] backdrop-blur min-[1367px]:sticky min-[1367px]:px-4 min-[1367px]:py-4", WORKSPACE_STICKY_TOP_CLASS].join(" ")}>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <label className="min-w-0 flex-1">
+              <span className="sr-only">Search retail accounts</span>
+              <input
+                value={draftSearch}
+                onChange={(event) => setDraftSearch(event.target.value)}
+                placeholder="Search retail accounts, contacts, city, or phone"
+                className="h-11 w-full rounded-lg border border-[var(--workspace-border-strong)] bg-[var(--workspace-surface-muted)] px-4 text-sm text-[var(--workspace-text)] outline-none transition focus:border-[var(--workspace-primary)] focus:bg-white"
+              />
+            </label>
+            <div className="flex flex-wrap gap-2">
+              <span className="inline-flex min-h-11 items-center rounded-lg border border-[var(--workspace-border)] bg-[var(--workspace-surface-muted)] px-3 text-sm font-semibold text-[var(--workspace-text-secondary)]">
+                {WORKFLOW_MODE_COPY[workflowMode].label}
+              </span>
+              <span className="inline-flex min-h-11 items-center rounded-lg border border-[var(--workspace-border)] bg-white px-3 text-sm text-[var(--workspace-text-secondary)]">
+                {activeFilterChips.length} active
+              </span>
+              <button type="button" onClick={() => setShowAdvancedFilters(true)} className={denseButtonClass("primary")}>
+                Filters
               </button>
-              <button type="button" onClick={resetFilters} className={denseButtonClass()}>
-                Reset Filters
-              </button>
-              <button type="button" onClick={() => setShowAdvancedFilters((current) => !current)} className={denseButtonClass()}>
-                Advanced Filters{advancedFilterCount > 0 ? ` (${advancedFilterCount})` : ""}
-              </button>
+              {activeFilterChips.length > 0 ? (
+                <button type="button" onClick={resetFilters} className={denseButtonClass()}>
+                  Clear all
+                </button>
+              ) : null}
             </div>
           </div>
 
-          <div className="grid gap-2 xl:grid-cols-2 2xl:grid-cols-[minmax(260px,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] xl:items-center">
-            <input
-              value={draftSearch}
-              onChange={(event) => setDraftSearch(event.target.value)}
-              aria-label="Search accounts"
-              placeholder="Search accounts, contacts, city, phone"
-              className="h-10 rounded-full border border-[#cedde6] bg-[#fffafd] px-4 text-sm text-[#173543] outline-none transition focus:border-[#8f52dc] focus:bg-white"
-            />
-            <select value={hotLeadFilter} onChange={(event) => startTransition(() => setHotLeadFilter(event.target.value as HotLeadFilter))} aria-label="Hot lead" className={toolbarSelectClass()}>
-              <option value="all">All Leads</option>
-              <option value="hot">Hot Lead</option>
-              <option value="not_hot">Not Hot</option>
-            </select>
-            <select value={taskStateFilter} onChange={(event) => startTransition(() => setTaskStateFilter(event.target.value as TaskStateFilter))} aria-label="Follow-up" className={toolbarSelectClass()}>
-              <option value="all">All Follow-Up</option>
-              <option value="has_open_task">Has Task</option>
-              <option value="no_open_task">No Task</option>
-              <option value="overdue_task">Overdue</option>
-            </select>
-            <select value={ownerFilter} onChange={(event) => startTransition(() => setOwnerFilter(event.target.value))} aria-label="Owner" className={toolbarSelectClass()}>
-              <option value="all">All Owners</option>
-              {owners.map((owner) => (
-                <option key={owner} value={owner}>
-                  {owner}
-                </option>
-              ))}
-            </select>
-            <select value={territoryFilter} onChange={(event) => startTransition(() => setTerritoryFilter(event.target.value))} aria-label="Territory" className={toolbarSelectClass()}>
-              <option value="all">All Territories</option>
-              {territoryOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-            <select value={sortKey} onChange={(event) => startTransition(() => setSortKey(event.target.value as SortKey))} aria-label="Sort" className={toolbarSelectClass()}>
-              <option value="activity_desc">Recent</option>
-              <option value="name_asc">Name A-Z</option>
-              <option value="name_desc">Name Z-A</option>
-              <option value="orders_desc">Most Orders</option>
-              <option value="owner_asc">Owner A-Z</option>
-            </select>
-            <select value={orderState} onChange={(event) => startTransition(() => setOrderState(event.target.value as OrderStateFilter))} aria-label="Order state" className={toolbarSelectClass()}>
-              <option value="all">All Order States</option>
-              <option value="has_orders">Has Orders</option>
-              <option value="no_orders">No Orders</option>
-            </select>
-          </div>
-
-          {showAdvancedFilters ? (
-            <section className="rounded-[20px] border border-[#e9def1] bg-[#fcf7fd] p-3 shadow-[0_8px_18px_rgba(16,42,67,0.05)]">
-              <div className="grid gap-3 xl:grid-cols-[repeat(4,minmax(0,1fr))] 2xl:grid-cols-[repeat(6,minmax(0,1fr))]">
-                <FilterSelect label="Source" value={sourceFilter} onChange={setSourceFilter} options={sources.map((source) => ({ value: source, label: formatSourceLabel(source) }))} />
-                <FilterSelect label="Import Source" value={importSourceFilter} onChange={setImportSourceFilter} options={importSources.map((source) => ({ value: source, label: formatSourceLabel(source) }))} />
-                <FilterSelect label="Status" value={statusFilter} onChange={setStatusFilter} options={statuses.map((status) => ({ value: status, label: titleCase(status) }))} />
-                <FilterSelect label="Stage" value={stageFilter} onChange={setStageFilter} options={stages.map((stage) => ({ value: stage, label: titleCase(stage) }))} />
-                <FilterSelect
-                  label="Contact Coverage"
-                  value={contactCoverage}
-                  onChange={(value) => setContactCoverage(value as ContactCoverageFilter)}
-                  options={[
-                    { value: "has_contacts", label: "Has Contacts" },
-                    { value: "missing_primary", label: "Missing Primary" },
-                    { value: "no_contacts", label: "No Contacts" },
-                  ]}
-                />
-                <FilterSelect
-                  label="Organize By"
-                  value={organizeBy}
-                  onChange={(value) => setOrganizeBy(value as OrganizeBy)}
-                  options={[
-                    { value: "territory", label: "Territory" },
-                    { value: "owner", label: "Owner" },
-                    { value: "stage", label: "Stage" },
-                  ]}
-                  allowAllLabel="None"
-                />
-              </div>
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <button type="button" onClick={selectAllVisible} disabled={visibleCustomers.length === 0} className={denseButtonClass()}>
-                  {allVisibleSelected ? "All visible in group" : `Select ${visibleCustomers.length} visible`}
+          {activeFilterChips.length > 0 ? (
+            <div className="flex min-w-0 flex-wrap items-center gap-2" aria-label="Active filters">
+              {visibleFilterChips.map((chip) => (
+                <button
+                  key={chip.key}
+                  type="button"
+                  onClick={() => startTransition(chip.clear)}
+                  className="inline-flex min-h-9 max-w-full items-center gap-2 rounded-full border border-[var(--workspace-border)] bg-[var(--workspace-surface-muted)] px-3 text-sm text-[var(--workspace-text-secondary)] hover:border-[var(--workspace-border-strong)]"
+                  aria-label={`Remove ${chip.label} filter`}
+                >
+                  <span className="truncate">{chip.label}</span>
+                  <span aria-hidden="true">×</span>
                 </button>
-                <button type="button" onClick={clearSelection} disabled={selectedCustomerIds.length === 0} className={denseButtonClass()}>
-                  Clear Group
-                </button>
-                {staffRole === "admin" ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => void geocodeVisibleResults()}
-                      disabled={visibleCustomers.length === 0 || geocodeBusyMode !== null}
-                      className={denseButtonClass()}
-                    >
-                      {geocodeBusyMode === "visible" ? "Geocoding..." : "Geocode Visible"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void geocodeSelectedSegment()}
-                      disabled={selectedCustomerIds.length === 0 || geocodeBusyMode !== null}
-                      className={denseButtonClass()}
-                    >
-                      {geocodeBusyMode === "segment" ? "Geocoding..." : "Geocode Segment"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void geocodeVisibleNeedsCoords()}
-                      disabled={visibleCustomers.every((customer) => getCoordinateCoverageState(customer) === "has_coords") || geocodeBusyMode !== null}
-                      className={denseButtonClass()}
-                    >
-                      {geocodeBusyMode === "needs_coords" ? "Geocoding..." : "Geocode Needs Coords"}
-                    </button>
-                  </>
-                ) : null}
-              </div>
-            </section>
+              ))}
+              {hiddenFilterChipCount > 0 ? <span className="text-sm text-[var(--workspace-muted)]">+{hiddenFilterChipCount} more</span> : null}
+            </div>
           ) : null}
 
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-[#e5d8ef] bg-[#fcf7fd] px-3 py-1.5 text-sm text-[#4f6877]">
-              Workflow {WORKFLOW_MODE_COPY[workflowMode].label}
-            </span>
-            <span className="rounded-full border border-[#e5d8ef] bg-[#fcf7fd] px-3 py-1.5 text-sm text-[#4f6877]">
-              Visible {visibleCustomers.length}
-            </span>
-            <span className="rounded-full border border-[#bfe8e2] bg-[#f5fffd] px-3 py-1.5 text-sm font-medium text-[#6f32b5]">
-              Working Group {selectedCustomerIds.length}
-            </span>
-            {selectedCustomerIds.length > 0 ? (
-              <span className="rounded-full border border-[#e5d8ef] bg-[#fcf7fd] px-3 py-1.5 text-sm text-[#4f6877]">
-                {selectedSegmentVisibleCount} visible in current filters{selectedSegmentHiddenCount > 0 ? ` • ${selectedSegmentHiddenCount} outside current filters` : ""}
-              </span>
-            ) : null}
-            <span className="rounded-full border border-[#e5d8ef] bg-[#fcf7fd] px-3 py-1.5 text-sm text-[#4f6877]">
-              Pending Stops {pendingStops.length}
-            </span>
-            <button type="button" onClick={clearSelection} disabled={selectedCustomerIds.length === 0} className={denseButtonClass()}>
-              Clear Group
-            </button>
-            {visibleGeocodeStatus ? <span className="text-sm text-[#4f6877]">{visibleGeocodeStatus}</span> : null}
+          <div className="flex flex-wrap items-center gap-2 text-sm text-[var(--workspace-text-secondary)]">
+            <span>{visibleCustomers.length} visible</span>
+            <span aria-hidden="true">•</span>
+            <span>{selectedCustomerIds.length} in working group</span>
+            <span aria-hidden="true">•</span>
+            <span>{pendingStops.length} pending stops</span>
+            {visibleGeocodeStatus ? <span>{visibleGeocodeStatus}</span> : null}
           </div>
         </section>
+
+        {showAdvancedFilters ? (
+          <>
+            <button
+              type="button"
+              aria-label="Close filters"
+              onClick={() => setShowAdvancedFilters(false)}
+              className="fixed inset-0 z-50 bg-black/25 min-[1367px]:hidden"
+            />
+            <aside
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="retail-account-filters-title"
+              className="fixed inset-y-16 right-0 z-[60] w-[min(92vw,28rem)] overflow-y-auto border-l border-[var(--workspace-border)] bg-white p-4 shadow-2xl min-[1367px]:static min-[1367px]:z-auto min-[1367px]:w-auto min-[1367px]:overflow-visible min-[1367px]:rounded-[var(--workspace-radius-lg)] min-[1367px]:border min-[1367px]:shadow-[var(--workspace-shadow)]"
+            >
+              <div className="sticky top-0 z-10 -mx-4 -mt-4 mb-4 flex items-center justify-between border-b border-[var(--workspace-border)] bg-white px-4 py-3">
+                <div>
+                  <h2 id="retail-account-filters-title" className="font-semibold text-[var(--workspace-text)]">Retail Account Filters</h2>
+                  <p className="mt-0.5 text-sm text-[var(--workspace-muted)]">{activeFilterChips.length} active filters</p>
+                </div>
+                <button type="button" onClick={() => setShowAdvancedFilters(false)} className={denseButtonClass()}>
+                  Close
+                </button>
+              </div>
+              <div className="mb-5 min-[1367px]:hidden">{queueShortcuts}</div>
+              {filterControls}
+              <div className="mt-5 flex flex-wrap justify-end gap-2 border-t border-[var(--workspace-border)] pt-4">
+                {activeFilterChips.length > 0 ? <button type="button" onClick={resetFilters} className={denseButtonClass()}>Clear all</button> : null}
+                <button type="button" onClick={() => setShowAdvancedFilters(false)} className={denseButtonClass("primary")}>Show {visibleCustomers.length} accounts</button>
+              </div>
+            </aside>
+          </>
+        ) : null}
 
         {selectedCustomerIds.length > 0 ? (
           <BulkActionBar
@@ -1648,14 +1629,14 @@ export default function CustomerWorkspaceIndex({
         ) : null}
 
         {organizeBy === "territory" && sections.length > 0 ? (
-          <nav className="rounded-[24px] border border-[#e9def1] bg-white p-4 shadow-[0_12px_32px_rgba(16,42,67,0.05)]">
+          <nav className="rounded-[24px] border border-[#deded8] bg-white p-4 shadow-[0_12px_32px_rgba(16,42,67,0.05)]">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">Territory Jump</p>
             <div className="mt-3 flex flex-wrap gap-2">
               {sections.map((section) => (
                 <a
                   key={section.key}
                   href={`#customer-segment-${section.key}`}
-                  className="rounded-full border border-[#d5e1e8] bg-[#fcf7fd] px-3 py-1.5 text-sm text-[#4a6575] transition hover:bg-white hover:text-[#173543]"
+                  className="rounded-full border border-[#d5e1e8] bg-[#f7f7f4] px-3 py-1.5 text-sm text-[#4a6575] transition hover:bg-white hover:text-[#181817]"
                 >
                   {section.label} ({section.customers.length})
                 </a>
@@ -1669,17 +1650,17 @@ export default function CustomerWorkspaceIndex({
             <div
               key={section.key}
               id={organizeBy === "territory" ? `customer-segment-${section.key}` : undefined}
-              className="rounded-[28px] border border-[#e9def1] bg-white p-4 shadow-[0_12px_32px_rgba(16,42,67,0.06)]"
+              className="rounded-[28px] border border-[#deded8] bg-white p-4 shadow-[0_12px_32px_rgba(16,42,67,0.06)]"
             >
               <div className="mb-4 flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">
                     {organizeBy === "none" ? "Results" : titleCase(organizeBy.replace("_", " "))}
                   </p>
-                  <h3 className="mt-1 text-xl font-semibold text-[#173543]">{section.label}</h3>
+                  <h3 className="mt-1 text-xl font-semibold text-[#181817]">{section.label}</h3>
                   <p className="mt-1 text-sm text-[#5c7483]">{section.description}</p>
                 </div>
-                <div className="rounded-2xl border border-[#e9def1] bg-[#fcf7fd] px-4 py-3 text-sm text-[#4f6877]">{section.statLine}</div>
+                <div className="rounded-2xl border border-[#deded8] bg-[#f7f7f4] px-4 py-3 text-sm text-[#4f6877]">{section.statLine}</div>
               </div>
 
               <div className="grid gap-3 xl:grid-cols-2 2xl:grid-cols-3">
@@ -1700,8 +1681,8 @@ export default function CustomerWorkspaceIndex({
           ))}
 
           {visibleCustomers.length === 0 ? (
-            <div className="rounded-[28px] border border-dashed border-[#ddcfe9] bg-white px-6 py-16 text-center">
-              <p className="text-lg font-semibold text-[#173543]">No accounts match the current segment.</p>
+            <div className="rounded-[28px] border border-dashed border-[#deded8] bg-white px-6 py-16 text-center">
+              <p className="text-lg font-semibold text-[#181817]">No accounts match the current segment.</p>
               <p className="mt-2 text-sm text-[#5c7483]">Adjust the search, filters, or organization mode to widen the workspace.</p>
             </div>
           ) : null}
@@ -1775,15 +1756,15 @@ function CustomerCard({
       onClick={() => onFocus(customer.id)}
       onKeyDown={handleCardKeyDown}
       className={[
-        "flex h-full cursor-pointer flex-col rounded-[24px] border bg-[linear-gradient(180deg,#ffffff_0%,#fffafd_100%)] p-4 shadow-[0_8px_18px_rgba(16,42,67,0.05)] transition hover:border-[#ddc6ea] hover:shadow-[0_14px_28px_rgba(16,42,67,0.08)] focus:outline-none focus:ring-2 focus:ring-[#173543]/20",
+        "flex h-full cursor-pointer flex-col rounded-[24px] border bg-[linear-gradient(180deg,#ffffff_0%,#fafaf8_100%)] p-4 shadow-[0_8px_18px_rgba(16,42,67,0.05)] transition hover:border-[#deded8] hover:shadow-[0_14px_28px_rgba(16,42,67,0.08)] focus:outline-none focus:ring-2 focus:ring-[#181817]/20",
         focused && selected
-          ? "border-[#2563eb] ring-2 ring-[#173543]/20"
+          ? "border-[#2563eb] ring-2 ring-[#181817]/20"
           : focused
-            ? "border-[#173543] ring-2 ring-[#d9e7ee]"
+            ? "border-[#181817] ring-2 ring-[#d9e7ee]"
             : selected
               ? "border-[#2563eb] ring-2 ring-[#bfdbfe]"
               : pendingSelected
-                ? "border-[#8f52dc]"
+                ? "border-[#1b1b1a]"
                 : "border-[#d9e7ee]",
       ].join(" ")}
     >
@@ -1805,7 +1786,7 @@ function CustomerCard({
                 onClick={stopCardEvent}
                 className={[
                   "truncate text-left text-base font-semibold transition",
-                  focused ? "text-[#6f32b5]" : "text-[#173543] hover:text-[#6f32b5]",
+                  focused ? "text-[#1b1b1a]" : "text-[#181817] hover:text-[#1b1b1a]",
                 ].join(" ")}
               >
                 {customer.name}
@@ -1842,33 +1823,33 @@ function CustomerCard({
         ) : null}
         <span className={["rounded-full border px-2 py-0.5 text-[11px] font-semibold", contactChipClass(customer)].join(" ")}>{contactState.label}</span>
         <span className={["rounded-full border px-2 py-0.5 text-[11px] font-semibold", followUpChipClass(customer)].join(" ")}>{followUpState}</span>
-        <span className="rounded-full border border-[#e5d8ef] bg-[#fcf7fd] px-2.5 py-1 text-xs font-semibold text-[#4f6877]">
+        <span className="rounded-full border border-[#deded8] bg-[#f7f7f4] px-2.5 py-1 text-xs font-semibold text-[#4f6877]">
           {customer.territoryCode ? `Territory ${customer.territoryCode}` : "No Territory"}
         </span>
         {needsCoordinates ? (
-          <span className="rounded-full border border-[#e5d8ef] bg-[#fcf7fd] px-2.5 py-1 text-xs font-semibold text-[#4f6877]">
+          <span className="rounded-full border border-[#deded8] bg-[#f7f7f4] px-2.5 py-1 text-xs font-semibold text-[#4f6877]">
             Needs Coordinates
           </span>
         ) : (
-          <span className="rounded-full border border-[#e8d7f7] bg-[#fcf3ff] px-2.5 py-1 text-xs font-semibold text-[#6f32b5]">
+          <span className="rounded-full border border-[#d9ddd9] bg-[#f7f7f4] px-2.5 py-1 text-xs font-semibold text-[#1b1b1a]">
             Map Ready
           </span>
         )}
         {customer.counts.estimates > 0 ? (
-          <span className="rounded-full border border-[#e5d8ef] bg-[#fcf7fd] px-2 py-0.5 text-[11px] font-semibold text-[#4f6877]">
+          <span className="rounded-full border border-[#deded8] bg-[#f7f7f4] px-2 py-0.5 text-[11px] font-semibold text-[#4f6877]">
             {customer.counts.estimates} estimate{customer.counts.estimates === 1 ? "" : "s"}
           </span>
         ) : null}
         {customer.counts.orders > 0 ? (
-          <span className="rounded-full border border-[#e5d8ef] bg-[#fcf7fd] px-2 py-0.5 text-[11px] font-semibold text-[#4f6877]">
+          <span className="rounded-full border border-[#deded8] bg-[#f7f7f4] px-2 py-0.5 text-[11px] font-semibold text-[#4f6877]">
             {customer.counts.orders} order{customer.counts.orders === 1 ? "" : "s"}
           </span>
         ) : null}
-        {pendingSelected ? <span className="rounded-full border border-[#bfe8e2] bg-[#f5fffd] px-2 py-0.5 text-[11px] font-semibold text-[#6f32b5]">Pending Stop</span> : null}
+        {pendingSelected ? <span className="rounded-full border border-[#bfe8e2] bg-[#f5fffd] px-2 py-0.5 text-[11px] font-semibold text-[#1b1b1a]">Pending Stop</span> : null}
       </div>
 
       <div className="mt-3 grid gap-3 text-sm text-[#56717f] sm:grid-cols-2">
-        <div className="min-w-0 rounded-[18px] border border-[#e3edf2] bg-[#fcf7fd] px-3 py-2.5">
+        <div className="min-w-0 rounded-[18px] border border-[#e3edf2] bg-[#f7f7f4] px-3 py-2.5">
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#7a909d]">Contact</p>
           <p className="mt-1 truncate font-medium text-[#294653]">{primaryContact?.name || "No primary contact"}</p>
           <p className="mt-1 flex min-w-0 items-start gap-1 text-xs text-[#7a909d]">
@@ -1879,7 +1860,7 @@ function CustomerCard({
           </p>
         </div>
 
-        <div className="min-w-0 rounded-[18px] border border-[#e3edf2] bg-[#fcf7fd] px-3 py-2.5">
+        <div className="min-w-0 rounded-[18px] border border-[#e3edf2] bg-[#f7f7f4] px-3 py-2.5">
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#7a909d]">CRM Snapshot</p>
           <p className="mt-1 truncate font-medium text-[#294653]">{bestNextAction}</p>
           <p className="mt-1 truncate text-xs text-[#7a909d]">{customer.contactCount} contacts • {activityCount} linked records</p>
@@ -1940,14 +1921,14 @@ function RouteActionButton({
         className={[
           "inline-flex h-8 min-w-[112px] items-center justify-center whitespace-nowrap rounded-full px-3 text-sm font-semibold transition",
           pendingSelected
-            ? "border border-[#bfe8e2] bg-[#f5fffd] text-[#6f32b5] hover:border-[#8f52dc]"
-            : "border border-[#cddbe4] bg-white text-[#21424d] hover:border-[#8f52dc] hover:text-[#6f32b5]",
+            ? "border border-[#bfe8e2] bg-[#f5fffd] text-[#1b1b1a] hover:border-[#1b1b1a]"
+            : "border border-[#cddbe4] bg-white text-[#21424d] hover:border-[#1b1b1a] hover:text-[#1b1b1a]",
         ].join(" ")}
       >
         {busy ? "Saving..." : pendingSelected ? "In Route" : "Add to Route"}
       </button>
       {routeHref ? (
-        <Link href={routeHref} className="inline-flex h-7 items-center whitespace-nowrap rounded-full border border-[#bfe8e2] px-3 text-xs font-semibold uppercase tracking-[0.08em] text-[#6f32b5] transition hover:text-[#0b5f58]">
+        <Link href={routeHref} className="inline-flex h-7 items-center whitespace-nowrap rounded-full border border-[#bfe8e2] px-3 text-xs font-semibold uppercase tracking-[0.08em] text-[#1b1b1a] transition hover:text-[#0b5f58]">
           View Route
         </Link>
       ) : null}
@@ -2011,7 +1992,7 @@ function BulkActionBar({
     <section className="rounded-[24px] border border-[#bfe8e2] bg-[linear-gradient(180deg,#f5fffd_0%,#ffffff_100%)] p-4 shadow-[0_14px_30px_rgba(16,42,67,0.08)]">
       <div className="flex flex-col gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6f32b5]">Working Group</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#1b1b1a]">Working Group</p>
           <p className="mt-1 text-sm text-[#35505d]">
             {selectedCount} account{selectedCount === 1 ? "" : "s"} in the current working group
           </p>
@@ -2027,7 +2008,7 @@ function BulkActionBar({
               type="button"
               onClick={() => onActionChange({ kind: "assign_sales_rep", value: "" })}
               disabled={busy}
-              className="h-10 rounded-full border border-[#decfe8] bg-white px-4 text-sm font-semibold text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543] disabled:cursor-not-allowed disabled:opacity-60"
+              className="h-10 rounded-full border border-[#deded8] bg-white px-4 text-sm font-semibold text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#181817] disabled:cursor-not-allowed disabled:opacity-60"
             >
               Assign Rep
             </button>
@@ -2036,7 +2017,7 @@ function BulkActionBar({
             type="button"
             onClick={() => onActionChange({ kind: "assign_territory", value: "" })}
             disabled={busy}
-            className="h-10 rounded-full border border-[#decfe8] bg-white px-4 text-sm font-semibold text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543] disabled:cursor-not-allowed disabled:opacity-60"
+            className="h-10 rounded-full border border-[#deded8] bg-white px-4 text-sm font-semibold text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#181817] disabled:cursor-not-allowed disabled:opacity-60"
           >
             Assign Territory
           </button>
@@ -2044,7 +2025,7 @@ function BulkActionBar({
             type="button"
             onClick={onAddToPending}
             disabled={busy || !canAddToPending}
-            className="h-10 rounded-full bg-[#173543] px-4 text-sm font-semibold text-white transition hover:bg-[#0f2a35] disabled:cursor-not-allowed disabled:opacity-60"
+            className="h-10 rounded-full bg-[#181817] px-4 text-sm font-semibold text-white transition hover:bg-[#0f2a35] disabled:cursor-not-allowed disabled:opacity-60"
           >
             Add to Pending Stops
           </button>
@@ -2052,7 +2033,7 @@ function BulkActionBar({
             type="button"
             onClick={onOpenRoutePrep}
             disabled={busy}
-            className="h-10 rounded-full border border-[#8f52dc] bg-white px-4 text-sm font-semibold text-[#6f32b5] transition hover:bg-[#fcf5ff] disabled:cursor-not-allowed disabled:opacity-60"
+            className="h-10 rounded-full border border-[#1b1b1a] bg-white px-4 text-sm font-semibold text-[#1b1b1a] transition hover:bg-[#f7f7f4] disabled:cursor-not-allowed disabled:opacity-60"
           >
             Open Map on Group
           </button>
@@ -2061,7 +2042,7 @@ function BulkActionBar({
               type="button"
               onClick={onRemoveFromPending}
               disabled={busy}
-              className="h-10 rounded-full border border-[#decfe8] bg-white px-4 text-sm font-semibold text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543] disabled:cursor-not-allowed disabled:opacity-60"
+              className="h-10 rounded-full border border-[#deded8] bg-white px-4 text-sm font-semibold text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#181817] disabled:cursor-not-allowed disabled:opacity-60"
             >
               Remove from Pending
             </button>
@@ -2070,7 +2051,7 @@ function BulkActionBar({
             type="button"
             onClick={onCreateEmailCampaign}
             disabled={busy}
-            className="h-10 rounded-full border border-[#173543] bg-white px-4 text-sm font-semibold text-[#173543] transition hover:bg-[#173543] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+            className="h-10 rounded-full border border-[#181817] bg-white px-4 text-sm font-semibold text-[#181817] transition hover:bg-[#181817] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
           >
             Create Email Campaign
           </button>
@@ -2078,7 +2059,7 @@ function BulkActionBar({
             type="button"
             onClick={onClear}
             disabled={busy}
-            className="h-10 rounded-full border border-[#decfe8] bg-white px-4 text-sm font-semibold text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#173543] disabled:cursor-not-allowed disabled:opacity-60"
+            className="h-10 rounded-full border border-[#deded8] bg-white px-4 text-sm font-semibold text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#181817] disabled:cursor-not-allowed disabled:opacity-60"
           >
             Clear Group
           </button>
@@ -2091,7 +2072,7 @@ function BulkActionBar({
               value={action.kind}
               onChange={(event) => onActionChange({ ...action, kind: event.target.value as BulkActionKind, value: "" })}
               disabled={busy}
-              className="h-10 rounded-2xl border border-[#cedde6] bg-white px-4 text-sm text-[#173543] outline-none transition focus:border-[#8f52dc]"
+              className="h-10 rounded-2xl border border-[#cedde6] bg-white px-4 text-sm text-[#181817] outline-none transition focus:border-[#1b1b1a]"
             >
               {availableActions.map((item) => (
                 <option key={item.key} value={item.key}>
@@ -2108,7 +2089,7 @@ function BulkActionBar({
                 value={action.value}
                 onChange={(event) => onActionChange({ ...action, value: event.target.value })}
                 disabled={busy}
-                className="h-10 min-w-[220px] rounded-2xl border border-[#cedde6] bg-white px-4 text-sm text-[#173543] outline-none transition focus:border-[#8f52dc]"
+                className="h-10 min-w-[220px] rounded-2xl border border-[#cedde6] bg-white px-4 text-sm text-[#181817] outline-none transition focus:border-[#1b1b1a]"
               >
                 <option value="">Select {valueLabel.toLowerCase()}</option>
                 {action.kind === "assign_sales_rep"
@@ -2127,7 +2108,7 @@ function BulkActionBar({
               </select>
             </label>
           ) : (
-            <div className="rounded-2xl border border-[#e5d8ef] bg-white px-4 py-3 text-sm text-[#4f6877]">
+            <div className="rounded-2xl border border-[#deded8] bg-white px-4 py-3 text-sm text-[#4f6877]">
               {action.kind === "convert_to_source"
                 ? "Creates source records from the selected customer accounts and soft-removes those accounts from the active workspace."
                 : action.kind === "archive_customers"
@@ -2144,7 +2125,7 @@ function BulkActionBar({
             type="button"
             onClick={onApply}
             disabled={busy}
-            className="h-10 rounded-full bg-[#173543] px-4 text-sm font-semibold text-white transition hover:bg-[#0f2a35] disabled:cursor-not-allowed disabled:opacity-60"
+            className="h-10 rounded-full bg-[#181817] px-4 text-sm font-semibold text-white transition hover:bg-[#0f2a35] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {busy ? "Applying..." : "Apply More Action"}
           </button>
@@ -2173,7 +2154,7 @@ function FilterSelect({
       <select
         value={value}
         onChange={(event) => startTransition(() => onChange(event.target.value))}
-        className="h-10 rounded-2xl border border-[#cedde6] bg-[#fffafd] px-4 text-sm text-[#173543] outline-none transition focus:border-[#8f52dc] focus:bg-white"
+        className="h-10 rounded-2xl border border-[#cedde6] bg-[#fafaf8] px-4 text-sm text-[#181817] outline-none transition focus:border-[#1b1b1a] focus:bg-white"
       >
         {allowAllLabel !== null ? <option value="all">{allowAllLabel}</option> : null}
         {options.map((option) => (
@@ -2190,7 +2171,7 @@ function MetricLine({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-3 text-sm text-[#506877]">
       <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7d95a3]">{label}</span>
-      <span className="text-lg font-semibold text-[#173543]">{value}</span>
+      <span className="text-lg font-semibold text-[#181817]">{value}</span>
     </div>
   );
 }
@@ -2198,7 +2179,7 @@ function MetricLine({ label, value }: { label: string; value: string }) {
 function QuickAction({ href, label, external = false }: { href: string | null; label: string; external?: boolean }) {
   if (!href) {
     return (
-      <span className="inline-flex h-8 items-center justify-center rounded-full border border-[#d9e5eb] bg-[#fdf7fb] px-3 text-sm text-[#89a0ad]">
+      <span className="inline-flex h-8 items-center justify-center rounded-full border border-[#d9e5eb] bg-[#f7f7f4] px-3 text-sm text-[#89a0ad]">
         {label}
       </span>
     );
@@ -2210,7 +2191,7 @@ function QuickAction({ href, label, external = false }: { href: string | null; l
       onClick={(event) => event.stopPropagation()}
       target={external ? "_blank" : undefined}
       rel={external ? "noreferrer" : undefined}
-      className="inline-flex h-8 items-center justify-center rounded-full border border-[#cddbe4] bg-white px-3 text-sm font-medium text-[#21424d] transition hover:border-[#8f52dc] hover:text-[#6f32b5]"
+      className="inline-flex h-8 items-center justify-center rounded-full border border-[#cddbe4] bg-white px-3 text-sm font-medium text-[#21424d] transition hover:border-[#1b1b1a] hover:text-[#1b1b1a]"
     >
       {label}
     </a>

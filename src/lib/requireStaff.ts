@@ -6,12 +6,12 @@ export async function requireStaff() {
   const supabase = await createClient();
   const { data: authData, error: authErr } = await supabase.auth.getUser();
   if (authErr || !authData?.user) {
-    redirect("/login?returnTo=/admin");
+    redirect("/crm/login?returnTo=/workspace/customers");
   }
 
   const context = await getStaffContext();
   if (!context) {
-    redirect("/dashboard");
+    redirect("/crm/login");
   }
 
   return context;

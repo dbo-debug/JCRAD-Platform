@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { renderCampaignEmail } from "@/lib/email/campaignRenderer";
-import { getGmailConnectionStatus, sendGmailMessage } from "@/lib/email/gmail";
+import { sendGmailMessage } from "@/lib/email/gmail";
+import { getCrmCommunicationsEmailStatus } from "@/lib/email/crmEmailIdentities";
 import { sendLoggedOutboundEmail } from "@/lib/email/outbound";
 import { loadManagedCampaign } from "@/lib/emailCampaigns";
 import { getStaffContext } from "@/lib/getStaffContext";
+import { filterNamelessCustomerIds } from "@/lib/namelessCustomerAccess";
 
 type RecipientInput = {
   customer_id?: unknown;
@@ -72,7 +74,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     return NextResponse.json({ error: message }, { status: message === "Forbidden" ? 403 : 404 });
   }
 
-  const gmailStatus = await getGmailConnectionStatus(staff.userId);
+  const gmailStatus = await getCrmCommunicationsEmailStatus(staff.userId);
   if (!gmailStatus.ok) {
     return NextResponse.json({ error: gmailStatus.error }, { status: 400 });
   }
@@ -124,6 +126,30 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   }
   if (recipients.length > 50) {
     return NextResponse.json({ error: "Campaign sends are limited to 50 recipients per action." }, { status: 400 });
+  }
+  const allowedCustomerIds = await filterNamelessCustomerIds(recipients.map((recipient) => recipient.customerId));
+  if (recipients.some((recipient) => !allowedCustomerIds.has(recipient.customerId))) {
+    return NextResponse.json({ error: "One or more recipients are outside the Nameless workspace." }, { status: 400 });
+  }
+  const contactIds = recipients.map((recipient) => recipient.contactId).filter((value): value is string => Boolean(value));
+  if (contactIds.length > 0) {
+    const { data: contacts, error: contactsError } = await admin
+      .from("customer_contacts")
+      .select("id, customer_id")
+      .in("id", contactIds);
+    if (contactsError) return NextResponse.json({ error: contactsError.message }, { status: 500 });
+    const customerByContactId = new Map(
+      ((contacts || []) as Array<{ id: string; customer_id: string }>).map((contact) => [contact.id, contact.customer_id])
+    );
+    if (
+      recipients.some(
+        (recipient) =>
+          recipient.contactId &&
+          customerByContactId.get(recipient.contactId) !== recipient.customerId
+      )
+    ) {
+      return NextResponse.json({ error: "One or more contacts do not belong to the selected account." }, { status: 400 });
+    }
   }
 
   await admin.from("email_campaign_recipients").upsert(

@@ -23,13 +23,14 @@ type SubmissionRow = {
 };
 
 type PageProps = {
-  searchParams?: {
+  searchParams?: Promise<{
     category?: string;
     returnTo?: string;
-  };
+  }>;
 };
 
 export default async function DashboardPackagingPage({ searchParams }: PageProps) {
+  const params = await searchParams;
   const { user, profile } = await getUserAndProfile();
   if (!user) {
     redirect("/login?returnTo=/dashboard/packaging");
@@ -39,8 +40,8 @@ export default async function DashboardPackagingPage({ searchParams }: PageProps
   if (role === "admin") redirect("/admin");
   if (role === "sales" || role === "employee") redirect("/portal");
 
-  const returnTo = safeInternalReturnTo(searchParams?.returnTo || "/dashboard");
-  const requestedCategory = normalizePackagingCategory(searchParams?.category || "");
+  const returnTo = safeInternalReturnTo(params?.returnTo || "/dashboard");
+  const requestedCategory = normalizePackagingCategory(params?.category || "");
   const supabase = await createClient();
 
   const { data: submissionRows } = await supabase

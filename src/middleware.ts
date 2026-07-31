@@ -1,8 +1,80 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+const STATIC_FILE_EXTENSION =
+  /\.(?:png|jpe?g|gif|webp|svg|ico|css|js|map|woff2?|ttf)$/i;
+
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
+
+  const isProtectedApplicationPath =
+    pathname === "/workspace" ||
+    pathname.startsWith("/workspace/") ||
+    pathname === "/admin" ||
+    pathname.startsWith("/admin/") ||
+    pathname === "/portal" ||
+    pathname.startsWith("/portal/") ||
+    pathname === "/auth" ||
+    pathname.startsWith("/auth/") ||
+    pathname === "/api" ||
+    pathname.startsWith("/api/") ||
+    pathname === "/estimate" ||
+    pathname.startsWith("/estimate/") ||
+    pathname === "/dashboard" ||
+    pathname.startsWith("/dashboard/") ||
+    pathname === "/menu" ||
+    pathname.startsWith("/menu/");
+
+  const isPublicStaticAsset =
+    pathname.startsWith("/_next/static/") ||
+    pathname.startsWith("/_next/image/") ||
+    pathname.startsWith("/brand/") ||
+    pathname === "/favicon.ico" ||
+    pathname === "/robots.txt" ||
+    pathname === "/sitemap.xml" ||
+    (!isProtectedApplicationPath && STATIC_FILE_EXTENSION.test(pathname));
+
+  if (isPublicStaticAsset) {
+    return NextResponse.next();
+  }
+
+  const isEstimatorPath =
+    pathname === "/estimate" ||
+    pathname.startsWith("/estimate/") ||
+    pathname === "/dashboard" ||
+    pathname.startsWith("/api/estimate/") ||
+    pathname.startsWith("/api/workspace/estimates/") ||
+    pathname.startsWith("/api/admin/estimate-lines/") ||
+    pathname === "/api/settings/yields" ||
+    pathname === "/api/production/finalize-line";
+  const isDisabledCatalogPath =
+    pathname === "/menu" ||
+    pathname.startsWith("/menu/") ||
+    pathname.startsWith("/api/admin/catalog-items") ||
+    pathname.startsWith("/api/admin/offers") ||
+    pathname.startsWith("/api/admin/packaging") ||
+    pathname.startsWith("/api/admin/product") ||
+    pathname === "/api/admin/settings/estimator" ||
+    pathname === "/api/admin/settings/pricing" ||
+    pathname === "/api/admin/settings/yields" ||
+    pathname.startsWith("/api/admin/upload-variant-media") ||
+    pathname.startsWith("/api/admin/variant-media") ||
+    pathname.startsWith("/api/variant-media") ||
+    pathname.startsWith("/api/packaging") ||
+    pathname.startsWith("/api/order/");
+
+  if (isEstimatorPath || isDisabledCatalogPath) {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json(
+        { error: isEstimatorPath ? "Estimator is temporarily disabled." : "Catalog functionality is temporarily disabled." },
+        { status: 410 }
+      );
+    }
+    const homeUrl = request.nextUrl.clone();
+    homeUrl.pathname = "/";
+    homeUrl.search = "";
+    return NextResponse.redirect(homeUrl);
+  }
 
   // Site-wide age gate:
   // If age verification cookie is missing, redirect to /age-gate for all
@@ -17,6 +89,10 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/images") ||
     pathname.startsWith("/assets") ||
     pathname === "/login" ||
+    pathname === "/crm" ||
+    pathname.startsWith("/crm/") ||
+    pathname.startsWith("/workspace") ||
+    pathname.startsWith("/admin") ||
     pathname.startsWith("/auth/");
 
   const hasAgeVerification = request.cookies.get("age_verified")?.value === "true";
@@ -57,39 +133,24 @@ export async function middleware(request: NextRequest) {
   if (pathname.startsWith("/admin")) {
     if (!user) {
       const loginUrl = request.nextUrl.clone();
-      loginUrl.pathname = "/login";
+      loginUrl.pathname = "/crm/login";
       loginUrl.searchParams.set("returnTo", `${request.nextUrl.pathname}${request.nextUrl.search}`);
       return NextResponse.redirect(loginUrl);
     }
-
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    const role = String(profile?.role || "").trim().toLowerCase();
-    const isStaff = role === "admin" || role === "sales";
-
-    if (!isStaff) {
-      const dashboardUrl = request.nextUrl.clone();
-      dashboardUrl.pathname = "/dashboard";
-      dashboardUrl.search = "";
-      return NextResponse.redirect(dashboardUrl);
-    }
-
-    if (role !== "admin" && pathname !== "/admin") {
-      const commandCenterUrl = request.nextUrl.clone();
-      commandCenterUrl.pathname = "/admin";
-      commandCenterUrl.search = "";
-      return NextResponse.redirect(commandCenterUrl);
-    }
-
-    return response;
+    const crmUrl = request.nextUrl.clone();
+    crmUrl.pathname = "/workspace/customers";
+    crmUrl.search = "";
+    return NextResponse.redirect(crmUrl);
   }
 
-  // Keep the existing Supabase auth behavior limited to /portal paths only.
-  // Other routes should continue without portal auth enforcement.
+  if (pathname.startsWith("/workspace") && !user) {
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = "/crm/login";
+    loginUrl.searchParams.set("returnTo", `${request.nextUrl.pathname}${request.nextUrl.search}`);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  // Keep the existing customer Supabase auth behavior limited to /portal paths.
   if (!pathname.startsWith("/portal")) {
     return response;
   }

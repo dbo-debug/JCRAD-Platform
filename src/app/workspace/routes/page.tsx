@@ -55,9 +55,9 @@ export default async function WorkspaceRoutesPage({
 
 function StageCard({ step, title, description }: { step: string; title: string; description: string }) {
   return (
-    <div className="rounded-[24px] border border-[#e5d8ef] bg-[linear-gradient(180deg,#ffffff_0%,#fdf7fb_100%)] p-5 shadow-[0_12px_30px_rgba(16,42,67,0.06)]">
+    <div className="rounded-[24px] border border-[#deded8] bg-[linear-gradient(180deg,#ffffff_0%,#f7f7f4_100%)] p-5 shadow-[0_12px_30px_rgba(16,42,67,0.06)]">
       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#617d8c]">{step}</p>
-      <p className="mt-2 text-xl font-semibold text-[#173543]">{title}</p>
+      <p className="mt-2 text-xl font-semibold text-[#181817]">{title}</p>
       <p className="mt-2 text-sm text-[#5c7483]">{description}</p>
     </div>
   );

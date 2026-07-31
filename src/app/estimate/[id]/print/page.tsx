@@ -4,11 +4,12 @@ import { createClient } from "@/lib/supabase/server";
 import EstimatePrintClient from "./print-client";
 
 type PrintPageProps = {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 };
 
 export default async function EstimatePrintPage({ params }: PrintPageProps) {
-  const id = String(params.id || "").trim();
+  const { id: rawId } = await params;
+  const id = String(rawId || "").trim();
   if (!id) {
     redirect("/estimate");
   }

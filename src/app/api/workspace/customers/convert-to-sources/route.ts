@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getStaffContext } from "@/lib/getStaffContext";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { filterNamelessCustomerIds } from "@/lib/namelessCustomerAccess";
 
 type CustomerRow = {
   id: string;
@@ -37,6 +38,10 @@ export async function POST(req: Request) {
   const customerIds = Array.from(new Set(asIdArray(body.customer_ids)));
   if (customerIds.length === 0) {
     return NextResponse.json({ error: "customer_ids required" }, { status: 400 });
+  }
+  const allowedCustomerIds = await filterNamelessCustomerIds(customerIds);
+  if (allowedCustomerIds.size !== customerIds.length) {
+    return NextResponse.json({ error: "One or more accounts are outside the Nameless workspace." }, { status: 400 });
   }
   console.log("[convert-to-sources] selected customer count", customerIds.length);
 
