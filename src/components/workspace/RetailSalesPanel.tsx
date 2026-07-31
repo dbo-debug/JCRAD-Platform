@@ -12,8 +12,8 @@ import {
 type ContactOption = { id: string; name: string; email: string | null; title: string | null };
 
 const inputClass =
-  "min-h-11 w-full rounded-xl border border-[#d6e4ea] bg-white px-3 py-2.5 text-sm text-[#181817] outline-none focus:border-[#405d6b] focus:ring-2 focus:ring-[#405d6b]/15";
-const cardClass = "rounded-[24px] border border-[#d8e6ed] bg-white p-4 shadow-sm sm:p-5";
+  "min-h-11 w-full rounded-xl border border-[var(--workspace-border)] bg-white px-3 py-2.5 text-sm text-[#181817] outline-none focus:border-black focus:ring-2 focus:ring-black/10";
+const cardClass = "rounded-[24px] border border-[var(--workspace-border)] bg-white p-4 shadow-sm sm:p-5";
 
 function labelize(value: unknown) {
   return String(value || "")
@@ -40,11 +40,13 @@ export default function RetailSalesPanel({
   contacts,
   data,
   canVerifyOwnership,
+  mode = "sales",
 }: {
   customerId: string;
   contacts: ContactOption[];
   data: RetailSalesAccountData;
   canVerifyOwnership: boolean;
+  mode?: "activity" | "sales" | "setup";
 }) {
   const router = useRouter();
   const endpoint = `/api/workspace/retail/accounts/${encodeURIComponent(customerId)}/sales`;
@@ -287,22 +289,26 @@ export default function RetailSalesPanel({
   }
 
   return (
-    <section id="nameless-sales-workspace" className="scroll-mt-24 space-y-5">
-      <div className="rounded-[28px] border border-[#bfe8df] bg-[linear-gradient(135deg,#effcf8_0%,#ffffff_70%)] p-5 shadow-sm sm:p-6">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#405d6b]">Nameless Genetics Retail Sales</p>
+    <section
+      id={mode === "activity" ? "retail-sales-activity" : mode === "setup" ? "retail-sales-setup" : "nameless-sales-workspace"}
+      className="scroll-mt-24 space-y-5"
+    >
+      {error ? <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p> : null}
+      {message ? <p className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">{message}</p> : null}
+      {mode === "sales" ? (
+        <>
+      <div className="rounded-2xl border border-[var(--workspace-border)] bg-white p-4 shadow-sm sm:p-5">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--workspace-muted)]">Sales Pipeline</p>
         <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h2 className="text-2xl font-semibold text-[#181817]">Account sales workspace</h2>
-            <p className="mt-1 text-sm text-[#5c7483]">Opportunities, buyer activity, samples, orders, and estimated commission stay attached to this retail account.</p>
+            <h2 className="text-xl font-semibold text-[#181817]">Pipeline, samples, orders & commission</h2>
+            <p className="mt-1 text-sm text-[#5c7483]">Daily retail-sales records stay attached to this account.</p>
           </div>
-          <span className="rounded-full border border-[#bfe8df] bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-[#405d6b]">
+          <span className="rounded-full border border-[var(--workspace-border)] bg-[var(--workspace-surface-muted)] px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--workspace-text-secondary)]">
             {labelize(data.account.ownershipStatus)}
           </span>
         </div>
       </div>
-
-      {error ? <p role="alert" className="rounded-xl border border-[#f1d1d1] bg-[#fff5f5] px-4 py-3 text-sm text-[#991b1b]">{error}</p> : null}
-      {message ? <p className="rounded-xl border border-[#bfe8df] bg-[#effcf8] px-4 py-3 text-sm text-[#405d6b]">{message}</p> : null}
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Metric label="Commissionable this month" value={currency(data.commission.commissionableSalesThisMonth)} />
@@ -310,7 +316,11 @@ export default function RetailSalesPanel({
         <Metric label="Approved unpaid" value={currency(data.commission.approvedUnpaidCommission)} />
         <Metric label="Paid commission" value={currency(data.commission.paidCommission)} />
       </div>
+        </>
+      ) : null}
 
+      {mode === "setup" ? (
+        <>
       <details className={cardClass}>
         <summary className="cursor-pointer text-lg font-semibold text-[#181817]">Retail account profile</summary>
         <form onSubmit={saveProfile} className="mt-5 grid gap-4 md:grid-cols-2">
@@ -328,7 +338,7 @@ export default function RetailSalesPanel({
         </form>
       </details>
 
-      <details className={cardClass} open>
+      <details className={cardClass}>
         <summary className="cursor-pointer text-lg font-semibold text-[#181817]">Ownership and commission protection</summary>
         <form onSubmit={saveOwnership} className="mt-5 grid gap-4 md:grid-cols-2">
           <Field label="Ownership status"><select value={ownership.status} onChange={(e) => setOwnership((current) => ({ ...current, status: e.target.value }))} className={inputClass}>{ACCOUNT_OWNERSHIP_OPTIONS.map((option) => <option key={option} value={option}>{labelize(option)}</option>)}</select></Field>
@@ -341,9 +351,13 @@ export default function RetailSalesPanel({
           <button disabled={busy !== null} className="min-h-12 rounded-full bg-[#181817] px-5 py-3 font-semibold text-white disabled:opacity-50 md:col-span-2">{busy === "update_ownership" ? "Saving..." : "Save Ownership"}</button>
         </form>
       </details>
+        </>
+      ) : null}
 
-      <div className="grid gap-5 2xl:grid-cols-2">
-        <details id="nameless-opportunity" className={`${cardClass} scroll-mt-24`} open>
+      {mode === "sales" ? (
+        <>
+      <div id="sales-pipeline" className="grid scroll-mt-24 gap-5 2xl:grid-cols-2">
+        <details id="nameless-opportunity" className={`${cardClass} scroll-mt-24`}>
           <summary className="cursor-pointer text-lg font-semibold text-[#181817]">Create opportunity</summary>
           <form onSubmit={createOpportunity} className="mt-5 grid gap-3 sm:grid-cols-2">
             <Field label="Opportunity name" className="sm:col-span-2"><input required value={opportunity.name} onChange={(e) => setOpportunity((current) => ({ ...current, name: e.target.value }))} className={inputClass} /></Field>
@@ -356,7 +370,7 @@ export default function RetailSalesPanel({
             <Field label="Next action" className="sm:col-span-2"><input value={opportunity.nextAction} onChange={(e) => setOpportunity((current) => ({ ...current, nextAction: e.target.value }))} className={inputClass} /></Field>
             <fieldset className="sm:col-span-2"><legend className="text-sm font-semibold text-[#355160]">Product interest</legend><div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">{PRODUCT_INTEREST_OPTIONS.map((product) => <label key={product} className="flex min-h-11 items-center gap-2 rounded-xl border border-[#d6e4ea] px-3 text-sm"><input type="checkbox" checked={opportunity.products.includes(product)} onChange={() => setOpportunity((current) => ({ ...current, products: current.products.includes(product) ? current.products.filter((item) => item !== product) : [...current.products, product] }))} className="h-4 w-4" />{product}</label>)}</div></fieldset>
             <Field label="Notes" className="sm:col-span-2"><textarea rows={3} value={opportunity.notes} onChange={(e) => setOpportunity((current) => ({ ...current, notes: e.target.value }))} className={inputClass} /></Field>
-            <button disabled={busy !== null} className="min-h-12 rounded-full bg-[#405d6b] px-5 py-3 font-semibold text-white disabled:opacity-50 sm:col-span-2">{busy === "create_opportunity" ? "Creating..." : "Create Opportunity"}</button>
+            <button disabled={busy !== null} className="min-h-12 rounded-lg bg-black px-5 py-3 font-semibold text-white disabled:opacity-50 sm:col-span-2">{busy === "create_opportunity" ? "Creating..." : "Create Opportunity"}</button>
           </form>
         </details>
 
@@ -370,7 +384,10 @@ export default function RetailSalesPanel({
           </div>
         </div>
       </div>
+        </>
+      ) : null}
 
+      {mode === "activity" ? (
       <div className="grid gap-5 2xl:grid-cols-2">
         <details id="nameless-activity" className={`${cardClass} scroll-mt-24`} open>
           <summary className="cursor-pointer text-lg font-semibold text-[#181817]">Log activity or meeting</summary>
@@ -387,7 +404,13 @@ export default function RetailSalesPanel({
           </form>
         </details>
 
-        <details id="nameless-samples" className={`${cardClass} scroll-mt-24`} open>
+      </div>
+      ) : null}
+
+      {mode === "sales" ? (
+        <>
+      <div id="samples-orders-commission" className="grid scroll-mt-24 gap-5 2xl:grid-cols-2">
+        <details id="nameless-samples" className={`${cardClass} scroll-mt-24`}>
           <summary className="cursor-pointer text-lg font-semibold text-[#181817]">Record samples</summary>
           <form onSubmit={createSample} className="mt-5 grid gap-3 sm:grid-cols-2">
             <ContactSelect contacts={contacts} value={sample.contactId} onChange={(value) => setSample((current) => ({ ...current, contactId: value }))} />
@@ -403,13 +426,28 @@ export default function RetailSalesPanel({
             <Field label="Follow-up date"><input type="date" value={sample.followUpDate} onChange={(e) => setSample((current) => ({ ...current, followUpDate: e.target.value }))} className={inputClass} /></Field>
             <Field label="Outcome"><select value={sample.outcome} onChange={(e) => setSample((current) => ({ ...current, outcome: e.target.value }))} className={inputClass}>{["pending","positive","neutral","negative","more_samples_requested","pricing_requested","order_expected","no_response"].map((option) => <option key={option} value={option}>{labelize(option)}</option>)}</select></Field>
             <Field label="Buyer feedback" className="sm:col-span-2"><textarea rows={3} value={sample.feedback} onChange={(e) => setSample((current) => ({ ...current, feedback: e.target.value }))} className={inputClass} /></Field>
-            <button disabled={busy !== null} className="min-h-12 rounded-full bg-[#405d6b] px-5 py-3 font-semibold text-white disabled:opacity-50 sm:col-span-2">{busy === "create_sample" ? "Saving..." : sample.deliveredAt ? "Record Sample Drop" : "Record Sample Request"}</button>
+            <button disabled={busy !== null} className="min-h-12 rounded-lg bg-black px-5 py-3 font-semibold text-white disabled:opacity-50 sm:col-span-2">{busy === "create_sample" ? "Saving..." : sample.deliveredAt ? "Record Sample Drop" : "Record Sample Request"}</button>
           </form>
         </details>
+        <div className={cardClass}>
+          <h3 className="text-lg font-semibold text-[#181817]">Sample history</h3>
+          <div className="mt-4 space-y-3">
+            {data.samples.map((item) => (
+              <div key={String(item.id)} className="rounded-2xl border border-[#d8e6ed] bg-[#f7fbfc] p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="font-semibold text-[#181817]">{text(item, "recipient") || "Retail sample"}</p>
+                  <span className="rounded-full border border-[var(--workspace-border)] bg-white px-2.5 py-1 text-xs font-semibold uppercase text-[var(--workspace-text-secondary)]">{labelize(item.outcome || item.approval_status)}</span>
+                </div>
+                <p className="mt-2 text-sm text-[#4f6877]">{text(item, "requested_at") || "Request date unavailable"}{text(item, "follow_up_date") ? ` • Follow up ${text(item, "follow_up_date")}` : ""}</p>
+              </div>
+            ))}
+            {data.samples.length === 0 ? <Empty label="No sample history yet." /> : null}
+          </div>
+        </div>
       </div>
 
       <div className="grid gap-5 2xl:grid-cols-2">
-        <details className={cardClass} open>
+        <details className={cardClass}>
           <summary className="cursor-pointer text-lg font-semibold text-[#181817]">Record order and estimated commission</summary>
           <p className="mt-2 text-sm text-[#9a6b00]">Commission is an operational estimate and is not guaranteed income.</p>
           <form onSubmit={createOrder} className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -435,19 +473,29 @@ export default function RetailSalesPanel({
         <div className={cardClass}>
           <h3 className="text-lg font-semibold text-[#181817]">Orders and commission</h3>
           <div className="mt-4 space-y-3">
-            {data.orders.map((item) => <div key={String(item.id)} className="rounded-2xl border border-[#d8e6ed] bg-[#f7fbfc] p-4"><div className="flex flex-wrap items-center justify-between gap-2"><p className="font-semibold text-[#181817]">{text(item, "order_number") || `Order ${String(item.id).slice(0, 8)}`}</p><span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold uppercase text-[#405d6b]">{labelize(item.commission_status)}</span></div><p className="mt-2 text-sm text-[#4f6877]">Commissionable {currency(item.commissionable_sales)} • Estimated commission {currency(item.estimated_commission)}</p><p className="mt-1 text-xs text-[#9a6b00]">Estimate only; not guaranteed income.</p></div>)}
+            {data.orders.map((item) => <div key={String(item.id)} className="rounded-2xl border border-[var(--workspace-border)] bg-[var(--workspace-surface-muted)] p-4"><div className="flex flex-wrap items-center justify-between gap-2"><p className="font-semibold text-[#181817]">{text(item, "order_number") || `Order ${String(item.id).slice(0, 8)}`}</p><span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold uppercase text-[var(--workspace-text-secondary)]">{labelize(item.commission_status)}</span></div><p className="mt-2 text-sm text-[#4f6877]">Commissionable {currency(item.commissionable_sales)} • Estimated commission {currency(item.estimated_commission)}</p><p className="mt-1 text-xs text-[#9a6b00]">Estimate only; not guaranteed income.</p></div>)}
             {data.orders.length === 0 ? <Empty label="No retail orders yet." /> : null}
           </div>
         </div>
       </div>
+        </>
+      ) : null}
     </section>
   );
+}
+
+export function RetailSalesActivityComposer(props: Omit<React.ComponentProps<typeof RetailSalesPanel>, "mode">) {
+  return <RetailSalesPanel {...props} mode="activity" />;
+}
+
+export function RetailSalesSetupPanel(props: Omit<React.ComponentProps<typeof RetailSalesPanel>, "mode">) {
+  return <RetailSalesPanel {...props} mode="setup" />;
 }
 
 function OpportunityCard({ item, busy, onAdvance }: { item: Record<string, unknown>; busy: string | null; onAdvance: (stage: string, lostReason: string) => Promise<boolean> }) {
   const [stage, setStage] = useState(String(item.stage || "new_prospect"));
   const [lostReason, setLostReason] = useState(String(item.lost_reason || ""));
-  return <div className="rounded-2xl border border-[#d8e6ed] bg-[#f7fbfc] p-4"><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="font-semibold text-[#181817]">{text(item, "name")}</p><p className="mt-1 text-sm text-[#5c7483]">{currency(item.estimated_order_value)} • {Number(item.probability || 0)}% probability</p></div><span className="rounded-full border border-[#bfe8df] bg-white px-2.5 py-1 text-xs font-semibold uppercase text-[#405d6b]">{labelize(item.stage)}</span></div><div className="mt-3 flex flex-col gap-2 sm:flex-row"><select value={stage} onChange={(e) => setStage(e.target.value)} className={inputClass}>{OPPORTUNITY_STAGE_OPTIONS.map((option) => <option key={option} value={option}>{labelize(option)}</option>)}</select><button type="button" disabled={busy !== null || stage === item.stage} onClick={() => void onAdvance(stage, lostReason)} className="min-h-11 shrink-0 rounded-full border border-[#405d6b] bg-white px-4 text-sm font-semibold text-[#405d6b] disabled:opacity-40">Advance</button></div>{stage === "lost" || stage === "not_qualified" ? <input value={lostReason} onChange={(event) => setLostReason(event.target.value)} placeholder="Lost / not-qualified reason" className={`${inputClass} mt-2`} /> : null}</div>;
+  return <div className="rounded-2xl border border-[var(--workspace-border)] bg-[var(--workspace-surface-muted)] p-4"><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="font-semibold text-[#181817]">{text(item, "name")}</p><p className="mt-1 text-sm text-[#5c7483]">{currency(item.estimated_order_value)} • {Number(item.probability || 0)}% probability</p></div><span className="rounded-full border border-[var(--workspace-border)] bg-white px-2.5 py-1 text-xs font-semibold uppercase text-[var(--workspace-text-secondary)]">{labelize(item.stage)}</span></div><div className="mt-3 flex flex-col gap-2 sm:flex-row"><select value={stage} onChange={(e) => setStage(e.target.value)} className={inputClass}>{OPPORTUNITY_STAGE_OPTIONS.map((option) => <option key={option} value={option}>{labelize(option)}</option>)}</select><button type="button" disabled={busy !== null || stage === item.stage} onClick={() => void onAdvance(stage, lostReason)} className="min-h-11 shrink-0 rounded-lg border border-[var(--workspace-border)] bg-white px-4 text-sm font-semibold text-[var(--workspace-text-secondary)] hover:border-black hover:text-black disabled:opacity-40">Advance</button></div>{stage === "lost" || stage === "not_qualified" ? <input value={lostReason} onChange={(event) => setLostReason(event.target.value)} placeholder="Lost / not-qualified reason" className={`${inputClass} mt-2`} /> : null}</div>;
 }
 
 function ContactSelect({ contacts, value, onChange }: { contacts: ContactOption[]; value: string; onChange: (value: string) => void }) {

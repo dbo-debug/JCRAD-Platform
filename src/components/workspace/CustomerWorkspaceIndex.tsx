@@ -329,10 +329,6 @@ function denseButtonClass(tone: "primary" | "secondary" = "secondary") {
     : "inline-flex h-9 items-center justify-center rounded-full border border-[#deded8] bg-white px-3.5 text-sm font-medium text-[#42606f] transition hover:border-[#9eb6c4] hover:text-[#181817]";
 }
 
-function toolbarSelectClass() {
-  return "h-9 min-w-0 rounded-full border border-[#cedde6] bg-[#fafaf8] px-3 text-sm text-[#181817] outline-none transition focus:border-[#1b1b1a] focus:bg-white";
-}
-
 function compareGroupLabels(left: string, right: string) {
   if (left.startsWith("Unassigned") || left === "No Stage") return 1;
   if (right.startsWith("Unassigned") || right === "No Stage") return -1;
@@ -529,15 +525,7 @@ export default function CustomerWorkspaceIndex({
   const [visibleGeocodeStatus, setVisibleGeocodeStatus] = useState<string | null>(null);
   const [showFilteredMap, setShowFilteredMap] = useState(false);
   const [mapSurfaceMode, setMapSurfaceMode] = useState<"visible" | "segment">("visible");
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(
-    Boolean(
-      initialFilters.territory ||
-        initialFilters.owner ||
-        initialFilters.status ||
-        initialFilters.stage ||
-        (initialFilters.orderState && initialFilters.orderState !== "all")
-    )
-  );
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
   const activeCustomers = customers.filter((customer) => !customer.archivedAt);
   const archivedCustomers = customers.filter((customer) => Boolean(customer.archivedAt));
@@ -557,6 +545,15 @@ export default function CustomerWorkspaceIndex({
     }, 180);
     return () => window.clearTimeout(timeout);
   }, [draftSearch]);
+
+  useEffect(() => {
+    if (!showAdvancedFilters) return;
+    const closeOnEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") setShowAdvancedFilters(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [showAdvancedFilters]);
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -663,7 +660,6 @@ export default function CustomerWorkspaceIndex({
   const selectedVisibleCustomers = visibleCustomers.filter((customer) => selectedVisibleCustomerIds.includes(customer.id));
   const selectedSegmentCustomers = customers.filter((customer) => selectedCustomerIdSet.has(customer.id));
   const selectedSegmentVisibleCount = selectedVisibleCustomers.length;
-  const selectedSegmentHiddenCount = Math.max(0, selectedSegmentCustomers.length - selectedSegmentVisibleCount);
   const selectedSegmentPendingCount = selectedSegmentCustomers.filter((customer) => pendingCustomerIdSet.has(customer.id)).length;
   const canAddSelectedToPending = selectedSegmentCustomers.some((customer) => !pendingCustomerIdSet.has(customer.id));
   const canRemoveSelectedFromPending = selectedSegmentPendingCount > 0;
@@ -687,16 +683,6 @@ export default function CustomerWorkspaceIndex({
     needsCoordinates: activeCustomers.filter((customer) => getCoordinateCoverageState(customer) !== "has_coords").length,
     archived: archivedCustomers.length,
   };
-  const advancedFilterCount = [
-    territoryFilter !== "all",
-    statusFilter !== "all",
-    stageFilter !== "all",
-    sourceFilter !== "all",
-    importSourceFilter !== "all",
-    contactCoverage !== "all",
-    orderState !== "all",
-    organizeBy !== "none",
-  ].filter(Boolean).length;
   const workflowMode = getWorkflowMode({
     savedView,
     hotLeadFilter,
@@ -1275,43 +1261,110 @@ export default function CustomerWorkspaceIndex({
     { key: "archived" as const, label: "Archived", count: navCounts.archived },
   ];
 
-  return (
-    <div className="grid min-w-0 gap-5 xl:grid-cols-[260px_minmax(0,1fr)] 2xl:grid-cols-[280px_minmax(0,1fr)]">
-      <aside className="min-w-0 xl:sticky xl:self-start xl:top-[calc(var(--workspace-header-offset,5rem)+1rem)]">
-        <section className="rounded-[24px] border border-[#d8e6ee] bg-[linear-gradient(180deg,#ffffff_0%,#f7f7f4_100%)] p-4 shadow-[0_10px_22px_rgba(16,42,67,0.06)]">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6c8797]">Queue Shortcuts</p>
-          <div className="mt-3 space-y-2">
-            {viewNavItems.map((item) => {
-              const active =
-                (item.key === "all" &&
-                  savedView === "all" &&
-                  sourceFilter === "all" &&
-                  importSourceFilter === "all" &&
-                  hotLeadFilter === "all" &&
-                  taskStateFilter === "all") ||
-                (item.key === "hall_of_flowers" && savedView === "hall_of_flowers" && sourceFilter === "hall_of_flowers") ||
-                (item.key === "hot_leads" && hotLeadFilter === "hot") ||
-                (item.key === "no_task" && taskStateFilter === "no_open_task") ||
-                (item.key === "overdue" && taskStateFilter === "overdue_task") ||
-                (item.key === "needs_coordinates" && savedView === "needs_coordinates") ||
-                (item.key === "archived" && savedView === "archived");
+  const activeFilterChips: Array<{ key: string; label: string; clear: () => void }> = [];
+  if (searchQuery) activeFilterChips.push({ key: "search", label: `Search: ${searchQuery}`, clear: handleClearSearch });
+  if (savedView !== "all") activeFilterChips.push({ key: "view", label: `View: ${titleCase(savedView)}`, clear: () => setSavedView("all") });
+  if (hotLeadFilter !== "all") activeFilterChips.push({ key: "hot", label: titleCase(hotLeadFilter), clear: () => setHotLeadFilter("all") });
+  if (taskStateFilter !== "all") activeFilterChips.push({ key: "task", label: `Follow-up: ${titleCase(taskStateFilter)}`, clear: () => setTaskStateFilter("all") });
+  if (ownerFilter !== "all") activeFilterChips.push({ key: "owner", label: `Owner: ${ownerFilter}`, clear: () => setOwnerFilter("all") });
+  if (territoryFilter !== "all") activeFilterChips.push({ key: "territory", label: `Territory: ${territoryLabelMap.get(territoryFilter) || territoryFilter}`, clear: () => setTerritoryFilter("all") });
+  if (statusFilter !== "all") activeFilterChips.push({ key: "status", label: `Status: ${titleCase(statusFilter)}`, clear: () => setStatusFilter("all") });
+  if (stageFilter !== "all") activeFilterChips.push({ key: "stage", label: `Stage: ${titleCase(stageFilter)}`, clear: () => setStageFilter("all") });
+  if (sourceFilter !== "all") activeFilterChips.push({ key: "source", label: `Source: ${formatSourceLabel(sourceFilter)}`, clear: () => setSourceFilter("all") });
+  if (importSourceFilter !== "all") activeFilterChips.push({ key: "import", label: `Import: ${formatSourceLabel(importSourceFilter)}`, clear: () => setImportSourceFilter("all") });
+  if (contactCoverage !== "all") activeFilterChips.push({ key: "contacts", label: `Contacts: ${titleCase(contactCoverage)}`, clear: () => setContactCoverage("all") });
+  if (orderState !== "all") activeFilterChips.push({ key: "orders", label: `Orders: ${titleCase(orderState)}`, clear: () => setOrderState("all") });
+  if (organizeBy !== "none") activeFilterChips.push({ key: "group", label: `Group: ${titleCase(organizeBy)}`, clear: () => setOrganizeBy("none") });
+  const visibleFilterChips = activeFilterChips.slice(0, 5);
+  const hiddenFilterChipCount = Math.max(0, activeFilterChips.length - visibleFilterChips.length);
 
-              return (
-                <button
-                  key={item.key}
-                  type="button"
-                  onClick={() => applyWorkspacePreset(item.key)}
-                  className={[
-                    "flex w-full items-center justify-between rounded-2xl border px-3 py-3 text-left text-sm transition",
-                    active ? "border-[#1b1b1a] bg-[#f7f7f4] text-[#1b1b1a]" : "border-[#deded8] bg-white text-[#35505d] hover:border-[#97c7c1] hover:bg-[#f4fbfa]",
-                  ].join(" ")}
-                >
-                  <span className="font-semibold">{item.label}</span>
-                  <span className="rounded-full border border-current/15 px-2 py-0.5 text-xs">{item.count}</span>
-                </button>
-              );
-            })}
-          </div>
+  const queueShortcuts = (
+    <>
+      <p className="text-xs font-semibold text-[var(--workspace-muted)]">Queue shortcuts</p>
+      <div className="mt-3 space-y-2">
+        {viewNavItems.map((item) => {
+          const active =
+            (item.key === "all" && savedView === "all" && sourceFilter === "all" && importSourceFilter === "all" && hotLeadFilter === "all" && taskStateFilter === "all") ||
+            (item.key === "hall_of_flowers" && savedView === "hall_of_flowers" && sourceFilter === "hall_of_flowers") ||
+            (item.key === "hot_leads" && hotLeadFilter === "hot") ||
+            (item.key === "no_task" && taskStateFilter === "no_open_task") ||
+            (item.key === "overdue" && taskStateFilter === "overdue_task") ||
+            (item.key === "needs_coordinates" && savedView === "needs_coordinates") ||
+            (item.key === "archived" && savedView === "archived");
+
+          return (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => {
+                applyWorkspacePreset(item.key);
+                setShowAdvancedFilters(false);
+              }}
+              className={[
+                "flex min-h-11 w-full items-center justify-between rounded-lg border px-3 py-2.5 text-left text-sm transition",
+                active
+                  ? "border-[var(--workspace-primary)] bg-[var(--workspace-primary)] text-white"
+                  : "border-[var(--workspace-border)] bg-white text-[var(--workspace-text-secondary)] hover:bg-[var(--workspace-surface-muted)]",
+              ].join(" ")}
+            >
+              <span className="font-semibold">{item.label}</span>
+              <span className="rounded-full border border-current/20 px-2 py-0.5 text-xs">{item.count}</span>
+            </button>
+          );
+        })}
+      </div>
+    </>
+  );
+
+  const filterControls = (
+    <div className="space-y-5">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <FilterSelect label="Hot lead" value={hotLeadFilter} onChange={(value) => setHotLeadFilter(value as HotLeadFilter)} options={[{ value: "hot", label: "Hot Lead" }, { value: "not_hot", label: "Not Hot" }]} />
+        <FilterSelect label="Follow-up" value={taskStateFilter} onChange={(value) => setTaskStateFilter(value as TaskStateFilter)} options={[{ value: "has_open_task", label: "Has Task" }, { value: "no_open_task", label: "No Task" }, { value: "overdue_task", label: "Overdue" }]} />
+        <FilterSelect label="Owner" value={ownerFilter} onChange={setOwnerFilter} options={owners.map((owner) => ({ value: owner, label: owner }))} />
+        <FilterSelect label="Territory" value={territoryFilter} onChange={setTerritoryFilter} options={territoryOptions} />
+        <FilterSelect label="Status" value={statusFilter} onChange={setStatusFilter} options={statuses.map((status) => ({ value: status, label: titleCase(status) }))} />
+        <FilterSelect label="Pipeline stage" value={stageFilter} onChange={setStageFilter} options={stages.map((stage) => ({ value: stage, label: titleCase(stage) }))} />
+        <FilterSelect label="Source" value={sourceFilter} onChange={setSourceFilter} options={sources.map((source) => ({ value: source, label: formatSourceLabel(source) }))} />
+        <FilterSelect label="Import source" value={importSourceFilter} onChange={setImportSourceFilter} options={importSources.map((source) => ({ value: source, label: formatSourceLabel(source) }))} />
+        <FilterSelect label="Contact coverage" value={contactCoverage} onChange={(value) => setContactCoverage(value as ContactCoverageFilter)} options={[{ value: "has_contacts", label: "Has Contacts" }, { value: "missing_primary", label: "Missing Primary" }, { value: "no_contacts", label: "No Contacts" }]} />
+        <FilterSelect label="Order state" value={orderState} onChange={(value) => setOrderState(value as OrderStateFilter)} options={[{ value: "has_orders", label: "Has Orders" }, { value: "no_orders", label: "No Orders" }]} />
+        <FilterSelect label="Organize by" value={organizeBy} onChange={(value) => setOrganizeBy(value as OrganizeBy)} options={[{ value: "territory", label: "Territory" }, { value: "owner", label: "Owner" }, { value: "stage", label: "Stage" }]} allowAllLabel="None" />
+        <FilterSelect label="Sort" value={sortKey} onChange={(value) => setSortKey(value as SortKey)} options={[{ value: "activity_desc", label: "Recent" }, { value: "name_asc", label: "Name A-Z" }, { value: "name_desc", label: "Name Z-A" }, { value: "orders_desc", label: "Most Orders" }, { value: "owner_asc", label: "Owner A-Z" }]} allowAllLabel={null} />
+      </div>
+
+      <div className="border-t border-[var(--workspace-border)] pt-4">
+        <p className="text-xs font-semibold text-[var(--workspace-muted)]">Selection and administrative utilities</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button type="button" onClick={selectAllVisible} disabled={visibleCustomers.length === 0} className={denseButtonClass()}>
+            {allVisibleSelected ? "All visible in group" : `Select ${visibleCustomers.length} visible`}
+          </button>
+          <button type="button" onClick={clearSelection} disabled={selectedCustomerIds.length === 0} className={denseButtonClass()}>
+            Clear Group
+          </button>
+          {staffRole === "admin" ? (
+            <>
+              <button type="button" onClick={() => void geocodeVisibleResults()} disabled={visibleCustomers.length === 0 || geocodeBusyMode !== null} className={denseButtonClass()}>
+                {geocodeBusyMode === "visible" ? "Geocoding..." : "Geocode Visible"}
+              </button>
+              <button type="button" onClick={() => void geocodeSelectedSegment()} disabled={selectedCustomerIds.length === 0 || geocodeBusyMode !== null} className={denseButtonClass()}>
+                {geocodeBusyMode === "segment" ? "Geocoding..." : "Geocode Segment"}
+              </button>
+              <button type="button" onClick={() => void geocodeVisibleNeedsCoords()} disabled={visibleCustomers.every((customer) => getCoordinateCoverageState(customer) === "has_coords") || geocodeBusyMode !== null} className={denseButtonClass()}>
+                {geocodeBusyMode === "needs_coords" ? "Geocoding..." : "Geocode Needs Coords"}
+              </button>
+            </>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="grid min-w-0 gap-5 min-[1367px]:grid-cols-[260px_minmax(0,1fr)] 2xl:grid-cols-[280px_minmax(0,1fr)]">
+      <aside className="hidden min-w-0 min-[1367px]:sticky min-[1367px]:top-[calc(var(--workspace-header-offset,5rem)+1rem)] min-[1367px]:block min-[1367px]:self-start">
+        <section className="rounded-[var(--workspace-radius-lg)] border border-[var(--workspace-border)] bg-white p-4 shadow-[var(--workspace-shadow)]">
+          {queueShortcuts}
 
           <div className="mt-4 grid gap-2 rounded-[20px] border border-[#deded8] bg-white/90 p-3">
             {workspaceMetricRows.map((metric) => (
@@ -1445,166 +1498,95 @@ export default function CustomerWorkspaceIndex({
           </div>
         </section>
 
-        <section className={["sticky z-30 space-y-3 rounded-[24px] border border-[#deded8] bg-white/95 p-3 shadow-[0_10px_22px_rgba(16,42,67,0.08)] backdrop-blur supports-[backdrop-filter]:bg-white/90 xl:px-4 xl:py-4", WORKSPACE_STICKY_TOP_CLASS].join(" ")}>
-          <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7891a0]">{WORKFLOW_MODE_COPY[workflowMode].label}</p>
-              <p className="mt-1 text-sm text-[#4f6877]">Common filters stay upfront. Broader targeting controls live under advanced filters.</p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <button type="button" onClick={handleClearSearch} className={denseButtonClass()}>
-                Clear Search
+        <section className={["z-30 space-y-3 rounded-[var(--workspace-radius-lg)] border border-[var(--workspace-border)] bg-white/95 p-3 shadow-[var(--workspace-shadow)] backdrop-blur min-[1367px]:sticky min-[1367px]:px-4 min-[1367px]:py-4", WORKSPACE_STICKY_TOP_CLASS].join(" ")}>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <label className="min-w-0 flex-1">
+              <span className="sr-only">Search retail accounts</span>
+              <input
+                value={draftSearch}
+                onChange={(event) => setDraftSearch(event.target.value)}
+                placeholder="Search retail accounts, contacts, city, or phone"
+                className="h-11 w-full rounded-lg border border-[var(--workspace-border-strong)] bg-[var(--workspace-surface-muted)] px-4 text-sm text-[var(--workspace-text)] outline-none transition focus:border-[var(--workspace-primary)] focus:bg-white"
+              />
+            </label>
+            <div className="flex flex-wrap gap-2">
+              <span className="inline-flex min-h-11 items-center rounded-lg border border-[var(--workspace-border)] bg-[var(--workspace-surface-muted)] px-3 text-sm font-semibold text-[var(--workspace-text-secondary)]">
+                {WORKFLOW_MODE_COPY[workflowMode].label}
+              </span>
+              <span className="inline-flex min-h-11 items-center rounded-lg border border-[var(--workspace-border)] bg-white px-3 text-sm text-[var(--workspace-text-secondary)]">
+                {activeFilterChips.length} active
+              </span>
+              <button type="button" onClick={() => setShowAdvancedFilters(true)} className={denseButtonClass("primary")}>
+                Filters
               </button>
-              <button type="button" onClick={resetFilters} className={denseButtonClass()}>
-                Reset Filters
-              </button>
-              <button type="button" onClick={() => setShowAdvancedFilters((current) => !current)} className={denseButtonClass()}>
-                Advanced Filters{advancedFilterCount > 0 ? ` (${advancedFilterCount})` : ""}
-              </button>
+              {activeFilterChips.length > 0 ? (
+                <button type="button" onClick={resetFilters} className={denseButtonClass()}>
+                  Clear all
+                </button>
+              ) : null}
             </div>
           </div>
 
-          <div className="grid gap-2 xl:grid-cols-2 2xl:grid-cols-[minmax(260px,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] xl:items-center">
-            <input
-              value={draftSearch}
-              onChange={(event) => setDraftSearch(event.target.value)}
-              aria-label="Search accounts"
-              placeholder="Search accounts, contacts, city, phone"
-              className="h-10 rounded-full border border-[#cedde6] bg-[#fafaf8] px-4 text-sm text-[#181817] outline-none transition focus:border-[#1b1b1a] focus:bg-white"
-            />
-            <select value={hotLeadFilter} onChange={(event) => startTransition(() => setHotLeadFilter(event.target.value as HotLeadFilter))} aria-label="Hot lead" className={toolbarSelectClass()}>
-              <option value="all">All Leads</option>
-              <option value="hot">Hot Lead</option>
-              <option value="not_hot">Not Hot</option>
-            </select>
-            <select value={taskStateFilter} onChange={(event) => startTransition(() => setTaskStateFilter(event.target.value as TaskStateFilter))} aria-label="Follow-up" className={toolbarSelectClass()}>
-              <option value="all">All Follow-Up</option>
-              <option value="has_open_task">Has Task</option>
-              <option value="no_open_task">No Task</option>
-              <option value="overdue_task">Overdue</option>
-            </select>
-            <select value={ownerFilter} onChange={(event) => startTransition(() => setOwnerFilter(event.target.value))} aria-label="Owner" className={toolbarSelectClass()}>
-              <option value="all">All Owners</option>
-              {owners.map((owner) => (
-                <option key={owner} value={owner}>
-                  {owner}
-                </option>
-              ))}
-            </select>
-            <select value={territoryFilter} onChange={(event) => startTransition(() => setTerritoryFilter(event.target.value))} aria-label="Territory" className={toolbarSelectClass()}>
-              <option value="all">All Territories</option>
-              {territoryOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-            <select value={sortKey} onChange={(event) => startTransition(() => setSortKey(event.target.value as SortKey))} aria-label="Sort" className={toolbarSelectClass()}>
-              <option value="activity_desc">Recent</option>
-              <option value="name_asc">Name A-Z</option>
-              <option value="name_desc">Name Z-A</option>
-              <option value="orders_desc">Most Orders</option>
-              <option value="owner_asc">Owner A-Z</option>
-            </select>
-            <select value={orderState} onChange={(event) => startTransition(() => setOrderState(event.target.value as OrderStateFilter))} aria-label="Order state" className={toolbarSelectClass()}>
-              <option value="all">All Order States</option>
-              <option value="has_orders">Has Orders</option>
-              <option value="no_orders">No Orders</option>
-            </select>
-          </div>
-
-          {showAdvancedFilters ? (
-            <section className="rounded-[20px] border border-[#deded8] bg-[#f7f7f4] p-3 shadow-[0_8px_18px_rgba(16,42,67,0.05)]">
-              <div className="grid gap-3 xl:grid-cols-[repeat(4,minmax(0,1fr))] 2xl:grid-cols-[repeat(6,minmax(0,1fr))]">
-                <FilterSelect label="Source" value={sourceFilter} onChange={setSourceFilter} options={sources.map((source) => ({ value: source, label: formatSourceLabel(source) }))} />
-                <FilterSelect label="Import Source" value={importSourceFilter} onChange={setImportSourceFilter} options={importSources.map((source) => ({ value: source, label: formatSourceLabel(source) }))} />
-                <FilterSelect label="Status" value={statusFilter} onChange={setStatusFilter} options={statuses.map((status) => ({ value: status, label: titleCase(status) }))} />
-                <FilterSelect label="Stage" value={stageFilter} onChange={setStageFilter} options={stages.map((stage) => ({ value: stage, label: titleCase(stage) }))} />
-                <FilterSelect
-                  label="Contact Coverage"
-                  value={contactCoverage}
-                  onChange={(value) => setContactCoverage(value as ContactCoverageFilter)}
-                  options={[
-                    { value: "has_contacts", label: "Has Contacts" },
-                    { value: "missing_primary", label: "Missing Primary" },
-                    { value: "no_contacts", label: "No Contacts" },
-                  ]}
-                />
-                <FilterSelect
-                  label="Organize By"
-                  value={organizeBy}
-                  onChange={(value) => setOrganizeBy(value as OrganizeBy)}
-                  options={[
-                    { value: "territory", label: "Territory" },
-                    { value: "owner", label: "Owner" },
-                    { value: "stage", label: "Stage" },
-                  ]}
-                  allowAllLabel="None"
-                />
-              </div>
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <button type="button" onClick={selectAllVisible} disabled={visibleCustomers.length === 0} className={denseButtonClass()}>
-                  {allVisibleSelected ? "All visible in group" : `Select ${visibleCustomers.length} visible`}
+          {activeFilterChips.length > 0 ? (
+            <div className="flex min-w-0 flex-wrap items-center gap-2" aria-label="Active filters">
+              {visibleFilterChips.map((chip) => (
+                <button
+                  key={chip.key}
+                  type="button"
+                  onClick={() => startTransition(chip.clear)}
+                  className="inline-flex min-h-9 max-w-full items-center gap-2 rounded-full border border-[var(--workspace-border)] bg-[var(--workspace-surface-muted)] px-3 text-sm text-[var(--workspace-text-secondary)] hover:border-[var(--workspace-border-strong)]"
+                  aria-label={`Remove ${chip.label} filter`}
+                >
+                  <span className="truncate">{chip.label}</span>
+                  <span aria-hidden="true">×</span>
                 </button>
-                <button type="button" onClick={clearSelection} disabled={selectedCustomerIds.length === 0} className={denseButtonClass()}>
-                  Clear Group
-                </button>
-                {staffRole === "admin" ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => void geocodeVisibleResults()}
-                      disabled={visibleCustomers.length === 0 || geocodeBusyMode !== null}
-                      className={denseButtonClass()}
-                    >
-                      {geocodeBusyMode === "visible" ? "Geocoding..." : "Geocode Visible"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void geocodeSelectedSegment()}
-                      disabled={selectedCustomerIds.length === 0 || geocodeBusyMode !== null}
-                      className={denseButtonClass()}
-                    >
-                      {geocodeBusyMode === "segment" ? "Geocoding..." : "Geocode Segment"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void geocodeVisibleNeedsCoords()}
-                      disabled={visibleCustomers.every((customer) => getCoordinateCoverageState(customer) === "has_coords") || geocodeBusyMode !== null}
-                      className={denseButtonClass()}
-                    >
-                      {geocodeBusyMode === "needs_coords" ? "Geocoding..." : "Geocode Needs Coords"}
-                    </button>
-                  </>
-                ) : null}
-              </div>
-            </section>
+              ))}
+              {hiddenFilterChipCount > 0 ? <span className="text-sm text-[var(--workspace-muted)]">+{hiddenFilterChipCount} more</span> : null}
+            </div>
           ) : null}
 
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-[#deded8] bg-[#f7f7f4] px-3 py-1.5 text-sm text-[#4f6877]">
-              Workflow {WORKFLOW_MODE_COPY[workflowMode].label}
-            </span>
-            <span className="rounded-full border border-[#deded8] bg-[#f7f7f4] px-3 py-1.5 text-sm text-[#4f6877]">
-              Visible {visibleCustomers.length}
-            </span>
-            <span className="rounded-full border border-[#bfe8e2] bg-[#f5fffd] px-3 py-1.5 text-sm font-medium text-[#1b1b1a]">
-              Working Group {selectedCustomerIds.length}
-            </span>
-            {selectedCustomerIds.length > 0 ? (
-              <span className="rounded-full border border-[#deded8] bg-[#f7f7f4] px-3 py-1.5 text-sm text-[#4f6877]">
-                {selectedSegmentVisibleCount} visible in current filters{selectedSegmentHiddenCount > 0 ? ` • ${selectedSegmentHiddenCount} outside current filters` : ""}
-              </span>
-            ) : null}
-            <span className="rounded-full border border-[#deded8] bg-[#f7f7f4] px-3 py-1.5 text-sm text-[#4f6877]">
-              Pending Stops {pendingStops.length}
-            </span>
-            <button type="button" onClick={clearSelection} disabled={selectedCustomerIds.length === 0} className={denseButtonClass()}>
-              Clear Group
-            </button>
-            {visibleGeocodeStatus ? <span className="text-sm text-[#4f6877]">{visibleGeocodeStatus}</span> : null}
+          <div className="flex flex-wrap items-center gap-2 text-sm text-[var(--workspace-text-secondary)]">
+            <span>{visibleCustomers.length} visible</span>
+            <span aria-hidden="true">•</span>
+            <span>{selectedCustomerIds.length} in working group</span>
+            <span aria-hidden="true">•</span>
+            <span>{pendingStops.length} pending stops</span>
+            {visibleGeocodeStatus ? <span>{visibleGeocodeStatus}</span> : null}
           </div>
         </section>
+
+        {showAdvancedFilters ? (
+          <>
+            <button
+              type="button"
+              aria-label="Close filters"
+              onClick={() => setShowAdvancedFilters(false)}
+              className="fixed inset-0 z-50 bg-black/25 min-[1367px]:hidden"
+            />
+            <aside
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="retail-account-filters-title"
+              className="fixed inset-y-16 right-0 z-[60] w-[min(92vw,28rem)] overflow-y-auto border-l border-[var(--workspace-border)] bg-white p-4 shadow-2xl min-[1367px]:static min-[1367px]:z-auto min-[1367px]:w-auto min-[1367px]:overflow-visible min-[1367px]:rounded-[var(--workspace-radius-lg)] min-[1367px]:border min-[1367px]:shadow-[var(--workspace-shadow)]"
+            >
+              <div className="sticky top-0 z-10 -mx-4 -mt-4 mb-4 flex items-center justify-between border-b border-[var(--workspace-border)] bg-white px-4 py-3">
+                <div>
+                  <h2 id="retail-account-filters-title" className="font-semibold text-[var(--workspace-text)]">Retail Account Filters</h2>
+                  <p className="mt-0.5 text-sm text-[var(--workspace-muted)]">{activeFilterChips.length} active filters</p>
+                </div>
+                <button type="button" onClick={() => setShowAdvancedFilters(false)} className={denseButtonClass()}>
+                  Close
+                </button>
+              </div>
+              <div className="mb-5 min-[1367px]:hidden">{queueShortcuts}</div>
+              {filterControls}
+              <div className="mt-5 flex flex-wrap justify-end gap-2 border-t border-[var(--workspace-border)] pt-4">
+                {activeFilterChips.length > 0 ? <button type="button" onClick={resetFilters} className={denseButtonClass()}>Clear all</button> : null}
+                <button type="button" onClick={() => setShowAdvancedFilters(false)} className={denseButtonClass("primary")}>Show {visibleCustomers.length} accounts</button>
+              </div>
+            </aside>
+          </>
+        ) : null}
 
         {selectedCustomerIds.length > 0 ? (
           <BulkActionBar
