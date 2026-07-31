@@ -7,7 +7,7 @@ import { safeInternalReturnTo } from "@/lib/auth/canAccessEstimator";
 import CrmLoginForm from "./CrmLoginForm";
 
 export const metadata: Metadata = {
-  title: "CRM Login | JC RAD",
+  title: "CRM Login | Nameless Genetics",
   robots: { index: false, follow: false },
 };
 
@@ -29,7 +29,7 @@ export default async function CrmLoginPage({
       <section className="relative z-10 w-full max-w-md rounded-[2rem] border border-white/90 bg-white/95 p-8 shadow-[0_30px_90px_rgba(23,53,67,0.16)] backdrop-blur sm:p-10">
         <div className="flex items-center gap-4">
           <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl border border-[#d8e6ed] bg-white p-1 shadow-sm">
-            <Image src="/brand/PRIMARY.png" alt="JC RAD Inc." width={64} height={64} className="h-full w-full object-contain" priority />
+            <Image src="/brand/nameless/nameless-monogram-black-on-white.jpg" alt="Nameless Genetics" width={64} height={64} className="h-full w-full object-contain" priority />
           </div>
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0d6f7a]">Private Access</p>
